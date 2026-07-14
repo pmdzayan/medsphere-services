@@ -1,0 +1,30 @@
+{
+  "compilerOptions": {
+    "strict": true,
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "baseUrl": ".",
+    "paths": {
+      "@medsphere/common/*": ["packages/common/src/*"],
+      "@medsphere/config/*": ["packages/config/src/*"],
+      "@medsphere/database/*": ["packages/database/src/*"],
+      "@medsphere/logger/*": ["packages/logger/src/*"],
+      "@medsphere/validation/*": ["packages/validation/src/*"],
+      "@medsphere/types/*": ["packages/types/src/*"],
+      "@medsphere/testing/*": ["packages/testing/src/*"]
+    },
+    "declaration": true,
+    "removeComments": true,
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "allowSyntheticDefaultImports": true,
+    "target": "es2022",
+    "sourceMap": true,
+    "incremental": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "noFallthroughCasesInSwitch": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true
+  }
+}

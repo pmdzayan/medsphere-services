@@ -1,0 +1,13 @@
+// Intentionally minimal. No domain models (Patient, Pharmacy, InventoryItem,
+// Reservation, ...) are defined yet — per PROJECT_RULES.md #8, schema design
+// is its own deliberate architecture-review step, not something to fabricate
+// here just to fill the file. Add models once that review happens.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}

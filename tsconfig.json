@@ -1,0 +1,16 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@medsphere/common/*": ["packages/common/src/*"],
+      "@medsphere/config/*": ["packages/config/src/*"],
+      "@medsphere/database/*": ["packages/database/src/*"],
+      "@medsphere/logger/*": ["packages/logger/src/*"],
+      "@medsphere/validation/*": ["packages/validation/src/*"],
+      "@medsphere/types/*": ["packages/types/src/*"],
+      "@medsphere/testing/*": ["packages/testing/src/*"]
+    }
+  },
+  "exclude": ["node_modules", "dist"]
+}
