@@ -6,14 +6,19 @@ import { createServiceLogger } from '@medsphere/logger';
 
 async function bootstrap(): Promise<void> {
   const logger = createServiceLogger('auth-service');
-  const app = await NestFactory.create(AppModule, { bufferLogs: true });
+
+  const app = await NestFactory.create(AppModule, {
+    bufferLogs: true,
+  });
 
   app.useGlobalFilters(new GlobalExceptionFilter());
   app.useGlobalPipes(createValidationPipe());
 
-  const port = process.env.PORT || 3000;
+  const port = Number(process.env.PORT) || 3000;
+
   await app.listen(port);
-  logger.info(`auth-service listening on port ${port}`);
+
+  logger.log(`Auth service listening on port ${port}`);
 }
 
 bootstrap();

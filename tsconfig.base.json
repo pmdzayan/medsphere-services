@@ -1,24 +1,40 @@
 {
   "compilerOptions": {
     "strict": true,
+    "target": "ES2022",
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
+    "types": ["node"],
+
     "baseUrl": ".",
     "paths": {
+      "@medsphere/common": ["packages/common/src"],
       "@medsphere/common/*": ["packages/common/src/*"],
+
+      "@medsphere/config": ["packages/config/src"],
       "@medsphere/config/*": ["packages/config/src/*"],
+
+      "@medsphere/database": ["packages/database/src"],
       "@medsphere/database/*": ["packages/database/src/*"],
+
+      "@medsphere/logger": ["packages/logger/src"],
       "@medsphere/logger/*": ["packages/logger/src/*"],
+
+      "@medsphere/validation": ["packages/validation/src"],
       "@medsphere/validation/*": ["packages/validation/src/*"],
+
+      "@medsphere/types": ["packages/types/src"],
       "@medsphere/types/*": ["packages/types/src/*"],
+
+      "@medsphere/testing": ["packages/testing/src"],
       "@medsphere/testing/*": ["packages/testing/src/*"]
     },
+
     "declaration": true,
     "removeComments": true,
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true,
     "allowSyntheticDefaultImports": true,
-    "target": "es2022",
     "sourceMap": true,
     "incremental": true,
     "skipLibCheck": true,
