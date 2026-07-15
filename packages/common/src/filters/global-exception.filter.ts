@@ -49,7 +49,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       const message =
         typeof body === 'string'
           ? body
-          : ((body as Record<string, unknown>).message as string) ?? exception.message;
+          : (((body as Record<string, unknown>).message as string) ?? exception.message);
       envelope = { error: { code: exception.name, message, requestId } };
     } else {
       // Unknown/unexpected error: full detail goes to the server-side log

@@ -1,4 +1,4 @@
-name: "MedSphere Secure Supply Chain & GitOps Delivery Engine"
+name: 'MedSphere Secure Supply Chain & GitOps Delivery Engine'
 
 on:
   push:
@@ -16,12 +16,12 @@ permissions:
   contents: read
 
 env:
-  AWS_REGION: "us-east-1"
-  AWS_ECR_REGISTRY: "123456789012.dkr.ecr.us-east-1.amazonaws.com"
+  AWS_REGION: 'us-east-1'
+  AWS_ECR_REGISTRY: '123456789012.dkr.ecr.us-east-1.amazonaws.com'
 
 jobs:
   build-and-gate:
-    name: "Compile and Scan Core Workloads"
+    name: 'Compile and Scan Core Workloads'
     runs-on: ubuntu-24.04
     permissions:
       id-token: write
@@ -29,35 +29,44 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        service: [auth-service, inventory-service, search-service, reservation-service, billing-service, notification-service, api-gateway]
+        service:
+          [
+            auth-service,
+            inventory-service,
+            search-service,
+            reservation-service,
+            billing-service,
+            notification-service,
+            api-gateway,
+          ]
     steps:
-      - name: "Checkout Monorepo Codebase"
+      - name: 'Checkout Monorepo Codebase'
         uses: actions/checkout@v4
 
       # FIX: was "actions/aws-actions/configure-aws-credentials@v4" — the
       # real action lives at "aws-actions/configure-aws-credentials", with no
       # "actions/" prefix. As written, this reference doesn't resolve and the
       # job fails at this step every run.
-      - name: "Configure AWS Token Credentials via OIDC"
+      - name: 'Configure AWS Token Credentials via OIDC'
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: "arn:aws:iam::123456789012:role/github-actions-medsphere-ecr-role"
+          role-to-assume: 'arn:aws:iam::123456789012:role/github-actions-medsphere-ecr-role'
           aws-region: ${{ env.AWS_REGION }}
           audience: sts.amazonaws.com
           role-duration-seconds: 7200
 
       # FIX: same issue as above — "aws-actions/amazon-ecr-login", not
       # "actions/aws-actions/amazon-ecr-login".
-      - name: "Authenticate Container Registry Engine Session"
+      - name: 'Authenticate Container Registry Engine Session'
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: "Set up QEMU for Multi-Architecture Cross-Compilation"
+      - name: 'Set up QEMU for Multi-Architecture Cross-Compilation'
         uses: docker/setup-qemu-action@v3
 
-      - name: "Set up Docker Buildx Builder Layer Engine"
+      - name: 'Set up Docker Buildx Builder Layer Engine'
         uses: docker/setup-buildx-action@v3
 
-      - name: "Compile Multi-Arch Target Directly to ECR Registry"
+      - name: 'Compile Multi-Arch Target Directly to ECR Registry'
         id: build-step
         uses: docker/build-push-action@v5
         with:
@@ -73,36 +82,36 @@ jobs:
           cache-from: type=gha,scope=${{ matrix.service }}
           cache-to: type=gha,mode=max,scope=${{ matrix.service }}
 
-      - name: "Audit Container Layers Against Trivy Database"
+      - name: 'Audit Container Layers Against Trivy Database'
         uses: aquasecurity/trivy-action@0.20.0
         with:
-          image-ref: "${{ env.AWS_ECR_REGISTRY }}/medsphere-${{ matrix.service }}:${{ github.sha }}-staging"
-          format: "table"
-          exit-code: "1"
+          image-ref: '${{ env.AWS_ECR_REGISTRY }}/medsphere-${{ matrix.service }}:${{ github.sha }}-staging'
+          format: 'table'
+          exit-code: '1'
           ignore-unfixed: true
-          severity: "HIGH,CRITICAL"
+          severity: 'HIGH,CRITICAL'
 
-      - name: "Generate Container SPDX Software Bill of Materials"
+      - name: 'Generate Container SPDX Software Bill of Materials'
         uses: anchore/sbom-action@v0
         with:
-          image: "${{ env.AWS_ECR_REGISTRY }}/medsphere-${{ matrix.service }}:${{ github.sha }}-staging"
-          format: "spdx-json"
-          output-file: "sbom-${{ matrix.service }}.spdx.json"
+          image: '${{ env.AWS_ECR_REGISTRY }}/medsphere-${{ matrix.service }}:${{ github.sha }}-staging'
+          format: 'spdx-json'
+          output-file: 'sbom-${{ matrix.service }}.spdx.json'
 
-      - name: "Promote Validated Staging Image Build to Production Immutable Reference"
+      - name: 'Promote Validated Staging Image Build to Production Immutable Reference'
         run: |
           docker buildx imagetools create \
             --tag ${{ env.AWS_ECR_REGISTRY }}/medsphere-${{ matrix.service }}:${{ github.sha }} \
             ${{ env.AWS_ECR_REGISTRY }}/medsphere-${{ matrix.service }}:${{ github.sha }}-staging
 
-      - name: "Stash Unique Cryptographic Root Index Digest Metrics"
+      - name: 'Stash Unique Cryptographic Root Index Digest Metrics'
         run: |
           jq -n \
             --arg svc "${{ matrix.service }}" \
             --arg dig "${{ steps.build-step.outputs.digest }}" \
             '{service: $svc, digest: $dig}' > "metadata-${{ matrix.service }}.json"
 
-      - name: "Persist Structural Metadata File as Workflow Artifact"
+      - name: 'Persist Structural Metadata File as Workflow Artifact'
         uses: actions/upload-artifact@v4
         with:
           name: metadata-${{ matrix.service }}
@@ -110,20 +119,20 @@ jobs:
           retention-days: 1
 
   aggregate-metadata:
-    name: "Reduce Metadata Matrix Maps"
+    name: 'Reduce Metadata Matrix Maps'
     needs: build-and-gate
     runs-on: ubuntu-24.04
     outputs:
       deployment-matrix: ${{ steps.compile-matrix.outputs.deployment-matrix }}
     steps:
-      - name: "Download All Stashed Matrix Metadata Files"
+      - name: 'Download All Stashed Matrix Metadata Files'
         uses: actions/download-artifact@v4
         with:
           path: metadata-pool/
           pattern: metadata-*
           merge-multiple: true
 
-      - name: "Compile Consolidated Matrix JSON String Array"
+      - name: 'Compile Consolidated Matrix JSON String Array'
         id: compile-matrix
         run: |
           cd metadata-pool/
@@ -131,7 +140,7 @@ jobs:
           echo "deployment-matrix=$(echo $MATRIX_JSON | jq -c .)" >> "$GITHUB_OUTPUT"
 
   generate-provenance:
-    name: "Attest System Layer Provenance"
+    name: 'Attest System Layer Provenance'
     needs: aggregate-metadata
     permissions:
       actions: read
@@ -141,30 +150,30 @@ jobs:
       matrix: ${{ fromJson(needs.aggregate-metadata.outputs.deployment-matrix) }}
     uses: slsa-framework/slsa-github-generator/.github/workflows/generator_container_slsa3.yml@v2.0.0
     with:
-      image: "123456789012.dkr.ecr.us-east-1.amazonaws.com/medsphere-${{ matrix.service }}"
+      image: '123456789012.dkr.ecr.us-east-1.amazonaws.com/medsphere-${{ matrix.service }}'
       digest: ${{ matrix.digest }}
 
   gitops-atomic-promotion:
-    name: "Execute Manifest Update & Verify Tracking States"
+    name: 'Execute Manifest Update & Verify Tracking States'
     needs: [aggregate-metadata, generate-provenance]
     runs-on: ubuntu-24.04
     permissions:
       contents: write
     steps:
-      - name: "Checkout Authorized GitOps Manifest Repository"
+      - name: 'Checkout Authorized GitOps Manifest Repository'
         uses: actions/checkout@v4
         with:
-          repository: "medsphere/medsphere-gitops-manifests"
+          repository: 'medsphere/medsphere-gitops-manifests'
           token: ${{ secrets.GITOPS_DEPLOYMENT_PIPELINE_TOKEN }}
 
-      - name: "Download Aggregated Metadata Artifact Maps"
+      - name: 'Download Aggregated Metadata Artifact Maps'
         uses: actions/download-artifact@v4
         with:
           path: metadata-pool/
           pattern: metadata-*
           merge-multiple: true
 
-      - name: "Hydrate Deployment Targets Natively via yq"
+      - name: 'Hydrate Deployment Targets Natively via yq'
         run: |
           cd metadata-pool/
           for file in metadata-*.json; do
@@ -173,7 +182,7 @@ jobs:
             yq eval ".services.${SERVICE_NAME}.digest = \"${ROOT_DIGEST}\"" -i ../charts/medsphere-platform/values.yaml
           done
 
-      - name: "Commit and Push Verified Manifest Reference Changes"
+      - name: 'Commit and Push Verified Manifest Reference Changes'
         run: |
           git config --global user.email "sre-automation-engine@medsphere.com"
           git config --global user.name "MedSphere SRE Automation System"
