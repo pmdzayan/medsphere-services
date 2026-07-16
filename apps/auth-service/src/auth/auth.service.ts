@@ -1,8 +1,10 @@
-import { ConflictException, Injectable } from '@nestjs/common';
+import { ConflictException, Injectable, UnauthorizedException } from '@nestjs/common';
+
 import { AuthRepository } from './auth.repository';
 import { UsersRepository } from '../users/users.repository';
 import { PasswordService } from './password.service';
 import { RegisterDto } from './dto/register.dto';
+import { LoginDto } from './dto/login.dto';
 
 @Injectable()
 export class AuthService {
@@ -31,6 +33,22 @@ export class AuthService {
       firstName: registerDto.firstName,
       lastName: registerDto.lastName,
     });
+
+    return user;
+  }
+
+  async login(loginDto: LoginDto) {
+    const user = await this.usersRepository.findByEmail(loginDto.tenantId, loginDto.email);
+
+    if (!user) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    const isValidPassword = await this.passwordService.verify(user.passwordHash, loginDto.password);
+
+    if (!isValidPassword) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
 
     return user;
   }

@@ -6,7 +6,9 @@
   "types": "./dist/index.d.ts",
   "scripts": {
     "prisma:generate": "prisma generate",
-    "prisma:migrate": "prisma migrate deploy",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:deploy": "prisma migrate deploy",
+    "prisma:studio": "prisma studio",
     "build": "pnpm prisma:generate && tsc",
     "lint": "eslint \"src/**/*.ts\"",
     "clean": "rimraf dist tsconfig.tsbuildinfo"
