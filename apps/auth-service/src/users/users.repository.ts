@@ -28,16 +28,27 @@ export class UsersRepository {
     passwordHash: string;
     firstName: string;
     lastName: string;
+    phone?: string;
   }) {
     return this.prisma.client.user.create({
       data,
     });
   }
 
-  async updatePassword(id: string, passwordHash: string) {
+  async update(
+    id: string,
+    data: {
+      email?: string;
+      passwordHash?: string;
+      firstName?: string;
+      lastName?: string;
+      phone?: string;
+      status?: 'ACTIVE' | 'INACTIVE' | 'SUSPENDED' | 'PENDING_VERIFICATION';
+    },
+  ) {
     return this.prisma.client.user.update({
       where: { id },
-      data: { passwordHash },
+      data,
     });
   }
 }
