@@ -78,10 +78,32 @@ model User {
 
   sessions       UserSession[]
   userRoles      UserRole[]
+  privacy        UserPrivacy?
  // auditLogs      SystemAuditLog[]
 
   @@unique([tenantId, email])
   @@index([tenantId])
+}
+
+model UserPrivacy {
+  id            String   @id @default(uuid()) @db.Uuid
+
+  userId        String   @unique @db.Uuid
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  sharePhone    Boolean  @default(false)
+  shareEmail    Boolean  @default(false)
+  allowInAppChat Boolean @default(true)
+  privatePickup Boolean  @default(false)
+  hideSensitiveNotifications Boolean @default(true)
+  preferredLanguage String @default("en")
+
+  version       Int      @default(1)
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([userId])
 }
 
 model Role {
