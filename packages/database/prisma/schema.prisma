@@ -27,6 +27,48 @@ enum AuditAction {
   ACCESS
 }
 
+enum ProviderType {
+  PHARMACY
+  HOSPITAL
+}
+
+enum VerificationStatus {
+  PENDING
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+  SUSPENDED
+  EXPIRED
+}
+
+enum ProductCategory {
+  MEDICINE
+  OTC
+  COSMETIC
+  AYURVEDIC
+  SUPPLEMENT
+  BABY_CARE
+  PERSONAL_CARE
+  MEDICAL_DEVICE
+}
+
+enum DosageForm {
+  TABLET
+  SYRUP
+  INJECTION
+  CREAM
+  OINTMENT
+  CAPSULE
+  DROPS
+  INHALER
+  SPRAY
+  LOTION
+  GEL
+  POWDER
+  SOLUTION
+  SUSPENSION
+}
+
 enum RoleType {
   SYSTEM
   TENANT
@@ -47,9 +89,11 @@ model Tenant {
   updatedAt   DateTime @updatedAt
   deletedAt   DateTime?
 
-  users        User[]
-  roles        Role[]
-  permissions  Permission[]
+  users                  User[]
+  roles                  Role[]
+  permissions            Permission[]
+  providerVerifications  ProviderVerification[]
+  providers              Provider[]
 
   @@index([slug])
 }
@@ -204,4 +248,133 @@ model UserSession {
 
   @@index([userId])
   @@index([status])
+}
+
+model ProviderVerification {
+  id                        String             @id @default(uuid()) @db.Uuid
+
+  tenantId                  String             @db.Uuid
+  tenant                    Tenant             @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+
+  providerType              ProviderType
+  status                    VerificationStatus @default(PENDING)
+
+  licenseNumber             String
+  licenseExpiryDate         DateTime
+  businessRegistrationNumber String
+  governmentIdReference     String
+
+  verificationNotes         String?
+  submittedAt               DateTime           @default(now())
+  verifiedAt                DateTime?
+  verifiedBy                String?            @db.Uuid
+
+  version                   Int                @default(1)
+
+  createdAt                 DateTime           @default(now())
+  updatedAt                 DateTime           @updatedAt
+  deletedAt                 DateTime?
+
+  @@index([tenantId])
+  @@index([status])
+  @@index([providerType])
+}
+
+model Provider {
+  id            String       @id @default(uuid()) @db.Uuid
+
+  tenantId      String       @db.Uuid
+  tenant        Tenant       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+
+  providerType  ProviderType
+  businessName  String
+  ownerName     String
+  email         String
+  phone         String
+  address       String
+  city          String
+  state         String
+  country       String
+  postalCode    String
+  latitude      Float
+  longitude     Float
+
+  isVerified    Boolean      @default(false)
+  isActive      Boolean      @default(true)
+
+  inventory     Inventory[]
+
+  version       Int          @default(1)
+
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  deletedAt     DateTime?
+
+  @@index([tenantId])
+  @@index([providerType])
+  @@index([email])
+}
+
+model Product {
+  id                  String         @id @default(uuid()) @db.Uuid
+
+  name                String
+  genericName         String?
+  brand               String
+  category            ProductCategory
+  subCategory         String?
+  description         String?
+  manufacturer        String
+  dosageForm          DosageForm
+  strength            String
+  barcode             String?
+  requiresPrescription Boolean       @default(false)
+
+  isActive            Boolean        @default(true)
+  inventory           Inventory[]
+
+  version             Int            @default(1)
+
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+  deletedAt           DateTime?
+
+  @@index([category])
+  @@index([name])
+  @@index([barcode])
+}
+
+model Inventory {
+  id                String             @id @default(uuid()) @db.Uuid
+
+  providerId        String             @db.Uuid
+  provider          Provider           @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  productId         String             @db.Uuid
+  product           Product            @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  sku               String?
+  batchNumber       String
+  expiryDate        DateTime
+  quantity          Int
+  reservedQuantity  Int                @default(0)
+  sellingPrice      Decimal            @db.Decimal(10, 2)
+  mrp               Decimal            @db.Decimal(10, 2)
+  discountPercentage Decimal            @db.Decimal(5, 2)
+  taxPercentage     Decimal            @db.Decimal(5, 2)
+  minimumStockLevel  Int               @default(10)
+
+  inStock           Boolean            @default(true)
+  isVisible         Boolean            @default(true)
+
+  version           Int                @default(1)
+
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  deletedAt         DateTime?
+
+  @@index([providerId])
+  @@index([productId])
+  @@index([expiryDate])
+  @@index([providerId, inStock])
 }
