@@ -380,3 +380,43 @@ model Inventory {
   @@index([expiryDate])
   @@index([providerId, inStock])
 }
+
+enum ReservationType {
+  MEDICINE_PICKUP
+  HOSPITAL_APPOINTMENT
+  LAB_TEST
+  VACCINATION
+}
+
+enum ReservationStatus {
+  PENDING
+  CONFIRMED
+  READY
+  COMPLETED
+  CANCELLED
+  EXPIRED
+}
+
+model Reservation {
+  id              String            @id @default(uuid()) @db.Uuid
+
+  userId          String            @db.Uuid
+  providerId      String            @db.Uuid
+
+  reservationType ReservationType
+  status          ReservationStatus @default(PENDING)
+
+  scheduledAt     DateTime
+  notes           String?
+
+  version         Int               @default(1)
+
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  deletedAt       DateTime?
+
+  @@index([userId])
+  @@index([providerId])
+  @@index([status])
+  @@index([scheduledAt])
+}
