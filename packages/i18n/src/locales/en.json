@@ -1,0 +1,79 @@
+{
+  "auth": {
+    "login": {
+      "success": "Login successful",
+      "failed": "Invalid email or password",
+      "sessionExpired": "Session expired, please login again"
+    },
+    "register": {
+      "success": "Registration successful",
+      "failed": "Registration failed",
+      "emailTaken": "Email already registered"
+    },
+    "logout": {
+      "success": "Logged out successfully"
+    },
+    "password": {
+      "changed": "Password changed successfully",
+      "mismatch": "Current password is incorrect",
+      "weak": "Password is too weak"
+    },
+    "token": {
+      "refreshed": "Token refreshed successfully",
+      "invalid": "Invalid or expired token"
+    }
+  },
+  "user": {
+    "profile": {
+      "updated": "Profile updated successfully",
+      "languageUpdated": "Language preference updated to {language}",
+      "notFound": "User not found"
+    },
+    "privacy": {
+      "updated": "Privacy settings updated"
+    }
+  },
+  "provider": {
+    "created": "Provider created successfully",
+    "updated": "Provider updated successfully",
+    "deleted": "Provider deleted successfully",
+    "notFound": "Provider not found",
+    "verification": {
+      "submitted": "Verification submitted successfully",
+      "approved": "Provider verified successfully",
+      "rejected": "Verification rejected",
+      "pending": "Verification is pending"
+    }
+  },
+  "product": {
+    "created": "Product created successfully",
+    "updated": "Product updated successfully",
+    "deleted": "Product deleted successfully",
+    "notFound": "Product not found"
+  },
+  "inventory": {
+    "created": "Inventory item created successfully",
+    "updated": "Inventory item updated successfully",
+    "deleted": "Inventory item deleted successfully",
+    "notFound": "Inventory item not found",
+    "outOfStock": "Product is out of stock"
+  },
+  "search": {
+    "noResults": "No results found for \"{query}\"",
+    "results": "Found {count} results for \"{query}\"",
+    "filterApplied": "Filters applied successfully"
+  },
+  "validation": {
+    "required": "{field} is required",
+    "invalid": "{field} is invalid",
+    "minLength": "{field} must be at least {min} characters",
+    "maxLength": "{field} must be at most {max} characters"
+  },
+  "common": {
+    "success": "Operation completed successfully",
+    "error": "An error occurred",
+    "notFound": "Resource not found",
+    "unauthorized": "Unauthorized access",
+    "forbidden": "Access forbidden"
+  }
+}

@@ -44,6 +44,7 @@ export class UsersRepository {
       lastName?: string;
       phone?: string;
       status?: 'ACTIVE' | 'INACTIVE' | 'SUSPENDED' | 'PENDING_VERIFICATION';
+      preferredLanguage?: string;
     },
   ) {
     return this.prisma.client.user.update({

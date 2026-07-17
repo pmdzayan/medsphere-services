@@ -112,6 +112,8 @@ model User {
 
   phone         String?
 
+  preferredLanguage String  @default("en")
+
   status        UserStatus  @default(ACTIVE)
 
   version       Int         @default(1)

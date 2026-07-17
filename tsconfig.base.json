@@ -27,7 +27,10 @@
       "@medsphere/types/*": ["packages/types/src/*"],
 
       "@medsphere/testing": ["packages/testing/src"],
-      "@medsphere/testing/*": ["packages/testing/src/*"]
+      "@medsphere/testing/*": ["packages/testing/src/*"],
+
+      "@medsphere/i18n": ["packages/i18n/src"],
+      "@medsphere/i18n/*": ["packages/i18n/src/*"]
     },
 
     "declaration": true,

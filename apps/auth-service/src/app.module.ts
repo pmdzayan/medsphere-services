@@ -6,6 +6,7 @@ import { ProviderVerificationModule } from './provider-verification/provider-ver
 import { ProvidersModule } from './providers/providers.module';
 import { ProductsModule } from './products/products.module';
 import { InventoryModule } from './inventory/inventory.module';
+import { LocalizationModule } from './localization/localization.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { InventoryModule } from './inventory/inventory.module';
     ProvidersModule,
     ProductsModule,
     InventoryModule,
+    LocalizationModule,
   ],
 })
 export class AppModule {}
