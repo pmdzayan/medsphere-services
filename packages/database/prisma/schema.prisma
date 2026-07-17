@@ -300,6 +300,7 @@ model Provider {
   postalCode    String
   latitude      Float
   longitude     Float
+  geoHash       String?
 
   isVerified    Boolean      @default(false)
   isActive      Boolean      @default(true)
@@ -379,6 +380,45 @@ model Inventory {
   @@index([productId])
   @@index([expiryDate])
   @@index([providerId, inStock])
+}
+
+enum MedicalRecordType {
+  PRESCRIPTION
+  LAB_REPORT
+  XRAY
+  MRI
+  CT_SCAN
+  VACCINATION
+  DISCHARGE_SUMMARY
+  INSURANCE
+  OTHER
+}
+
+model MedicalRecord {
+  id              String            @id @default(uuid()) @db.Uuid
+
+  userId          String            @db.Uuid
+
+  recordType      MedicalRecordType
+  title           String
+  description     String?
+
+  fileUrl         String
+  fileName        String
+  fileSize        Int
+  mimeType        String
+
+  recordDate      DateTime
+  uploadedAt      DateTime          @default(now())
+
+  version         Int               @default(1)
+
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  deletedAt       DateTime?
+
+  @@index([userId])
+  @@index([recordType])
 }
 
 enum ReservationType {
