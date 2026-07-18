@@ -74,6 +74,25 @@ enum RoleType {
   TENANT
 }
 
+enum BatchStatus {
+  ACTIVE
+  EXPIRED
+  EXHAUSTED
+}
+
+enum StockMovementType {
+  STOCK_IN
+  STOCK_OUT
+  ADJUSTMENT
+  TRANSFER_IN
+  TRANSFER_OUT
+  RETURN
+  RETURN_IN
+  RETURN_OUT
+  EXPIRED
+  DAMAGED
+}
+
 model Tenant {
   id          String   @id @default(uuid()) @db.Uuid
 
@@ -125,7 +144,6 @@ model User {
   sessions       UserSession[]
   userRoles      UserRole[]
   privacy        UserPrivacy?
- // auditLogs      SystemAuditLog[]
 
   @@unique([tenantId, email])
   @@index([tenantId])
@@ -306,6 +324,7 @@ model Provider {
   isActive      Boolean      @default(true)
 
   inventory     Inventory[]
+  batches       Batch[]
 
   version       Int          @default(1)
 
@@ -335,6 +354,7 @@ model Product {
 
   isActive            Boolean        @default(true)
   inventory           Inventory[]
+  batches             Batch[]
 
   version             Int            @default(1)
 
@@ -376,10 +396,112 @@ model Inventory {
   updatedAt         DateTime           @updatedAt
   deletedAt         DateTime?
 
+  stockMovements    StockMovement[]
+
   @@index([providerId])
   @@index([productId])
   @@index([expiryDate])
   @@index([providerId, inStock])
+}
+
+model Batch {
+  id                String       @id @default(uuid()) @db.Uuid
+
+  providerId        String       @db.Uuid
+  provider          Provider     @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  productId         String       @db.Uuid
+  product           Product      @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  batchNumber       String
+  manufacturingDate DateTime?
+  expiryDate        DateTime
+  initialQuantity   Int
+  currentQuantity   Int
+  purchasePrice     Decimal      @db.Decimal(10, 2)
+  sellingPrice      Decimal      @db.Decimal(10, 2)
+  status            BatchStatus  @default(ACTIVE)
+
+  version           Int          @default(1)
+
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+  deletedAt         DateTime?
+
+  stockMovements    StockMovement[]
+
+  @@unique([providerId, productId, batchNumber])
+  @@index([providerId])
+  @@index([productId])
+  @@index([expiryDate])
+  @@index([status])
+}
+
+model StockMovement {
+  id                String             @id @default(uuid()) @db.Uuid
+
+  inventoryId       String             @db.Uuid
+  inventory         Inventory          @relation(fields: [inventoryId], references: [id], onDelete: Restrict)
+
+  batchId           String?            @db.Uuid
+  batch             Batch?             @relation(fields: [batchId], references: [id], onDelete: Restrict)
+
+  providerId        String             @db.Uuid
+  productId         String             @db.Uuid
+
+  type              StockMovementType
+  quantity          Int
+  quantityBefore    Int
+  quantityAfter     Int
+
+  referenceType     String?
+  referenceId       String?
+  reason            String?
+  notes             String?
+
+  userId            String             @db.Uuid
+
+  version           Int                @default(1)
+
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  deletedAt         DateTime?
+
+  @@index([inventoryId])
+  @@index([batchId])
+  @@index([providerId])
+  @@index([productId])
+  @@index([type])
+  @@index([createdAt])
+}
+
+model InventoryHistory {
+  id                String             @id @default(uuid()) @db.Uuid
+
+  inventoryId       String             @db.Uuid
+  providerId        String             @db.Uuid
+  productId         String             @db.Uuid
+  batchId           String?            @db.Uuid
+
+  type              StockMovementType
+  quantity          Int
+  quantityBefore    Int
+  quantityAfter     Int
+  referenceType     String?
+  referenceId       String?
+  reason            String?
+  notes             String?
+
+  userId            String             @db.Uuid
+
+  createdAt         DateTime           @default(now())
+
+  @@index([inventoryId])
+  @@index([providerId])
+  @@index([productId])
+  @@index([batchId])
+  @@index([type])
+  @@index([createdAt])
 }
 
 enum MedicalRecordType {
