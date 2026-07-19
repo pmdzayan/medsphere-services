@@ -1,5 +1,7 @@
 # MedSphere Monorepo — Engineering Review
 
+> **Historical document:** This review describes an earlier implementation pass and is not current architecture authority. Its decision to preserve microservices was superseded by [ADR-001](adr/0001-modular-monolith-for-version-1.md) after the 2026-07-20 CTO baseline audit. Use `PROJECT_STATUS.md` for current acceptance and blockers.
+
 Principal-engineer review pass over the scaffolded monorepo. Scope: fix real defects and fill the two explicitly-requested gaps (shared package barrel exports, standardized error handling). Architecture (microservices, Kafka, CQRS, Saga, transactional outbox, Kubernetes) is unchanged, per direction — see the standing scale/complexity concern raised in chat, which remains true independent of these fixes.
 
 For each item: reason → what changed → migration required → compatibility impact → what it affects.

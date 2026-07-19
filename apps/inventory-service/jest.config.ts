@@ -9,6 +9,9 @@ const config: Config = {
       'ts-jest',
       {
         diagnostics: false,
+        tsconfig: {
+          isolatedModules: true,
+        },
       },
     ],
   },
