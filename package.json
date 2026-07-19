@@ -2,7 +2,7 @@
   "name": "medsphere-monorepo",
   "version": "1.0.0",
   "private": true,
-  "description": "Production-hardened distributed medication inventory and reservation platform",
+  "description": "Healthcare platform monorepo undergoing architecture and security stabilization",
   "engines": {
     "node": ">=20.11.0",
     "pnpm": ">=9.0.0"
@@ -15,6 +15,7 @@
     "test:cov": "turbo run test:cov --concurrency=1",
     "lint": "turbo run lint",
     "format": "prettier --write \"**/*.{ts,js,json,md,yml,yaml}\"",
+    "format:check": "prettier --check \"**/*.{ts,js,json,md,yml,yaml}\"",
     "clean": "turbo run clean && rimraf node_modules .turbo",
     "prepare": "husky"
   },
@@ -31,6 +32,7 @@
     "lint-staged": "^15.2.7",
     "prettier": "^3.2.5",
     "rimraf": "^5.0.5",
+    "ts-node": "10.9.2",
     "turbo": "^1.13.0",
     "typescript": "^5.3.3"
   }

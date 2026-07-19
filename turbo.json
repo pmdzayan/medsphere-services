@@ -1,25 +1,25 @@
 {
   "$schema": "https://turbo.build/schema.json",
-  "globalDependencies": ["tsconfig.base.json", ".env"],
+  "globalDependencies": ["tsconfig.base.json", ".eslintrc.js", ".prettierrc"],
   "pipeline": {
     "build": {
       "dependsOn": ["^build"],
       "outputs": ["dist/**", ".next/**"],
-      "inputs": ["src/**", "tsconfig.json", "package.json"]
+      "inputs": ["src/**", "prisma/**", "tsconfig*.json", "package.json"]
     },
     "lint": {
       "outputs": [],
-      "inputs": ["src/**", ".eslintrc.js", "tsconfig.json"]
+      "inputs": ["src/**", "tsconfig*.json", "package.json"]
     },
     "test": {
       "dependsOn": ["build"],
       "outputs": ["coverage/**"],
-      "inputs": ["src/**", "tsconfig.json"]
+      "inputs": ["src/**", "jest.config.*", "tsconfig*.json", "package.json"]
     },
     "test:cov": {
       "dependsOn": ["build"],
       "outputs": ["coverage/**"],
-      "inputs": ["src/**", "tsconfig.json"]
+      "inputs": ["src/**", "jest.config.*", "tsconfig*.json", "package.json"]
     },
     "clean": {
       "cache": false

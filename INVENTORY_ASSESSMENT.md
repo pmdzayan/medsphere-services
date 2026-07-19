@@ -1,5 +1,7 @@
 # Inventory Assessment Summary
 
+> **Historical assessment:** This file predates the 2026-07-20 CTO baseline audit. Its "minimal" change plan is not approved for implementation because it does not resolve the competing Inventory/Batch sources of truth, transaction-client misuse, reservation concurrency, tenant isolation, migration mismatch, or audit requirements. Follow `PROJECT_STATUS.md`, `PRODUCT_ROADMAP.md`, and ADR-001.
+
 ## Current Architecture Review
 
 ### Existing Modules:
