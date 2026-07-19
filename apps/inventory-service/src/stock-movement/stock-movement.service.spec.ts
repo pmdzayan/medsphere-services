@@ -142,7 +142,6 @@ describe('StockMovementService', () => {
     batchRepository = module.get(BatchRepository);
     inventoryRepository = module.get(InventoryRepository);
     historyRepository = module.get(InventoryHistoryRepository);
-    prisma = module.get(PrismaService);
   });
 
   describe('create', () => {

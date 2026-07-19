@@ -28,11 +28,13 @@ export class CreateStockMovementDto {
 
   @IsNumber()
   @Min(0)
-  quantityBefore!: number;
+  @IsOptional()
+  quantityBefore?: number;
 
   @IsNumber()
   @Min(0)
-  quantityAfter!: number;
+  @IsOptional()
+  quantityAfter?: number;
 
   @IsString()
   @IsOptional()

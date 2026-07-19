@@ -504,6 +504,35 @@ model InventoryHistory {
   @@index([createdAt])
 }
 
+model AuditLog {
+  id              String   @id @default(uuid()) @db.Uuid
+
+  organizationId  String   @db.Uuid
+  userId          String   @db.Uuid
+
+  module          String
+  action          String
+  resourceType    String
+  resourceId      String
+
+  oldValue        Json?
+  newValue        Json?
+
+  ipAddress       String?
+  userAgent       String?
+  requestId       String?
+  deviceType      String?
+
+  createdAt       DateTime @default(now())
+
+  @@index([userId])
+  @@index([organizationId])
+  @@index([module])
+  @@index([resourceType])
+  @@index([createdAt])
+  @@index([organizationId, createdAt])
+}
+
 enum MedicalRecordType {
   PRESCRIPTION
   LAB_REPORT

@@ -7,6 +7,9 @@ import { ProvidersModule } from './providers/providers.module';
 import { ProductsModule } from './products/products.module';
 import { InventoryModule } from './inventory/inventory.module';
 import { LocalizationModule } from './localization/localization.module';
+import { RbacModule } from './rbac/rbac.module';
+import { RbacSeedService } from './rbac/rbac-seed.service';
+import { AuditModule } from './audit/audit.module';
 
 @Module({
   imports: [
@@ -18,6 +21,9 @@ import { LocalizationModule } from './localization/localization.module';
     ProductsModule,
     InventoryModule,
     LocalizationModule,
+    RbacModule,
+    AuditModule,
   ],
+  providers: [RbacSeedService],
 })
 export class AppModule {}
