@@ -2,7 +2,7 @@
 
 **Last updated:** 2026-07-20
 
-**Current sprint:** S0.1 — Architecture and Repository Governance (ready for review; publication blocked)
+**Current sprint:** S0.1 — Architecture and Repository Governance (in review — merge pending)
 
 **Next feature work:** Blocked
 
@@ -49,15 +49,30 @@ See `docs/audits/2026-07-20-cto-baseline.md` for the accepted baseline.
 
 ## Agent routing
 
-| Agent               | Authorized work                                                                              |
-| ------------------- | -------------------------------------------------------------------------------------------- |
-| ChatGPT / CTO       | Architecture, roadmap, ADR, sprint definition, code review, documentation acceptance         |
-| Cline               | One approved backend sprint with a complete specification                                    |
-| Claude              | One approved frontend sprint after backend contracts and frontend specification are accepted |
-| Roo Code / Continue | Bounded refactoring or bug fixes identified by review                                        |
-| Windsurf            | Test implementation, QA execution, regression analysis, and acceptance evidence              |
+| Agent           | Authorized work                                                                                                                                                                                                                                                                                                                                                                               |
+| --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ChatGPT / Codex | Product and system architecture; roadmap and dependency control; Architecture Decision Records; database strategy; security and healthcare compliance; large, high-risk, or cross-module backend implementations; sprint design; final code and architecture review; documentation acceptance; milestone acceptance                                                                           |
+| Claude          | Frontend architecture; frontend implementation; components, pages, workflows, state management, and API integration; responsive behavior; accessibility; frontend testing. Must use approved backend contracts and frontend specifications. Must not independently change backend architecture or API contracts                                                                               |
+| Cline           | Small, bounded backend changes; configuration improvements; documentation maintenance; small bug fixes; bounded refactoring; supporting unit or integration tests; repository maintenance tasks. Must not make major architecture, database-strategy, security-policy, compliance-policy, or cross-module decisions without CTO approval. Must not implement frontend work assigned to Claude |
 
 An agent must not begin a later milestone, combine unrelated modules, or expand scope because a nearby defect looks convenient to fix. Report out-of-scope defects in the completion report.
+
+## Cline task-bundling policy
+
+- One Cline prompt must have one coherent sprint objective.
+- A prompt may contain multiple small work items when all items:
+  - belong to the same sprint;
+  - affect the same module, layer, or governance outcome;
+  - share dependencies or validation;
+  - can be reviewed together safely;
+  - do not bypass roadmap dependencies.
+- There is no fixed numeric limit for related small work items.
+- Do not combine unrelated modules merely to make a larger prompt.
+- Every work item must have explicit requirements, constraints, acceptance criteria, and deliverables.
+- Every Cline prompt must still include objective, repository analysis, requirements, constraints, coding standards, validation, and deliverables.
+- Cline must read `AI_HANDOFF.md` and `PROJECT_STATUS.md` before implementation.
+- Cline must reuse existing services, DTOs, utilities, guards, repositories, tests, and patterns.
+- Cline must use safe VS Code navigation, refactoring, warning-fixing, and rename tools where appropriate.
 
 ## Completion report contract
 

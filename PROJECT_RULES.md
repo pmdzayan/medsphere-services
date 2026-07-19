@@ -114,7 +114,17 @@ Before completion, review for duplicate code, bad boundaries, missing validation
 
 ## 9. Cline task standard
 
-One Cline task equals one focused sprint. Every prompt must be complete and include:
+One Cline prompt must have one coherent sprint objective. A prompt may contain multiple small work items when all items:
+
+- belong to the same sprint;
+- affect the same module, layer, or governance outcome;
+- share dependencies or validation;
+- can be reviewed together safely;
+- do not bypass roadmap dependencies.
+
+There is no fixed numeric limit for related small work items. Do not combine unrelated modules merely to make a larger prompt.
+
+Every prompt must be complete and include:
 
 1. Objective
 2. Repository analysis
@@ -135,11 +145,11 @@ The completion report must list files modified, database changes, API endpoints,
 
 ## 10. Agent responsibilities
 
-- **ChatGPT / CTO:** architecture, roadmap, ADRs, task design, review, and documentation approval
-- **Cline:** backend implementation from an approved sprint specification
-- **Claude:** frontend implementation from an approved frontend specification
-- **Roo Code / Continue:** bounded refactoring and bug fixes after review
-- **Windsurf:** testing, QA, regression evidence, and acceptance verification
+- **ChatGPT / Codex (CTO):** product and system architecture; roadmap and dependency control; Architecture Decision Records; database strategy; security and healthcare compliance; large, high-risk, or cross-module backend implementations; sprint design; final code and architecture review; documentation acceptance; milestone acceptance
+- **Claude (frontend engineer):** frontend architecture; frontend implementation; components, pages, workflows, state management, and API integration; responsive behavior; accessibility; frontend testing. Must use approved backend contracts and frontend specifications. Must not independently change backend architecture or API contracts
+- **Cline (small-task implementation engineer):** small, bounded backend changes; configuration improvements; documentation maintenance; small bug fixes; bounded refactoring; supporting unit or integration tests; repository maintenance tasks. Must not make major architecture, database-strategy, security-policy, compliance-policy, or cross-module decisions without CTO approval. Must not implement frontend work assigned to Claude
+
+Implementation testing is the responsibility of the implementing agent. Final acceptance is the responsibility of the CTO.
 
 No agent may self-approve a major architecture change or mark a milestone complete without CTO review.
 
