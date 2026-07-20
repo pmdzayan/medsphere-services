@@ -1,9 +1,14 @@
 import { randomUUID } from 'node:crypto';
 import { RedisThrottlerStorage } from './redis-throttler.storage';
+import { isInfrastructureTestEnabled, requireEnv } from '../auth/testing/infrastructure-test-gate';
 
-const describeWithRedis = process.env.REDIS_CLUSTER_URL ? describe : describe.skip;
+const describeRedisInfra = isInfrastructureTestEnabled() ? describe : describe.skip;
 
-describeWithRedis('RedisThrottlerStorage integration', () => {
+if (isInfrastructureTestEnabled()) {
+  requireEnv('REDIS_CLUSTER_URL');
+}
+
+describeRedisInfra('RedisThrottlerStorage integration', () => {
   let storage: RedisThrottlerStorage;
 
   beforeAll(async () => {

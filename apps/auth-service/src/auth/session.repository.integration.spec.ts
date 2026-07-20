@@ -1,10 +1,15 @@
 import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { SessionRepository } from './session.repository';
+import { isInfrastructureTestEnabled, requireEnv } from './testing/infrastructure-test-gate';
 
-const describeWithDatabase = process.env.DATABASE_URL ? describe : describe.skip;
+const describeSessionInfra = isInfrastructureTestEnabled() ? describe : describe.skip;
 
-describeWithDatabase('SessionRepository PostgreSQL security integration', () => {
+if (isInfrastructureTestEnabled()) {
+  requireEnv('DATABASE_URL');
+}
+
+describeSessionInfra('SessionRepository PostgreSQL security integration', () => {
   const prisma = new PrismaService();
   const repository = new SessionRepository(prisma);
   const tenantId = randomUUID();
