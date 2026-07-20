@@ -8,7 +8,7 @@ MedSphere is a planned multi-tenant healthcare ecosystem for patients, pharmacie
 
 MedSphere Version 1 is being consolidated into a **modular monolith** with explicit bounded modules and future service-extraction seams. The current repository still contains multiple service applications that share one database; they are migration inputs, not the approved target architecture.
 
-The decision and its consequences are recorded in [ADR-001](docs/adr/0001-modular-monolith-for-version-1.md).
+The architecture and database-baseline decisions are recorded in [ADR-001](docs/adr/0001-modular-monolith-for-version-1.md) and [ADR-002](docs/adr/0002-append-only-reproducible-database-baseline.md).
 
 ## Required reading
 
@@ -44,10 +44,20 @@ Requirements:
 - PNPM 9.15.0
 - A local `.env` created from `.env.example`; never commit real secrets
 
+Start the local PostgreSQL 16 database and verify the full migration chain:
+
+```bash
+docker compose --env-file .env -f compose/docker-compose.database.yml up -d
+pnpm db:verify
+```
+
+`db:verify` validates the Prisma schema, deploys every migration, checks migration status, and fails if the deployed database drifts from the declared schema. Never use `prisma db push` on a shared database.
+
 Run the same mandatory gates used in pull requests:
 
 ```bash
 pnpm install --frozen-lockfile
+pnpm format:check
 pnpm lint
 pnpm test
 pnpm build
