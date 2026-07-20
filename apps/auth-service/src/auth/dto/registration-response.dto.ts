@@ -1,17 +1,8 @@
-export class RegistrationResponseDto {
-  id!: string;
-  email!: string;
-  firstName!: string;
-  lastName!: string;
-  status!: string;
-  createdAt!: Date;
+import { ApiProperty } from '@nestjs/swagger';
 
-  constructor(
-    partial: Pick<
-      RegistrationResponseDto,
-      'id' | 'email' | 'firstName' | 'lastName' | 'status' | 'createdAt'
-    >,
-  ) {
-    Object.assign(this, partial);
-  }
+export class RegistrationResponseDto {
+  @ApiProperty({
+    example: 'If registration is available, onboarding instructions will be sent.',
+  })
+  message = 'If registration is available, onboarding instructions will be sent.';
 }

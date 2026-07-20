@@ -1,113 +1,89 @@
-import { JwtService } from '@nestjs/jwt';
+import { randomUUID } from 'node:crypto';
 import { UnauthorizedException } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
+import { AuthConfigService, parseAuthEnvironment } from './auth-config.service';
 import { TokenService } from './token.service';
+import { createAuthConfigFixture } from './testing/auth-config-fixture';
 
 describe('TokenService', () => {
-  let service: TokenService;
-  let jwtService: jest.Mocked<JwtService>;
+  const configuration = parseAuthEnvironment(createAuthConfigFixture());
+  const jwtService = new JwtService();
+  const service = new TokenService(jwtService, {
+    value: configuration,
+  } as AuthConfigService);
 
-  beforeEach(() => {
-    jest.clearAllMocks();
-    jwtService = {
-      sign: jest.fn(),
-      verify: jest.fn(),
-      decode: jest.fn(),
-    } as unknown as jest.Mocked<JwtService>;
+  const identity = {
+    userId: randomUUID(),
+    membershipId: randomUUID(),
+    tenantId: randomUUID(),
+    sessionId: randomUUID(),
+  };
 
-    service = new TokenService(jwtService);
+  it('issues and strictly verifies a minimal RS256 access token', () => {
+    const issued = service.issueAccessToken(identity);
+    const verified = service.verifyAccessToken(issued.value);
+    const decoded = jwtService.decode(issued.value, { complete: true });
+
+    expect(verified).toMatchObject({
+      sub: identity.userId,
+      mid: identity.membershipId,
+      tid: identity.tenantId,
+      sid: identity.sessionId,
+      tokenUse: 'access',
+    });
+    expect(decoded).toMatchObject({
+      header: { alg: 'RS256', typ: 'at+jwt', kid: configuration.keyId },
+    });
+    expect(verified).not.toHaveProperty('email');
+    expect(verified).not.toHaveProperty('roles');
   });
 
-  describe('generateAccessToken', () => {
-    it('should generate an access token', () => {
-      const payload = { sub: 'user-id', email: 'test@example.com' };
-      const token = 'access-token';
+  it('rejects a token with a different issuer', () => {
+    const token = jwtService.sign(
+      {
+        sub: identity.userId,
+        mid: identity.membershipId,
+        tid: identity.tenantId,
+        sid: identity.sessionId,
+        jti: randomUUID(),
+        tokenUse: 'access',
+      },
+      {
+        privateKey: configuration.privateKeyPem,
+        algorithm: 'RS256',
+        issuer: 'https://attacker.test',
+        audience: configuration.audience,
+        expiresIn: 300,
+        header: {
+          alg: 'RS256',
+          typ: 'at+jwt',
+          kid: configuration.keyId,
+        },
+      },
+    );
 
-      jwtService.sign.mockReturnValue(token);
-
-      const result = service.generateAccessToken(payload);
-
-      expect(result).toBe(token);
-      expect(jwtService.sign).toHaveBeenCalledWith(payload, {
-        expiresIn: '15m',
-      });
-    });
+    expect(() => service.verifyAccessToken(token)).toThrow(UnauthorizedException);
   });
 
-  describe('generateRefreshToken', () => {
-    it('should generate a refresh token', () => {
-      const payload = { sub: 'user-id', email: 'test@example.com' };
-      const token = 'refresh-token';
-
-      jwtService.sign.mockReturnValue(token);
-
-      const result = service.generateRefreshToken(payload);
-
-      expect(result).toBe(token);
-      expect(jwtService.sign).toHaveBeenCalledWith(payload, {
-        expiresIn: '7d',
-      });
-    });
+  it('rejects malformed access input with the generic authentication error', () => {
+    expect(() => service.verifyAccessToken('not-a-jwt')).toThrow(UnauthorizedException);
   });
 
-  describe('verifyAccessToken', () => {
-    it('should return decoded payload for a valid token', () => {
-      const token = 'valid-token';
-      const decoded = { sub: 'user-id', email: 'test@example.com' };
+  it('issues a 256-bit opaque refresh credential and stores only its digest', () => {
+    const issued = service.issueRefreshCredential();
+    const parts = service.parseRefreshCredential(issued.value);
 
-      jwtService.verify.mockReturnValue(decoded);
-
-      const result = service.verifyAccessToken(token);
-
-      expect(result).toEqual(decoded);
-      expect(jwtService.verify).toHaveBeenCalledWith(token);
-    });
-
-    it('should throw UnauthorizedException for an invalid token', () => {
-      const token = 'invalid-token';
-
-      jwtService.verify.mockImplementation(() => {
-        throw new Error('Invalid token');
-      });
-
-      expect(() => service.verifyAccessToken(token)).toThrow(UnauthorizedException);
-    });
+    expect(parts.sessionId).toBe(issued.sessionId);
+    expect(Buffer.from(parts.verifier, 'base64url')).toHaveLength(32);
+    expect(issued.hash).toMatch(/^[a-f0-9]{64}$/);
+    expect(issued.hash).not.toContain(parts.verifier);
+    expect(service.verifyRefreshCredentialHash(issued.value, issued.hash)).toBe(true);
+    expect(service.verifyRefreshCredentialHash(`${issued.value}x`, issued.hash)).toBe(false);
   });
 
-  describe('verifyRefreshToken', () => {
-    it('should return decoded payload for a valid refresh token', () => {
-      const token = 'valid-refresh-token';
-      const decoded = { sub: 'user-id', email: 'test@example.com' };
-
-      jwtService.verify.mockReturnValue(decoded);
-
-      const result = service.verifyRefreshToken(token);
-
-      expect(result).toEqual(decoded);
-      expect(jwtService.verify).toHaveBeenCalledWith(token);
-    });
-
-    it('should throw UnauthorizedException for an invalid refresh token', () => {
-      const token = 'invalid-refresh-token';
-
-      jwtService.verify.mockImplementation(() => {
-        throw new Error('Invalid token');
-      });
-
-      expect(() => service.verifyRefreshToken(token)).toThrow(UnauthorizedException);
-    });
-  });
-
-  describe('decode', () => {
-    it('should decode a token without verification', () => {
-      const token = 'some-token';
-      const decoded = { sub: 'user-id' };
-
-      jwtService.decode.mockReturnValue(decoded);
-
-      const result = service.decode(token);
-
-      expect(result).toEqual(decoded);
-      expect(jwtService.decode).toHaveBeenCalledWith(token);
-    });
+  it('rejects malformed refresh credentials before database access', () => {
+    expect(() => service.parseRefreshCredential('not-a-refresh-credential')).toThrow(
+      UnauthorizedException,
+    );
   });
 });

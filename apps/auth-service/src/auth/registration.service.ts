@@ -1,4 +1,4 @@
-import { ConflictException, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 
 import { UsersRepository } from '../users/users.repository';
 import { PasswordService } from './password.service';
@@ -13,36 +13,18 @@ export class RegistrationService {
   ) {}
 
   async register(registerDto: RegisterDto): Promise<RegistrationResponseDto> {
-    const existingUser = await this.usersRepository.findByEmail(
-      registerDto.tenantId,
-      registerDto.email,
-    );
-
-    if (existingUser) {
-      throw new ConflictException('User already exists');
-    }
-
+    // Hash before policy/existence handling so public responses do not expose
+    // a materially different fast path for unknown tenants or existing users.
     const passwordHash = await this.passwordService.hash(registerDto.password);
 
-    const user = await this.usersRepository.create({
-      tenantId: registerDto.tenantId,
+    await this.usersRepository.createPendingRegistration({
+      tenantSlug: registerDto.tenantSlug,
       email: registerDto.email,
       passwordHash,
       firstName: registerDto.firstName,
       lastName: registerDto.lastName,
     });
 
-    const updatedUser = await this.usersRepository.update(user.id, {
-      status: 'PENDING_VERIFICATION',
-    });
-
-    return new RegistrationResponseDto({
-      id: updatedUser.id,
-      email: updatedUser.email,
-      firstName: updatedUser.firstName,
-      lastName: updatedUser.lastName,
-      status: updatedUser.status,
-      createdAt: updatedUser.createdAt,
-    });
+    return new RegistrationResponseDto();
   }
 }

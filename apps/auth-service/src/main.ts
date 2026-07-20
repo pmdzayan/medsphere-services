@@ -1,8 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
-import { GlobalExceptionFilter } from '@medsphere/common';
-import { createValidationPipe } from '@medsphere/validation';
 import { createServiceLogger } from '@medsphere/logger';
+import { configureAuthApplication } from './app.bootstrap';
 
 async function bootstrap(): Promise<void> {
   const logger = createServiceLogger('auth-service');
@@ -11,8 +10,7 @@ async function bootstrap(): Promise<void> {
     bufferLogs: true,
   });
 
-  app.useGlobalFilters(new GlobalExceptionFilter());
-  app.useGlobalPipes(createValidationPipe());
+  configureAuthApplication(app);
 
   const port = Number(process.env.PORT) || 3000;
 

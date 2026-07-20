@@ -1,333 +1,204 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { ConflictException, ForbiddenException, UnauthorizedException } from '@nestjs/common';
-
+import { randomUUID } from 'node:crypto';
+import { UnauthorizedException } from '@nestjs/common';
+import { AuthConfigService } from './auth-config.service';
+import { AuthSecurityEventService } from './auth-security-event.service';
 import { AuthService } from './auth.service';
-import { RegistrationService } from './registration.service';
-import { TokenService } from './token.service';
-import { SessionRepository } from './session.repository';
-import { UsersRepository } from '../users/users.repository';
 import { PasswordService } from './password.service';
+import { RegistrationService } from './registration.service';
+import { SessionRepository } from './session.repository';
+import { TokenService } from './token.service';
+import { UsersRepository } from '../users/users.repository';
 
 describe('AuthService', () => {
-  let authService: AuthService;
+  const userId = randomUUID();
+  const membershipId = randomUUID();
+  const tenantId = randomUUID();
+  const sessionId = randomUUID();
+  const nextSessionId = randomUUID();
+  const tokenId = randomUUID();
+  const metadata = { ipAddress: '127.0.0.1', userAgent: 'Jest' };
+  const loginDto = {
+    tenantSlug: 'central-pharmacy',
+    email: 'user@example.com',
+    password: 'a secure passphrase',
+  };
+  const loginIdentity = {
+    user: {
+      id: userId,
+      email: loginDto.email,
+      passwordHash: 'password-hash',
+      firstName: 'Test',
+      lastName: 'User',
+    },
+    membershipId,
+    tenantId,
+  };
+
   let usersRepository: jest.Mocked<UsersRepository>;
   let passwordService: jest.Mocked<PasswordService>;
   let registrationService: jest.Mocked<RegistrationService>;
   let tokenService: jest.Mocked<TokenService>;
   let sessionRepository: jest.Mocked<SessionRepository>;
+  let securityEvents: jest.Mocked<AuthSecurityEventService>;
+  let service: AuthService;
 
-  const tenantId = '550e8400-e29b-41d4-a716-446655440000';
-  const userId = '660e8400-e29b-41d4-a716-446655440001';
+  beforeEach(() => {
+    usersRepository = {
+      findLoginIdentity: jest.fn(),
+      update: jest.fn(),
+    } as unknown as jest.Mocked<UsersRepository>;
+    passwordService = {
+      verify: jest.fn(),
+      verifyAgainstDummy: jest.fn(),
+      hash: jest.fn(),
+      needsRehash: jest.fn(),
+    } as unknown as jest.Mocked<PasswordService>;
+    registrationService = {
+      register: jest.fn(),
+    } as unknown as jest.Mocked<RegistrationService>;
+    tokenService = {
+      issueAccessToken: jest.fn(),
+      issueRefreshCredential: jest.fn(),
+      parseRefreshCredential: jest.fn(),
+      hashRefreshCredential: jest.fn(),
+    } as unknown as jest.Mocked<TokenService>;
+    sessionRepository = {
+      createSession: jest.fn(),
+      rotateSession: jest.fn(),
+      revokeCurrentFamily: jest.fn(),
+      revokeAllForUser: jest.fn(),
+    } as unknown as jest.Mocked<SessionRepository>;
+    securityEvents = {
+      record: jest.fn(),
+    } as unknown as jest.Mocked<AuthSecurityEventService>;
 
-  const baseUser = {
-    id: userId,
-    tenantId,
-    email: 'test@example.com',
-    passwordHash: 'hashed-password',
-    firstName: 'John',
-    lastName: 'Doe',
-    phone: null,
-    status: 'ACTIVE' as const,
-    version: 1,
-    createdAt: new Date('2024-01-01'),
-    updatedAt: new Date('2024-01-01'),
-    deletedAt: null,
-  };
-
-  beforeEach(async () => {
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        AuthService,
-        {
-          provide: UsersRepository,
-          useValue: {
-            findByEmail: jest.fn(),
-            findById: jest.fn(),
-            create: jest.fn(),
-            update: jest.fn(),
-          },
+    service = new AuthService(
+      usersRepository,
+      passwordService,
+      registrationService,
+      tokenService,
+      sessionRepository,
+      {
+        value: {
+          refreshIdleTtlSeconds: 604800,
+          refreshAbsoluteTtlSeconds: 2592000,
         },
-        {
-          provide: PasswordService,
-          useValue: {
-            hash: jest.fn(),
-            verify: jest.fn(),
-          },
-        },
-        {
-          provide: RegistrationService,
-          useValue: {
-            register: jest.fn(),
-          },
-        },
-        {
-          provide: TokenService,
-          useValue: {
-            generateAccessToken: jest.fn(),
-            generateRefreshToken: jest.fn(),
-            verifyAccessToken: jest.fn(),
-            verifyRefreshToken: jest.fn(),
-            decode: jest.fn(),
-          },
-        },
-        {
-          provide: SessionRepository,
-          useValue: {
-            createSession: jest.fn(),
-            findById: jest.fn(),
-            findByRefreshToken: jest.fn(),
-            revokeSession: jest.fn(),
-            revokeAllUserSessions: jest.fn(),
-            deleteExpiredSessions: jest.fn(),
-          },
-        },
-      ],
-    }).compile();
-
-    authService = module.get<AuthService>(AuthService);
-    usersRepository = module.get(UsersRepository);
-    passwordService = module.get(PasswordService);
-    registrationService = module.get(RegistrationService);
-    tokenService = module.get(TokenService);
-    sessionRepository = module.get(SessionRepository);
+      } as unknown as AuthConfigService,
+      securityEvents,
+    );
   });
 
-  afterEach(() => {
-    jest.clearAllMocks();
-  });
-
-  // ─── Registration ────────────────────────────────────────────────────
-
-  describe('register', () => {
-    const registerDto = {
-      tenantId,
-      email: 'new@example.com',
-      password: 'password123',
-      firstName: 'Jane',
-      lastName: 'Doe',
-    };
-
-    it('should register a new user successfully', async () => {
-      const expectedResponse = {
-        id: 'new-id',
-        email: 'new@example.com',
-        firstName: 'Jane',
-        lastName: 'Doe',
-        status: 'PENDING_VERIFICATION',
-        createdAt: new Date(),
-      };
-
-      registrationService.register.mockResolvedValue(expectedResponse);
-
-      const result = await authService.register(registerDto);
-
-      expect(result).toEqual(expectedResponse);
-      expect(registrationService.register).toHaveBeenCalledWith(registerDto);
+  it('creates a membership-bound session and returns no password data', async () => {
+    usersRepository.findLoginIdentity.mockResolvedValue(loginIdentity);
+    passwordService.verify.mockResolvedValue(true);
+    passwordService.needsRehash.mockReturnValue(false);
+    tokenService.issueRefreshCredential.mockReturnValue({
+      value: 'opaque-refresh',
+      hash: 'a'.repeat(64),
+      sessionId,
+    });
+    tokenService.issueAccessToken.mockReturnValue({
+      value: 'access-token',
+      expiresIn: 900,
+      tokenId,
     });
 
-    it('should throw ConflictException for duplicate email', async () => {
-      registrationService.register.mockRejectedValue(new ConflictException('User already exists'));
+    const result = await service.login(loginDto, metadata);
 
-      await expect(authService.register(registerDto)).rejects.toThrow(ConflictException);
-    });
-  });
-
-  // ─── Login ───────────────────────────────────────────────────────────
-
-  describe('login', () => {
-    const loginDto = {
-      tenantId,
-      email: 'test@example.com',
-      password: 'correct-password',
-    };
-
-    it('should login successfully and return tokens', async () => {
-      usersRepository.findByEmail.mockResolvedValue(baseUser);
-      passwordService.verify.mockResolvedValue(true);
-      tokenService.generateAccessToken.mockReturnValue('access-token');
-      tokenService.generateRefreshToken.mockReturnValue('refresh-token');
-      sessionRepository.createSession.mockResolvedValue(undefined);
-
-      const result = await authService.login(loginDto);
-
-      expect(result.accessToken).toBe('access-token');
-      expect(result.refreshToken).toBe('refresh-token');
-      expect(result.expiresIn).toBe(900);
-      expect(result.user).toEqual({
-        id: userId,
-        email: 'test@example.com',
-        firstName: 'John',
-        lastName: 'Doe',
-      });
-      expect(result).not.toHaveProperty('passwordHash');
-    });
-
-    it('should throw UnauthorizedException when user is not found', async () => {
-      usersRepository.findByEmail.mockResolvedValue(null);
-
-      await expect(authService.login(loginDto)).rejects.toThrow(UnauthorizedException);
-    });
-
-    it('should throw ForbiddenException when user is inactive', async () => {
-      usersRepository.findByEmail.mockResolvedValue({
-        ...baseUser,
-        status: 'INACTIVE',
-      });
-
-      await expect(authService.login(loginDto)).rejects.toThrow(ForbiddenException);
-    });
-
-    it('should throw ForbiddenException when user is suspended', async () => {
-      usersRepository.findByEmail.mockResolvedValue({
-        ...baseUser,
-        status: 'SUSPENDED',
-      });
-
-      await expect(authService.login(loginDto)).rejects.toThrow(ForbiddenException);
-    });
-
-    it('should throw UnauthorizedException when password is wrong', async () => {
-      usersRepository.findByEmail.mockResolvedValue(baseUser);
-      passwordService.verify.mockResolvedValue(false);
-
-      await expect(authService.login(loginDto)).rejects.toThrow(UnauthorizedException);
-    });
-  });
-
-  // ─── Refresh ─────────────────────────────────────────────────────────
-
-  describe('refresh', () => {
-    const refreshTokenDto = {
-      refreshToken: 'old-refresh-token',
-    };
-
-    const decodedPayload = {
-      sub: userId,
-      email: 'test@example.com',
-      tenantId,
-    };
-
-    const activeSession = {
-      id: 'session-id',
+    expect(usersRepository.findLoginIdentity).toHaveBeenCalledWith(
+      loginDto.tenantSlug,
+      loginDto.email,
+    );
+    expect(sessionRepository.createSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: sessionId,
+        membershipId,
+        refreshTokenHash: 'a'.repeat(64),
+        metadata,
+      }),
+    );
+    expect(tokenService.issueAccessToken).toHaveBeenCalledWith({
       userId,
-      refreshToken: 'old-refresh-token',
-      ipAddress: null,
-      userAgent: null,
-      deviceName: null,
-      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-      status: 'ACTIVE' as const,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
+      membershipId,
+      tenantId,
+      sessionId,
+    });
+    expect(result.context).toEqual({ membershipId, tenantId });
+    expect(result).not.toHaveProperty('passwordHash');
+  });
 
-    it('should rotate tokens successfully', async () => {
-      tokenService.verifyRefreshToken.mockReturnValue(decodedPayload);
-      sessionRepository.findByRefreshToken.mockResolvedValue(activeSession);
-      tokenService.generateAccessToken.mockReturnValue('new-access-token');
-      tokenService.generateRefreshToken.mockReturnValue('new-refresh-token');
-      sessionRepository.revokeSession.mockResolvedValue(undefined);
-      sessionRepository.createSession.mockResolvedValue(undefined);
+  it('uses one generic failure for an unknown membership and never creates a session', async () => {
+    usersRepository.findLoginIdentity.mockResolvedValue(null);
+    await expect(service.login(loginDto, metadata)).rejects.toThrow(
+      new UnauthorizedException('Invalid credentials'),
+    );
+    expect(passwordService.verifyAgainstDummy).toHaveBeenCalledWith(loginDto.password);
+    expect(sessionRepository.createSession).not.toHaveBeenCalled();
+  });
 
-      const result = await authService.refresh(refreshTokenDto);
+  it('uses the same generic failure for an invalid password', async () => {
+    usersRepository.findLoginIdentity.mockResolvedValue(loginIdentity);
+    passwordService.verify.mockResolvedValue(false);
+    await expect(service.login(loginDto, metadata)).rejects.toThrow(
+      new UnauthorizedException('Invalid credentials'),
+    );
+    expect(sessionRepository.createSession).not.toHaveBeenCalled();
+  });
 
-      expect(result.accessToken).toBe('new-access-token');
-      expect(result.refreshToken).toBe('new-refresh-token');
-      expect(result.expiresIn).toBe(900);
-      expect(sessionRepository.revokeSession).toHaveBeenCalledWith('session-id');
-      expect(sessionRepository.createSession).toHaveBeenCalled();
+  it('rotates an opaque credential and issues access for the successor session', async () => {
+    tokenService.parseRefreshCredential.mockReturnValue({ sessionId, verifier: 'v'.repeat(43) });
+    tokenService.hashRefreshCredential.mockReturnValue('a'.repeat(64));
+    tokenService.issueRefreshCredential.mockReturnValue({
+      value: 'next-refresh',
+      hash: 'b'.repeat(64),
+      sessionId: nextSessionId,
+    });
+    sessionRepository.rotateSession.mockResolvedValue({
+      status: 'ROTATED',
+      identity: { userId, membershipId, tenantId, sessionId: nextSessionId },
+      expiresAt: new Date(),
+      absoluteExpiresAt: new Date(),
+    });
+    tokenService.issueAccessToken.mockReturnValue({
+      value: 'next-access',
+      expiresIn: 900,
+      tokenId,
     });
 
-    it('should throw UnauthorizedException when session is not found', async () => {
-      tokenService.verifyRefreshToken.mockReturnValue(decodedPayload);
-      sessionRepository.findByRefreshToken.mockResolvedValue(null);
-
-      await expect(authService.refresh(refreshTokenDto)).rejects.toThrow(UnauthorizedException);
-    });
-
-    it('should throw UnauthorizedException when session is revoked', async () => {
-      tokenService.verifyRefreshToken.mockReturnValue(decodedPayload);
-      sessionRepository.findByRefreshToken.mockResolvedValue({
-        ...activeSession,
-        status: 'REVOKED',
-      });
-
-      await expect(authService.refresh(refreshTokenDto)).rejects.toThrow(UnauthorizedException);
-    });
-
-    it('should throw UnauthorizedException when session is expired', async () => {
-      tokenService.verifyRefreshToken.mockReturnValue(decodedPayload);
-      sessionRepository.findByRefreshToken.mockResolvedValue({
-        ...activeSession,
-        expiresAt: new Date(Date.now() - 1000),
-      });
-
-      await expect(authService.refresh(refreshTokenDto)).rejects.toThrow(UnauthorizedException);
-    });
-
-    it('should throw UnauthorizedException when refresh token is invalid', async () => {
-      tokenService.verifyRefreshToken.mockImplementation(() => {
-        throw new UnauthorizedException('Invalid or expired refresh token');
-      });
-
-      await expect(authService.refresh(refreshTokenDto)).rejects.toThrow(UnauthorizedException);
+    await expect(service.refresh({ refreshToken: 'presented' }, metadata)).resolves.toEqual({
+      accessToken: 'next-access',
+      refreshToken: 'next-refresh',
+      expiresIn: 900,
     });
   });
 
-  // ─── Logout ──────────────────────────────────────────────────────────
-
-  describe('logout', () => {
-    const refreshTokenDto = {
-      refreshToken: 'some-refresh-token',
-    };
-
-    it('should logout successfully and revoke session', async () => {
-      tokenService.verifyRefreshToken.mockReturnValue({ sub: userId });
-      sessionRepository.findByRefreshToken.mockResolvedValue({
-        id: 'session-id',
-      });
-      sessionRepository.revokeSession.mockResolvedValue(undefined);
-
-      const result = await authService.logout(refreshTokenDto);
-
-      expect(result).toEqual({ message: 'Logged out successfully' });
-      expect(sessionRepository.revokeSession).toHaveBeenCalledWith('session-id');
+  it('rejects replay after the repository revokes the session family', async () => {
+    tokenService.parseRefreshCredential.mockReturnValue({ sessionId, verifier: 'v'.repeat(43) });
+    tokenService.hashRefreshCredential.mockReturnValue('a'.repeat(64));
+    tokenService.issueRefreshCredential.mockReturnValue({
+      value: 'unused',
+      hash: 'b'.repeat(64),
+      sessionId: nextSessionId,
     });
+    sessionRepository.rotateSession.mockResolvedValue({ status: 'REPLAY_DETECTED' });
 
-    it('should return success idempotently when session does not exist', async () => {
-      tokenService.verifyRefreshToken.mockReturnValue({ sub: userId });
-      sessionRepository.findByRefreshToken.mockResolvedValue(null);
-
-      const result = await authService.logout(refreshTokenDto);
-
-      expect(result).toEqual({ message: 'Logged out successfully' });
-      expect(sessionRepository.revokeSession).not.toHaveBeenCalled();
-    });
-
-    it('should return success idempotently when token is already invalid', async () => {
-      tokenService.verifyRefreshToken.mockImplementation(() => {
-        throw new UnauthorizedException('Invalid or expired refresh token');
-      });
-
-      const result = await authService.logout(refreshTokenDto);
-
-      expect(result).toEqual({ message: 'Logged out successfully' });
-      expect(sessionRepository.findByRefreshToken).not.toHaveBeenCalled();
-      expect(sessionRepository.revokeSession).not.toHaveBeenCalled();
-    });
+    await expect(service.refresh({ refreshToken: 'replayed' }, metadata)).rejects.toThrow(
+      UnauthorizedException,
+    );
+    expect(securityEvents.record).toHaveBeenCalledWith(
+      'refresh-replay',
+      expect.objectContaining({ outcome: 'denied' }),
+    );
   });
 
-  // ─── Logout All Devices ──────────────────────────────────────────────
+  it('scopes logout and logout-all to the authenticated identity', async () => {
+    const identity = { userId, membershipId, tenantId, sessionId, tokenId };
+    sessionRepository.revokeCurrentFamily.mockResolvedValue(1);
+    sessionRepository.revokeAllForUser.mockResolvedValue(3);
 
-  describe('logoutAllDevices', () => {
-    it('should revoke all sessions and return count', async () => {
-      sessionRepository.revokeAllUserSessions.mockResolvedValue({
-        count: 3,
-      });
-
-      const result = await authService.logoutAllDevices(userId);
-
-      expect(result).toEqual({ revokedCount: 3 });
-      expect(sessionRepository.revokeAllUserSessions).toHaveBeenCalledWith(userId);
-    });
+    await service.logout(identity);
+    await expect(service.logoutAllDevices(identity)).resolves.toEqual({ revokedCount: 3 });
+    expect(sessionRepository.revokeCurrentFamily).toHaveBeenCalledWith(sessionId, userId);
+    expect(sessionRepository.revokeAllForUser).toHaveBeenCalledWith(userId);
   });
 });

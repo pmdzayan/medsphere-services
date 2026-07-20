@@ -16,7 +16,16 @@ enum UserStatus {
 
 enum SessionStatus {
   ACTIVE
+  ROTATED
   EXPIRED
+  REVOKED
+  COMPROMISED
+}
+
+enum MembershipStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
   REVOKED
 }
 
@@ -100,7 +109,8 @@ model Tenant {
   slug        String   @unique
   email       String?  @unique
 
-  isActive    Boolean  @default(true)
+  isActive               Boolean  @default(true)
+  selfRegistrationEnabled Boolean @default(false)
 
   version     Int      @default(1)
 
@@ -108,7 +118,7 @@ model Tenant {
   updatedAt   DateTime @updatedAt
   deletedAt   DateTime?
 
-  users                  User[]
+  memberships            TenantMembership[]
   roles                  Role[]
   permissions            Permission[]
   providerVerifications  ProviderVerification[]
@@ -120,10 +130,7 @@ model Tenant {
 model User {
   id            String      @id @default(uuid()) @db.Uuid
 
-  tenantId      String      @db.Uuid
-  tenant        Tenant      @relation(fields: [tenantId], references: [id], onDelete: Restrict)
-
-  email         String
+  email         String      @unique @db.Citext
   passwordHash  String
 
   firstName     String
@@ -141,12 +148,36 @@ model User {
   updatedAt     DateTime    @updatedAt
   deletedAt     DateTime?
 
-  sessions       UserSession[]
+  memberships    TenantMembership[]
   userRoles      UserRole[]
   privacy        UserPrivacy?
+}
 
-  @@unique([tenantId, email])
-  @@index([tenantId])
+model TenantMembership {
+  id          String           @id @default(uuid()) @db.Uuid
+
+  tenantId    String           @db.Uuid
+  tenant      Tenant           @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+
+  userId      String           @db.Uuid
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  status      MembershipStatus @default(PENDING)
+  isDefault   Boolean          @default(false)
+  joinedAt    DateTime?
+  endedAt     DateTime?
+
+  version     Int              @default(1)
+
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  deletedAt   DateTime?
+
+  sessions    UserSession[]
+
+  @@unique([tenantId, userId])
+  @@index([userId, status])
+  @@index([tenantId, status])
 }
 
 model UserPrivacy {
@@ -248,26 +279,38 @@ model RolePermission {
 }
 
 model UserSession {
-  id             String         @id @default(uuid()) @db.Uuid
+  id                String           @id @default(uuid()) @db.Uuid
 
-  userId         String         @db.Uuid
-  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  membershipId      String           @db.Uuid
+  membership        TenantMembership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
 
-  refreshToken   String         @unique
+  familyId           String           @db.Uuid
+  refreshTokenHash   String           @unique @db.VarChar(64)
 
-  ipAddress      String?
-  userAgent      String?
-  deviceName     String?
+  ipAddress          String?          @db.Inet
+  userAgent          String?          @db.VarChar(512)
+  deviceName         String?          @db.VarChar(120)
 
-  expiresAt      DateTime
+  expiresAt          DateTime
+  absoluteExpiresAt  DateTime
+  lastUsedAt         DateTime         @default(now())
 
-  status         SessionStatus  @default(ACTIVE)
+  status             SessionStatus    @default(ACTIVE)
 
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
+  replacedById       String?          @unique @db.Uuid
+  replacedBy         UserSession?     @relation("SessionRotation", fields: [replacedById], references: [id], onDelete: SetNull)
+  replaces           UserSession?     @relation("SessionRotation")
 
-  @@index([userId])
-  @@index([status])
+  revokedAt          DateTime?
+  revocationReason   String?          @db.VarChar(120)
+
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  @@index([membershipId, status])
+  @@index([familyId, status])
+  @@index([status, expiresAt])
+  @@index([status, absoluteExpiresAt])
 }
 
 model ProviderVerification {

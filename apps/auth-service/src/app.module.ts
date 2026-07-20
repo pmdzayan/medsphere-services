@@ -1,29 +1,26 @@
 import { Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
+import { ThrottlerGuard } from '@nestjs/throttler';
 import { HealthModule } from '@medsphere/common';
 import { PrismaModule } from './prisma/prisma.module';
 import { UsersModule } from './users/users.module';
-import { ProviderVerificationModule } from './provider-verification/provider-verification.module';
-import { ProvidersModule } from './providers/providers.module';
-import { ProductsModule } from './products/products.module';
-import { InventoryModule } from './inventory/inventory.module';
 import { LocalizationModule } from './localization/localization.module';
-import { RbacModule } from './rbac/rbac.module';
-import { RbacSeedService } from './rbac/rbac-seed.service';
-import { AuditModule } from './audit/audit.module';
+import { AuthModule } from './auth/auth.module';
+import { JwtAuthGuard } from './auth/jwt-auth.guard';
+import { AuthRateLimitModule } from './security/auth-rate-limit.module';
 
 @Module({
   imports: [
     HealthModule,
+    AuthRateLimitModule,
     PrismaModule,
+    AuthModule,
     UsersModule,
-    ProviderVerificationModule,
-    ProvidersModule,
-    ProductsModule,
-    InventoryModule,
     LocalizationModule,
-    RbacModule,
-    AuditModule,
   ],
-  providers: [RbacSeedService],
+  providers: [
+    { provide: APP_GUARD, useClass: JwtAuthGuard },
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
+  ],
 })
 export class AppModule {}

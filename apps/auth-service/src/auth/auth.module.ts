@@ -1,14 +1,16 @@
 import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
+import { PassportModule } from '@nestjs/passport';
 
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
-import { AuthRepository } from './auth.repository';
+import { AuthConfigService } from './auth-config.service';
+import { AuthSecurityEventService } from './auth-security-event.service';
+import { JwtStrategy } from './jwt.strategy';
 import { PasswordService } from './password.service';
 import { RegistrationService } from './registration.service';
 import { SessionRepository } from './session.repository';
 import { TokenService } from './token.service';
-
 import { PrismaModule } from '../prisma/prisma.module';
 import { UsersModule } from '../users/users.module';
 
@@ -16,20 +18,20 @@ import { UsersModule } from '../users/users.module';
   imports: [
     PrismaModule,
     UsersModule,
-    JwtModule.register({
-      secret: process.env.JWT_SECRET || 'fallback-secret',
-      signOptions: { expiresIn: '15m' },
-    }),
+    PassportModule.register({ defaultStrategy: 'jwt', session: false }),
+    JwtModule.register({}),
   ],
   controllers: [AuthController],
   providers: [
     AuthService,
-    AuthRepository,
+    AuthConfigService,
+    AuthSecurityEventService,
+    JwtStrategy,
     PasswordService,
     RegistrationService,
     SessionRepository,
     TokenService,
   ],
-  exports: [TokenService],
+  exports: [AuthConfigService, SessionRepository, TokenService],
 })
 export class AuthModule {}

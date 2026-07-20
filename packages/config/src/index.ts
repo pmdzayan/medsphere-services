@@ -5,7 +5,7 @@ import 'dotenv/config';
  * falling back to an insecure default — see PROJECT_RULES.md #9. Call once
  * at service bootstrap, before anything else touches process.env.
  *
- * Example: const env = loadEnv(['DATABASE_URL', 'JWT_SECRET'] as const);
+ * Example: const env = loadEnv(['DATABASE_URL', 'AUTH_JWT_ISSUER'] as const);
  */
 export function loadEnv<T extends string>(required: readonly T[]): Record<T, string> {
   const missing = required.filter((key) => !process.env[key]);

@@ -1,4 +1,5 @@
 import { Controller, Get, HttpCode } from '@nestjs/common';
+import { PublicEndpoint } from '../auth/public-endpoint.decorator';
 
 /**
  * Shared across every service so liveness/readiness semantics — and the
@@ -7,6 +8,7 @@ import { Controller, Get, HttpCode } from '@nestjs/common';
  * the container-level check that calls these endpoints.
  */
 @Controller('health')
+@PublicEndpoint()
 export class HealthController {
   @Get('live')
   @HttpCode(200)
