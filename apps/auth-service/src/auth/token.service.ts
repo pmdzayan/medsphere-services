@@ -12,16 +12,14 @@ import {
   IssuedRefreshCredential,
   RefreshCredentialParts,
 } from './auth.types';
+import {
+  assertValidAccessTokenClaims,
+  hasExpectedAccessTokenHeader,
+  isUuid,
+} from './access-token.validation';
 
 const REFRESH_CREDENTIAL_PATTERN =
   /^msr\.([0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\.([A-Za-z0-9_-]{43})$/;
-
-function isUuid(value: unknown): value is string {
-  return (
-    typeof value === 'string' &&
-    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
-  );
-}
 
 @Injectable()
 export class TokenService {
@@ -64,30 +62,13 @@ export class TokenService {
 
   verifyAccessToken(token: string): AccessTokenClaims {
     const configuration = this.authConfig.value;
-    let decoded: ReturnType<JwtService['decode']>;
-    try {
-      decoded = this.jwtService.decode(token, { complete: true });
-    } catch {
-      throw new UnauthorizedException('Authentication required');
-    }
-    const header =
-      decoded && typeof decoded === 'object' && 'header' in decoded ? decoded.header : undefined;
-    if (
-      !header ||
-      typeof header !== 'object' ||
-      !('alg' in header) ||
-      !('typ' in header) ||
-      !('kid' in header) ||
-      header.alg !== 'RS256' ||
-      header.typ !== ACCESS_TOKEN_TYPE ||
-      header.kid !== configuration.keyId
-    ) {
+    if (!hasExpectedAccessTokenHeader(token, configuration.keyId)) {
       throw new UnauthorizedException('Authentication required');
     }
 
-    let claims: AccessTokenClaims;
+    let claims: unknown;
     try {
-      claims = this.jwtService.verify<AccessTokenClaims>(token, {
+      claims = this.jwtService.verify<Record<string, unknown>>(token, {
         publicKey: configuration.publicKeyPem,
         algorithms: ['RS256'],
         issuer: configuration.issuer,
@@ -97,19 +78,7 @@ export class TokenService {
       throw new UnauthorizedException('Authentication required');
     }
 
-    if (
-      claims.tokenUse !== ACCESS_TOKEN_USE ||
-      !isUuid(claims.sub) ||
-      !isUuid(claims.mid) ||
-      !isUuid(claims.tid) ||
-      !isUuid(claims.sid) ||
-      !isUuid(claims.jti) ||
-      !Number.isInteger(claims.iat) ||
-      !Number.isInteger(claims.exp) ||
-      (claims.exp as number) <= (claims.iat as number)
-    ) {
-      throw new UnauthorizedException('Authentication required');
-    }
+    assertValidAccessTokenClaims(claims);
 
     return claims;
   }

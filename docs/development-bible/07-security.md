@@ -16,6 +16,11 @@
 8. Logout and logout-all are derived from authenticated self context.
 9. Authentication attempts are limited across instances with Redis.
 10. Credentials, keys, digests, emails, and authorization headers are excluded from security logs.
+11. Access-token header and claim validation is shared by direct verification
+    and the Passport strategy so algorithm, type, key ID, token-use, and UUID
+    checks cannot drift across code paths.
+12. Account throttle locators use the same canonicalization as login and
+    registration DTOs even though guards execute before request pipes.
 
 ## Required configuration
 
@@ -84,6 +89,11 @@ Each rotation creates a new session ID in the same family, preserves absolute ex
 | Credential guessing         | Redis network plus account/session counters            | Redis integration and API limit tests |
 | Secret disclosure in logs   | Allowlisted event shape                                | Log capture/review                    |
 | Prototype route exposure    | Unmounted modules plus deny-by-default guard           | Route inventory test                  |
+
+The HTTP security suite complements, but does not replace, the real adapter
+tests. It verifies the assembled Nest application and actual HTTP behavior;
+PostgreSQL tests remain authoritative for session rotation, replay, and tenant
+chain queries, while Redis tests remain authoritative for shared counters.
 
 ## Accepted limitations
 
