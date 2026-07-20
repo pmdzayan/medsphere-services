@@ -1,6 +1,6 @@
 # Volume 04 — Database Bible
 
-**Baseline:** S0.2 reproducible database baseline plus S0.3 trusted-auth migration under review
+**Baseline:** S0.2 reproducible database baseline plus S0.3 trusted-auth migration accepted
 
 **Engine:** PostgreSQL 16
 
