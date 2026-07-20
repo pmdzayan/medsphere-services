@@ -227,9 +227,17 @@ describe('S0.3 authentication HTTP security boundary', () => {
     ).resolves.toMatchObject({ status: 401 });
   });
 
+  it.each(['/rbac/roles', '/audit'])(
+    'S0.4 accepted module requires authentication: %s',
+    async (path) => {
+      const response = await sendRequest(path);
+      // S0.4 mounts RBAC and Audit modules — they now return 401 (auth required)
+      // instead of 404 (not found).
+      expect(response.status).toBe(401);
+    },
+  );
+
   it.each([
-    '/rbac/roles',
-    '/audit',
     '/provider-verification/status',
     `/providers/${randomUUID()}`,
     '/products',
