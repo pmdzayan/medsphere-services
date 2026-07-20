@@ -2,9 +2,9 @@
 
 **Last updated:** 2026-07-20
 
-**Current sprint:** S0.2 — Reproducible Database Baseline (CTO review passed, merge pending)
+**Current sprint:** S0.3 — Authentication and Trusted Tenant Context (not started; dependency met)
 
-**Next feature work:** Blocked
+**Next feature work:** Blocked by S0.3
 
 ## Mandatory startup sequence
 
@@ -39,7 +39,7 @@ The migration must be incremental:
 - Most controllers are not guarded.
 - Tenant and user identity are sometimes client-controlled or hard-coded.
 - RBAC operations are not reliably tenant-scoped.
-- The S0.2 migration and documentation are CI-verified; S0.2 acceptance now awaits PR #2 merge.
+- The S0.2 database baseline is accepted and merged. The database is reproducible through append-only migrations, but the models' security, tenant-isolation, and domain controls remain unaccepted.
 - Reservation and stock operations contain transaction/concurrency defects.
 - Audit logging is not connected to business mutations.
 - Medical-record functionality precedes consent and privacy foundations.
@@ -47,13 +47,10 @@ The migration must be incremental:
 
 See `docs/audits/2026-07-20-cto-baseline.md` for the accepted baseline.
 
-## Current S0.2 boundary
+## Current S0.3 boundary
 
-- Preserve the original migration and use forward-only migration repair.
-- Do not use `prisma db push` for shared environments.
-- Do not redesign authentication, RBAC, audit, inventory, reservation, consent, or privacy behavior in this sprint.
-- A table created by the baseline is not an accepted feature.
-- S0.3 remains blocked until PR #2 is merged.
+- S0.2 is accepted and merged. S0.3 is the current sprint.
+- S0.3 scope is to be defined in its design and ADR.
 
 ## Agent routing
 
