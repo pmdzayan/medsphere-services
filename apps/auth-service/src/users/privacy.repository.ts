@@ -19,7 +19,6 @@ export class PrivacyRepository {
       allowInAppChat?: boolean;
       privatePickup?: boolean;
       hideSensitiveNotifications?: boolean;
-      preferredLanguage?: string;
     },
   ) {
     return this.prisma.client.userPrivacy.upsert({

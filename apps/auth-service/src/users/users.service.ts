@@ -1,7 +1,7 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { UsersRepository } from './users.repository';
 import { PrivacyRepository } from './privacy.repository';
-import { UpdatePrivacyDto } from './dto/privacy.dto';
+import { PrivacyResponseDto, UpdatePrivacyDto } from './dto/privacy.dto';
 import { UpdateLanguageDto } from '../localization/dto/update-language.dto';
 import { LocalizationService } from '../localization/localization.service';
 
@@ -13,7 +13,7 @@ export class UsersService {
     private readonly localizationService: LocalizationService,
   ) {}
 
-  async getPrivacy(userId: string) {
+  async getPrivacy(userId: string): Promise<PrivacyResponseDto> {
     const user = await this.usersRepository.findById(userId);
     if (!user) {
       throw new NotFoundException('User not found');
@@ -27,10 +27,9 @@ export class UsersService {
         allowInAppChat: true,
         privatePickup: false,
         hideSensitiveNotifications: true,
-        preferredLanguage: 'en',
       };
     }
-    return privacy;
+    return this.toPrivacyResponse(privacy);
   }
 
   async updatePrivacy(userId: string, dto: UpdatePrivacyDto) {
@@ -38,7 +37,11 @@ export class UsersService {
     if (!user) {
       throw new NotFoundException('User not found');
     }
-    return this.privacyRepository.upsert(userId, dto);
+    if (Object.keys(dto).length === 0) {
+      throw new BadRequestException('At least one privacy preference is required');
+    }
+    const privacy = await this.privacyRepository.upsert(userId, dto);
+    return this.toPrivacyResponse(privacy);
   }
 
   async updateLanguage(userId: string, dto: UpdateLanguageDto) {
@@ -57,6 +60,16 @@ export class UsersService {
         dto.preferredLanguage,
         { language: dto.preferredLanguage },
       ),
+    };
+  }
+
+  private toPrivacyResponse(privacy: PrivacyResponseDto): PrivacyResponseDto {
+    return {
+      sharePhone: privacy.sharePhone,
+      shareEmail: privacy.shareEmail,
+      allowInAppChat: privacy.allowInAppChat,
+      privatePickup: privacy.privatePickup,
+      hideSensitiveNotifications: privacy.hideSensitiveNotifications,
     };
   }
 }

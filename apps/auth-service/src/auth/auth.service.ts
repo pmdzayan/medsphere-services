@@ -1,14 +1,22 @@
-import { Injectable, UnauthorizedException, ForbiddenException } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 
 import { UsersRepository } from '../users/users.repository';
 import { PasswordService } from './password.service';
 import { RegistrationService } from './registration.service';
 import { TokenService } from './token.service';
 import { SessionRepository } from './session.repository';
+import { AuthConfigService } from './auth-config.service';
+import { AuthSecurityEventService } from './auth-security-event.service';
+import { AuthenticatedIdentity, RequestMetadata } from './auth.types';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { LoginResponseDto } from './dto/login-response.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
+import { RegistrationResponseDto } from './dto/registration-response.dto';
+
+const INVALID_CREDENTIALS_MESSAGE = 'Invalid credentials';
+const INVALID_REFRESH_MESSAGE = 'Invalid refresh credential';
 
 @Injectable()
 export class AuthService {
@@ -18,125 +26,155 @@ export class AuthService {
     private readonly registrationService: RegistrationService,
     private readonly tokenService: TokenService,
     private readonly sessionRepository: SessionRepository,
+    private readonly authConfig: AuthConfigService,
+    private readonly securityEvents: AuthSecurityEventService,
   ) {}
 
-  async register(registerDto: RegisterDto) {
-    return this.registrationService.register(registerDto);
+  async register(registerDto: RegisterDto): Promise<RegistrationResponseDto> {
+    const response = await this.registrationService.register(registerDto);
+    this.securityEvents.record('registration', {
+      outcome: 'success',
+      reason: 'registration-processed',
+    });
+    return response;
   }
 
-  async login(loginDto: LoginDto): Promise<LoginResponseDto> {
-    const user = await this.usersRepository.findByEmail(loginDto.tenantId, loginDto.email);
+  async login(loginDto: LoginDto, metadata: RequestMetadata): Promise<LoginResponseDto> {
+    const loginIdentity = await this.usersRepository.findLoginIdentity(
+      loginDto.tenantSlug,
+      loginDto.email,
+    );
 
-    if (!user) {
-      throw new UnauthorizedException('Invalid credentials');
+    if (!loginIdentity) {
+      await this.passwordService.verifyAgainstDummy(loginDto.password);
+      this.recordInvalidLogin();
+      throw new UnauthorizedException(INVALID_CREDENTIALS_MESSAGE);
     }
 
-    if (user.status !== 'ACTIVE') {
-      throw new ForbiddenException('Account is not active');
+    const passwordValid = await this.passwordService.verify(
+      loginIdentity.user.passwordHash,
+      loginDto.password,
+    );
+    if (!passwordValid) {
+      this.recordInvalidLogin();
+      throw new UnauthorizedException(INVALID_CREDENTIALS_MESSAGE);
     }
 
-    const isValidPassword = await this.passwordService.verify(user.passwordHash, loginDto.password);
-
-    if (!isValidPassword) {
-      throw new UnauthorizedException('Invalid credentials');
+    if (this.passwordService.needsRehash(loginIdentity.user.passwordHash)) {
+      const passwordHash = await this.passwordService.hash(loginDto.password);
+      await this.usersRepository.update(loginIdentity.user.id, { passwordHash });
     }
 
-    const tokenPayload = { sub: user.id, email: user.email, tenantId: user.tenantId };
-
-    const accessToken = this.tokenService.generateAccessToken(tokenPayload);
-    const refreshToken = this.tokenService.generateRefreshToken(tokenPayload);
-
-    const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + 7);
+    const now = Date.now();
+    const configuration = this.authConfig.value;
+    const refreshCredential = this.tokenService.issueRefreshCredential();
+    const familyId = randomUUID();
+    const expiresAt = new Date(now + configuration.refreshIdleTtlSeconds * 1000);
+    const absoluteExpiresAt = new Date(now + configuration.refreshAbsoluteTtlSeconds * 1000);
 
     await this.sessionRepository.createSession({
-      userId: user.id,
-      refreshToken,
+      id: refreshCredential.sessionId,
+      membershipId: loginIdentity.membershipId,
+      familyId,
+      refreshTokenHash: refreshCredential.hash,
       expiresAt,
+      absoluteExpiresAt,
+      metadata,
     });
 
+    const accessToken = this.tokenService.issueAccessToken({
+      userId: loginIdentity.user.id,
+      membershipId: loginIdentity.membershipId,
+      tenantId: loginIdentity.tenantId,
+      sessionId: refreshCredential.sessionId,
+    });
+
+    const eventContext = {
+      outcome: 'success' as const,
+      userId: loginIdentity.user.id,
+      membershipId: loginIdentity.membershipId,
+      tenantId: loginIdentity.tenantId,
+      sessionId: refreshCredential.sessionId,
+    };
+    this.securityEvents.record('login', eventContext);
+    this.securityEvents.record('session-created', eventContext);
+
     return {
-      accessToken,
-      refreshToken,
-      expiresIn: 900,
+      accessToken: accessToken.value,
+      refreshToken: refreshCredential.value,
+      expiresIn: accessToken.expiresIn,
       user: {
-        id: user.id,
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
+        id: loginIdentity.user.id,
+        email: loginIdentity.user.email,
+        firstName: loginIdentity.user.firstName,
+        lastName: loginIdentity.user.lastName,
+      },
+      context: {
+        membershipId: loginIdentity.membershipId,
+        tenantId: loginIdentity.tenantId,
       },
     };
   }
 
-  async logout(refreshTokenDto: RefreshTokenDto): Promise<{ message: string }> {
-    try {
-      this.tokenService.verifyRefreshToken(refreshTokenDto.refreshToken);
-    } catch {
-      return { message: 'Logged out successfully' };
+  async refresh(refreshTokenDto: RefreshTokenDto, metadata: RequestMetadata) {
+    const refreshParts = this.tokenService.parseRefreshCredential(refreshTokenDto.refreshToken);
+    const nextCredential = this.tokenService.issueRefreshCredential();
+    const rotation = await this.sessionRepository.rotateSession({
+      currentSessionId: refreshParts.sessionId,
+      presentedHash: this.tokenService.hashRefreshCredential(refreshTokenDto.refreshToken),
+      nextSessionId: nextCredential.sessionId,
+      nextRefreshTokenHash: nextCredential.hash,
+      idleTtlSeconds: this.authConfig.value.refreshIdleTtlSeconds,
+      metadata,
+    });
+
+    if (rotation.status === 'REPLAY_DETECTED') {
+      this.securityEvents.record('refresh-replay', {
+        outcome: 'denied',
+        sessionId: refreshParts.sessionId,
+        reason: 'refresh-replay',
+      });
+      throw new UnauthorizedException(INVALID_REFRESH_MESSAGE);
     }
 
-    const existingSession = await this.sessionRepository.findByRefreshToken(
-      refreshTokenDto.refreshToken,
-    );
-
-    if (!existingSession) {
-      return { message: 'Logged out successfully' };
+    if (rotation.status === 'REJECTED') {
+      this.securityEvents.record('refresh', {
+        outcome: 'denied',
+        sessionId: refreshParts.sessionId,
+        reason: 'invalid-refresh-credential',
+      });
+      throw new UnauthorizedException(INVALID_REFRESH_MESSAGE);
     }
 
-    await this.sessionRepository.revokeSession(existingSession.id);
-
-    return { message: 'Logged out successfully' };
-  }
-
-  async logoutAllDevices(userId: string): Promise<{ revokedCount: number }> {
-    const result = await this.sessionRepository.revokeAllUserSessions(userId);
-
-    return { revokedCount: result.count };
-  }
-
-  async refresh(refreshTokenDto: RefreshTokenDto) {
-    const decoded = this.tokenService.verifyRefreshToken(refreshTokenDto.refreshToken);
-
-    const existingSession = await this.sessionRepository.findByRefreshToken(
-      refreshTokenDto.refreshToken,
-    );
-
-    if (!existingSession) {
-      throw new UnauthorizedException('Invalid refresh token');
-    }
-
-    if (existingSession.status !== 'ACTIVE') {
-      throw new UnauthorizedException('Refresh token has been revoked');
-    }
-
-    if (existingSession.expiresAt < new Date()) {
-      throw new UnauthorizedException('Refresh token has expired');
-    }
-
-    const tokenPayload = {
-      sub: existingSession.userId,
-      email: decoded.email,
-      tenantId: decoded.tenantId,
-    };
-
-    const newAccessToken = this.tokenService.generateAccessToken(tokenPayload);
-    const newRefreshToken = this.tokenService.generateRefreshToken(tokenPayload);
-
-    await this.sessionRepository.revokeSession(existingSession.id);
-
-    const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + 7);
-
-    await this.sessionRepository.createSession({
-      userId: existingSession.userId,
-      refreshToken: newRefreshToken,
-      expiresAt,
+    const accessToken = this.tokenService.issueAccessToken(rotation.identity);
+    this.securityEvents.record('refresh', {
+      outcome: 'success',
+      ...rotation.identity,
     });
 
     return {
-      accessToken: newAccessToken,
-      refreshToken: newRefreshToken,
-      expiresIn: 900,
+      accessToken: accessToken.value,
+      refreshToken: nextCredential.value,
+      expiresIn: accessToken.expiresIn,
     };
+  }
+
+  async logout(identity: AuthenticatedIdentity): Promise<{ message: string }> {
+    await this.sessionRepository.revokeCurrentFamily(identity.sessionId, identity.userId);
+    this.securityEvents.record('logout', { outcome: 'success', ...identity });
+    return { message: 'Logged out successfully' };
+  }
+
+  async logoutAllDevices(identity: AuthenticatedIdentity): Promise<{ revokedCount: number }> {
+    const revokedCount = await this.sessionRepository.revokeAllForUser(identity.userId);
+    this.securityEvents.record('logout-all', { outcome: 'success', ...identity });
+    return { revokedCount };
+  }
+
+  private recordInvalidLogin(): void {
+    this.securityEvents.record('login', {
+      outcome: 'denied',
+      reason: 'invalid-credentials',
+    });
   }
 }

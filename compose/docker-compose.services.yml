@@ -29,11 +29,23 @@ services:
     environment:
       NODE_ENV: development
       PORT: 3000
-      # Required, no fallback default: an unset secret now fails the container
-      # at startup instead of silently running with a guessable value.
+      # Authentication and distributed rate limiting fail closed when any
+      # required key material or dependency is absent.
       DATABASE_URL: postgresql://${POSTGRES_USER:?POSTGRES_USER is required}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/${POSTGRES_DB:?POSTGRES_DB is required}?schema=public
       REDIS_CLUSTER_URL: redis://:${REDIS_PASSWORD:?REDIS_PASSWORD is required}@redis:6379
-      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      AUTH_JWT_PRIVATE_KEY_BASE64: ${AUTH_JWT_PRIVATE_KEY_BASE64:?AUTH_JWT_PRIVATE_KEY_BASE64 is required}
+      AUTH_JWT_PUBLIC_KEY_BASE64: ${AUTH_JWT_PUBLIC_KEY_BASE64:?AUTH_JWT_PUBLIC_KEY_BASE64 is required}
+      AUTH_JWT_ISSUER: ${AUTH_JWT_ISSUER:?AUTH_JWT_ISSUER is required}
+      AUTH_JWT_AUDIENCE: ${AUTH_JWT_AUDIENCE:?AUTH_JWT_AUDIENCE is required}
+      AUTH_JWT_KEY_ID: ${AUTH_JWT_KEY_ID:?AUTH_JWT_KEY_ID is required}
+      AUTH_ACCESS_TOKEN_TTL_SECONDS: ${AUTH_ACCESS_TOKEN_TTL_SECONDS:-900}
+      AUTH_REFRESH_IDLE_TTL_SECONDS: ${AUTH_REFRESH_IDLE_TTL_SECONDS:-604800}
+      AUTH_REFRESH_ABSOLUTE_TTL_SECONDS: ${AUTH_REFRESH_ABSOLUTE_TTL_SECONDS:-2592000}
+      AUTH_REFRESH_TOKEN_PEPPER: ${AUTH_REFRESH_TOKEN_PEPPER:?AUTH_REFRESH_TOKEN_PEPPER is required}
+      AUTH_ARGON2_MEMORY_KIB: ${AUTH_ARGON2_MEMORY_KIB:-19456}
+      AUTH_ARGON2_TIME_COST: ${AUTH_ARGON2_TIME_COST:-2}
+      AUTH_ARGON2_PARALLELISM: ${AUTH_ARGON2_PARALLELISM:-1}
+      ENABLE_SWAGGER: ${ENABLE_SWAGGER:-false}
     networks:
       - medsphere-infra
       - medsphere-apps

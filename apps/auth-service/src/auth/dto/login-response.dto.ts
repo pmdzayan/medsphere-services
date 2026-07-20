@@ -1,11 +1,40 @@
+import { ApiProperty } from '@nestjs/swagger';
+
+export class AuthenticatedUserResponseDto {
+  @ApiProperty({ format: 'uuid' })
+  id!: string;
+
+  @ApiProperty({ format: 'email' })
+  email!: string;
+
+  @ApiProperty()
+  firstName!: string;
+
+  @ApiProperty()
+  lastName!: string;
+}
+
+export class TenantContextResponseDto {
+  @ApiProperty({ format: 'uuid' })
+  membershipId!: string;
+
+  @ApiProperty({ format: 'uuid' })
+  tenantId!: string;
+}
+
 export class LoginResponseDto {
+  @ApiProperty()
   accessToken!: string;
+
+  @ApiProperty()
   refreshToken!: string;
+
+  @ApiProperty({ example: 900 })
   expiresIn!: number;
-  user!: {
-    id: string;
-    email: string;
-    firstName: string;
-    lastName: string;
-  };
+
+  @ApiProperty({ type: AuthenticatedUserResponseDto })
+  user!: AuthenticatedUserResponseDto;
+
+  @ApiProperty({ type: TenantContextResponseDto })
+  context!: TenantContextResponseDto;
 }

@@ -1,6 +1,6 @@
 # Volume 04 — Database Bible
 
-**Baseline:** S0.2 reproducible database baseline
+**Baseline:** S0.2 reproducible database baseline plus S0.3 trusted-auth migration under review
 
 **Engine:** PostgreSQL 16
 
@@ -18,10 +18,11 @@ No production or real healthcare data is approved.
 
 ## Migration chain
 
-| Order | Migration                                       | Purpose                                                                |
-| ----: | ----------------------------------------------- | ---------------------------------------------------------------------- |
-|     1 | `20260715163416_init_auth_schema`               | Tenant, user, session, role, permission, and assignment foundation     |
-|     2 | `20260720020000_complete_reproducible_baseline` | Additive migration from the auth state to the complete declared schema |
+| Order | Migration                                              | Purpose                                                                |
+| ----: | ------------------------------------------------------ | ---------------------------------------------------------------------- |
+|     1 | `20260715163416_init_auth_schema`                      | Tenant, user, session, role, permission, and assignment foundation     |
+|     2 | `20260720020000_complete_reproducible_baseline`        | Additive migration from the auth state to the complete declared schema |
+|     3 | `20260720120000_trusted_authentication_tenant_context` | Global identity, tenant memberships, and secure rotated sessions       |
 
 Migration history is append-only under ADR-002. Applied migrations are never edited or deleted. Shared databases use `prisma migrate deploy`; `prisma db push` is prohibited.
 
@@ -42,7 +43,8 @@ pnpm db:verify
 | Enum                 | Values                                                                                                                                           |
 | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `UserStatus`         | `ACTIVE`, `INACTIVE`, `SUSPENDED`, `PENDING_VERIFICATION`                                                                                        |
-| `SessionStatus`      | `ACTIVE`, `EXPIRED`, `REVOKED`                                                                                                                   |
+| `SessionStatus`      | `ACTIVE`, `ROTATED`, `EXPIRED`, `REVOKED`, `COMPROMISED`                                                                                         |
+| `MembershipStatus`   | `PENDING`, `ACTIVE`, `SUSPENDED`, `REVOKED`                                                                                                      |
 | `AuditAction`        | `CREATE`, `UPDATE`, `DELETE`, `ACCESS`                                                                                                           |
 | `ProviderType`       | `PHARMACY`, `HOSPITAL`                                                                                                                           |
 | `VerificationStatus` | `PENDING`, `UNDER_REVIEW`, `APPROVED`, `REJECTED`, `SUSPENDED`, `EXPIRED`                                                                        |
@@ -59,16 +61,16 @@ pnpm db:verify
 
 ## Provisional model ownership
 
-| Module                     | Models                                                    | Current acceptance                              |
-| -------------------------- | --------------------------------------------------------- | ----------------------------------------------- |
-| Tenancy and Identity       | `Tenant`, `User`, `UserPrivacy`, `UserSession`            | Reproducible; security acceptance blocked       |
-| Access Control             | `Role`, `Permission`, `UserRole`, `RolePermission`        | Reproducible; tenant-safe RBAC rejected         |
-| Provider Registry          | `Provider`, `ProviderVerification`                        | Prototype; verification workflow blocked        |
-| Medicine Catalog           | `Product`                                                 | Prototype                                       |
-| Inventory and Stock Ledger | `Inventory`, `Batch`, `StockMovement`, `InventoryHistory` | Reproducible prototype; integrity rejected      |
-| Audit and Policy           | `AuditLog`                                                | Storage prototype; integration rejected         |
-| Patient Records            | `MedicalRecord`                                           | Blocked by authentication, consent, and privacy |
-| Reservation and Fulfilment | `Reservation`                                             | Reproducible prototype; workflow rejected       |
+| Module                     | Models                                                             | Current acceptance                              |
+| -------------------------- | ------------------------------------------------------------------ | ----------------------------------------------- |
+| Tenancy and Identity       | `Tenant`, `User`, `TenantMembership`, `UserPrivacy`, `UserSession` | S0.3 implementation under review                |
+| Access Control             | `Role`, `Permission`, `UserRole`, `RolePermission`                 | Reproducible; tenant-safe RBAC rejected         |
+| Provider Registry          | `Provider`, `ProviderVerification`                                 | Prototype; verification workflow blocked        |
+| Medicine Catalog           | `Product`                                                          | Prototype                                       |
+| Inventory and Stock Ledger | `Inventory`, `Batch`, `StockMovement`, `InventoryHistory`          | Reproducible prototype; integrity rejected      |
+| Audit and Policy           | `AuditLog`                                                         | Storage prototype; integration rejected         |
+| Patient Records            | `MedicalRecord`                                                    | Blocked by authentication, consent, and privacy |
+| Reservation and Fulfilment | `Reservation`                                                      | Reproducible prototype; workflow rejected       |
 
 Ownership is provisional until bounded-context and persistence-boundary work is accepted. Existing service folders do not establish ownership.
 
@@ -78,22 +80,33 @@ Types below describe the PostgreSQL representation. Columns are required unless 
 
 ### `Tenant`
 
-- Columns: `id UUID PK`; `name text`; `slug text unique`; `email text? unique`; `isActive boolean=true`; `version integer=1`; `createdAt timestamp=now`; `updatedAt timestamp`; `deletedAt timestamp?`.
-- Relationships: parent of users, roles, permissions, provider verifications, and providers.
+- Columns: `id UUID PK`; `name text`; normalized `slug text unique`; `email text? unique`; `isActive boolean=true`; `selfRegistrationEnabled boolean=false`; `version integer=1`; `createdAt timestamp=now`; `updatedAt timestamp`; `deletedAt timestamp?`.
+- Relationships: parent of memberships, roles, permissions, provider verifications, and providers.
+- Constraints: unique slug and optional email; normalized lowercase-hyphen slug check in the S0.3 migration.
 - Indexes: unique `slug`; unique `email`; `slug` index.
-- Sensitive/audit notes: email may be personal or organizational contact data. Soft deletion exists; retention policy is not accepted.
+- Sensitive/audit notes: email may be personal or organizational contact data. Public onboarding is denied by default. Soft deletion exists; retention policy is not accepted.
 
 ### `User`
 
-- Columns: `id UUID PK`; `tenantId UUID`; `email text`; `passwordHash text`; `firstName text`; `lastName text`; `phone text?`; `preferredLanguage text='en'`; `status UserStatus=ACTIVE`; `version integer=1`; `createdAt timestamp=now`; `updatedAt timestamp`; `deletedAt timestamp?`.
-- Relationships: belongs to `Tenant`; parent of sessions, role assignments, and one privacy record.
-- Constraints: foreign key `tenantId → Tenant.id` with delete restrict; unique `(tenantId, email)`.
-- Indexes: `tenantId`; composite unique `(tenantId, email)`.
-- Sensitive/audit notes: identity and authentication data. Password-hash handling is reviewed in S0.3; soft-delete/retention behavior remains unaccepted.
+- Columns: `id UUID PK`; `email citext global unique`; `passwordHash text`; `firstName text`; `lastName text`; `phone text?`; `preferredLanguage text='en'`; `status UserStatus=ACTIVE`; `version integer=1`; `createdAt timestamp=now`; `updatedAt timestamp`; `deletedAt timestamp?`.
+- Relationships: global identity parent of memberships, role assignments, and one privacy record.
+- Constraints: case-insensitive global unique email.
+- Indexes: unique `email`.
+- Migration behavior: normalized duplicate emails stop the migration without exposing email values; no automatic identity merge occurs.
+- Sensitive/audit notes: identity and authentication data. Passwords use explicitly configured Argon2id. Soft-delete/retention behavior remains unaccepted.
+
+### `TenantMembership`
+
+- Columns: `id UUID PK`; `tenantId UUID`; `userId UUID`; `status MembershipStatus=PENDING`; `isDefault boolean=false`; `joinedAt timestamp?`; `endedAt timestamp?`; `version integer=1`; `createdAt timestamp=now`; `updatedAt timestamp`; `deletedAt timestamp?`.
+- Relationships: joins global `User` to `Tenant`; parent of sessions.
+- Constraints: `tenantId → Tenant.id` delete restrict; `userId → User.id` cascade delete; unique `(tenantId, userId)`; partial unique default membership per non-deleted user.
+- Indexes: `(userId, status)`; `(tenantId, status)`; unique tenant/user; partial unique default.
+- Migration behavior: one deterministic default membership is backfilled from every S0.2 tenant-bound user. Status maps conservatively; ambiguous global emails abort instead of merging.
+- Security note: this is the sole authoritative tenant context for authentication. Role assignment remains S0.4 work.
 
 ### `UserPrivacy`
 
-- Columns: `id UUID PK`; `userId UUID unique`; `sharePhone boolean=false`; `shareEmail boolean=false`; `allowInAppChat boolean=true`; `privatePickup boolean=false`; `hideSensitiveNotifications boolean=true`; `preferredLanguage text='en'`; `version integer=1`; `createdAt timestamp=now`; `updatedAt timestamp`.
+- Columns: `id UUID PK`; `userId UUID unique`; `sharePhone boolean=false`; `shareEmail boolean=false`; `allowInAppChat boolean=true`; `privatePickup boolean=false`; `hideSensitiveNotifications boolean=true`; `preferredLanguage text='en'` (legacy, non-authoritative, not exposed by accepted APIs; removal requires a reviewed data migration); `version integer=1`; `createdAt timestamp=now`; `updatedAt timestamp`.
 - Relationships: belongs one-to-one to `User`.
 - Constraints: foreign key `userId → User.id` with cascade delete; unique `userId`.
 - Indexes: unique `userId`; `userId` index.
@@ -133,11 +146,12 @@ Types below describe the PostgreSQL representation. Columns are required unless 
 
 ### `UserSession`
 
-- Columns: `id UUID PK`; `userId UUID`; `refreshToken text unique`; `ipAddress text?`; `userAgent text?`; `deviceName text?`; `expiresAt timestamp`; `status SessionStatus=ACTIVE`; `createdAt timestamp=now`; `updatedAt timestamp`.
-- Relationships: belongs to `User`.
-- Constraints: `userId → User.id` cascade delete; unique `refreshToken`.
-- Indexes: `userId`; `status`; unique `refreshToken`.
-- Sensitive/audit notes: device and network metadata are sensitive. Plain refresh-token persistence is not accepted and is addressed in S0.3.
+- Columns: `id UUID PK`; `membershipId UUID`; `familyId UUID`; `refreshTokenHash varchar(64) unique`; `ipAddress inet?`; `userAgent varchar(512)?`; `deviceName varchar(120)?`; `expiresAt timestamp`; `absoluteExpiresAt timestamp`; `lastUsedAt timestamp=now`; `status SessionStatus=ACTIVE`; `replacedById UUID? unique`; `revokedAt timestamp?`; `revocationReason varchar(120)?`; `createdAt timestamp=now`; `updatedAt timestamp`.
+- Relationships: belongs to `TenantMembership`; optional self-reference to the rotation successor.
+- Constraints: `membershipId → TenantMembership.id` cascade delete; `replacedById → UserSession.id` set null; unique digest and successor reference.
+- Indexes: `(membershipId, status)`; `(familyId, status)`; `(status, expiresAt)`; `(status, absoluteExpiresAt)`; unique digest and successor.
+- Migration behavior: all raw prototype refresh sessions are deliberately deleted and users must authenticate again. Raw credentials cannot be safely transformed into opaque single-use values.
+- Sensitive/audit notes: only a peppered HMAC digest is stored. Device and network metadata remain sensitive and require an accepted retention policy.
 
 ### `ProviderVerification`
 
@@ -218,7 +232,7 @@ Types below describe the PostgreSQL representation. Columns are required unless 
 
 The following are deliberately documented rather than silently accepted:
 
-- Cross-tenant RBAC relationships are not enforced by composite foreign keys.
+- Cross-tenant RBAC relationships are not enforced by composite foreign keys; S0.4 must migrate role assignment from global-user ambiguity to membership-safe ownership.
 - Several identifier columns have no foreign keys.
 - Inventory and batch quantities lack database check constraints.
 - `Inventory` and `Batch` are competing stock sources of truth.
