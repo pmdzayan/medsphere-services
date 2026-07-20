@@ -44,6 +44,9 @@ Repositories own persistence queries; controllers do not access Prisma. Services
 ## Validation and API documentation
 
 - The shared validation pipe strips no unknown fields silently: it rejects them.
+- Production bootstrap and HTTP-boundary tests call the same
+  `configureAuthApplication` function so global filters, validation, and
+  opt-in OpenAPI behavior cannot drift between runtime and test setup.
 - Tenant slugs and email locators are trimmed and lowercased; passwords are never transformed.
 - Passwords allow Unicode and passphrases, with 15–128 character bounds while MFA is unavailable.
 - All external strings are bounded.
@@ -61,6 +64,25 @@ Redis-backed counters apply across instances. Health checks are excluded; other 
 | Refresh  | 30 per minute    | 10 per minute           |
 
 Generated storage keys contain route-scoped, domain-separated HMAC digests rather than raw emails, IP addresses, user IDs, passwords, refresh credentials, or authorization headers. Redis failure prevents the service from starting or authorizing an unmetered request.
+
+Account rate-limit tracking canonicalizes tenant slugs and email addresses
+with the same trim-and-lowercase rule as the authentication DTOs. This is
+required because guards execute before DTO transformation; raw casing or
+whitespace must not create additional throttle buckets for the same account.
+
+## HTTP boundary verification
+
+The application-level security suite boots the real `AppModule`, global
+guards, Passport strategy, validation pipe, and exception filter over an
+ephemeral HTTP listener. Persistence and Redis adapters are replaced with
+deterministic test doubles because their real behavior is verified separately
+by the PostgreSQL and Redis integration suites.
+
+The suite proves that public health and language metadata remain available,
+protected self routes fail with the shared 401 envelope, HS256 substitution is
+rejected before identity lookup, client identity headers cannot replace the
+signed and server-validated context, revoked session chains invalidate an
+otherwise valid access token, and every unaccepted prototype route returns 404.
 
 ## Error and logging rules
 

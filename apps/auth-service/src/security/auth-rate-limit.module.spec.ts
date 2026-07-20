@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import { ExecutionContext } from '@nestjs/common';
-import { createRateLimitKeyGenerator } from './auth-rate-limit.module';
+import { accountTracker, createRateLimitKeyGenerator } from './auth-rate-limit.module';
 
 describe('authentication rate-limit key generation', () => {
   const context = {
@@ -27,5 +27,17 @@ describe('authentication rate-limit key generation', () => {
     expect(generator(context, tracker, 'account')).not.toBe(
       generator(context, 'account:central-pharmacy:other@example.com', 'account'),
     );
+  });
+
+  it('canonicalizes account locators before guards run the account throttle', () => {
+    expect(
+      accountTracker({
+        ip: '127.0.0.1',
+        body: {
+          tenantSlug: '  Central-Pharmacy ',
+          email: ' USER@Example.COM  ',
+        },
+      }),
+    ).toBe('account:central-pharmacy:user@example.com');
   });
 });

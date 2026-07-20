@@ -2,6 +2,7 @@ import { createHmac } from 'node:crypto';
 import { ExecutionContext, Module } from '@nestjs/common';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { AuthConfigService } from '../auth/auth-config.service';
+import { normalizeAuthenticationLocator } from '../auth/auth-normalization';
 import { AuthModule } from '../auth/auth.module';
 import { RedisThrottlerStorage } from './redis-throttler.storage';
 
@@ -24,7 +25,7 @@ function ipTracker(request: Record<string, unknown>): string {
   return typeof request.ip === 'string' ? request.ip : 'unknown-network-source';
 }
 
-function accountTracker(request: Record<string, unknown>): string {
+export function accountTracker(request: Record<string, unknown>): string {
   const typedRequest = request as ThrottleRequest;
   if (typedRequest.user?.userId) {
     return `user:${typedRequest.user.userId}`;
@@ -33,7 +34,9 @@ function accountTracker(request: Record<string, unknown>): string {
   const tenantSlug = typedRequest.body?.tenantSlug;
   const email = typedRequest.body?.email;
   if (typeof tenantSlug === 'string' && typeof email === 'string') {
-    return `account:${tenantSlug.toLowerCase()}:${email.toLowerCase()}`;
+    return `account:${normalizeAuthenticationLocator(tenantSlug)}:${normalizeAuthenticationLocator(
+      email,
+    )}`;
   }
 
   const refreshCredential = typedRequest.body?.refreshToken;
