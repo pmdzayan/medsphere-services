@@ -16,9 +16,26 @@ permissions:
 
 jobs:
   verify:
-    name: Lint, Test, and Build
+    name: Database, Lint, Test, and Build
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    env:
+      DATABASE_URL: postgresql://medsphere_ci:medsphere_ci@localhost:5432/medsphere_ci?schema=public
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: medsphere_ci
+          POSTGRES_PASSWORD: medsphere_ci
+          POSTGRES_DB: medsphere_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U medsphere_ci -d medsphere_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
 
     steps:
       - name: Checkout
@@ -38,6 +55,9 @@ jobs:
 
       - name: Install locked dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Verify clean database migration and drift
+        run: pnpm db:verify
 
       - name: Check formatting
         run: pnpm format:check

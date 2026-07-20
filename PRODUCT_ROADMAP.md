@@ -14,9 +14,9 @@ This roadmap preserves the MedSphere product vision while inserting the engineer
 
 Ordered sprints:
 
-1. S0.1 Architecture and repository governance
-2. S0.2 Reproducible database baseline
-3. S0.3 Authentication and trusted tenant context
+1. S0.1 Architecture and repository governance — accepted
+2. S0.2 Reproducible database baseline — current
+3. S0.3 Authentication and trusted tenant context — blocked by S0.2
 4. S0.4 Tenant-safe RBAC and audit integration
 5. S0.5 Inventory ledger and reservation integrity
 

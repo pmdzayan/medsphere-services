@@ -2,7 +2,7 @@
 
 **Last updated:** 2026-07-20
 
-**Current sprint:** S0.1 — Architecture and Repository Governance (in review — merge pending)
+**Current sprint:** S0.2 — Reproducible Database Baseline (implementation in progress)
 
 **Next feature work:** Blocked
 
@@ -23,7 +23,7 @@ If a required document is missing or conflicts with an accepted ADR, stop implem
 
 ## Current architectural context
 
-ADR-001 selects a modular monolith for Version 1. The repository still contains seven NestJS applications sharing a Prisma database. Do not treat those deployment boundaries as approved domain boundaries, and do not add another service.
+ADR-001 selects a modular monolith for Version 1. ADR-002 preserves append-only migration history and requires clean PostgreSQL deployment and drift verification. The repository still contains seven NestJS applications sharing a Prisma database. Do not treat those deployment boundaries as approved domain boundaries, and do not add another service.
 
 The migration must be incremental:
 
@@ -39,13 +39,21 @@ The migration must be incremental:
 - Most controllers are not guarded.
 - Tenant and user identity are sometimes client-controlled or hard-coded.
 - RBAC operations are not reliably tenant-scoped.
-- Prisma schema and migrations are materially out of sync.
+- Prisma schema and migrations were materially out of sync; S0.2 remains unaccepted until the additive migration passes clean-database CI and drift verification.
 - Reservation and stock operations contain transaction/concurrency defects.
 - Audit logging is not connected to business mutations.
 - Medical-record functionality precedes consent and privacy foundations.
 - Automated test coverage is insufficient for the current risk.
 
 See `docs/audits/2026-07-20-cto-baseline.md` for the accepted baseline.
+
+## Current S0.2 boundary
+
+- Preserve the original migration and use forward-only migration repair.
+- Do not use `prisma db push` for shared environments.
+- Do not redesign authentication, RBAC, audit, inventory, reservation, consent, or privacy behavior in this sprint.
+- A table created by the baseline is not an accepted feature.
+- S0.3 remains blocked until S0.2 is reviewed, CI-verified, and merged.
 
 ## Agent routing
 
