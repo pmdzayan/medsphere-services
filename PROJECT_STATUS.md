@@ -16,7 +16,7 @@
 
 **Objective:** Make the complete declared Prisma schema reproducible through append-only migrations, a documented database contract, and automated clean-PostgreSQL deployment and drift verification.
 
-**Status:** Implementation in progress — clean-database CI evidence required
+**Status:** CTO review passed — merge pending
 
 **In scope**
 
@@ -102,17 +102,23 @@ Progress is measured by accepted milestone criteria, not by the number of files 
 
 PR #1 was accepted and squash-merged as `d8958c4c1573b181e1f23874386b86ee837dd305`.
 
-## S0.2 evidence status
+## S0.2 verification evidence
 
-- Schema audit: 18 models and 13 enums declared; the original migration contains 7 models and 4 enums.
-- Prisma schema validation and client generation: passed.
-- Additive schema diff: the tracked migration body exactly matches Prisma's generated diff from the original auth state to the declared schema.
-- Formatting: passed.
-- Local lint: passed — 15/15 uncached Turbo tasks using the previously verified locked dependency set mirrored into the isolated S0.2 worktree.
-- Local tests: passed — 17/17 uncached Turbo tasks; 75/75 Jest tests passed.
-- Local build: passed — 15/15 uncached Turbo tasks.
-- JSON/YAML syntax, repository-local Markdown links, migration destructive-statement scan, and `git diff --check`: passed.
-- Clean locked install in the isolated S0.2 worktree: blocked by repeated registry HTTP 502 responses; the mirrored-dependency checks above are local evidence, not a substitute for the pull-request clean install.
-- Clean PostgreSQL migration deploy and drift check: pending pull-request CI.
+| Check                                          | Result                                                                                                                         |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| Schema audit                                   | 18 models and 13 enums declared; the original migration contains 7 models and 4 enums                                          |
+| Prisma schema validation and client generation | Passed                                                                                                                         |
+| Additive schema diff                           | Tracked migration body exactly matches Prisma's generated diff from original auth state to declared schema                     |
+| Clean PNPM locked installation                 | Passed in GitHub Actions ([workflow run 29732542356](https://github.com/pmdzayan/medsphere-services/actions/runs/29732542356)) |
+| Clean PostgreSQL 16 migration deploy           | Passed                                                                                                                         |
+| `prisma migrate status`                        | Passed — no unapplied migrations reported                                                                                      |
+| Live-database-to-schema drift verification     | Passed — no drift detected                                                                                                     |
+| Formatting                                     | Passed                                                                                                                         |
+| Lint                                           | Passed                                                                                                                         |
+| Tests                                          | Passed                                                                                                                         |
+| Build                                          | Passed                                                                                                                         |
+| PostgreSQL container cleanup                   | Passed                                                                                                                         |
 
-S0.3 must not begin until S0.2 is reviewed, its required GitHub checks pass, and its pull request is merged.
+Reference: [PR #2](https://github.com/pmdzayan/medsphere-services/pull/2), workflow run [29732542356](https://github.com/pmdzayan/medsphere-services/actions/runs/29732542356), commit `ed03abee671d075967499bfca742afbd61eb02d4`.
+
+S0.3 remains blocked until PR #2 is merged.

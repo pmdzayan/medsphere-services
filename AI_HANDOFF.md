@@ -2,7 +2,7 @@
 
 **Last updated:** 2026-07-20
 
-**Current sprint:** S0.2 — Reproducible Database Baseline (implementation in progress)
+**Current sprint:** S0.2 — Reproducible Database Baseline (CTO review passed, merge pending)
 
 **Next feature work:** Blocked
 
