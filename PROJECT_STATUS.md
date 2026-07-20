@@ -47,23 +47,23 @@
 
 ## CTO acceptance ledger
 
-| Area                        | Repository evidence                                             | CTO status         |
-| --------------------------- | --------------------------------------------------------------- | ------------------ |
-| Planning and architecture   | ADR-001 and S0.1 governance merged in PR #1                     | Accepted baseline  |
-| Monorepo/tooling foundation | PNPM, Turbo, TypeScript, NestJS, Prisma, shared packages exist  | Partially accepted |
-| Database reproducibility    | Additive migration and clean-database gate under S0.2 review    | In remediation     |
-| Inventory foundation        | Batch, stock, availability, FEFO, and search scaffolding exists | Prototype only     |
-| Reservation                 | Competing implementations and unsafe transaction boundaries     | Rejected           |
-| Task 11 — Identity/RBAC     | Authentication and tenant enforcement incomplete                | Rejected           |
-| Task 12 — Audit Logging     | Storage scaffolding exists; integration and isolation absent    | Rejected           |
-| Task 13 onward              | Dependencies are not complete                                   | Blocked            |
+| Area                        | Repository evidence                                                 | CTO status              |
+| --------------------------- | ------------------------------------------------------------------- | ----------------------- |
+| Planning and architecture   | ADR-001 and S0.1 governance merged in PR #1                         | Accepted baseline       |
+| Monorepo/tooling foundation | PNPM, Turbo, TypeScript, NestJS, Prisma, shared packages exist      | Partially accepted      |
+| Database reproducibility    | PR #2 migration and clean-database gates CI-verified; merge pending | Approved; merge pending |
+| Inventory foundation        | Batch, stock, availability, FEFO, and search scaffolding exists     | Prototype only          |
+| Reservation                 | Competing implementations and unsafe transaction boundaries         | Rejected                |
+| Task 11 — Identity/RBAC     | Authentication and tenant enforcement incomplete                    | Rejected                |
+| Task 12 — Audit Logging     | Storage scaffolding exists; integration and isolation absent        | Rejected                |
+| Task 13 onward              | Dependencies are not complete                                       | Blocked                 |
 
 ## Critical blockers
 
 1. Empty JWT strategy and missing deny-by-default authentication enforcement.
 2. Client-controlled or hard-coded identity and tenant context.
 3. Cross-tenant RBAC risks.
-4. Prisma schema and migration history mismatch until S0.2 clean-database evidence passes.
+4. S0.2 database remediation is CI-verified but does not become the accepted base until PR #2 is merged.
 5. Non-atomic reservation and inventory mutations.
 6. Competing inventory/batch sources of truth.
 7. Audit logging not integrated into business operations.
@@ -119,6 +119,6 @@ PR #1 was accepted and squash-merged as `d8958c4c1573b181e1f23874386b86ee837dd30
 | Build                                          | Passed                                                                                                                         |
 | PostgreSQL container cleanup                   | Passed                                                                                                                         |
 
-Reference: [PR #2](https://github.com/pmdzayan/medsphere-services/pull/2), workflow run [29732542356](https://github.com/pmdzayan/medsphere-services/actions/runs/29732542356), commit `ed03abee671d075967499bfca742afbd61eb02d4`.
+The initial implementation commit `ed03abee671d075967499bfca742afbd61eb02d4` and the documentation evidence commit `c880d3d4e759ba369023dd319c5213885e06af4b` both passed every gate. Reference: [PR #2](https://github.com/pmdzayan/medsphere-services/pull/2), workflow runs [29732542356](https://github.com/pmdzayan/medsphere-services/actions/runs/29732542356) and [29736345081](https://github.com/pmdzayan/medsphere-services/actions/runs/29736345081).
 
 S0.3 remains blocked until PR #2 is merged.

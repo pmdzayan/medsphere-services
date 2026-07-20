@@ -39,7 +39,7 @@ The migration must be incremental:
 - Most controllers are not guarded.
 - Tenant and user identity are sometimes client-controlled or hard-coded.
 - RBAC operations are not reliably tenant-scoped.
-- Prisma schema and migrations were materially out of sync; S0.2 remains unaccepted until the additive migration passes clean-database CI and drift verification.
+- The S0.2 migration and documentation are CI-verified; S0.2 acceptance now awaits PR #2 merge.
 - Reservation and stock operations contain transaction/concurrency defects.
 - Audit logging is not connected to business mutations.
 - Medical-record functionality precedes consent and privacy foundations.
@@ -53,7 +53,7 @@ See `docs/audits/2026-07-20-cto-baseline.md` for the accepted baseline.
 - Do not use `prisma db push` for shared environments.
 - Do not redesign authentication, RBAC, audit, inventory, reservation, consent, or privacy behavior in this sprint.
 - A table created by the baseline is not an accepted feature.
-- S0.3 remains blocked until S0.2 is reviewed, CI-verified, and merged.
+- S0.3 remains blocked until PR #2 is merged.
 
 ## Agent routing
 
