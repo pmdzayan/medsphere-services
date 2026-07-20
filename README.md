@@ -8,7 +8,7 @@ MedSphere is a planned multi-tenant healthcare ecosystem for patients, pharmacie
 
 MedSphere Version 1 is being consolidated into a **modular monolith** with explicit bounded modules and future service-extraction seams. The current repository still contains multiple service applications that share one database; they are migration inputs, not the approved target architecture.
 
-The architecture and database-baseline decisions are recorded in [ADR-001](docs/adr/0001-modular-monolith-for-version-1.md) and [ADR-002](docs/adr/0002-append-only-reproducible-database-baseline.md).
+The architecture, database-baseline, and authentication decisions are recorded in [ADR-001](docs/adr/0001-modular-monolith-for-version-1.md), [ADR-002](docs/adr/0002-append-only-reproducible-database-baseline.md), and [ADR-003](docs/adr/0003-trusted-authentication-and-tenant-context.md).
 
 ## Required reading
 
