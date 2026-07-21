@@ -9,37 +9,41 @@ export class AuditService {
     private readonly rbacService: RbacService,
   ) {}
 
+  /**
+   * Public method to persist a raw audit log entry.
+   * Used by the AuditLogInterceptor and other services.
+   */
+  async log(data: CreateAuditLogData) {
+    return this.repository.create(data);
+  }
+
   async logCreate(params: {
-    organizationId: string;
-    userId: string;
-    module: string;
-    resourceType: string;
-    resourceId: string;
+    tenantId: string;
+    userId?: string;
+    resource: string;
+    resourceId?: string;
     newValue?: Record<string, unknown>;
     ipAddress?: string;
     userAgent?: string;
-    requestId?: string;
-    deviceType?: string;
+    correlationId?: string;
   }) {
     return this.log({
       ...params,
       action: 'CREATE',
-      oldValue: undefined,
+      oldValues: undefined,
     });
   }
 
   async logUpdate(params: {
-    organizationId: string;
-    userId: string;
-    module: string;
-    resourceType: string;
-    resourceId: string;
+    tenantId: string;
+    userId?: string;
+    resource: string;
+    resourceId?: string;
     oldValue?: Record<string, unknown>;
     newValue?: Record<string, unknown>;
     ipAddress?: string;
     userAgent?: string;
-    requestId?: string;
-    deviceType?: string;
+    correlationId?: string;
   }) {
     return this.log({
       ...params,
@@ -48,100 +52,24 @@ export class AuditService {
   }
 
   async logDelete(params: {
-    organizationId: string;
-    userId: string;
-    module: string;
-    resourceType: string;
-    resourceId: string;
+    tenantId: string;
+    userId?: string;
+    resource: string;
+    resourceId?: string;
     oldValue?: Record<string, unknown>;
     ipAddress?: string;
     userAgent?: string;
-    requestId?: string;
-    deviceType?: string;
+    correlationId?: string;
   }) {
     return this.log({
       ...params,
       action: 'DELETE',
-      newValue: undefined,
+      newValues: undefined,
     });
   }
 
-  async logRestore(params: {
-    organizationId: string;
-    userId: string;
-    module: string;
-    resourceType: string;
-    resourceId: string;
-    newValue?: Record<string, unknown>;
-    ipAddress?: string;
-    userAgent?: string;
-    requestId?: string;
-    deviceType?: string;
-  }) {
-    return this.log({
-      ...params,
-      action: 'RESTORE',
-      oldValue: undefined,
-    });
-  }
-
-  async logLogin(params: {
-    organizationId: string;
-    userId: string;
-    module: string;
-    ipAddress?: string;
-    userAgent?: string;
-    requestId?: string;
-    deviceType?: string;
-  }) {
-    return this.log({
-      ...params,
-      action: 'LOGIN',
-      resourceType: 'session',
-      resourceId: params.userId,
-      oldValue: undefined,
-      newValue: undefined,
-    });
-  }
-
-  async logLogout(params: {
-    organizationId: string;
-    userId: string;
-    module: string;
-    ipAddress?: string;
-    userAgent?: string;
-    requestId?: string;
-    deviceType?: string;
-  }) {
-    return this.log({
-      ...params,
-      action: 'LOGOUT',
-      resourceType: 'session',
-      resourceId: params.userId,
-      oldValue: undefined,
-      newValue: undefined,
-    });
-  }
-
-  async logCustom(params: {
-    organizationId: string;
-    userId: string;
-    module: string;
-    action: string;
-    resourceType: string;
-    resourceId: string;
-    oldValue?: Record<string, unknown>;
-    newValue?: Record<string, unknown>;
-    ipAddress?: string;
-    userAgent?: string;
-    requestId?: string;
-    deviceType?: string;
-  }) {
+  async logCustom(params: CreateAuditLogData) {
     return this.log(params);
-  }
-
-  private async log(data: CreateAuditLogData) {
-    return this.repository.create(data);
   }
 
   async findById(id: string) {
@@ -160,10 +88,10 @@ export class AuditService {
     }
 
     const filterParams: AuditLogFilterParams = {
-      organizationId: params.organizationId,
+      tenantId: params.tenantId,
       userId: params.userId,
-      module: params.module,
-      resourceType: params.resourceType,
+      action: params.action,
+      resource: params.resource,
       startDate: params.startDate,
       endDate: params.endDate,
       limit: params.limit,

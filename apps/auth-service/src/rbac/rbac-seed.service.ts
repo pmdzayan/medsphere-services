@@ -1,6 +1,6 @@
 import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
 import { RbacRepository } from './rbac.repository';
-import { Permissions, RolePermissions } from './permission.constants';
+import { Permissions, RolePermissions, parsePermission } from './permission.constants';
 
 const DEFAULT_ROLES = [
   { name: 'Super Admin', type: 'SYSTEM' as const },
@@ -14,10 +14,10 @@ const DEFAULT_ROLES = [
   { name: 'Support Staff', type: 'TENANT' as const },
 ];
 
-const PERMISSION_DEFINITIONS = Object.values(Permissions).map((name) => ({
-  name,
-  description: `${name} permission`,
-}));
+const PERMISSION_DEFINITIONS = Object.values(Permissions).map((perm) => {
+  const { resource, action } = parsePermission(perm);
+  return { resource, action, description: `${resource}:${action} permission` };
+});
 
 const SYSTEM_TENANT_ID = '00000000-0000-0000-0000-000000000000';
 
@@ -33,28 +33,40 @@ export class RbacSeedService implements OnModuleInit {
 
   async seed() {
     try {
-      // Check if roles already exist
-      const existingRoles = await this.repository.findAllRoles();
-      if (existingRoles.length > 0) {
-        this.logger.log('Roles already seeded, skipping...');
+      // Check if permissions already exist
+      const existingPermissions = await this.repository.findAllPermissions();
+      if (existingPermissions.length > 0) {
+        this.logger.log('Permissions already seeded, skipping...');
         return;
       }
 
       this.logger.log('Seeding default permissions...');
-      const permissions: Array<{ id: string; name: string }> = [];
+      const permissions: Array<{ id: string; resource: string; action: string }> = [];
       for (const perm of PERMISSION_DEFINITIONS) {
         const created = await this.repository.createPermission({
-          tenantId: SYSTEM_TENANT_ID,
-          name: perm.name,
+          resource: perm.resource,
+          action: perm.action,
           description: perm.description,
         });
-        permissions.push({ id: created.id, name: created.name });
+        permissions.push({ id: created.id, resource: created.resource, action: created.action });
       }
 
       this.logger.log('Seeding default roles...');
-      const permissionMap = new Map(permissions.map((p) => [p.name, p.id]));
+      const permissionKeyMap = new Map(permissions.map((p) => [`${p.resource}:${p.action}`, p.id]));
+
+      // Create a system tenant for seeding (create if not exists?)
+      // Roles are tenant-scoped, so we use the SYSTEM_TENANT_ID
+
+      // Create default roles if they don't exist
+      const existingRoles = await this.repository.findAllRoles(SYSTEM_TENANT_ID);
+      const existingRoleNames = new Set(existingRoles.map((r: { name: string }) => r.name));
 
       for (const roleDef of DEFAULT_ROLES) {
+        if (existingRoleNames.has(roleDef.name)) {
+          this.logger.log(`Role "${roleDef.name}" already exists, skipping...`);
+          continue;
+        }
+
         const role = await this.repository.createRole({
           tenantId: SYSTEM_TENANT_ID,
           name: roleDef.name,
@@ -64,7 +76,7 @@ export class RbacSeedService implements OnModuleInit {
         const rolePermissionNames = RolePermissions[roleDef.name];
         if (rolePermissionNames && rolePermissionNames.length > 0) {
           const rolePermissionIds = rolePermissionNames
-            .map((name) => permissionMap.get(name))
+            .map((permName) => permissionKeyMap.get(permName as string))
             .filter((id): id is string => id !== undefined);
           if (rolePermissionIds.length > 0) {
             await this.repository.assignPermissionsToRole(role.id, rolePermissionIds);

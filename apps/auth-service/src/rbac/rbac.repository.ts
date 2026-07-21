@@ -29,7 +29,11 @@ export class RbacRepository {
           include: { permission: true },
         },
         userRoles: {
-          include: { user: true },
+          include: {
+            tenantMembership: {
+              include: { user: true },
+            },
+          },
         },
       },
     });
@@ -78,18 +82,20 @@ export class RbacRepository {
     });
   }
 
-  async createPermission(data: { tenantId: string; name: string; description?: string }) {
+  async createPermission(data: { resource: string; action: string; description?: string }) {
     return this.prisma.client.permission.create({ data });
   }
 
-  async findAllPermissions(tenantId?: string) {
-    const where: Record<string, unknown> = { deletedAt: null };
-    if (tenantId) {
-      where.tenantId = tenantId;
-    }
+  async findAllPermissions() {
     return this.prisma.client.permission.findMany({
-      where,
-      orderBy: { name: 'asc' },
+      where: { deletedAt: null },
+      orderBy: [{ resource: 'asc' }, { action: 'asc' }],
+    });
+  }
+
+  async findPermissionByResourceAction(resource: string, action: string) {
+    return this.prisma.client.permission.findUnique({
+      where: { resource_action: { resource, action } },
     });
   }
 
@@ -108,23 +114,28 @@ export class RbacRepository {
     }
   }
 
-  async assignRoleToUser(roleId: string, userId: string) {
+  async assignRoleToUser(roleId: string, tenantMembershipId: string) {
     return this.prisma.client.userRole.upsert({
-      where: { userId_roleId: { userId, roleId } },
+      where: {
+        tenantMembershipId_roleId: {
+          tenantMembershipId,
+          roleId,
+        },
+      },
       update: {},
-      create: { userId, roleId },
+      create: { tenantMembershipId, roleId },
     });
   }
 
-  async removeRoleFromUser(roleId: string, userId: string) {
+  async removeRoleFromUser(roleId: string, tenantMembershipId: string) {
     return this.prisma.client.userRole.deleteMany({
-      where: { userId, roleId },
+      where: { tenantMembershipId, roleId },
     });
   }
 
-  async getUserRoles(userId: string) {
+  async getUserRoles(tenantMembershipId: string) {
     return this.prisma.client.userRole.findMany({
-      where: { userId },
+      where: { tenantMembershipId },
       include: {
         role: {
           include: {
@@ -137,9 +148,9 @@ export class RbacRepository {
     });
   }
 
-  async getUserPermissions(userId: string): Promise<string[]> {
+  async getUserPermissionsByMembership(tenantMembershipId: string): Promise<string[]> {
     const userRoles = await this.prisma.client.userRole.findMany({
-      where: { userId },
+      where: { tenantMembershipId },
       include: {
         role: {
           include: {
@@ -154,9 +165,57 @@ export class RbacRepository {
     const permissions = new Set<string>();
     for (const userRole of userRoles) {
       for (const rp of userRole.role.rolePermissions) {
-        permissions.add(rp.permission.name);
+        permissions.add(`${rp.permission.resource}:${rp.permission.action}`);
       }
     }
     return Array.from(permissions);
+  }
+
+  async getUserPermissions(userId: string): Promise<string[]> {
+    const memberships = await this.prisma.client.tenantMembership.findMany({
+      where: { userId, deletedAt: null },
+      include: {
+        userRoles: {
+          include: {
+            role: {
+              include: {
+                rolePermissions: {
+                  include: { permission: true },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    const permissions = new Set<string>();
+    for (const membership of memberships) {
+      for (const userRole of membership.userRoles) {
+        for (const rp of userRole.role.rolePermissions) {
+          permissions.add(`${rp.permission.resource}:${rp.permission.action}`);
+        }
+      }
+    }
+    return Array.from(permissions);
+  }
+
+  async findTenantMembership(tenantId: string, userId: string) {
+    return this.prisma.client.tenantMembership.findUnique({
+      where: { tenantId_userId: { tenantId, userId } },
+      include: {
+        userRoles: {
+          include: {
+            role: {
+              include: {
+                rolePermissions: {
+                  include: { permission: true },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
   }
 }

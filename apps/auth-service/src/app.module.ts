@@ -10,6 +10,7 @@ import { JwtAuthGuard } from './auth/jwt-auth.guard';
 import { AuthRateLimitModule } from './security/auth-rate-limit.module';
 import { RbacModule } from './rbac/rbac.module';
 import { AuditModule } from './audit/audit.module';
+import { MpiModule } from './mpi/mpi.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { AuditModule } from './audit/audit.module';
     LocalizationModule,
     RbacModule,
     AuditModule,
+    MpiModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },

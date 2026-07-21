@@ -1,14 +1,15 @@
 /**
  * Centralized permission constants for tenant-scoped authorization.
  *
- * Naming convention: `<resource>:<action>`
+ * Each permission is defined as a `{ resource, action }` tuple expressed
+ * in the format `<resource>:<action>`.
  *
  * Resources group related domain operations. Actions follow standard CRUD
  * plus domain-specific verbs (approve, export, assign).
  *
- * Do not embed permission strings in controllers or guards — import from
- * this module instead.
+ * This module is safe for use in decorators, guards, and seed scripts.
  */
+
 export const Permissions = {
   // Inventory
   INVENTORY_CREATE: 'inventory:create' as const,
@@ -75,9 +76,27 @@ export const Permissions = {
   // Audit
   AUDIT_READ: 'audit:read' as const,
   AUDIT_EXPORT: 'audit:export' as const,
+
+  // MPI (Master Patient Index)
+  MPI_CREATE: 'mpi:create' as const,
+  MPI_READ: 'mpi:read' as const,
+  MPI_UPDATE: 'mpi:update' as const,
+  MPI_DELETE: 'mpi:delete' as const,
+  MPI_MERGE: 'mpi:merge' as const,
 } as const;
 
 export type Permission = (typeof Permissions)[keyof typeof Permissions];
+
+/**
+ * Splits a "<resource>:<action>" string into its components.
+ */
+export function parsePermission(permission: string): { resource: string; action: string } {
+  const [resource, action] = permission.split(':');
+  return {
+    resource: resource ?? '*',
+    action: action ?? '*',
+  };
+}
 
 /**
  * Predefined role definitions mapping role names to their granted permissions.
@@ -174,5 +193,16 @@ export const RolePermissions: Record<string, readonly Permission[]> = {
     Permissions.USERS_UPDATE,
     Permissions.RESERVATION_READ,
     Permissions.RESERVATION_UPDATE,
+  ],
+
+  // MPI roles get all MPI permissions
+  'Registration Clerk': [Permissions.MPI_CREATE, Permissions.MPI_READ, Permissions.MPI_UPDATE],
+
+  'MPI Administrator': [
+    Permissions.MPI_CREATE,
+    Permissions.MPI_READ,
+    Permissions.MPI_UPDATE,
+    Permissions.MPI_DELETE,
+    Permissions.MPI_MERGE,
   ],
 } as const;

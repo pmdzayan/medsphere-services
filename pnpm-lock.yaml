@@ -147,6 +147,9 @@ importers:
       passport-jwt:
         specifier: ^4.0.1
         version: 4.0.1
+      rxjs:
+        specifier: ^7.8.1
+        version: 7.8.2
     devDependencies:
       '@nestjs/cli':
         specifier: ^10.3.2

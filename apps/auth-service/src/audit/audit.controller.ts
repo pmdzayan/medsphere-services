@@ -1,23 +1,37 @@
 import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiHeader } from '@nestjs/swagger';
 import { AuditService } from './audit.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { PermissionsGuard } from '../common/guards/permissions.guard';
-import { RequirePermissions } from '../common/decorators/permissions.decorator';
+import { RequirePermissions } from '../common/decorators/require-permissions.decorator';
+import { TenantRbacGuard } from '../common/guards/tenant-rbac.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 
+@ApiTags('Audit')
 @Controller('audit')
-@UseGuards(JwtAuthGuard, PermissionsGuard)
+@UseGuards(JwtAuthGuard, TenantRbacGuard)
+@ApiHeader({
+  name: 'x-tenant-id',
+  description: 'Tenant ID for tenant-scoped access',
+  required: true,
+})
+@ApiHeader({
+  name: 'x-correlation-id',
+  description: 'Correlation ID for request tracing',
+  required: false,
+})
 export class AuditController {
   constructor(private readonly auditService: AuditService) {}
 
   @Get()
-  @RequirePermissions('audit:read')
+  @RequirePermissions({ resource: 'audit', action: 'read' })
+  @ApiOperation({ summary: 'List audit log entries with tenant-scoped filtering' })
+  @ApiResponse({ status: 200, description: 'Paginated audit log entries' })
   async findAll(
-    @CurrentUser() user: { sub: string; tenantId: string },
-    @Query('organizationId') organizationId?: string,
+    @CurrentUser() user: { sub: string; tenantId?: string },
+    @Query('tenantId') tenantId?: string,
     @Query('userId') userId?: string,
-    @Query('module') module?: string,
-    @Query('resourceType') resourceType?: string,
+    @Query('action') action?: string,
+    @Query('resource') resource?: string,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
     @Query('limit') limit?: string,
@@ -27,10 +41,10 @@ export class AuditController {
   ) {
     return this.auditService.findAll({
       requestingUserId: user.sub,
-      organizationId,
+      tenantId,
       userId,
-      module,
-      resourceType,
+      action,
+      resource,
       startDate,
       endDate,
       limit: limit ? parseInt(limit, 10) : undefined,
@@ -41,7 +55,10 @@ export class AuditController {
   }
 
   @Get(':id')
-  @RequirePermissions('audit:read')
+  @RequirePermissions({ resource: 'audit', action: 'read' })
+  @ApiOperation({ summary: 'Get a single audit log entry by ID' })
+  @ApiResponse({ status: 200, description: 'Audit log entry' })
+  @ApiResponse({ status: 404, description: 'Audit log not found' })
   async findById(@Param('id') id: string) {
     return this.auditService.findById(id);
   }

@@ -80,31 +80,39 @@ export class RbacService {
     await this.repository.softDeleteRole(id);
   }
 
-  async assignRoleToUser(roleId: string, userId: string) {
+  async assignRoleToUser(roleId: string, tenantMembershipId: string) {
     const role = await this.repository.findRoleById(roleId);
     if (!role || role.deletedAt) {
       throw new NotFoundException('Role not found');
     }
-    return this.repository.assignRoleToUser(roleId, userId);
+    return this.repository.assignRoleToUser(roleId, tenantMembershipId);
   }
 
-  async removeRoleFromUser(roleId: string, userId: string) {
-    const result = await this.repository.removeRoleFromUser(roleId, userId);
+  async removeRoleFromUser(roleId: string, tenantMembershipId: string) {
+    const result = await this.repository.removeRoleFromUser(roleId, tenantMembershipId);
     if (result.count === 0) {
       throw new BadRequestException('User does not have this role assigned');
     }
     return { message: 'Role removed from user successfully' };
   }
 
-  async getUserRoles(userId: string) {
-    return this.repository.getUserRoles(userId);
+  async getUserRoles(tenantMembershipId: string) {
+    return this.repository.getUserRoles(tenantMembershipId);
   }
 
   async getUserPermissions(userId: string): Promise<string[]> {
     return this.repository.getUserPermissions(userId);
   }
 
-  async listPermissions(tenantId?: string) {
-    return this.repository.findAllPermissions(tenantId);
+  async getUserPermissionsByMembership(tenantMembershipId: string): Promise<string[]> {
+    return this.repository.getUserPermissionsByMembership(tenantMembershipId);
+  }
+
+  async findTenantMembership(tenantId: string, userId: string) {
+    return this.repository.findTenantMembership(tenantId, userId);
+  }
+
+  async listPermissions() {
+    return this.repository.findAllPermissions();
   }
 }

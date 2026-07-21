@@ -2,25 +2,24 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 export interface CreateAuditLogData {
-  organizationId: string;
-  userId: string;
-  module: string;
+  tenantId: string;
+  userId?: string;
   action: string;
-  resourceType: string;
-  resourceId: string;
-  oldValue?: Record<string, unknown>;
-  newValue?: Record<string, unknown>;
+  resource: string;
+  resourceId?: string;
+  correlationId?: string;
   ipAddress?: string;
   userAgent?: string;
-  requestId?: string;
-  deviceType?: string;
+  oldValues?: Record<string, unknown>;
+  newValues?: Record<string, unknown>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface AuditLogFilterParams {
-  organizationId?: string;
+  tenantId?: string;
   userId?: string;
-  module?: string;
-  resourceType?: string;
+  action?: string;
+  resource?: string;
   startDate?: string;
   endDate?: string;
   limit?: number;
@@ -34,22 +33,30 @@ export class AuditRepository {
   constructor(private readonly prisma: PrismaService) {}
 
   async create(data: CreateAuditLogData) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const createData: any = {
-      organizationId: data.organizationId,
-      userId: data.userId,
-      module: data.module,
+    const createInput: Record<string, unknown> = {
+      tenant: { connect: { id: data.tenantId } },
       action: data.action,
-      resourceType: data.resourceType,
+      resource: data.resource,
       resourceId: data.resourceId,
+      correlationId: data.correlationId,
       ipAddress: data.ipAddress,
       userAgent: data.userAgent,
-      requestId: data.requestId,
-      deviceType: data.deviceType,
     };
-    if (data.oldValue !== undefined) createData.oldValue = data.oldValue;
-    if (data.newValue !== undefined) createData.newValue = data.newValue;
-    return this.prisma.client.auditLog.create({ data: createData });
+    if (data.userId) {
+      createInput.user = { connect: { id: data.userId } };
+    }
+    if (data.oldValues !== undefined) {
+      createInput.oldValues = data.oldValues;
+    }
+    if (data.newValues !== undefined) {
+      createInput.newValues = data.newValues;
+    }
+    if (data.metadata !== undefined) {
+      createInput.metadata = data.metadata;
+    }
+    return this.prisma.client.auditLog.create({
+      data: createInput as Parameters<typeof this.prisma.client.auditLog.create>[0]['data'],
+    });
   }
 
   async findById(id: string) {
@@ -61,10 +68,10 @@ export class AuditRepository {
   async findAll(params: AuditLogFilterParams) {
     const where: Record<string, unknown> = {};
 
-    if (params.organizationId) where.organizationId = params.organizationId;
+    if (params.tenantId) where.tenantId = params.tenantId;
     if (params.userId) where.userId = params.userId;
-    if (params.module) where.module = params.module;
-    if (params.resourceType) where.resourceType = params.resourceType;
+    if (params.action) where.action = params.action;
+    if (params.resource) where.resource = params.resource;
 
     if (params.startDate || params.endDate) {
       const createdAtFilter: Record<string, Date> = {};

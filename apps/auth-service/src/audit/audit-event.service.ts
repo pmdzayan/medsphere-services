@@ -23,20 +23,19 @@ export class AuditEventService {
   async recordAuthenticationEvent(
     event: string,
     context: AuthenticationSecurityEventContext,
-    requestMetadata?: { ipAddress?: string; userAgent?: string; requestId?: string },
+    requestMetadata?: { ipAddress?: string; userAgent?: string; correlationId?: string },
   ): Promise<void> {
     await this.auditService.logCustom({
-      organizationId: context.tenantId ?? 'system',
+      tenantId: context.tenantId ?? 'system',
       userId: context.userId ?? 'unknown',
-      module: 'authentication',
       action: event,
-      resourceType: 'session',
+      resource: 'session',
       resourceId: context.sessionId ?? context.userId ?? 'unknown',
-      oldValue: context.outcome === 'denied' ? { reason: context.reason } : undefined,
-      newValue: context.outcome === 'success' ? { outcome: 'success' } : undefined,
+      oldValues: context.outcome === 'denied' ? { reason: context.reason } : undefined,
+      newValues: context.outcome === 'success' ? { outcome: 'success' } : undefined,
       ipAddress: requestMetadata?.ipAddress,
       userAgent: requestMetadata?.userAgent,
-      requestId: requestMetadata?.requestId,
+      correlationId: requestMetadata?.correlationId,
     });
   }
 
@@ -44,17 +43,16 @@ export class AuditEventService {
    * Persist a business mutation as a durable audit log entry.
    */
   async recordBusinessEvent(params: {
-    organizationId: string;
-    userId: string;
-    module: string;
+    tenantId: string;
+    userId?: string;
     action: string;
-    resourceType: string;
-    resourceId: string;
-    oldValue?: Record<string, unknown>;
-    newValue?: Record<string, unknown>;
+    resource: string;
+    resourceId?: string;
+    oldValues?: Record<string, unknown>;
+    newValues?: Record<string, unknown>;
     ipAddress?: string;
     userAgent?: string;
-    requestId?: string;
+    correlationId?: string;
   }): Promise<void> {
     await this.auditService.logCustom(params);
   }

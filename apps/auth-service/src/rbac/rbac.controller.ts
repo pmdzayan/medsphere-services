@@ -3,72 +3,78 @@ import { RbacService } from './rbac.service';
 import { CreateRoleDto } from './dto/create-role.dto';
 import { UpdateRoleDto } from './dto/update-role.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { RequirePermissions } from '../common/decorators/permissions.decorator';
-import { PermissionsGuard } from '../common/guards/permissions.guard';
+import { RequirePermissions } from '../common/decorators/require-permissions.decorator';
+import { TenantRbacGuard } from '../common/guards/tenant-rbac.guard';
 
 @Controller('rbac')
-@UseGuards(JwtAuthGuard, PermissionsGuard)
+@UseGuards(JwtAuthGuard, TenantRbacGuard)
 export class RbacController {
   constructor(private readonly rbacService: RbacService) {}
 
   @Post('roles')
-  @RequirePermissions('admin:create')
+  @RequirePermissions({ resource: 'admin', action: 'create' })
   async createRole(@Body() dto: CreateRoleDto) {
     return this.rbacService.createRole(dto);
   }
 
   @Get('roles')
-  @RequirePermissions('admin:read')
+  @RequirePermissions({ resource: 'admin', action: 'read' })
   async findAllRoles(@Query('tenantId') tenantId?: string) {
     return this.rbacService.findAllRoles(tenantId);
   }
 
   @Get('roles/:id')
-  @RequirePermissions('admin:read')
+  @RequirePermissions({ resource: 'admin', action: 'read' })
   async findRoleById(@Param('id') id: string) {
     return this.rbacService.findRoleById(id);
   }
 
   @Put('roles/:id')
-  @RequirePermissions('admin:update')
+  @RequirePermissions({ resource: 'admin', action: 'update' })
   async updateRole(@Param('id') id: string, @Body() dto: UpdateRoleDto) {
     return this.rbacService.updateRole(id, dto);
   }
 
   @Delete('roles/:id')
-  @RequirePermissions('admin:delete')
+  @RequirePermissions({ resource: 'admin', action: 'delete' })
   async removeRole(@Param('id') id: string) {
     await this.rbacService.removeRole(id);
     return { message: 'Role deleted successfully' };
   }
 
-  @Post('roles/:roleId/users/:userId')
-  @RequirePermissions('admin:update')
-  async assignRoleToUser(@Param('roleId') roleId: string, @Param('userId') userId: string) {
-    return this.rbacService.assignRoleToUser(roleId, userId);
+  @Post('roles/:roleId/memberships/:membershipId')
+  @RequirePermissions({ resource: 'admin', action: 'update' })
+  async assignRoleToUser(
+    @Param('roleId') roleId: string,
+    @Param('membershipId') membershipId: string,
+  ) {
+    return this.rbacService.assignRoleToUser(roleId, membershipId);
   }
 
-  @Delete('roles/:roleId/users/:userId')
-  @RequirePermissions('admin:update')
-  async removeRoleFromUser(@Param('roleId') roleId: string, @Param('userId') userId: string) {
-    return this.rbacService.removeRoleFromUser(roleId, userId);
+  @Delete('roles/:roleId/memberships/:membershipId')
+  @RequirePermissions({ resource: 'admin', action: 'update' })
+  async removeRoleFromUser(
+    @Param('roleId') roleId: string,
+    @Param('membershipId') membershipId: string,
+  ) {
+    return this.rbacService.removeRoleFromUser(roleId, membershipId);
   }
 
-  @Get('users/:userId/roles')
-  @RequirePermissions('admin:read')
-  async getUserRoles(@Param('userId') userId: string) {
-    return this.rbacService.getUserRoles(userId);
+  @Get('memberships/:membershipId/roles')
+  @RequirePermissions({ resource: 'admin', action: 'read' })
+  async getUserRoles(@Param('membershipId') membershipId: string) {
+    return this.rbacService.getUserRoles(membershipId);
   }
 
   @Get('users/:userId/permissions')
-  @RequirePermissions('admin:read')
+  @RequirePermissions({ resource: 'admin', action: 'read' })
   async getUserPermissions(@Param('userId') userId: string) {
     return this.rbacService.getUserPermissions(userId);
   }
 
   @Get('permissions')
-  @RequirePermissions('admin:read')
-  async listPermissions(@Query('tenantId') tenantId?: string) {
-    return this.rbacService.listPermissions(tenantId);
+  @RequirePermissions({ resource: 'admin', action: 'read' })
+  async listPermissions() {
+    return this.rbacService.listPermissions();
   }
 }
