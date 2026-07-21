@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { Test, TestingModule } from '@nestjs/testing';
 import { StockMovementService } from './stock-movement.service';
 import { StockMovementRepository } from './stock-movement.repository';
@@ -15,11 +16,31 @@ describe('StockMovementService', () => {
   let batchRepository: jest.Mocked<BatchRepository>;
   let inventoryRepository: jest.Mocked<InventoryRepository>;
   let historyRepository: jest.Mocked<InventoryHistoryRepository>;
-  const mockInventoryRecord = {
+  const fullProduct = {
+    id: 'product-1',
+    name: 'Test Medicine',
+    genericName: null,
+    brand: 'TestBrand',
+    category: 'MEDICINE' as const,
+    subCategory: null,
+    description: null,
+    manufacturer: 'TestMfg',
+    dosageForm: 'TABLET' as const,
+    strength: '500mg',
+    barcode: null,
+    requiresPrescription: false,
+    isActive: true,
+    version: 1,
+    createdAt: new Date('2026-01-01'),
+    updatedAt: new Date('2026-01-01'),
+    deletedAt: null,
+  };
+
+  const mockInventoryRecord: any = {
     id: 'inventory-1',
     providerId: 'provider-1',
     productId: 'product-1',
-    product: { id: 'product-1', name: 'Test Medicine' },
+    product: fullProduct,
     quantity: 100,
     reservedQuantity: 0,
     batchNumber: 'BATCH-001',
@@ -39,7 +60,7 @@ describe('StockMovementService', () => {
     stockMovements: [],
   };
 
-  const mockBatchRecord = {
+  const mockBatchRecord: any = {
     id: 'batch-1',
     providerId: 'provider-1',
     productId: 'product-1',
@@ -55,10 +76,10 @@ describe('StockMovementService', () => {
     createdAt: new Date('2026-01-01'),
     updatedAt: new Date('2026-01-01'),
     deletedAt: null,
-    product: { id: 'product-1', name: 'Test Medicine' },
+    product: fullProduct,
   };
 
-  const mockMovementRecord = {
+  const mockMovementRecord: any = {
     id: 'movement-1',
     inventoryId: 'inventory-1',
     batchId: 'batch-1',
@@ -163,7 +184,7 @@ describe('StockMovementService', () => {
       movementRepository.create.mockResolvedValue(mockMovementRecord);
       inventoryRepository.update.mockResolvedValue({ ...mockInventoryRecord, quantity: 150 });
       batchRepository.update.mockResolvedValue({ ...mockBatchRecord, currentQuantity: 150 });
-      historyRepository.create.mockResolvedValue({});
+      historyRepository.create.mockResolvedValue({} as any);
 
       const result = await service.create(baseDto);
 

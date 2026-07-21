@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { Test, TestingModule } from '@nestjs/testing';
 import { BatchService } from './batch.service';
 import { BatchRepository } from './batch.repository';
@@ -10,7 +11,7 @@ describe('BatchService', () => {
   let service: BatchService;
   let repository: jest.Mocked<BatchRepository>;
 
-  const mockBatchRecord = {
+  const mockBatchRecord: any = {
     id: 'batch-1',
     providerId: 'provider-1',
     productId: 'product-1',
@@ -129,7 +130,7 @@ describe('BatchService', () => {
     });
 
     it('should throw ConflictException for duplicate batch number', async () => {
-      repository.findAll.mockResolvedValue([mockBatchRecord as unknown as Record<string, unknown>]);
+      repository.findAll.mockResolvedValue([mockBatchRecord]);
 
       await expect(service.create(createDto)).rejects.toThrow(ConflictException);
     });

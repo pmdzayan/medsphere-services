@@ -148,6 +148,13 @@ model Tenant {
   providers              Provider[]
   auditLogs              AuditLog[]
   patients               Patient[]
+  productCatalogs        ProductCatalog[]
+  locations              Location[]
+  encounters             Encounter[]
+  financialAccounts      Account[]
+  journalEntries         JournalEntry[]
+  invoices               Invoice[]
+  outboxEvents           OutboxEvent[]
 
   @@index([slug])
 }
@@ -176,6 +183,7 @@ model User {
   memberships    TenantMembership[]
   privacy        UserPrivacy?
   auditLogs      AuditLog[]
+  encounters     Encounter[]            @relation("PractitionerEncounters")
 }
 
 model TenantMembership {
@@ -633,6 +641,9 @@ model Patient {
   identifiers      PatientIdentifier[]
   linksAsSource    PatientLink[]        @relation("SourcePatient")
   linksAsTarget    PatientLink[]        @relation("TargetPatient")
+  encounters       Encounter[]
+  invoices         Invoice[]
+  insuranceClaims  InsuranceClaim[]
 
   @@unique([tenantId, mrn])
   @@index([tenantId, lastName, firstName])
@@ -757,4 +768,479 @@ model Reservation {
   @@index([providerId])
   @@index([status])
   @@index([scheduledAt])
+}
+
+// === Universal Multi-Warehouse Stock Ledger Models (S0.5+) ===
+
+enum LocationType {
+  CENTRAL_WAREHOUSE
+  PHARMACY_COUNTER
+  HOSPITAL_WARD
+  LABORATORY
+  SUPPLIER_EXTERNAL
+  PATIENT_OUTBOUND
+  WASTE_DISPOSAL
+}
+
+enum TransactionType {
+  RECEIVE
+  TRANSFER
+  DISPENSE
+  ADJUSTMENT_ADD
+  ADJUSTMENT_SUB
+  EXPIRED_DISCARD
+  RETURN_INBOUND
+}
+
+enum ReservationStatusV2 {
+  ACTIVE
+  FULFILLED
+  EXPIRED
+  CANCELLED
+}
+
+model ProductCatalog {
+  id                String       @id @default(uuid()) @db.Uuid
+  tenantId          String       @db.Uuid
+  sku               String
+  name              String
+  genericName       String?
+  description       String?
+  category          String
+  unitOfMeasure     String
+  isControlled      Boolean      @default(false)
+  requiresColdChain Boolean      @default(false)
+  minStockThreshold Int          @default(0)
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  tenant            Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  batches           StockBatch[]
+  prescriptionItems PrescriptionItem[]
+
+  @@unique([tenantId, sku])
+  @@index([tenantId, name])
+  @@index([genericName])
+  @@map("product_catalog")
+}
+
+model Location {
+  id                   String            @id @default(uuid()) @db.Uuid
+  tenantId             String            @db.Uuid
+  name                 String
+  type                 LocationType
+  isStorage            Boolean           @default(true)
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
+
+  tenant               Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  sourceTransactions   StockLedger[]     @relation("SourceLocation")
+  targetTransactions   StockLedger[]     @relation("TargetLocation")
+  reservations         StockReservation[]
+
+  @@unique([tenantId, name])
+  @@map("locations")
+}
+
+model StockBatch {
+  id                String             @id @default(uuid()) @db.Uuid
+  tenantId          String             @db.Uuid
+  productId         String             @db.Uuid
+  batchNumber       String
+  manufacturedDate  DateTime?
+  expiryDate        DateTime
+  unitCost          Float
+  sellingPrice      Float
+  initialQuantity   Int
+  currentQuantity   Int
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+
+  product           ProductCatalog     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  ledgerEntries     StockLedger[]
+  reservations      StockReservation[]
+
+  @@unique([tenantId, productId, batchNumber])
+  @@index([tenantId, productId, expiryDate])
+  @@index([batchNumber])
+  @@map("stock_batches")
+}
+
+model StockLedger {
+  id               String          @id @default(uuid()) @db.Uuid
+  tenantId         String          @db.Uuid
+  transactionType  TransactionType
+  productId        String          @db.Uuid
+  batchId          String          @db.Uuid
+  sourceLocationId String          @db.Uuid
+  targetLocationId String          @db.Uuid
+  quantity         Int
+  referenceType    String?
+  referenceId      String?
+  correlationId    String?
+  createdAt        DateTime        @default(now())
+
+  batch            StockBatch      @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  sourceLocation   Location        @relation("SourceLocation", fields: [sourceLocationId], references: [id], onDelete: Cascade)
+  targetLocation   Location        @relation("TargetLocation", fields: [targetLocationId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, productId])
+  @@index([tenantId, batchId])
+  @@index([referenceType, referenceId])
+  @@map("stock_ledger")
+}
+
+model StockReservation {
+  id          String            @id @default(uuid()) @db.Uuid
+  tenantId    String            @db.Uuid
+  locationId  String            @db.Uuid
+  productId   String            @db.Uuid
+  batchId     String            @db.Uuid
+  quantity    Int
+  status      ReservationStatusV2 @default(ACTIVE)
+  expiresAt   DateTime
+  referenceId String
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  location    Location          @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  batch       StockBatch        @relation(fields: [batchId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, locationId, productId, status])
+  @@map("stock_reservations")
+}
+
+// === Clinical Encounter & Prescription Models (Gate 4) ===
+
+enum EncounterStatus {
+  PLANNED
+  IN_PROGRESS
+  ON_HOLD
+  COMPLETED
+  CANCELLED
+}
+
+enum EncounterType {
+  AMBULATORY
+  EMERGENCY
+  INPATIENT
+  TELEMEDICINE
+}
+
+enum PrescriptionStatus {
+  DRAFT
+  SUBMITTED
+  PARTIALLY_DISPENSED
+  FULLY_DISPENSED
+  CANCELLED
+}
+
+model Encounter {
+  id              String          @id @default(uuid()) @db.Uuid
+  tenantId        String          @db.Uuid
+  patientId       String          @db.Uuid
+  practitionerId  String          @db.Uuid
+  locationId      String?         @db.Uuid
+  type            EncounterType
+  status          EncounterStatus @default(PLANNED)
+  chiefComplaint  String?
+  startedAt       DateTime?
+  endedAt         DateTime?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  tenant          Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  patient         Patient         @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  practitioner    User            @relation("PractitionerEncounters", fields: [practitionerId], references: [id], onDelete: Cascade)
+  clinicalNotes   ClinicalNote[]
+  vitalSigns      VitalSign[]
+  prescriptions   Prescription[]
+  invoices        Invoice[]
+
+  @@index([tenantId, patientId])
+  @@index([tenantId, practitionerId])
+  @@index([tenantId, status])
+  @@map("encounters")
+}
+
+model ClinicalNote {
+  id           String      @id @default(uuid()) @db.Uuid
+  tenantId     String      @db.Uuid
+  encounterId  String      @db.Uuid
+  authorId     String      @db.Uuid
+  subjective   String?
+  objective    String?
+  assessment   String?
+  plan         String?
+  isFinalized  Boolean     @default(false)
+  finalizedAt  DateTime?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  encounter    Encounter   @relation(fields: [encounterId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, encounterId])
+  @@map("clinical_notes")
+}
+
+model VitalSign {
+  id                  String     @id @default(uuid()) @db.Uuid
+  tenantId            String     @db.Uuid
+  encounterId         String     @db.Uuid
+  patientId           String     @db.Uuid
+  systolicBp          Int?
+  diastolicBp         Int?
+  heartRate           Int?
+  temperature         Float?
+  spO2                Float?
+  respiratoryRate     Int?
+  weight              Float?
+  height              Float?
+  bmi                 Float?
+  recordedAt          DateTime   @default(now())
+
+  encounter           Encounter  @relation(fields: [encounterId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, patientId])
+  @@map("vital_signs")
+}
+
+model Prescription {
+  id              String             @id @default(uuid()) @db.Uuid
+  tenantId        String             @db.Uuid
+  encounterId     String             @db.Uuid
+  patientId       String             @db.Uuid
+  practitionerId  String             @db.Uuid
+  targetLocationId String            @db.Uuid
+  status          PrescriptionStatus @default(DRAFT)
+  notes           String?
+  submittedAt     DateTime?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  encounter       Encounter          @relation(fields: [encounterId], references: [id], onDelete: Cascade)
+  items           PrescriptionItem[]
+
+  @@index([tenantId, patientId])
+  @@index([tenantId, status])
+  @@map("prescriptions")
+}
+
+model PrescriptionItem {
+  id             String         @id @default(uuid()) @db.Uuid
+  prescriptionId String         @db.Uuid
+  productId      String         @db.Uuid
+  dosage         String
+  frequency      String
+  durationDays   Int
+  quantity       Int
+  instructions   String?
+
+  prescription   Prescription   @relation(fields: [prescriptionId], references: [id], onDelete: Cascade)
+  product        ProductCatalog @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@map("prescription_items")
+}
+
+// === Financial Ledger & Billing Models (Gate 5) ===
+
+enum AccountType {
+  ASSET
+  LIABILITY
+  EQUITY
+  REVENUE
+  EXPENSE
+}
+
+enum InvoiceStatus {
+  DRAFT
+  ISSUED
+  PARTIALLY_PAID
+  PAID
+  CANCELLED
+  VOID
+}
+
+enum PaymentMethod {
+  CASH
+  CREDIT_CARD
+  DEBIT_CARD
+  BANK_TRANSFER
+  MOBILE_MONEY
+  INSURANCE_DIRECT
+}
+
+enum ClaimStatus {
+  DRAFT
+  SUBMITTED
+  IN_REVIEW
+  APPROVED
+  PARTIALLY_APPROVED
+  REJECTED
+  SETTLED
+}
+
+model Account {
+  id            String        @id @default(uuid()) @db.Uuid
+  tenantId      String        @db.Uuid
+  code          String
+  name          String
+  type          AccountType
+  isActive      Boolean       @default(true)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  tenant        Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  journalLines  JournalLine[]
+
+  @@unique([tenantId, code])
+  @@map("financial_accounts")
+}
+
+model JournalEntry {
+  id            String        @id @default(uuid()) @db.Uuid
+  tenantId      String        @db.Uuid
+  entryNumber   String        @default(uuid())
+  referenceType String?
+  referenceId   String?
+  memo          String?
+  postedAt      DateTime      @default(now())
+  createdAt     DateTime      @default(now())
+
+  tenant        Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  lines         JournalLine[]
+
+  @@index([tenantId, postedAt])
+  @@index([referenceType, referenceId])
+  @@map("journal_entries")
+}
+
+model JournalLine {
+  id             String       @id @default(uuid()) @db.Uuid
+  journalEntryId String       @db.Uuid
+  accountId      String       @db.Uuid
+  debit          Float        @default(0.0)
+  credit         Float        @default(0.0)
+
+  journalEntry   JournalEntry @relation(fields: [journalEntryId], references: [id], onDelete: Cascade)
+  account        Account      @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@map("journal_lines")
+}
+
+model Invoice {
+  id             String        @id @default(uuid()) @db.Uuid
+  tenantId       String        @db.Uuid
+  invoiceNumber  String
+  patientId      String        @db.Uuid
+  encounterId    String?       @db.Uuid
+  status         InvoiceStatus @default(DRAFT)
+  subtotal       Float
+  taxAmount      Float         @default(0.0)
+  discountAmount Float         @default(0.0)
+  totalAmount    Float
+  paidAmount     Float         @default(0.0)
+  balanceDue     Float
+  dueDate        DateTime
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  tenant         Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  patient        Patient        @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  encounter      Encounter?     @relation(fields: [encounterId], references: [id], onDelete: SetNull)
+  items          InvoiceItem[]
+  payments       Payment[]
+  claims         InsuranceClaim[]
+
+  @@unique([tenantId, invoiceNumber])
+  @@index([tenantId, patientId])
+  @@index([tenantId, status])
+  @@map("invoices")
+}
+
+model InvoiceItem {
+  id           String   @id @default(uuid()) @db.Uuid
+  invoiceId    String   @db.Uuid
+  description  String
+  quantity     Int
+  unitPrice    Float
+  totalPrice   Float
+  resourceType String?
+  resourceId   String?
+
+  invoice      Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@map("invoice_items")
+}
+
+model Payment {
+  id          String        @id @default(uuid()) @db.Uuid
+  tenantId    String        @db.Uuid
+  invoiceId   String        @db.Uuid
+  amount      Float
+  method      PaymentMethod
+  referenceNo String?
+  paidAt      DateTime      @default(now())
+
+  invoice     Invoice       @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, invoiceId])
+  @@map("payments")
+}
+
+model InsuranceClaim {
+  id              String      @id @default(uuid()) @db.Uuid
+  tenantId        String      @db.Uuid
+  invoiceId       String      @db.Uuid
+  patientId       String      @db.Uuid
+  payerName       String
+  policyNumber    String
+  claimNumber     String      @default(uuid())
+  claimedAmount   Float
+  approvedAmount  Float       @default(0.0)
+  status          ClaimStatus @default(DRAFT)
+  rejectionReason String?
+  submittedAt     DateTime?
+  adjudicatedAt   DateTime?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  invoice         Invoice     @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  patient         Patient     @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, invoiceId])
+  @@index([tenantId, status])
+  @@map("insurance_claims")
+}
+
+// === Event Bus / Transactional Outbox Models (Gate 6) ===
+
+enum OutboxStatus {
+  PENDING
+  PROCESSING
+  PUBLISHED
+  FAILED
+}
+
+model OutboxEvent {
+  id            String       @id @default(uuid()) @db.Uuid
+  tenantId      String       @db.Uuid
+  eventType     String
+  aggregateType String
+  aggregateId   String
+  payload       Json
+  correlationId String?
+  status        OutboxStatus @default(PENDING)
+  retryCount    Int          @default(0)
+  lastError     String?
+  scheduledFor  DateTime     @default(now())
+  publishedAt   DateTime?
+  createdAt     DateTime     @default(now())
+
+  tenant        Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([status, scheduledFor])
+  @@index([tenantId, eventType])
+  @@index([correlationId])
+  @@map("outbox_events")
 }

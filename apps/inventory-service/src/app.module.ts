@@ -12,6 +12,8 @@ import { FefoModule } from './fefo/fefo.module';
 import { AvailabilityModule } from './availability/availability.module';
 import { SearchModule } from './search/search.module';
 import { NearbyModule } from './nearby/nearby.module';
+import { StockLedgerModule } from './stock-ledger/stock-ledger.module';
+import { ClinicalModule } from './clinical/clinical.module';
 
 @Module({
   imports: [
@@ -28,6 +30,8 @@ import { NearbyModule } from './nearby/nearby.module';
     AvailabilityModule,
     SearchModule,
     NearbyModule,
+    StockLedgerModule,
+    ClinicalModule,
   ],
 })
 export class AppModule {}

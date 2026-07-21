@@ -13,7 +13,7 @@ module.exports = {
     'plugin:prettier/recommended',
   ],
   env: { node: true, es2022: true },
-  ignorePatterns: ['dist', 'node_modules', '**/*.js'],
+  ignorePatterns: ['dist', 'node_modules', '**/*.js', '**/*.d.ts'],
   rules: {
     '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
     '@typescript-eslint/explicit-function-return-type': 'off',
