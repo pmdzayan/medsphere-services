@@ -155,6 +155,9 @@ model Tenant {
   journalEntries         JournalEntry[]
   invoices               Invoice[]
   outboxEvents           OutboxEvent[]
+  notificationTemplates  NotificationTemplate[]
+  notificationConfigs    TenantNotificationConfig[]
+  notificationLogs       NotificationLog[]
 
   @@index([slug])
 }
@@ -1243,4 +1246,92 @@ model OutboxEvent {
   @@index([tenantId, eventType])
   @@index([correlationId])
   @@map("outbox_events")
+}
+
+// === Multi-Tenant Notification Platform (Gate 7) ===
+
+enum NotificationChannel {
+  EMAIL
+  SMS
+  WHATSAPP
+  PUSH
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  DELIVERED
+  FAILED
+}
+
+/// Provider types for notification delivery channels.
+/// Named `NotificationProviderType` to avoid collision with the existing
+/// healthcare `ProviderType` enum (PHARMACY, HOSPITAL).
+enum NotificationProviderType {
+  SMTP
+  SENDGRID
+  TWILIO
+  AWS_SES
+  FCM
+  WHATSAPP_BUSINESS
+  MOCK
+}
+
+model NotificationTemplate {
+  id          String              @id @default(uuid()) @db.Uuid
+  tenantId    String              @db.Uuid
+  code        String              // Unique template identifier (e.g., "RX_SUBMITTED_PATIENT")
+  channel     NotificationChannel
+  subject     String?             // Required for Email/Push
+  body        String              // Text/HTML template with {{placeholders}}
+  variables   Json                // List of allowed variable keys e.g. ["patientName", "rxNumber"]
+  isActive    Boolean             @default(true)
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  tenant      Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, code, channel])
+  @@map("notification_templates")
+}
+
+model TenantNotificationConfig {
+  id          String              @id @default(uuid()) @db.Uuid
+  tenantId    String              @db.Uuid
+  channel     NotificationChannel
+  provider    NotificationProviderType
+  credentials Json                // Encrypted API keys, tokens, or SMTP credentials
+  isDefault   Boolean             @default(true)
+  isActive    Boolean             @default(true)
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  tenant      Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, channel, provider])
+  @@map("tenant_notification_configs")
+}
+
+model NotificationLog {
+  id            String              @id @default(uuid()) @db.Uuid
+  tenantId      String              @db.Uuid
+  userId        String?             @db.Uuid
+  channel       NotificationChannel
+  recipient     String              // Email address, Phone number, or Device Token
+  subject       String?
+  body          String
+  status        NotificationStatus  @default(PENDING)
+  errorMessage  String?
+  correlationId String?
+  metadata      Json?
+  sentAt        DateTime?
+  createdAt     DateTime            @default(now())
+
+  tenant        Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user          User?               @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, createdAt])
+  @@index([tenantId, status])
+  @@index([correlationId])
+  @@map("notification_logs")
 }
