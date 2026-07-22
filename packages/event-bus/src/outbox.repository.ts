@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { getPrismaClient } from '@medsphere/database';
 import { OutboxStatus } from './types';
 
@@ -18,7 +19,7 @@ export class OutboxRepository {
         eventType: data.eventType,
         aggregateType: data.aggregateType,
         aggregateId: data.aggregateId,
-        payload: data.payload,
+        payload: data.payload as Prisma.InputJsonValue,
         correlationId: data.correlationId,
       },
     });
