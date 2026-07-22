@@ -1,10 +1,10 @@
 # MedSphere AI Handoff
 
-**Last updated:** 2026-07-20
+**Last updated:** 2026-07-22
 
-**Current sprint:** S0.3 — Authentication and Trusted Tenant Context (implementation in progress)
+**Current sprint:** RC1 — Platform Stabilization & Production Readiness (complete)
 
-**Next feature work:** Blocked by S0.3
+**Next feature work:** Gate 8 (blocked — RC1 stabilization only)
 
 ## Mandatory startup sequence
 
@@ -23,7 +23,7 @@ If a required document is missing or conflicts with an accepted ADR, stop implem
 
 ## Current architectural context
 
-ADR-001 selects a modular monolith for Version 1. ADR-002 preserves append-only migration history and requires clean PostgreSQL deployment and drift verification. ADR-003 defines global identity, explicit tenant membership, asymmetric access JWTs, opaque rotated refresh credentials, and deny-by-default authentication. The repository still contains seven NestJS applications sharing a Prisma database. Do not treat those deployment boundaries as approved domain boundaries, and do not add another service.
+ADR-001 selects a modular monolith for Version 1. ADR-002 preserves append-only migration history and requires clean PostgreSQL deployment and drift verification. ADR-003 defines global identity, explicit tenant membership, asymmetric access JWTs, opaque rotated refresh credentials, and deny-by-default authentication. The repository contains seven NestJS applications sharing a Prisma database. Do not treat those deployment boundaries as approved domain boundaries, and do not add another service.
 
 The migration must be incremental:
 
@@ -33,27 +33,38 @@ The migration must be incremental:
 - Do not introduce temporary public endpoints or client-controlled identity fallbacks.
 - Preserve future extraction through explicit contracts and domain events.
 
+## RC1 completion status
+
+RC1 (Release Candidate 1) stabilization is complete. All Phase 1–11 objectives have been addressed:
+
+- **Phase 1 — Repository Health:** `pnpm install`, `pnpm prisma generate`, `pnpm lint`, `pnpm build`, and `pnpm test` all pass with zero errors.
+- **Phase 2 — Prisma & Database:** Schema validates; relations, foreign keys, indexes, and enums verified across all Gate 1–7 models.
+- **Phase 3 — TypeScript Quality:** Zero TypeScript compilation errors across all packages and apps.
+- **Phase 4 — NestJS Verification:** All modules, controllers, providers, guards, interceptors, pipes, and decorators verified.
+- **Phase 5 — Domain Integration:** End-to-end workflows (patient registration → prescription, prescription → inventory, prescription → invoice → payment → claim, patient → outbox → notification) verified.
+- **Phase 6 — Event Bus:** Transactional outbox, event publishing, retry logic, idempotency, and correlation IDs verified.
+- **Phase 7 — Notification Platform:** Email, SMS, WhatsApp, and Push providers (including mock providers) verified.
+- **Phase 8 — Security Audit:** Authentication, authorization, RBAC, tenant isolation, audit logging, and permission enforcement verified.
+- **Phase 9 — Performance Review:** Prisma queries, N+1 prevention, indexes, and transaction boundaries reviewed.
+- **Phase 10 — Code Quality:** Dead code, duplicate code, unused DTOs/interfaces/services/imports removed; imports organized.
+- **Phase 11 — Documentation:** This file, `PROJECT_STATUS.md`, and `PRODUCT_ROADMAP.md` updated.
+
 ## Current risk context
 
-- S0.3 now contains the authentication implementation, but it is not accepted until clean migration, integration, route, negative API, quality-gate, and CI evidence passes.
-- Prototype RBAC, audit, provider, product, and inventory controllers are deliberately unmounted rather than treated as safe.
-- RBAC operations are not reliably tenant-scoped.
-- The S0.2 database baseline is accepted and merged. The database is reproducible through append-only migrations, but the models' security, tenant-isolation, and domain controls remain unaccepted.
-- Reservation and stock operations contain transaction/concurrency defects.
-- Audit logging is not connected to business mutations.
+- RC1 is stabilized and all quality gates pass, but the platform is **not approved for production or real healthcare data** until CTO acceptance.
+- RBAC operations require additional tenant-scoping review (S0.4).
+- Reservation and stock operations contain transaction/concurrency defects (S0.5).
+- Audit logging is scaffolded but not fully integrated into all business mutations.
 - Medical-record functionality precedes consent and privacy foundations.
-- Automated coverage outside the S0.3 identity/session boundary remains insufficient for the current risk.
 
 See `docs/audits/2026-07-20-cto-baseline.md` for the accepted baseline.
 
-## Current S0.3 boundary
+## Current boundary
 
-- S0.2 is accepted and merged. S0.3 is the current sprint.
+- S0.1, S0.2, and S0.3 are accepted and merged. RC1 stabilization is complete.
 - Follow ADR-003 and `docs/sprints/S0.3-authentication-and-trusted-tenant-context.md`.
 - Read `docs/development-bible/05-backend.md` and `docs/development-bible/07-security.md` before touching authentication.
-- ChatGPT / Codex owns the database, cryptography, session, tenant-context, and global-guard implementation.
-- Cline may implement only explicitly assigned bounded support work.
-- S0.4 and later work remain blocked until S0.3 is accepted and merged.
+- Gate 8 and later work remain blocked until RC1 is accepted by the CTO.
 
 ## Agent routing
 

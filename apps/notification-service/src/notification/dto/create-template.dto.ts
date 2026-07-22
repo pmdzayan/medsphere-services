@@ -6,7 +6,6 @@ import {
   IsBoolean,
   IsArray,
   IsUUID,
-  IsJSON,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { NotificationChannel } from '../enums';

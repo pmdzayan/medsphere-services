@@ -6,7 +6,7 @@ import { UpdateTemplateDto } from './dto/update-template.dto';
 import { CreateConfigDto } from './dto/create-config.dto';
 import { UpdateConfigDto } from './dto/update-config.dto';
 import { SendNotificationDto } from './dto/send-notification.dto';
-import { NotificationChannel, NotificationStatus } from './enums';
+import { NotificationChannel } from './enums';
 
 @Injectable()
 export class NotificationService {

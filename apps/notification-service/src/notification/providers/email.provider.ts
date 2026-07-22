@@ -20,7 +20,7 @@ export class EmailProvider implements NotificationProvider {
     subject: string | undefined,
     body: string,
     credentials: Record<string, unknown>,
-    metadata?: Record<string, unknown>,
+    _metadata?: Record<string, unknown>,
   ): Promise<NotificationSendResult> {
     const provider = credentials.provider as string | undefined;
     const messageId = `email_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;

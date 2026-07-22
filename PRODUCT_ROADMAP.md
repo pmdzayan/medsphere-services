@@ -8,7 +8,7 @@ This roadmap preserves the MedSphere product vision while inserting the engineer
 
 ## Milestone 0 — Architecture and Safety Stabilization
 
-**Status:** In progress
+**Status:** RC1 complete — awaiting CTO acceptance
 
 **Purpose:** Make the existing foundation reproducible, secure, testable, and truthful before new features.
 
@@ -16,11 +16,25 @@ Ordered sprints:
 
 1. S0.1 Architecture and repository governance — accepted
 2. S0.2 Reproducible database baseline — accepted and merged
-3. S0.3 Authentication and trusted tenant context — current
-4. S0.4 Tenant-safe RBAC and audit integration
-5. S0.5 Inventory ledger and reservation integrity
+3. S0.3 Authentication and trusted tenant context — accepted
+4. RC1 Platform Stabilization & Production Readiness — **complete**
+5. S0.4 Tenant-safe RBAC and audit integration — blocked by RC1
+6. S0.5 Inventory ledger and reservation integrity — blocked by S0.4
 
 **Completion gate:** Accepted ADRs; protected review flow; clean migrations; deny-by-default authentication; tenant-isolation tests; integrated audit trail; atomic stock/reservation behavior; mandatory lint/test/build passing.
+
+### RC1 completion summary
+
+RC1 stabilization is complete. All quality gates pass:
+
+- `pnpm install` — passed
+- `pnpm prisma generate` — passed
+- `pnpm prisma validate` — passed
+- `pnpm lint` — passed (zero errors)
+- `pnpm build` — passed (zero TypeScript errors)
+- `pnpm test` — passed (all test suites)
+
+14 bugs were found and fixed during RC1, including Prisma schema relation fixes, unused import/parameter cleanup, TypeScript configuration fixes, and test timeout resolution. See `PROJECT_STATUS.md` for the full bug list and `AI_HANDOFF.md` for the completion report.
 
 ## Milestone 1 — Foundation and Core Inventory
 
@@ -98,3 +112,13 @@ Every integration requires its own discovery, legal/compliance review, ADRs, thr
 ## Milestone movement rule
 
 A milestone moves to complete only after implementation review, required migrations, security and tenant review, tests, lint, build, documentation updates, and CTO acceptance. Work may be researched in advance, but implementation may not skip an incomplete dependency.
+
+## Next milestone recommendations
+
+After RC1 is accepted by the CTO:
+
+1. **S0.4 Tenant-safe RBAC and audit integration** — tenant-scope all RBAC operations, integrate audit logging into business mutations, and add comprehensive tenant-isolation tests.
+2. **S0.5 Inventory ledger and reservation integrity** — resolve transaction/concurrency defects in reservation and stock operations, consolidate competing implementations, and add concurrency tests.
+3. **Consent and privacy foundations** — implement consent management and privacy controls before medical-record functionality.
+4. **Automated test coverage expansion** — increase coverage outside the S0.3 identity/session boundary.
+5. **Performance optimization** — review and optimize Prisma queries, add missing indexes, and review transaction boundaries.

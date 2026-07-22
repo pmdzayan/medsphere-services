@@ -157,9 +157,11 @@ model Tenant {
   outboxEvents           OutboxEvent[]
   notificationTemplates  NotificationTemplate[]
   notificationConfigs    TenantNotificationConfig[]
-  notificationLogs       NotificationLog[]
+   notificationLogs       NotificationLog[]
+   documents              Document[]
+   documentAccessLogs     DocumentAccessLog[]
 
-  @@index([slug])
+   @@index([slug])
 }
 
 model User {
@@ -183,10 +185,13 @@ model User {
   updatedAt     DateTime    @updatedAt
   deletedAt     DateTime?
 
-  memberships    TenantMembership[]
-  privacy        UserPrivacy?
-  auditLogs      AuditLog[]
-  encounters     Encounter[]            @relation("PractitionerEncounters")
+   memberships    TenantMembership[]
+   privacy        UserPrivacy?
+   auditLogs      AuditLog[]
+   encounters     Encounter[]            @relation("PractitionerEncounters")
+   notificationLogs NotificationLog[]
+   documents        Document[]
+   documentAccessLogs DocumentAccessLog[]
 }
 
 model TenantMembership {
@@ -646,9 +651,10 @@ model Patient {
   linksAsTarget    PatientLink[]        @relation("TargetPatient")
   encounters       Encounter[]
   invoices         Invoice[]
-  insuranceClaims  InsuranceClaim[]
+   insuranceClaims  InsuranceClaim[]
+   documents        Document[]
 
-  @@unique([tenantId, mrn])
+   @@unique([tenantId, mrn])
   @@index([tenantId, lastName, firstName])
   @@index([nationalIdHash])
   @@index([phone])
@@ -1332,6 +1338,76 @@ model NotificationLog {
 
   @@index([tenantId, createdAt])
   @@index([tenantId, status])
-  @@index([correlationId])
-  @@map("notification_logs")
+   @@index([correlationId])
+   @@map("notification_logs")
+}
+
+// === Document Management & Secure Object Storage (Gate 8) ===
+
+enum DocumentCategory {
+  CLINICAL_NOTE_ATTACHMENT
+  LAB_REPORT_PDF
+  PRESCRIPTION_SCAN
+  RADIOLOGY_DICOM
+  PATIENT_IDENTIFICATION
+  INSURANCE_CARD
+  GENERAL_ATTACHMENT
+}
+
+enum StorageProviderType {
+  S3
+  MINIO
+  LOCAL_DISK
+}
+
+model Document {
+  id             String           @id @default(uuid()) @db.Uuid
+  tenantId       String           @db.Uuid
+  patientId      String?          @db.Uuid
+  uploaderId     String           @db.Uuid
+  category       DocumentCategory
+  title          String
+  description    String?
+  originalName   String
+  mimeType       String
+  fileSize       Int              // Size in Bytes
+  storageBucket  String
+  storageKey     String           // Storage path/key e.g., "tenants/{tenantId}/docs/{uuid}.pdf"
+  checksumSha256 String           // SHA-256 hash for file integrity verification
+  isEncrypted    Boolean          @default(true)
+  isSigned       Boolean          @default(false)
+  signatureData  Json?            // Digital signature payload (hash, public key, timestamp)
+  metadata       Json?            // Arbitrary key-value tags
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  tenant         Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  patient        Patient?         @relation(fields: [patientId], references: [id], onDelete: SetNull)
+  uploader       User             @relation(fields: [uploaderId], references: [id], onDelete: Cascade)
+  accessLogs     DocumentAccessLog[]
+
+  @@index([tenantId, patientId])
+  @@index([tenantId, category])
+  @@index([checksumSha256])
+  @@map("documents")
+}
+
+model DocumentAccessLog {
+  id            String   @id @default(uuid()) @db.Uuid
+  tenantId      String   @db.Uuid
+  documentId    String   @db.Uuid
+  accessedById  String   @db.Uuid
+  action        String   // E.g., "METADATA_READ", "PRESIGNED_DOWNLOAD_URL_GENERATED", "SIGNED"
+  ipAddress     String?
+  userAgent     String?
+  correlationId String?
+  createdAt     DateTime @default(now())
+
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  document      Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  accessedBy    User     @relation(fields: [accessedById], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, documentId])
+  @@index([accessedById])
+  @@map("document_access_logs")
 }

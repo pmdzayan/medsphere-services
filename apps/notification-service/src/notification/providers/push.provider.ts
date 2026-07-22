@@ -18,9 +18,9 @@ export class PushProvider implements NotificationProvider {
   async send(
     to: string,
     subject: string | undefined,
-    body: string,
-    credentials: Record<string, unknown>,
-    metadata?: Record<string, unknown>,
+    _body: string,
+    _credentials: Record<string, unknown>,
+    _metadata?: Record<string, unknown>,
   ): Promise<NotificationSendResult> {
     const messageId = `push_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 

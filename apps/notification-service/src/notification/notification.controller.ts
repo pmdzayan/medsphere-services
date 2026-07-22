@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Post, Put, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Put, Query } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiHeader } from '@nestjs/swagger';
 import { NotificationService } from './notification.service';
 import { CreateTemplateDto } from './dto/create-template.dto';
@@ -6,7 +6,6 @@ import { UpdateTemplateDto } from './dto/update-template.dto';
 import { CreateConfigDto } from './dto/create-config.dto';
 import { UpdateConfigDto } from './dto/update-config.dto';
 import { SendNotificationDto } from './dto/send-notification.dto';
-import { NotificationChannel } from './enums';
 
 @ApiTags('Notifications')
 @Controller('notifications')

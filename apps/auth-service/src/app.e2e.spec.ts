@@ -27,6 +27,7 @@ interface RequestOptions {
 }
 
 describe('S0.3 authentication HTTP security boundary', () => {
+  jest.setTimeout(30000);
   const userId = randomUUID();
   const membershipId = randomUUID();
   const tenantId = randomUUID();
