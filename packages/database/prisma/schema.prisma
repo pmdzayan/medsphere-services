@@ -161,7 +161,6 @@ model Tenant {
    documents              Document[]
    documentAccessLogs     DocumentAccessLog[]
 
-   @@index([slug])
 }
 
 model User {
@@ -240,7 +239,6 @@ model UserPrivacy {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  @@index([userId])
 }
 
 model Role {

@@ -132,9 +132,9 @@ export class DocumentController {
     dto.documentId = documentId;
     dto.expiresInSeconds = expiresInSeconds ? parseInt(expiresInSeconds, 10) : undefined;
 
-    const requestMetadata = this.extractRequestMetadata(headers);
+    const requestMetadata = this.extractRequestMetadata(headers ?? {});
     // Use the uploaderId from the x-user-id header as the accessor
-    const accessedById = headers['x-user-id'] ?? 'unknown';
+    const accessedById = headers?.['x-user-id'] ?? 'unknown';
     return this.documentService.generatePresignedDownloadUrl(
       dto,
       tenantId,
