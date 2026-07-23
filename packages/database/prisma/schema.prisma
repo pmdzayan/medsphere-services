@@ -160,8 +160,15 @@ model Tenant {
    notificationLogs       NotificationLog[]
    documents              Document[]
    documentAccessLogs     DocumentAccessLog[]
+   workflowDefinitions    WorkflowDefinition[]
+   workflowInstances      WorkflowInstance[]
+   pharmacyStores         PharmacyStore[]
+   marketplaceProducts    MarketplaceProduct[]
+   shoppingCarts          ShoppingCart[]
+   marketplaceOrders      MarketplaceOrder[]
 
 }
+
 
 model User {
   id            String      @id @default(uuid()) @db.Uuid
@@ -191,6 +198,8 @@ model User {
    notificationLogs NotificationLog[]
    documents        Document[]
    documentAccessLogs DocumentAccessLog[]
+   workflowInstancesInitiated WorkflowInstance[]
+   workflowApprovals           WorkflowApproval[]
 }
 
 model TenantMembership {
@@ -260,6 +269,7 @@ model Role {
 
   userRoles        UserRole[]
   rolePermissions  RolePermission[]
+  workflowTransitions WorkflowTransition[]
 
   @@unique([tenantId, name])
   @@index([tenantId])
@@ -437,6 +447,9 @@ model Product {
   isActive            Boolean        @default(true)
   inventory           Inventory[]
   batches             Batch[]
+  marketplaceProducts MarketplaceProduct[]
+  cartItems           ShoppingCartItem[]
+  orderItems          MarketplaceOrderItem[]
 
   version             Int            @default(1)
 
@@ -1409,3 +1422,345 @@ model DocumentAccessLog {
   @@index([accessedById])
   @@map("document_access_logs")
 }
+
+// === Configurable Workflow State Machine & Dynamic Approval Engine (Gate 9) ===
+
+enum WorkflowStatus {
+  ACTIVE
+  SUSPENDED
+  ARCHIVED
+}
+
+enum InstanceStatus {
+  IN_PROGRESS
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum ApprovalDecision {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model WorkflowDefinition {
+  id          String              @id @default(uuid()) @db.Uuid
+  tenantId    String              @db.Uuid
+  code        String              // Unique key e.g., "PO_HIGH_VALUE_APPROVAL", "CONTROLLED_DRUG_OVERRIDE"
+  name        String
+  description String?
+  entityType  String              // Target entity e.g., "PURCHASE_ORDER", "PRESCRIPTION", "INVOICE"
+  version     Int                 @default(1)
+  status      WorkflowStatus      @default(ACTIVE)
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  tenant      Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  states      WorkflowState[]
+  transitions WorkflowTransition[]
+  instances   WorkflowInstance[]
+
+  @@unique([tenantId, code, version])
+  @@index([tenantId, entityType])
+  @@map("workflow_definitions")
+}
+
+model WorkflowState {
+  id                   String             @id @default(uuid()) @db.Uuid
+  workflowDefinitionId String             @db.Uuid
+  code                 String             // State code e.g., "DRAFT", "PENDING_LEVEL_1", "APPROVED"
+  name                 String
+  isInitial            Boolean            @default(false)
+  isFinal              Boolean            @default(false)
+  requiresApproval     Boolean            @default(false)
+
+  workflowDefinition   WorkflowDefinition @relation(fields: [workflowDefinitionId], references: [id], onDelete: Cascade)
+  fromTransitions      WorkflowTransition[] @relation("FromState")
+  toTransitions        WorkflowTransition[]   @relation("ToState")
+  currentInstances     WorkflowInstance[]   @relation("CurrentState")
+
+  @@unique([workflowDefinitionId, code])
+  @@map("workflow_states")
+}
+
+model WorkflowTransition {
+  id                   String             @id @default(uuid()) @db.Uuid
+  workflowDefinitionId String             @db.Uuid
+  fromStateId          String             @db.Uuid
+  toStateId            String             @db.Uuid
+  actionName           String             // Action trigger e.g., "SUBMIT_FOR_APPROVAL", "APPROVE_L1", "REJECT"
+  requiredPermission   String?            // RBAC permission string required to execute transition
+  requiredRoleId       String?            // Role ID required for approval
+  minAmountThreshold   Float?             // Optional monetary threshold e.g., > 10000 USD requires L2
+  approvalLevel        Int                @default(1)
+
+  workflowDefinition   WorkflowDefinition @relation(fields: [workflowDefinitionId], references: [id], onDelete: Cascade)
+  fromState            WorkflowState      @relation("FromState", fields: [fromStateId], references: [id], onDelete: Cascade)
+  toState              WorkflowState      @relation("ToState", fields: [toStateId], references: [id], onDelete: Cascade)
+  role                 Role?              @relation(fields: [requiredRoleId], references: [id], onDelete: SetNull)
+  approvals            WorkflowApproval[]
+
+  @@unique([workflowDefinitionId, fromStateId, actionName])
+  @@map("workflow_transitions")
+}
+
+model WorkflowInstance {
+  id                   String             @id @default(uuid()) @db.Uuid
+  tenantId             String             @db.Uuid
+  workflowDefinitionId String             @db.Uuid
+  currentStateId       String             @db.Uuid
+  entityType           String             // Subject entity e.g., "PURCHASE_ORDER"
+  entityId             String             // Subject entity UUID
+  status               InstanceStatus     @default(IN_PROGRESS)
+  initiatorId          String             // User ID who triggered workflow
+  metadata             Json?              // Context data e.g. { amount: 15000, department: "Pharmacy" }
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  tenant               Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  workflowDefinition   WorkflowDefinition @relation(fields: [workflowDefinitionId], references: [id], onDelete: Cascade)
+  currentState         WorkflowState      @relation("CurrentState", fields: [currentStateId], references: [id], onDelete: Cascade)
+  initiator            User               @relation(fields: [initiatorId], references: [id], onDelete: Cascade)
+  approvals            WorkflowApproval[]
+
+  @@index([tenantId, entityType, entityId])
+  @@index([tenantId, status])
+  @@map("workflow_instances")
+}
+
+model WorkflowApproval {
+  id                 String             @id @default(uuid()) @db.Uuid
+  workflowInstanceId String             @db.Uuid
+  transitionId       String             @db.Uuid
+  approverId         String?            // User ID who made decision
+  decision           ApprovalDecision   @default(PENDING)
+  comments           String?
+  decidedAt          DateTime?
+  createdAt          DateTime           @default(now())
+
+  instance           WorkflowInstance   @relation(fields: [workflowInstanceId], references: [id], onDelete: Cascade)
+  transition         WorkflowTransition @relation(fields: [transitionId], references: [id], onDelete: Cascade)
+  approver           User?              @relation(fields: [approverId], references: [id], onDelete: SetNull)
+
+  @@index([workflowInstanceId, decision])
+  @@map("workflow_approvals")
+}
+
+// === Intelligent Medicine Marketplace (Gate 10) ===
+
+enum CartStatus {
+  ACTIVE
+  CHECKOUT
+  COMPLETED
+  ABANDONED
+}
+
+enum MarketplaceOrderStatus {
+  PENDING
+  CONFIRMED
+  RESERVED
+  APPROVAL_REQUIRED
+  APPROVED
+  PAID
+  FULFILLED
+  CANCELLED
+  REFUNDED
+}
+
+enum FulfillmentStrategy {
+  SINGLE_PHARMACY
+  SPLIT
+  SUBSTITUTION
+}
+
+enum DeliveryStatus {
+  PENDING
+  ASSIGNED
+  IN_TRANSIT
+  DELIVERED
+  CANCELLED
+}
+
+enum ProductVisibility {
+  PUBLIC
+  PRIVATE
+  UNLISTED
+}
+
+model PharmacyStore {
+  id               String   @id @default(uuid()) @db.Uuid
+
+  tenantId         String   @db.Uuid
+
+  name             String
+  description      String?
+  address          String
+  latitude         Float
+  longitude        Float
+  operatingHours   Json?
+  deliveryRadiusKm Float    @default(10.0)
+  supportsPickup   Boolean  @default(true)
+  supportsDelivery Boolean  @default(true)
+  averageRating    Float    @default(0.0)
+  isActive         Boolean  @default(true)
+
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  tenant           Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  marketplaceProducts MarketplaceProduct[]
+  orderItems       MarketplaceOrderItem[]
+  cartItems        ShoppingCartItem[]
+
+  @@index([tenantId])
+  @@index([isActive])
+  @@index([latitude, longitude])
+  @@map("pharmacy_stores")
+}
+
+model MarketplaceProduct {
+  id                    String   @id @default(uuid()) @db.Uuid
+
+  tenantId              String   @db.Uuid
+
+  pharmacyId            String   @db.Uuid
+  productId             String   @db.Uuid
+
+  sellingPrice          Decimal  @db.Decimal(10, 2)
+  availableQuantity     Int      @default(0)
+  estimatedPreparationTime Int   @default(30)
+  visibility            ProductVisibility @default(PUBLIC)
+
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  tenant                Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  pharmacy              PharmacyStore       @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
+  product               Product             @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, pharmacyId, productId])
+  @@index([tenantId, productId])
+  @@index([tenantId, pharmacyId])
+  @@index([visibility])
+  @@map("marketplace_products")
+}
+
+model ShoppingCart {
+  id          String           @id @default(uuid()) @db.Uuid
+
+  tenantId    String           @db.Uuid
+  patientId   String           @db.Uuid
+
+  status      CartStatus       @default(ACTIVE)
+
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  tenant      Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  items       ShoppingCartItem[]
+  orders      MarketplaceOrder[]
+
+  @@index([tenantId, patientId])
+  @@index([tenantId, status])
+  @@map("shopping_carts")
+}
+
+model ShoppingCartItem {
+  id                   String   @id @default(uuid()) @db.Uuid
+
+  cartId               String   @db.Uuid
+  productId            String   @db.Uuid
+  requestedQuantity    Int
+  selectedPharmacyId   String?  @db.Uuid
+  allocatedQuantity    Int      @default(0)
+
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  cart                 ShoppingCart       @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  product              Product            @relation(fields: [productId], references: [id], onDelete: Restrict)
+  selectedPharmacy     PharmacyStore?     @relation(fields: [selectedPharmacyId], references: [id], onDelete: SetNull)
+
+  @@index([cartId])
+  @@index([productId])
+  @@index([cartId, productId])
+  @@map("shopping_cart_items")
+}
+
+model MarketplaceOrder {
+  id                   String               @id @default(uuid()) @db.Uuid
+
+  tenantId             String               @db.Uuid
+  patientId            String               @db.Uuid
+
+  orderNumber          String
+  status               MarketplaceOrderStatus @default(PENDING)
+  subtotal             Decimal              @db.Decimal(10, 2) @default(0)
+  deliveryFee          Decimal              @db.Decimal(10, 2) @default(0)
+  discount             Decimal              @db.Decimal(10, 2) @default(0)
+  tax                  Decimal              @db.Decimal(10, 2) @default(0)
+  total                Decimal              @db.Decimal(10, 2) @default(0)
+  fulfillmentStrategy  FulfillmentStrategy  @default(SINGLE_PHARMACY)
+
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+
+  tenant               Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  items                MarketplaceOrderItem[]
+  deliveryAssignment   DeliveryAssignment?
+  cartId               String?              @db.Uuid
+  cart                 ShoppingCart?        @relation(fields: [cartId], references: [id], onDelete: SetNull)
+
+  @@unique([tenantId, orderNumber])
+  @@index([tenantId, patientId])
+  @@index([tenantId, status])
+  @@index([createdAt])
+  @@map("marketplace_orders")
+}
+
+model MarketplaceOrderItem {
+  id              String   @id @default(uuid()) @db.Uuid
+
+  orderId         String   @db.Uuid
+  productId       String   @db.Uuid
+  pharmacyId      String   @db.Uuid
+  quantity        Int
+  reservedBatchId String?  @db.Uuid
+  sellingPrice    Decimal  @db.Decimal(10, 2)
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  order           MarketplaceOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product         Product          @relation(fields: [productId], references: [id], onDelete: Restrict)
+  pharmacy        PharmacyStore    @relation(fields: [pharmacyId], references: [id], onDelete: Restrict)
+
+  @@index([orderId])
+  @@index([pharmacyId])
+  @@index([productId])
+  @@map("marketplace_order_items")
+}
+
+model DeliveryAssignment {
+  id               String         @id @default(uuid()) @db.Uuid
+
+  orderId          String         @db.Uuid @unique
+  deliveryPartner  String
+  trackingNumber   String?
+  status           DeliveryStatus @default(PENDING)
+  estimatedArrival DateTime?
+
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  order            MarketplaceOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([deliveryPartner])
+  @@index([status])
+  @@map("delivery_assignments")
+}
+
+
+

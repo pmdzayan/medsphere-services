@@ -27,4 +27,24 @@ export const DomainEvents = {
   // Patient
   PATIENT_CREATED: 'patient.created',
   PATIENT_MERGED: 'patient.merged',
+
+  // Workflow (Gate 9)
+  WORKFLOW_INSTANCE_CREATED: 'workflow.instance.created',
+  WORKFLOW_INSTANCE_APPROVAL_REQUESTED: 'workflow.instance.approval_requested',
+  WORKFLOW_INSTANCE_APPROVED: 'workflow.instance.approved',
+  WORKFLOW_INSTANCE_REJECTED: 'workflow.instance.rejected',
+  WORKFLOW_INSTANCE_COMPLETED: 'workflow.instance.completed',
+  WORKFLOW_INSTANCE_CANCELLED: 'workflow.instance.cancelled',
+  WORKFLOW_DEFINITION_CREATED: 'workflow.definition.created',
+  WORKFLOW_DEFINITION_UPDATED: 'workflow.definition.updated',
+
+  // Marketplace (Gate 10)
+  MARKETPLACE_CART_CREATED: 'marketplace.cart.created',
+  MARKETPLACE_CART_UPDATED: 'marketplace.cart.updated',
+  MARKETPLACE_ORDER_CREATED: 'marketplace.order.created',
+  MARKETPLACE_ORDER_CONFIRMED: 'marketplace.order.confirmed',
+  MARKETPLACE_INVENTORY_RESERVED: 'marketplace.inventory.reserved',
+  MARKETPLACE_PAYMENT_COMPLETED: 'marketplace.payment.completed',
+  MARKETPLACE_DELIVERY_ASSIGNED: 'marketplace.delivery.assigned',
+  MARKETPLACE_ORDER_COMPLETED: 'marketplace.order.completed',
 } as const;
