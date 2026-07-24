@@ -1,48 +1,43 @@
-import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Param, ParseUUIDPipe, Query, UseGuards } from '@nestjs/common';
+import {
+  ApiBearerAuth,
+  ApiForbiddenResponse,
+  ApiOkResponse,
+  ApiOperation,
+  ApiTags,
+} from '@nestjs/swagger';
+import { AuthenticatedIdentity } from '../auth/auth.types';
+import { PERMISSIONS } from '../authorization/permission.constants';
+import { PermissionsGuard } from '../authorization/permissions.guard';
+import { RequirePermissions } from '../authorization/require-permissions.decorator';
+import { CurrentIdentity } from '../common/decorators/current-identity.decorator';
 import { AuditService } from './audit.service';
-import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { PermissionsGuard } from '../common/guards/permissions.guard';
-import { RequirePermissions } from '../common/decorators/permissions.decorator';
-import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { AuditEventQueryDto } from './dto/audit-event-query.dto';
+import { AuditEventListResponseDto, AuditEventResponseDto } from './dto/audit-event-response.dto';
 
-@Controller('audit')
-@UseGuards(JwtAuthGuard, PermissionsGuard)
+@Controller('audit/events')
+@ApiTags('Audit')
+@ApiBearerAuth()
+@UseGuards(PermissionsGuard)
+@RequirePermissions(PERMISSIONS.auditEventsRead)
+@ApiForbiddenResponse({ description: 'Permission denied' })
 export class AuditController {
   constructor(private readonly auditService: AuditService) {}
 
   @Get()
-  @RequirePermissions('audit:read')
-  async findAll(
-    @CurrentUser() user: { sub: string; tenantId: string },
-    @Query('organizationId') organizationId?: string,
-    @Query('userId') userId?: string,
-    @Query('module') module?: string,
-    @Query('resourceType') resourceType?: string,
-    @Query('startDate') startDate?: string,
-    @Query('endDate') endDate?: string,
-    @Query('limit') limit?: string,
-    @Query('offset') offset?: string,
-    @Query('sortBy') sortBy?: string,
-    @Query('sortOrder') sortOrder?: 'asc' | 'desc',
-  ) {
-    return this.auditService.findAll({
-      requestingUserId: user.sub,
-      organizationId,
-      userId,
-      module,
-      resourceType,
-      startDate,
-      endDate,
-      limit: limit ? parseInt(limit, 10) : undefined,
-      offset: offset ? parseInt(offset, 10) : undefined,
-      sortBy,
-      sortOrder,
-    });
+  @ApiOperation({ summary: 'Read bounded append-only events from the authenticated tenant' })
+  @ApiOkResponse({ type: AuditEventListResponseDto })
+  list(@CurrentIdentity() identity: AuthenticatedIdentity, @Query() query: AuditEventQueryDto) {
+    return this.auditService.listTenantEvents(identity, query);
   }
 
-  @Get(':id')
-  @RequirePermissions('audit:read')
-  async findById(@Param('id') id: string) {
-    return this.auditService.findById(id);
+  @Get(':eventId')
+  @ApiOperation({ summary: 'Read one append-only event from the authenticated tenant' })
+  @ApiOkResponse({ type: AuditEventResponseDto })
+  findOne(
+    @CurrentIdentity() identity: AuthenticatedIdentity,
+    @Param('eventId', new ParseUUIDPipe({ version: '4' })) eventId: string,
+  ) {
+    return this.auditService.findTenantEvent(identity, eventId);
   }
 }

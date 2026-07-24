@@ -29,11 +29,21 @@ enum MembershipStatus {
   REVOKED
 }
 
-enum AuditAction {
-  CREATE
-  UPDATE
-  DELETE
-  ACCESS
+enum AuditActorType {
+  TENANT_USER
+  PLATFORM_USER
+  SYSTEM
+}
+
+enum AuditScope {
+  TENANT
+  PLATFORM
+}
+
+enum AuditOutcome {
+  SUCCEEDED
+  DENIED
+  FAILED
 }
 
 enum ProviderType {
@@ -103,209 +113,201 @@ enum StockMovementType {
 }
 
 model Tenant {
-  id          String   @id @default(uuid()) @db.Uuid
+  id String @id @default(uuid()) @db.Uuid
 
-  name        String
-  slug        String   @unique
-  email       String?  @unique
+  name  String
+  slug  String  @unique
+  email String? @unique
 
-  isActive               Boolean  @default(true)
+  isActive                Boolean @default(true)
   selfRegistrationEnabled Boolean @default(false)
 
-  version     Int      @default(1)
+  version Int @default(1)
 
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  deletedAt   DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
-  memberships            TenantMembership[]
-  roles                  Role[]
-  permissions            Permission[]
-  providerVerifications  ProviderVerification[]
-  providers              Provider[]
+  memberships           TenantMembership[]
+  roles                 Role[]
+  auditEvents           AuditEvent[]
+  providerVerifications ProviderVerification[]
+  providers             Provider[]
 
   @@index([slug])
 }
 
 model User {
-  id            String      @id @default(uuid()) @db.Uuid
+  id String @id @default(uuid()) @db.Uuid
 
-  email         String      @unique @db.Citext
-  passwordHash  String
+  email        String @unique @db.Citext
+  passwordHash String
 
-  firstName     String
-  lastName      String
+  firstName String
+  lastName  String
 
-  phone         String?
+  phone String?
 
-  preferredLanguage String  @default("en")
+  preferredLanguage String @default("en")
 
-  status        UserStatus  @default(ACTIVE)
+  status UserStatus @default(ACTIVE)
 
-  version       Int         @default(1)
+  version Int @default(1)
 
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
-  deletedAt     DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
-  memberships    TenantMembership[]
-  userRoles      UserRole[]
-  privacy        UserPrivacy?
+  memberships         TenantMembership[]
+  platformAuditEvents AuditEvent[]
+  privacy             UserPrivacy?
 }
 
 model TenantMembership {
-  id          String           @id @default(uuid()) @db.Uuid
+  id String @id @default(uuid()) @db.Uuid
 
-  tenantId    String           @db.Uuid
-  tenant      Tenant           @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  tenantId String @db.Uuid
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
 
-  userId      String           @db.Uuid
-  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  status      MembershipStatus @default(PENDING)
-  isDefault   Boolean          @default(false)
-  joinedAt    DateTime?
-  endedAt     DateTime?
+  status    MembershipStatus @default(PENDING)
+  isDefault Boolean          @default(false)
+  joinedAt  DateTime?
+  endedAt   DateTime?
 
-  version     Int              @default(1)
+  version Int @default(1)
 
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
-  deletedAt   DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
-  sessions    UserSession[]
+  sessions        UserSession[]
+  roleAssignments MembershipRole[]
+  auditEvents     AuditEvent[]
 
   @@unique([tenantId, userId])
+  @@unique([id, tenantId])
   @@index([userId, status])
   @@index([tenantId, status])
 }
 
 model UserPrivacy {
-  id            String   @id @default(uuid()) @db.Uuid
+  id String @id @default(uuid()) @db.Uuid
 
-  userId        String   @unique @db.Uuid
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String @unique @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  sharePhone    Boolean  @default(false)
-  shareEmail    Boolean  @default(false)
-  allowInAppChat Boolean @default(true)
-  privatePickup Boolean  @default(false)
+  sharePhone                 Boolean @default(false)
+  shareEmail                 Boolean @default(false)
+  allowInAppChat             Boolean @default(true)
+  privatePickup              Boolean @default(false)
   hideSensitiveNotifications Boolean @default(true)
-  preferredLanguage String @default("en")
+  preferredLanguage          String  @default("en")
 
-  version       Int      @default(1)
+  version Int @default(1)
 
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([userId])
 }
 
 model Role {
-  id          String    @id @default(uuid()) @db.Uuid
+  id String @id @default(uuid()) @db.Uuid
 
-  tenantId    String    @db.Uuid
-  tenant      Tenant    @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  tenantId String @db.Uuid
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
 
-  name         String
-  description  String?
+  name        String
+  description String?
 
-  type         RoleType @default(TENANT)
+  type RoleType @default(TENANT)
 
-  version      Int      @default(1)
+  version Int @default(1)
 
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  deletedAt    DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
-  userRoles        UserRole[]
-  rolePermissions  RolePermission[]
+  roleAssignments MembershipRole[]
+  rolePermissions RolePermission[]
 
   @@unique([tenantId, name])
+  @@unique([id, tenantId])
   @@index([tenantId])
 }
 
 model Permission {
-  id          String    @id @default(uuid()) @db.Uuid
-
-  tenantId    String    @db.Uuid
-  tenant      Tenant    @relation(fields: [tenantId], references: [id], onDelete: Restrict)
-
-  name         String
-  description  String?
-
-  version      Int      @default(1)
-
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  deletedAt    DateTime?
+  id          String   @id @db.Uuid
+  name        String   @unique @db.VarChar(120)
+  description String   @db.VarChar(240)
+  createdAt   DateTime @default(now())
 
   rolePermissions RolePermission[]
-
-  @@unique([tenantId, name])
-  @@index([tenantId])
 }
 
-model UserRole {
-  id        String   @id @default(uuid()) @db.Uuid
+model MembershipRole {
+  id           String @id @default(uuid()) @db.Uuid
+  tenantId     String @db.Uuid
+  membershipId String @db.Uuid
+  roleId       String @db.Uuid
 
-  userId    String   @db.Uuid
-  roleId    String   @db.Uuid
-
-  user       User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  role       Role    @relation(fields: [roleId], references: [id], onDelete: Restrict)
+  membership TenantMembership @relation(fields: [membershipId, tenantId], references: [id, tenantId], onDelete: Cascade)
+  role       Role             @relation(fields: [roleId, tenantId], references: [id, tenantId], onDelete: Restrict)
 
   createdAt DateTime @default(now())
 
-  @@unique([userId, roleId])
-  @@index([userId])
-  @@index([roleId])
+  @@unique([membershipId, roleId])
+  @@index([tenantId, membershipId])
+  @@index([tenantId, roleId])
 }
 
 model RolePermission {
-  id            String      @id @default(uuid()) @db.Uuid
+  id           String @id @default(uuid()) @db.Uuid
+  tenantId     String @db.Uuid
+  roleId       String @db.Uuid
+  permissionId String @db.Uuid
 
-  roleId         String      @db.Uuid
-  permissionId   String      @db.Uuid
+  role       Role       @relation(fields: [roleId, tenantId], references: [id, tenantId], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Restrict)
 
-  role           Role        @relation(fields: [roleId], references: [id], onDelete: Cascade)
-  permission     Permission  @relation(fields: [permissionId], references: [id], onDelete: Restrict)
-
-  createdAt      DateTime    @default(now())
+  createdAt DateTime @default(now())
 
   @@unique([roleId, permissionId])
-  @@index([roleId])
+  @@index([tenantId, roleId])
   @@index([permissionId])
 }
 
 model UserSession {
-  id                String           @id @default(uuid()) @db.Uuid
+  id String @id @default(uuid()) @db.Uuid
 
-  membershipId      String           @db.Uuid
-  membership        TenantMembership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  membershipId String           @db.Uuid
+  membership   TenantMembership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
 
-  familyId           String           @db.Uuid
-  refreshTokenHash   String           @unique @db.VarChar(64)
+  familyId         String @db.Uuid
+  refreshTokenHash String @unique @db.VarChar(64)
 
-  ipAddress          String?          @db.Inet
-  userAgent          String?          @db.VarChar(512)
-  deviceName         String?          @db.VarChar(120)
+  ipAddress  String? @db.Inet
+  userAgent  String? @db.VarChar(512)
+  deviceName String? @db.VarChar(120)
 
-  expiresAt          DateTime
-  absoluteExpiresAt  DateTime
-  lastUsedAt         DateTime         @default(now())
+  expiresAt         DateTime
+  absoluteExpiresAt DateTime
+  lastUsedAt        DateTime @default(now())
 
-  status             SessionStatus    @default(ACTIVE)
+  status SessionStatus @default(ACTIVE)
 
-  replacedById       String?          @unique @db.Uuid
-  replacedBy         UserSession?     @relation("SessionRotation", fields: [replacedById], references: [id], onDelete: SetNull)
-  replaces           UserSession?     @relation("SessionRotation")
+  replacedById String?      @unique @db.Uuid
+  replacedBy   UserSession? @relation("SessionRotation", fields: [replacedById], references: [id], onDelete: SetNull)
+  replaces     UserSession? @relation("SessionRotation")
 
-  revokedAt          DateTime?
-  revocationReason   String?          @db.VarChar(120)
+  revokedAt        DateTime?
+  revocationReason String?   @db.VarChar(120)
 
-  createdAt          DateTime         @default(now())
-  updatedAt          DateTime         @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([membershipId, status])
   @@index([familyId, status])
@@ -314,29 +316,29 @@ model UserSession {
 }
 
 model ProviderVerification {
-  id                        String             @id @default(uuid()) @db.Uuid
+  id String @id @default(uuid()) @db.Uuid
 
-  tenantId                  String             @db.Uuid
-  tenant                    Tenant             @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  tenantId String @db.Uuid
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
 
-  providerType              ProviderType
-  status                    VerificationStatus @default(PENDING)
+  providerType ProviderType
+  status       VerificationStatus @default(PENDING)
 
-  licenseNumber             String
-  licenseExpiryDate         DateTime
+  licenseNumber              String
+  licenseExpiryDate          DateTime
   businessRegistrationNumber String
-  governmentIdReference     String
+  governmentIdReference      String
 
-  verificationNotes         String?
-  submittedAt               DateTime           @default(now())
-  verifiedAt                DateTime?
-  verifiedBy                String?            @db.Uuid
+  verificationNotes String?
+  submittedAt       DateTime  @default(now())
+  verifiedAt        DateTime?
+  verifiedBy        String?   @db.Uuid
 
-  version                   Int                @default(1)
+  version Int @default(1)
 
-  createdAt                 DateTime           @default(now())
-  updatedAt                 DateTime           @updatedAt
-  deletedAt                 DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
   @@index([tenantId])
   @@index([status])
@@ -344,36 +346,36 @@ model ProviderVerification {
 }
 
 model Provider {
-  id            String       @id @default(uuid()) @db.Uuid
+  id String @id @default(uuid()) @db.Uuid
 
-  tenantId      String       @db.Uuid
-  tenant        Tenant       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  tenantId String @db.Uuid
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
 
-  providerType  ProviderType
-  businessName  String
-  ownerName     String
-  email         String
-  phone         String
-  address       String
-  city          String
-  state         String
-  country       String
-  postalCode    String
-  latitude      Float
-  longitude     Float
-  geoHash       String?
+  providerType ProviderType
+  businessName String
+  ownerName    String
+  email        String
+  phone        String
+  address      String
+  city         String
+  state        String
+  country      String
+  postalCode   String
+  latitude     Float
+  longitude    Float
+  geoHash      String?
 
-  isVerified    Boolean      @default(false)
-  isActive      Boolean      @default(true)
+  isVerified Boolean @default(false)
+  isActive   Boolean @default(true)
 
-  inventory     Inventory[]
-  batches       Batch[]
+  inventory Inventory[]
+  batches   Batch[]
 
-  version       Int          @default(1)
+  version Int @default(1)
 
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
-  deletedAt     DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
   @@index([tenantId])
   @@index([providerType])
@@ -381,29 +383,29 @@ model Provider {
 }
 
 model Product {
-  id                  String         @id @default(uuid()) @db.Uuid
+  id String @id @default(uuid()) @db.Uuid
 
-  name                String
-  genericName         String?
-  brand               String
-  category            ProductCategory
-  subCategory         String?
-  description         String?
-  manufacturer        String
-  dosageForm          DosageForm
-  strength            String
-  barcode             String?
-  requiresPrescription Boolean       @default(false)
+  name                 String
+  genericName          String?
+  brand                String
+  category             ProductCategory
+  subCategory          String?
+  description          String?
+  manufacturer         String
+  dosageForm           DosageForm
+  strength             String
+  barcode              String?
+  requiresPrescription Boolean         @default(false)
 
-  isActive            Boolean        @default(true)
-  inventory           Inventory[]
-  batches             Batch[]
+  isActive  Boolean     @default(true)
+  inventory Inventory[]
+  batches   Batch[]
 
-  version             Int            @default(1)
+  version Int @default(1)
 
-  createdAt           DateTime       @default(now())
-  updatedAt           DateTime       @updatedAt
-  deletedAt           DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
   @@index([category])
   @@index([name])
@@ -411,35 +413,35 @@ model Product {
 }
 
 model Inventory {
-  id                String             @id @default(uuid()) @db.Uuid
+  id String @id @default(uuid()) @db.Uuid
 
-  providerId        String             @db.Uuid
-  provider          Provider           @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  providerId String   @db.Uuid
+  provider   Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
 
-  productId         String             @db.Uuid
-  product           Product            @relation(fields: [productId], references: [id], onDelete: Restrict)
+  productId String  @db.Uuid
+  product   Product @relation(fields: [productId], references: [id], onDelete: Restrict)
 
-  sku               String?
-  batchNumber       String
-  expiryDate        DateTime
-  quantity          Int
-  reservedQuantity  Int                @default(0)
-  sellingPrice      Decimal            @db.Decimal(10, 2)
-  mrp               Decimal            @db.Decimal(10, 2)
-  discountPercentage Decimal            @db.Decimal(5, 2)
-  taxPercentage     Decimal            @db.Decimal(5, 2)
-  minimumStockLevel  Int               @default(10)
+  sku                String?
+  batchNumber        String
+  expiryDate         DateTime
+  quantity           Int
+  reservedQuantity   Int      @default(0)
+  sellingPrice       Decimal  @db.Decimal(10, 2)
+  mrp                Decimal  @db.Decimal(10, 2)
+  discountPercentage Decimal  @db.Decimal(5, 2)
+  taxPercentage      Decimal  @db.Decimal(5, 2)
+  minimumStockLevel  Int      @default(10)
 
-  inStock           Boolean            @default(true)
-  isVisible         Boolean            @default(true)
+  inStock   Boolean @default(true)
+  isVisible Boolean @default(true)
 
-  version           Int                @default(1)
+  version Int @default(1)
 
-  createdAt         DateTime           @default(now())
-  updatedAt         DateTime           @updatedAt
-  deletedAt         DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
-  stockMovements    StockMovement[]
+  stockMovements StockMovement[]
 
   @@index([providerId])
   @@index([productId])
@@ -448,30 +450,30 @@ model Inventory {
 }
 
 model Batch {
-  id                String       @id @default(uuid()) @db.Uuid
+  id String @id @default(uuid()) @db.Uuid
 
-  providerId        String       @db.Uuid
-  provider          Provider     @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  providerId String   @db.Uuid
+  provider   Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
 
-  productId         String       @db.Uuid
-  product           Product      @relation(fields: [productId], references: [id], onDelete: Restrict)
+  productId String  @db.Uuid
+  product   Product @relation(fields: [productId], references: [id], onDelete: Restrict)
 
   batchNumber       String
   manufacturingDate DateTime?
   expiryDate        DateTime
   initialQuantity   Int
   currentQuantity   Int
-  purchasePrice     Decimal      @db.Decimal(10, 2)
-  sellingPrice      Decimal      @db.Decimal(10, 2)
-  status            BatchStatus  @default(ACTIVE)
+  purchasePrice     Decimal     @db.Decimal(10, 2)
+  sellingPrice      Decimal     @db.Decimal(10, 2)
+  status            BatchStatus @default(ACTIVE)
 
-  version           Int          @default(1)
+  version Int @default(1)
 
-  createdAt         DateTime     @default(now())
-  updatedAt         DateTime     @updatedAt
-  deletedAt         DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
-  stockMovements    StockMovement[]
+  stockMovements StockMovement[]
 
   @@unique([providerId, productId, batchNumber])
   @@index([providerId])
@@ -481,34 +483,34 @@ model Batch {
 }
 
 model StockMovement {
-  id                String             @id @default(uuid()) @db.Uuid
+  id String @id @default(uuid()) @db.Uuid
 
-  inventoryId       String             @db.Uuid
-  inventory         Inventory          @relation(fields: [inventoryId], references: [id], onDelete: Restrict)
+  inventoryId String    @db.Uuid
+  inventory   Inventory @relation(fields: [inventoryId], references: [id], onDelete: Restrict)
 
-  batchId           String?            @db.Uuid
-  batch             Batch?             @relation(fields: [batchId], references: [id], onDelete: Restrict)
+  batchId String? @db.Uuid
+  batch   Batch?  @relation(fields: [batchId], references: [id], onDelete: Restrict)
 
-  providerId        String             @db.Uuid
-  productId         String             @db.Uuid
+  providerId String @db.Uuid
+  productId  String @db.Uuid
 
-  type              StockMovementType
-  quantity          Int
-  quantityBefore    Int
-  quantityAfter     Int
+  type           StockMovementType
+  quantity       Int
+  quantityBefore Int
+  quantityAfter  Int
 
-  referenceType     String?
-  referenceId       String?
-  reason            String?
-  notes             String?
+  referenceType String?
+  referenceId   String?
+  reason        String?
+  notes         String?
 
-  userId            String             @db.Uuid
+  userId String @db.Uuid
 
-  version           Int                @default(1)
+  version Int @default(1)
 
-  createdAt         DateTime           @default(now())
-  updatedAt         DateTime           @updatedAt
-  deletedAt         DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
   @@index([inventoryId])
   @@index([batchId])
@@ -519,25 +521,25 @@ model StockMovement {
 }
 
 model InventoryHistory {
-  id                String             @id @default(uuid()) @db.Uuid
+  id String @id @default(uuid()) @db.Uuid
 
-  inventoryId       String             @db.Uuid
-  providerId        String             @db.Uuid
-  productId         String             @db.Uuid
-  batchId           String?            @db.Uuid
+  inventoryId String  @db.Uuid
+  providerId  String  @db.Uuid
+  productId   String  @db.Uuid
+  batchId     String? @db.Uuid
 
-  type              StockMovementType
-  quantity          Int
-  quantityBefore    Int
-  quantityAfter     Int
-  referenceType     String?
-  referenceId       String?
-  reason            String?
-  notes             String?
+  type           StockMovementType
+  quantity       Int
+  quantityBefore Int
+  quantityAfter  Int
+  referenceType  String?
+  referenceId    String?
+  reason         String?
+  notes          String?
 
-  userId            String             @db.Uuid
+  userId String @db.Uuid
 
-  createdAt         DateTime           @default(now())
+  createdAt DateTime @default(now())
 
   @@index([inventoryId])
   @@index([providerId])
@@ -547,33 +549,32 @@ model InventoryHistory {
   @@index([createdAt])
 }
 
-model AuditLog {
-  id              String   @id @default(uuid()) @db.Uuid
+model AuditEvent {
+  id                  String         @id @default(uuid()) @db.Uuid
+  scope               AuditScope
+  actorType           AuditActorType
+  outcome             AuditOutcome
+  tenantId            String?        @db.Uuid
+  actorMembershipId   String?        @db.Uuid
+  platformActorUserId String?        @db.Uuid
+  eventType           String         @db.VarChar(120)
+  resourceType        String?        @db.VarChar(80)
+  resourceId          String?        @db.VarChar(120)
+  requestId           String?        @db.VarChar(120)
+  ipAddress           String?        @db.Inet
+  userAgent           String?        @db.VarChar(512)
+  metadata            Json
+  occurredAt          DateTime       @default(now())
 
-  organizationId  String   @db.Uuid
-  userId          String   @db.Uuid
+  tenant            Tenant?           @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  actorMembership   TenantMembership? @relation(fields: [actorMembershipId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  platformActorUser User?             @relation(fields: [platformActorUserId], references: [id], onDelete: Restrict)
 
-  module          String
-  action          String
-  resourceType    String
-  resourceId      String
-
-  oldValue        Json?
-  newValue        Json?
-
-  ipAddress       String?
-  userAgent       String?
-  requestId       String?
-  deviceType      String?
-
-  createdAt       DateTime @default(now())
-
-  @@index([userId])
-  @@index([organizationId])
-  @@index([module])
-  @@index([resourceType])
-  @@index([createdAt])
-  @@index([organizationId, createdAt])
+  @@index([tenantId, occurredAt(sort: Desc), id(sort: Desc)])
+  @@index([tenantId, eventType, occurredAt(sort: Desc)])
+  @@index([actorMembershipId, occurredAt(sort: Desc)])
+  @@index([platformActorUserId, occurredAt(sort: Desc)])
+  @@index([resourceType, resourceId, occurredAt(sort: Desc)])
 }
 
 enum MedicalRecordType {
@@ -589,27 +590,27 @@ enum MedicalRecordType {
 }
 
 model MedicalRecord {
-  id              String            @id @default(uuid()) @db.Uuid
+  id String @id @default(uuid()) @db.Uuid
 
-  userId          String            @db.Uuid
+  userId String @db.Uuid
 
-  recordType      MedicalRecordType
-  title           String
-  description     String?
+  recordType  MedicalRecordType
+  title       String
+  description String?
 
-  fileUrl         String
-  fileName        String
-  fileSize        Int
-  mimeType        String
+  fileUrl  String
+  fileName String
+  fileSize Int
+  mimeType String
 
-  recordDate      DateTime
-  uploadedAt      DateTime          @default(now())
+  recordDate DateTime
+  uploadedAt DateTime @default(now())
 
-  version         Int               @default(1)
+  version Int @default(1)
 
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
-  deletedAt       DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
   @@index([userId])
   @@index([recordType])
@@ -632,22 +633,22 @@ enum ReservationStatus {
 }
 
 model Reservation {
-  id              String            @id @default(uuid()) @db.Uuid
+  id String @id @default(uuid()) @db.Uuid
 
-  userId          String            @db.Uuid
-  providerId      String            @db.Uuid
+  userId     String @db.Uuid
+  providerId String @db.Uuid
 
   reservationType ReservationType
   status          ReservationStatus @default(PENDING)
 
-  scheduledAt     DateTime
-  notes           String?
+  scheduledAt DateTime
+  notes       String?
 
-  version         Int               @default(1)
+  version Int @default(1)
 
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
-  deletedAt       DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
   @@index([userId])
   @@index([providerId])

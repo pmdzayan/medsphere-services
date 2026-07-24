@@ -12,6 +12,9 @@ import { AuthConfigService } from './auth/auth-config.service';
 import { AuthenticatedIdentity } from './auth/auth.types';
 import { SessionRepository } from './auth/session.repository';
 import { TokenService } from './auth/token.service';
+import { AuditService } from './audit/audit.service';
+import { AuditWriter } from './audit/audit-writer.service';
+import { AuthorizationService } from './authorization/authorization.service';
 import { RedisThrottlerStorage } from './security/redis-throttler.storage';
 import { UsersService } from './users/users.service';
 
@@ -21,12 +24,12 @@ interface ApiResponse {
 }
 
 interface RequestOptions {
-  readonly method?: 'GET' | 'POST';
+  readonly method?: 'GET' | 'POST' | 'PATCH';
   readonly headers?: Readonly<Record<string, string>>;
   readonly body?: unknown;
 }
 
-describe('S0.3 authentication HTTP security boundary', () => {
+describe('S0.4 authentication and authorization HTTP security boundary', () => {
   const userId = randomUUID();
   const membershipId = randomUUID();
   const tenantId = randomUUID();
@@ -46,6 +49,22 @@ describe('S0.3 authentication HTTP security boundary', () => {
   const rateLimitStorage = {
     increment: jest.fn().mockResolvedValue({ totalHits: 1, timeToExpire: 60 }),
   } as unknown as RedisThrottlerStorage;
+  const hasAllPermissions = jest.fn();
+  const listRoles = jest.fn();
+  const updateRole = jest.fn();
+  const authorizationService = {
+    hasAllPermissions,
+    listRoles,
+    updateRole,
+  } as unknown as AuthorizationService;
+  const listTenantEvents = jest.fn();
+  const auditService = {
+    listTenantEvents,
+  } as unknown as AuditService;
+  const appendTenantUser = jest.fn();
+  const auditWriter = {
+    appendTenantUser,
+  } as unknown as AuditWriter;
 
   let app: INestApplication;
   let module: TestingModule;
@@ -68,6 +87,12 @@ describe('S0.3 authentication HTTP security boundary', () => {
       .useValue(usersService)
       .overrideProvider(RedisThrottlerStorage)
       .useValue(rateLimitStorage)
+      .overrideProvider(AuthorizationService)
+      .useValue(authorizationService)
+      .overrideProvider(AuditService)
+      .useValue(auditService)
+      .overrideProvider(AuditWriter)
+      .useValue(auditWriter)
       .compile();
 
     app = module.createNestApplication();
@@ -97,6 +122,11 @@ describe('S0.3 authentication HTTP security boundary', () => {
   beforeEach(() => {
     validateAccessIdentity.mockReset();
     getPrivacy.mockReset();
+    hasAllPermissions.mockReset();
+    listRoles.mockReset();
+    updateRole.mockReset();
+    listTenantEvents.mockReset();
+    appendTenantUser.mockReset().mockResolvedValue(undefined);
     getPrivacy.mockResolvedValue({
       sharePhone: false,
       shareEmail: false,
@@ -225,6 +255,168 @@ describe('S0.3 authentication HTTP security boundary', () => {
     await expect(
       sendRequest('/users/me/privacy', { headers: authorization }),
     ).resolves.toMatchObject({ status: 401 });
+  });
+
+  it.each(['/authorization/roles', '/audit/events'])(
+    'keeps an accepted S0.4 route authenticated: %s',
+    async (path) => {
+      await expect(sendRequest(path)).resolves.toMatchObject({ status: 401 });
+      expect(hasAllPermissions).not.toHaveBeenCalled();
+    },
+  );
+
+  it('derives authorization tenant context from trusted identity and ignores forged headers', async () => {
+    const issued = issueAccessToken();
+    const identity: AuthenticatedIdentity = {
+      userId,
+      membershipId,
+      tenantId,
+      sessionId,
+      tokenId: issued.tokenId,
+    };
+    validateAccessIdentity.mockResolvedValue(identity);
+    hasAllPermissions.mockResolvedValue(true);
+    listRoles.mockResolvedValue({ data: [], total: 0, limit: 50, offset: 0 });
+
+    const response = await sendRequest('/authorization/roles', {
+      headers: {
+        authorization: `Bearer ${issued.value}`,
+        'x-user-id': randomUUID(),
+        'x-tenant-id': randomUUID(),
+      },
+    });
+
+    expect(response).toMatchObject({ status: 200 });
+    expect(hasAllPermissions).toHaveBeenCalledWith(identity, ['authorization.roles.read']);
+    expect(listRoles).toHaveBeenCalledWith(identity, expect.objectContaining({ limit: 50 }));
+  });
+
+  it('records a durable tenant denial before returning forbidden', async () => {
+    const issued = issueAccessToken();
+    const identity: AuthenticatedIdentity = {
+      userId,
+      membershipId,
+      tenantId,
+      sessionId,
+      tokenId: issued.tokenId,
+    };
+    validateAccessIdentity.mockResolvedValue(identity);
+    hasAllPermissions.mockResolvedValue(false);
+
+    const response = await sendRequest('/authorization/roles', {
+      headers: {
+        authorization: `Bearer ${issued.value}`,
+        'x-request-id': 'e2e-denial-1',
+      },
+    });
+
+    expect(response.status).toBe(403);
+    expect(listRoles).not.toHaveBeenCalled();
+    expect(appendTenantUser).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        tenantId,
+        actorMembershipId: membershipId,
+        eventType: 'authorization.permission.denied',
+        request: expect.objectContaining({ requestId: 'e2e-denial-1' }),
+      }),
+    );
+  });
+
+  it.each([
+    [undefined, 428],
+    ['W/"1"', 400],
+    ['1', 400],
+    ['"0"', 400],
+  ])('rejects a missing or malformed strong role precondition: %s', async (ifMatch, status) => {
+    const issued = issueAccessToken();
+    validateAccessIdentity.mockResolvedValue({
+      userId,
+      membershipId,
+      tenantId,
+      sessionId,
+      tokenId: issued.tokenId,
+    });
+    hasAllPermissions.mockResolvedValue(true);
+    const roleId = randomUUID();
+
+    const response = await sendRequest(`/authorization/roles/${roleId}`, {
+      method: 'PATCH',
+      headers: {
+        authorization: `Bearer ${issued.value}`,
+        ...(ifMatch ? { 'if-match': ifMatch } : {}),
+      },
+      body: { description: 'Updated description' },
+    });
+
+    expect(response.status).toBe(status);
+    expect(updateRole).not.toHaveBeenCalled();
+  });
+
+  it('passes a strong role version and bounded request context to the service', async () => {
+    const issued = issueAccessToken();
+    const identity: AuthenticatedIdentity = {
+      userId,
+      membershipId,
+      tenantId,
+      sessionId,
+      tokenId: issued.tokenId,
+    };
+    validateAccessIdentity.mockResolvedValue(identity);
+    hasAllPermissions.mockResolvedValue(true);
+    const roleId = randomUUID();
+    updateRole.mockResolvedValue({
+      id: roleId,
+      name: 'PHARMACY_MANAGER',
+      description: 'Updated description',
+      type: 'TENANT',
+      version: 4,
+      permissionKeys: [],
+      assignmentCount: 0,
+    });
+
+    const response = await sendRequest(`/authorization/roles/${roleId}`, {
+      method: 'PATCH',
+      headers: {
+        authorization: `Bearer ${issued.value}`,
+        'if-match': '"3"',
+        'x-request-id': 'e2e-update-1',
+      },
+      body: { description: 'Updated description' },
+    });
+
+    expect(response.status).toBe(200);
+    expect(updateRole).toHaveBeenCalledWith(
+      identity,
+      roleId,
+      3,
+      { description: 'Updated description' },
+      expect.objectContaining({ requestId: 'e2e-update-1' }),
+    );
+  });
+
+  it('uses the authenticated tenant for bounded audit reads', async () => {
+    const issued = issueAccessToken();
+    const identity: AuthenticatedIdentity = {
+      userId,
+      membershipId,
+      tenantId,
+      sessionId,
+      tokenId: issued.tokenId,
+    };
+    validateAccessIdentity.mockResolvedValue(identity);
+    hasAllPermissions.mockResolvedValue(true);
+    listTenantEvents.mockResolvedValue({ data: [], nextCursor: null });
+
+    const response = await sendRequest('/audit/events?limit=10', {
+      headers: {
+        authorization: `Bearer ${issued.value}`,
+        'x-tenant-id': randomUUID(),
+      },
+    });
+
+    expect(response).toMatchObject({ status: 200, body: { data: [], nextCursor: null } });
+    expect(listTenantEvents).toHaveBeenCalledWith(identity, expect.objectContaining({ limit: 10 }));
   });
 
   it.each([

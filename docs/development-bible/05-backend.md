@@ -1,29 +1,48 @@
-# Volume 05 — Backend Bible: Identity and Authentication
+# Volume 05 — Backend Bible: Identity, Authorization, and Audit
 
-**Sprint:** S0.3 Authentication and Trusted Tenant Context
+**Sprints:** S0.3 accepted; S0.4 CTO-accepted for merge
 
-**Decision:** ADR-003
+**Decisions:** ADR-003 and ADR-004
 
-**Status:** Implementation in progress; not production-approved
+**Status:** S0.4 accepted for merge; not production-approved
 
 ## Purpose and boundary
 
-The authentication module establishes a trusted global user, tenant membership, tenant, and session context. It authenticates identity only. Tenant-safe roles, permissions, policy evaluation, and durable audit persistence remain S0.4.
+The authentication module establishes a trusted global user, tenant membership,
+tenant, and session context. The authorization module derives permissions from
+that exact active membership on every request. The audit module records bounded,
+attributable, append-only evidence for accepted authorization and session
+events.
 
-The active auth-service application mounts only health, authentication, self-user privacy/language, and language metadata. RBAC, audit, providers, verification, products, and inventory prototype modules remain in source but are deliberately unmounted until their dependency-ordered sprints accept their authorization boundaries.
+The active auth-service application mounts health, authentication, self-user
+privacy/language, language metadata, S0.4 authorization administration, and
+tenant audit reads. Provider, verification, product, inventory, reservation,
+medical-record, marketplace, delivery, payment, and controlled-medicine APIs
+remain unmounted.
 
 ## Accepted route contract
 
-| Method | Route                | Access         | Authoritative context                        |
-| ------ | -------------------- | -------------- | -------------------------------------------- |
-| POST   | `/auth/register`     | Public/limited | Normalized tenant slug plus tenant policy    |
-| POST   | `/auth/login`        | Public/limited | Active user-membership-tenant database chain |
-| POST   | `/auth/refresh`      | Public/limited | Stored session membership                    |
-| POST   | `/auth/logout`       | Authenticated  | Verified request identity                    |
-| POST   | `/auth/logout-all`   | Authenticated  | Verified global user                         |
-| GET    | `/users/me/privacy`  | Authenticated  | Verified request identity user               |
-| PATCH  | `/users/me/privacy`  | Authenticated  | Verified request identity user               |
-| PATCH  | `/users/me/language` | Authenticated  | Verified request identity user               |
+| Method | Route                                                    | Access                  | Authoritative context                        |
+| ------ | -------------------------------------------------------- | ----------------------- | -------------------------------------------- |
+| POST   | `/auth/register`                                         | Public/limited          | Normalized tenant slug plus tenant policy    |
+| POST   | `/auth/login`                                            | Public/limited          | Active user-membership-tenant database chain |
+| POST   | `/auth/refresh`                                          | Public/limited          | Stored session membership                    |
+| POST   | `/auth/logout`                                           | Authenticated           | Verified request identity                    |
+| POST   | `/auth/logout-all`                                       | Authenticated           | Verified global user                         |
+| GET    | `/users/me/privacy`                                      | Authenticated           | Verified request identity user               |
+| PATCH  | `/users/me/privacy`                                      | Authenticated           | Verified request identity user               |
+| PATCH  | `/users/me/language`                                     | Authenticated           | Verified request identity user               |
+| GET    | `/authorization/permissions`                             | Permission guarded      | Global migration-owned catalogue             |
+| GET    | `/authorization/roles`                                   | Permission guarded      | Verified request tenant                      |
+| POST   | `/authorization/roles`                                   | Permission guarded      | Verified request tenant                      |
+| GET    | `/authorization/roles/:roleId`                           | Permission guarded      | Verified request tenant                      |
+| PATCH  | `/authorization/roles/:roleId`                           | Permission + `If-Match` | Verified request tenant                      |
+| DELETE | `/authorization/roles/:roleId`                           | Permission + `If-Match` | Verified request tenant                      |
+| GET    | `/authorization/memberships/:membershipId/roles`         | Permission guarded      | Verified request tenant                      |
+| PUT    | `/authorization/memberships/:membershipId/roles/:roleId` | Permission guarded      | Verified request tenant                      |
+| DELETE | `/authorization/memberships/:membershipId/roles/:roleId` | Permission guarded      | Verified request tenant                      |
+| GET    | `/audit/events`                                          | `audit.events.read`     | Verified request tenant only                 |
+| GET    | `/audit/events/:eventId`                                 | `audit.events.read`     | Verified request tenant only                 |
 
 No accepted endpoint takes an authoritative user, membership, tenant, or session ID from the request body, path, query, or custom header.
 
@@ -38,8 +57,59 @@ No accepted endpoint takes an authoritative user, membership, tenant, or session
 - `JwtAuthGuard`: global deny-by-default route enforcement with shared public metadata.
 - `AuthSecurityEventService`: allowlisted non-credential event seam for S0.4 durable audit integration.
 - `RedisThrottlerStorage`: shared fixed-window counters for network-source and account/session throttles.
+- `AuthorizationRepository`: tenant-bound role, catalogue, assignment, and
+  current-permission queries.
+- `AuthorizationService`: serializable role/assignment orchestration,
+  optimistic versions, immutable built-in policy, and last-administrator
+  protection.
+- `PermissionsGuard`: deny-by-default permission enforcement with durable
+  denial evidence.
+- `AuditWriter`: typed event construction, event-specific metadata allowlists,
+  request correlation, and tenant/platform actor scoping.
+- `AuditRepository` and `AuditService`: field-minimized, cursor-based tenant
+  reads that cannot return platform evidence.
 
 Repositories own persistence queries; controllers do not access Prisma. Services own orchestration and security state transitions. DTOs own transport validation and normalization. The access identity is readonly and contains `userId`, `membershipId`, `tenantId`, `sessionId`, and the verified token ID.
+
+Role and assignment mutations write their required audit event inside the same
+serializable transaction. Session creation, rotation, replay response, logout,
+and logout-all use the same rule. Permission denial has no protected mutation,
+so its audit row is written before the guard returns forbidden.
+
+## Authorization rules
+
+- The client never submits an authoritative tenant identifier.
+- Roles belong to one tenant; assignments belong to `TenantMembership`.
+- The eight S0.4 permissions are compile-time constants and migration-owned
+  rows. Wildcards and arbitrary tenant capabilities are rejected.
+- `TENANT_ADMINISTRATOR` is the only built-in role. Tenant APIs cannot rename,
+  delete, or replace its permissions.
+- Custom role update/delete requires a strong positive numeric `If-Match`
+  validator. Weak, missing, malformed, unsafe, and stale values fail.
+- Concurrent assignment `PUT` is idempotent. Concurrent last-administrator
+  removal is serialized through the tenant version and preserves one active
+  administrator.
+- Soft-deleted roles, inactive memberships, inactive tenants, absent policy
+  metadata, and persistence errors never authorize.
+
+## Durable audit contract
+
+The accepted S0.4 vocabulary is:
+
+- role created, updated, and deleted;
+- assignment added and removed;
+- permission denied;
+- session created;
+- refresh succeeded, failed, and replayed;
+- current-session logout succeeded;
+- global logout-all succeeded.
+
+Metadata is an event-specific object of bounded scalar values. Passwords,
+credentials, tokens, secrets, authorization headers, contact details, clinical
+content, payloads, bodies, old/new snapshots, and arbitrary keys are rejected.
+The application limit is 12 KiB and the database limit is 16 KiB. Tenant API
+responses expose only the documented event fields and revalidate persisted
+metadata before returning it.
 
 ## Validation and API documentation
 
@@ -78,11 +148,13 @@ ephemeral HTTP listener. Persistence and Redis adapters are replaced with
 deterministic test doubles because their real behavior is verified separately
 by the PostgreSQL and Redis integration suites.
 
-The suite proves that public health and language metadata remain available,
-protected self routes fail with the shared 401 envelope, HS256 substitution is
-rejected before identity lookup, client identity headers cannot replace the
-signed and server-validated context, revoked session chains invalidate an
-otherwise valid access token, and every unaccepted prototype route returns 404.
+The suite proves that public health and all five language options remain
+available; protected routes fail with the shared 401 envelope; HS256
+substitution is rejected before identity lookup; forged identity headers cannot
+replace the signed and server-validated context; revoked session chains
+invalidate an otherwise valid access token; permission denials return 403 only
+after durable evidence; strong role preconditions are enforced; tenant audit
+reads use trusted identity; and every unaccepted prototype route returns 404.
 
 ## Error and logging rules
 
@@ -90,8 +162,14 @@ otherwise valid access token, and every unaccepted prototype route returns 404.
 - Registration always returns the same accepted response and never attaches an existing global identity publicly.
 - Refresh errors do not distinguish missing, expired, revoked, or replayed credentials to the caller.
 - Logs and event payloads must never contain passwords, access tokens, refresh credentials, token digests, keys, email addresses, authorization headers, or credential request bodies.
-- Authentication security events are operational evidence only until S0.4 integrates a durable, tenant-safe audit record.
+- Authentication operational logs remain separate from S0.4 durable audit
+  events. Neither channel may contain credentials or private payloads.
 
 ## Future extension seams
 
-S0.4 consumes the trusted identity for RBAC and audit. Later reviewed work may add invitation onboarding, email verification, password recovery, MFA/passkeys, device management, external identity providers, and a measured revocation cache. None may weaken membership-derived tenant context or bypass session revocation.
+Later reviewed work may add invitation/administrator bootstrap, email
+verification, password recovery, MFA/passkeys, device management, external
+identity providers, authorization caching, delegated policy, audit
+partitioning/export, and a measured revocation cache. None may weaken
+membership-derived tenant context, bypass session revocation, or mutate
+historical audit evidence.

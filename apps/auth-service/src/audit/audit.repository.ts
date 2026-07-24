@@ -1,94 +1,86 @@
 import { Injectable } from '@nestjs/common';
+import { Prisma } from '@medsphere/database';
 import { PrismaService } from '../prisma/prisma.service';
+import { AuditEventQueryDto } from './dto/audit-event-query.dto';
 
-export interface CreateAuditLogData {
-  organizationId: string;
-  userId: string;
-  module: string;
-  action: string;
-  resourceType: string;
-  resourceId: string;
-  oldValue?: Record<string, unknown>;
-  newValue?: Record<string, unknown>;
-  ipAddress?: string;
-  userAgent?: string;
-  requestId?: string;
-  deviceType?: string;
-}
-
-export interface AuditLogFilterParams {
-  organizationId?: string;
-  userId?: string;
-  module?: string;
-  resourceType?: string;
-  startDate?: string;
-  endDate?: string;
-  limit?: number;
-  offset?: number;
-  sortBy?: string;
-  sortOrder?: 'asc' | 'desc';
-}
+const auditEventSelect = {
+  id: true,
+  eventType: true,
+  outcome: true,
+  actorMembershipId: true,
+  resourceType: true,
+  resourceId: true,
+  requestId: true,
+  metadata: true,
+  occurredAt: true,
+} as const;
 
 @Injectable()
 export class AuditRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  async create(data: CreateAuditLogData) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const createData: any = {
-      organizationId: data.organizationId,
-      userId: data.userId,
-      module: data.module,
-      action: data.action,
-      resourceType: data.resourceType,
-      resourceId: data.resourceId,
-      ipAddress: data.ipAddress,
-      userAgent: data.userAgent,
-      requestId: data.requestId,
-      deviceType: data.deviceType,
-    };
-    if (data.oldValue !== undefined) createData.oldValue = data.oldValue;
-    if (data.newValue !== undefined) createData.newValue = data.newValue;
-    return this.prisma.client.auditLog.create({ data: createData });
-  }
-
-  async findById(id: string) {
-    return this.prisma.client.auditLog.findUnique({
-      where: { id },
+  async findTenantEvent(tenantId: string, eventId: string) {
+    return this.prisma.client.auditEvent.findFirst({
+      where: { id: eventId, tenantId, scope: 'TENANT' },
+      select: auditEventSelect,
     });
   }
 
-  async findAll(params: AuditLogFilterParams) {
-    const where: Record<string, unknown> = {};
-
-    if (params.organizationId) where.organizationId = params.organizationId;
-    if (params.userId) where.userId = params.userId;
-    if (params.module) where.module = params.module;
-    if (params.resourceType) where.resourceType = params.resourceType;
-
-    if (params.startDate || params.endDate) {
-      const createdAtFilter: Record<string, Date> = {};
-      if (params.startDate) createdAtFilter.gte = new Date(params.startDate);
-      if (params.endDate) createdAtFilter.lte = new Date(params.endDate);
-      where.createdAt = createdAtFilter;
+  async listTenantEvents(tenantId: string, query: AuditEventQueryDto) {
+    let cursorBoundary:
+      | {
+          readonly occurredAt: Date;
+          readonly id: string;
+        }
+      | null
+      | undefined;
+    if (query.cursor) {
+      cursorBoundary = await this.prisma.client.auditEvent.findFirst({
+        where: { id: query.cursor, tenantId, scope: 'TENANT' },
+        select: { occurredAt: true, id: true },
+      });
     }
 
-    const take = params.limit ?? 50;
-    const skip = params.offset ?? 0;
-    const orderBy = params.sortBy
-      ? { [params.sortBy]: params.sortOrder ?? 'desc' }
-      : { createdAt: 'desc' as const };
+    const where: Prisma.AuditEventWhereInput = {
+      tenantId,
+      scope: 'TENANT',
+      ...(query.eventType ? { eventType: query.eventType } : {}),
+      ...(query.outcome ? { outcome: query.outcome } : {}),
+      ...(query.actorMembershipId ? { actorMembershipId: query.actorMembershipId } : {}),
+      ...(query.resourceType ? { resourceType: query.resourceType } : {}),
+      ...(query.resourceId ? { resourceId: query.resourceId } : {}),
+      ...(query.startDate || query.endDate
+        ? {
+            occurredAt: {
+              ...(query.startDate ? { gte: new Date(query.startDate) } : {}),
+              ...(query.endDate ? { lte: new Date(query.endDate) } : {}),
+            },
+          }
+        : {}),
+      ...(cursorBoundary
+        ? {
+            AND: [
+              {
+                OR: [
+                  { occurredAt: { lt: cursorBoundary.occurredAt } },
+                  {
+                    occurredAt: cursorBoundary.occurredAt,
+                    id: { lt: cursorBoundary.id },
+                  },
+                ],
+              },
+            ],
+          }
+        : {}),
+    };
 
-    const [data, total] = await Promise.all([
-      this.prisma.client.auditLog.findMany({
-        where,
-        orderBy,
-        take,
-        skip,
-      }),
-      this.prisma.client.auditLog.count({ where }),
-    ]);
+    const data = await this.prisma.client.auditEvent.findMany({
+      where,
+      select: auditEventSelect,
+      orderBy: [{ occurredAt: 'desc' }, { id: 'desc' }],
+      take: query.limit + 1,
+    });
 
-    return { data, total, limit: take, offset: skip };
+    return { data, cursorFound: query.cursor === undefined || cursorBoundary !== null };
   }
 }

@@ -1,8 +1,9 @@
 # MedSphere AI Handoff
 
-**Last updated:** 2026-07-20
+**Last updated:** 2026-07-25
 
-**Current sprint:** S0.4 — Tenant-Safe RBAC and Audit Integration (CTO design preparation; code not yet authorized)
+**Current sprint:** S0.4 — Tenant-Safe RBAC and Durable Audit (CTO acceptance
+approved; final documentation CI and merge pending)
 
 **Next feature work:** Blocked by S0.4
 
@@ -36,23 +37,73 @@ The migration must be incremental:
 ## Current risk context
 
 - The S0.3 authentication, trusted tenant context, and session boundary are accepted and merged.
-- Prototype RBAC, audit, provider, product, and inventory controllers remain deliberately unmounted.
-- RBAC operations are not reliably tenant-scoped — S0.4 must repair this.
-- The S0.2 and S0.3 database baselines are accepted, but the models' domain controls beyond authentication remain unaccepted.
+- The unsafe prototype RBAC and audit implementations were removed. Only the
+  reviewed S0.4 authorization administration and tenant-audit APIs are mounted.
+- S0.4 tenant-safe authorization and durable audit passed PostgreSQL
+  constraints, triggers, atomicity, concurrency, Redis, clean migration, drift,
+  and populated S0.3 upgrade verification.
+- Provider, product, inventory, reservation, and medical-record controllers
+  remain deliberately unmounted.
+- The S0.2 and S0.3 database baselines are accepted. S0.4 is accepted for merge
+  but does not unblock S0.5 until PR #7 reaches the base branch.
 - Reservation and stock operations contain transaction/concurrency defects.
-- Audit logging is not connected to business mutations — S0.4 work.
+- Durable audit covers S0.4 authorization and accepted authentication session
+  mutations. Future business modules must add atomic audit coverage when their
+  own sprints are accepted.
 - Medical-record functionality precedes consent and privacy foundations.
-- Automated coverage outside the S0.3 identity/session boundary remains insufficient for the current risk.
+- S0.4 infrastructure coverage executed on PostgreSQL 16 and Redis 7 with zero
+  skipped tests.
 
 See `docs/audits/2026-07-20-cto-baseline.md` for the accepted baseline.
 
 ## Current S0.4 boundary
 
-- S0.3 is accepted and merged. S0.4 is the current sprint.
-- S0.4 code implementation is not yet authorized — ADR-004 and the S0.4 sprint contract must be accepted first.
-- S0.4 covers tenant-safe roles, permissions, assignments, authorization policy, and durable audit integration.
+- S0.3 is accepted and merged. Its documentation handoff is the verified branch
+  dependency for S0.4.
+- ADR-004 and the S0.4 sprint contract are accepted. S0.4 implementation and
+  local review are complete on
+  `cto/s0.4-tenant-safe-rbac-durable-audit`.
+- S0.4 covers tenant-safe roles, permissions, membership assignments,
+  authorization policy, and durable append-only audit integration.
 - Inventory and reservation integrity remain S0.5.
-- The CTO owns ADR-004 and the S0.4 architecture design.
+- Marketplace, delivery, payment, frontend, and controlled-medicine work remain
+  blocked.
+- The CTO owns the S0.4 implementation and acceptance review.
+
+## S0.4 checkpoint state
+
+1. Architecture and sprint contract — completed in local commit `9603f5b`
+2. Database schema and migration — implemented in `a8b2128` and hardened in
+   `993324b`; PostgreSQL deploy, drift, constraint, and populated-upgrade proof
+   complete
+3. Authorization implementation — completed and locally reviewed
+4. Durable audit and authentication integration — completed and locally
+   reviewed
+5. Local security verification — format, Prisma validation/generation, lint,
+   non-infrastructure tests, strict auth test type-check, and build completed;
+   PostgreSQL/Redis suites passed in workflow run `30130479231`
+6. Populated S0.3 upgrade verification — completed in `4f10eef`; all six
+   isolated scenarios passed in workflow run `30131410814`
+7. CTO acceptance — approved; final documentation commit, CI, and PR #7 merge
+   pending
+
+If ownership transfers after a checkpoint, resume at the first pending item.
+Never restart from the oversized `cline/s0.4-rbac-audit` branch.
+
+## Exact continuation point
+
+Do not implement S0.5 or ask Cline to begin another feature. First:
+
+1. Keep [PR #7](https://github.com/pmdzayan/medsphere-services/pull/7) in draft.
+2. Publish the final CTO acceptance documentation commit.
+3. Require the full workflow to pass again on that exact commit.
+4. Mark PR #7 ready and squash-merge only after the final check is green.
+5. Synchronize `feature/database-architecture` and record the resulting accepted
+   baseline before authorizing S0.5.
+
+If CI fails, Cline may receive one complete, narrowly scoped prompt for the
+specific failure set. Cline must not redesign the schema, permission model,
+audit contract, or tenant boundary.
 
 ## Agent routing
 

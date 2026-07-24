@@ -113,6 +113,7 @@ describe('AuthService', () => {
       expect.objectContaining({
         id: sessionId,
         membershipId,
+        tenantId,
         refreshTokenHash: 'a'.repeat(64),
         metadata,
       }),
@@ -198,7 +199,7 @@ describe('AuthService', () => {
 
     await service.logout(identity);
     await expect(service.logoutAllDevices(identity)).resolves.toEqual({ revokedCount: 3 });
-    expect(sessionRepository.revokeCurrentFamily).toHaveBeenCalledWith(sessionId, userId);
-    expect(sessionRepository.revokeAllForUser).toHaveBeenCalledWith(userId);
+    expect(sessionRepository.revokeCurrentFamily).toHaveBeenCalledWith(identity, {});
+    expect(sessionRepository.revokeAllForUser).toHaveBeenCalledWith(identity, {});
   });
 });

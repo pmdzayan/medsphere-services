@@ -5,7 +5,7 @@ import { AuthController } from './auth.controller';
 import { HealthController } from '@medsphere/common';
 import { LocalizationController } from '../localization/localization.controller';
 
-describe('S0.3 route policy', () => {
+describe('S0.4 route policy', () => {
   it.each([
     [AuthController, 'register'],
     [AuthController, 'login'],
@@ -33,7 +33,7 @@ describe('S0.3 route policy', () => {
     },
   );
 
-  it('does not mount rejected prototype modules', () => {
+  it('mounts accepted authorization and audit modules without later-domain prototypes', () => {
     const imports = Reflect.getMetadata(MODULE_METADATA.IMPORTS, AppModule) as Array<{
       name?: string;
       module?: { name?: string };
@@ -48,12 +48,12 @@ describe('S0.3 route policy', () => {
         'AuthModule',
         'UsersModule',
         'LocalizationModule',
+        'AuthorizationModule',
+        'AuditModule',
       ]),
     );
     expect(mountedNames).not.toEqual(
       expect.arrayContaining([
-        'AuditModule',
-        'RbacModule',
         'ProviderVerificationModule',
         'ProvidersModule',
         'ProductsModule',

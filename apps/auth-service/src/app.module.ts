@@ -8,6 +8,8 @@ import { LocalizationModule } from './localization/localization.module';
 import { AuthModule } from './auth/auth.module';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
 import { AuthRateLimitModule } from './security/auth-rate-limit.module';
+import { AuthorizationModule } from './authorization/authorization.module';
+import { AuditModule } from './audit/audit.module';
 
 @Module({
   imports: [
@@ -17,6 +19,8 @@ import { AuthRateLimitModule } from './security/auth-rate-limit.module';
     AuthModule,
     UsersModule,
     LocalizationModule,
+    AuthorizationModule,
+    AuditModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },

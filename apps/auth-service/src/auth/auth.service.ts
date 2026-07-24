@@ -75,6 +75,7 @@ export class AuthService {
     await this.sessionRepository.createSession({
       id: refreshCredential.sessionId,
       membershipId: loginIdentity.membershipId,
+      tenantId: loginIdentity.tenantId,
       familyId,
       refreshTokenHash: refreshCredential.hash,
       expiresAt,
@@ -159,14 +160,20 @@ export class AuthService {
     };
   }
 
-  async logout(identity: AuthenticatedIdentity): Promise<{ message: string }> {
-    await this.sessionRepository.revokeCurrentFamily(identity.sessionId, identity.userId);
+  async logout(
+    identity: AuthenticatedIdentity,
+    metadata: RequestMetadata = {},
+  ): Promise<{ message: string }> {
+    await this.sessionRepository.revokeCurrentFamily(identity, metadata);
     this.securityEvents.record('logout', { outcome: 'success', ...identity });
     return { message: 'Logged out successfully' };
   }
 
-  async logoutAllDevices(identity: AuthenticatedIdentity): Promise<{ revokedCount: number }> {
-    const revokedCount = await this.sessionRepository.revokeAllForUser(identity.userId);
+  async logoutAllDevices(
+    identity: AuthenticatedIdentity,
+    metadata: RequestMetadata = {},
+  ): Promise<{ revokedCount: number }> {
+    const revokedCount = await this.sessionRepository.revokeAllForUser(identity, metadata);
     this.securityEvents.record('logout-all', { outcome: 'success', ...identity });
     return { revokedCount };
   }

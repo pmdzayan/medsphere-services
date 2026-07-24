@@ -5,8 +5,8 @@
   "scripts": {
     "build": "nest build",
     "dev": "nest start --watch",
-    "test": "jest",
-    "test:cov": "jest --coverage",
+    "test": "tsc -p tsconfig.spec.json --noEmit && jest",
+    "test:cov": "tsc -p tsconfig.spec.json --noEmit && jest --coverage",
     "lint": "eslint \"src/**/*.ts\"",
     "clean": "rimraf dist tsconfig.tsbuildinfo"
   },

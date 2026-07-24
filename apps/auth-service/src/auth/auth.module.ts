@@ -13,11 +13,13 @@ import { SessionRepository } from './session.repository';
 import { TokenService } from './token.service';
 import { PrismaModule } from '../prisma/prisma.module';
 import { UsersModule } from '../users/users.module';
+import { AuditPersistenceModule } from '../audit/audit-persistence.module';
 
 @Module({
   imports: [
     PrismaModule,
     UsersModule,
+    AuditPersistenceModule,
     PassportModule.register({ defaultStrategy: 'jwt', session: false }),
     JwtModule.register({}),
   ],
