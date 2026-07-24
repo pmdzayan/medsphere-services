@@ -1,14 +1,14 @@
 import { Module } from '@nestjs/common';
+import { AuthorizationModule } from '../authorization/authorization.module';
+import { PrismaModule } from '../prisma/prisma.module';
+import { AuditPersistenceModule } from './audit-persistence.module';
+import { AuditController } from './audit.controller';
 import { AuditRepository } from './audit.repository';
 import { AuditService } from './audit.service';
-import { AuditController } from './audit.controller';
-import { PrismaModule } from '../prisma/prisma.module';
-import { RbacModule } from '../rbac/rbac.module';
 
 @Module({
-  imports: [PrismaModule, RbacModule],
+  imports: [PrismaModule, AuditPersistenceModule, AuthorizationModule],
   controllers: [AuditController],
   providers: [AuditRepository, AuditService],
-  exports: [AuditRepository, AuditService],
 })
 export class AuditModule {}

@@ -46,6 +46,7 @@ export interface RequestMetadata {
   readonly ipAddress?: string;
   readonly userAgent?: string;
   readonly deviceName?: string;
+  readonly requestId?: string;
 }
 
 export interface LoginIdentity {

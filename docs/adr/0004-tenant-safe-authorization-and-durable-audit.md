@@ -48,16 +48,16 @@ append-only event record before inventory or reservation integrity work begins.
 Permissions are global, immutable capabilities owned by migration history. S0.4
 accepts exactly these keys:
 
-| Permission                               | Purpose                                  |
-| ---------------------------------------- | ---------------------------------------- |
-| `authorization.roles.read`               | Read roles in the active tenant          |
-| `authorization.roles.create`             | Create custom tenant roles               |
-| `authorization.roles.update`             | Update custom tenant roles               |
-| `authorization.roles.delete`             | Soft-delete custom tenant roles          |
-| `authorization.permissions.read`         | Read the accepted permission catalogue   |
-| `authorization.assignments.read`         | Read membership-role assignments         |
-| `authorization.assignments.manage`       | Add or remove membership-role assignments |
-| `audit.events.read`                      | Read tenant-scoped audit events           |
+| Permission                         | Purpose                                   |
+| ---------------------------------- | ----------------------------------------- |
+| `authorization.roles.read`         | Read roles in the active tenant           |
+| `authorization.roles.create`       | Create custom tenant roles                |
+| `authorization.roles.update`       | Update custom tenant roles                |
+| `authorization.roles.delete`       | Soft-delete custom tenant roles           |
+| `authorization.permissions.read`   | Read the accepted permission catalogue    |
+| `authorization.assignments.read`   | Read membership-role assignments          |
+| `authorization.assignments.manage` | Add or remove membership-role assignments |
+| `audit.events.read`                | Read tenant-scoped audit events           |
 
 The catalogue is inserted by migration with stable identifiers. Runtime startup
 does not create roles or permissions. Unknown legacy permission data blocks the

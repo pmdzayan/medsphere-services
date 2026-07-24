@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { SessionRepository } from './session.repository';
 import { isInfrastructureTestEnabled, requireEnv } from './testing/infrastructure-test-gate';
+import { AuditWriter } from '../audit/audit-writer.service';
 
 const describeSessionInfra = isInfrastructureTestEnabled() ? describe : describe.skip;
 
@@ -11,7 +12,7 @@ if (isInfrastructureTestEnabled()) {
 
 describeSessionInfra('SessionRepository PostgreSQL security integration', () => {
   const prisma = new PrismaService();
-  const repository = new SessionRepository(prisma);
+  const repository = new SessionRepository(prisma, new AuditWriter());
   const tenantId = randomUUID();
   const otherTenantId = randomUUID();
   const userId = randomUUID();
@@ -50,8 +51,6 @@ describeSessionInfra('SessionRepository PostgreSQL security integration', () => 
   });
 
   afterAll(async () => {
-    await prisma.client.user.deleteMany({ where: { id: userId } });
-    await prisma.client.tenant.deleteMany({ where: { id: { in: [tenantId, otherTenantId] } } });
     await prisma.client.$disconnect();
   });
 
@@ -143,6 +142,68 @@ describeSessionInfra('SessionRepository PostgreSQL security integration', () => 
     expect(activeCount).toBe(0);
   });
 
+  it('writes session creation evidence atomically and rolls back when audit persistence fails', async () => {
+    const acceptedSessionId = randomUUID();
+    await createActiveSession(acceptedSessionId, randomUUID(), '1'.repeat(64));
+
+    await expect(
+      prisma.client.auditEvent.count({
+        where: {
+          tenantId,
+          actorMembershipId: membershipId,
+          eventType: 'authentication.session.created',
+          resourceId: acceptedSessionId,
+        },
+      }),
+    ).resolves.toBe(1);
+
+    const rejectedSessionId = randomUUID();
+    await expect(
+      repository.createSession({
+        id: rejectedSessionId,
+        membershipId,
+        tenantId,
+        familyId: randomUUID(),
+        refreshTokenHash: '2'.repeat(64),
+        expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+        absoluteExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+        metadata: { ipAddress: 'not-an-ip-address' },
+      }),
+    ).rejects.toBeDefined();
+    await expect(
+      prisma.client.userSession.findUnique({ where: { id: rejectedSessionId } }),
+    ).resolves.toBeNull();
+  });
+
+  it('records logout-all as platform evidence rather than a tenant aggregate', async () => {
+    const sessionId = randomUUID();
+    await createActiveSession(sessionId, randomUUID(), '3'.repeat(64));
+    const identity = {
+      userId,
+      membershipId,
+      tenantId,
+      sessionId,
+      tokenId: randomUUID(),
+    };
+
+    await repository.revokeAllForUser(identity, metadata);
+
+    const event = await prisma.client.auditEvent.findFirstOrThrow({
+      where: {
+        platformActorUserId: userId,
+        eventType: 'authentication.sessions.logout.succeeded',
+        resourceId: userId,
+      },
+      orderBy: { occurredAt: 'desc' },
+    });
+    expect(event).toMatchObject({
+      scope: 'PLATFORM',
+      actorType: 'PLATFORM_USER',
+      tenantId: null,
+      actorMembershipId: null,
+    });
+  });
+
   async function createActiveSession(
     id: string,
     familyId: string,
@@ -152,6 +213,7 @@ describeSessionInfra('SessionRepository PostgreSQL security integration', () => 
     await repository.createSession({
       id,
       membershipId,
+      tenantId,
       familyId,
       refreshTokenHash,
       expiresAt: new Date(Date.now() + 60 * 60 * 1000),

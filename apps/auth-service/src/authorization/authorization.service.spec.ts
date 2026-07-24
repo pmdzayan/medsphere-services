@@ -1,0 +1,165 @@
+import { randomUUID } from 'node:crypto';
+import { ConflictException, ForbiddenException, PreconditionFailedException } from '@nestjs/common';
+import { Prisma } from '@medsphere/database';
+import { AuthenticatedIdentity } from '../auth/auth.types';
+import { AuditWriter } from '../audit/audit-writer.service';
+import { AuthorizationRepository } from './authorization.repository';
+import { AuthorizationService } from './authorization.service';
+import { PERMISSIONS, TENANT_ADMINISTRATOR_ROLE } from './permission.constants';
+
+describe('AuthorizationService', () => {
+  const identity: AuthenticatedIdentity = {
+    userId: randomUUID(),
+    membershipId: randomUUID(),
+    tenantId: randomUUID(),
+    sessionId: randomUUID(),
+    tokenId: randomUUID(),
+  };
+  const transaction = {} as Prisma.TransactionClient;
+  const transactionClient = {
+    $transaction: jest.fn(
+      async (operation: (database: Prisma.TransactionClient) => Promise<unknown>) =>
+        operation(transaction),
+    ),
+  };
+  let repository: jest.Mocked<AuthorizationRepository>;
+  let auditWriter: jest.Mocked<AuditWriter>;
+  let service: AuthorizationService;
+
+  beforeEach(() => {
+    transactionClient.$transaction.mockClear();
+    repository = {
+      transactionClient,
+      findEffectivePermissions: jest.fn(),
+      findRole: jest.fn(),
+      findRoleByName: jest.fn(),
+      findPermissions: jest.fn(),
+      updateRoleVersioned: jest.fn(),
+      replaceRolePermissions: jest.fn(),
+      bumpTenantVersion: jest.fn(),
+      findMembership: jest.fn(),
+      findAssignment: jest.fn(),
+      countActiveTenantAdministrators: jest.fn(),
+      removeAssignment: jest.fn(),
+    } as unknown as jest.Mocked<AuthorizationRepository>;
+    auditWriter = {
+      appendTenantUser: jest.fn().mockResolvedValue(undefined),
+    } as unknown as jest.Mocked<AuditWriter>;
+    service = new AuthorizationService(repository, auditWriter);
+  });
+
+  it('requires every current permission from the active membership', async () => {
+    repository.findEffectivePermissions.mockResolvedValue([
+      PERMISSIONS.rolesRead,
+      PERMISSIONS.rolesUpdate,
+    ]);
+
+    await expect(
+      service.hasAllPermissions(identity, [PERMISSIONS.rolesRead, PERMISSIONS.rolesUpdate]),
+    ).resolves.toBe(true);
+    await expect(
+      service.hasAllPermissions(identity, [PERMISSIONS.rolesRead, PERMISSIONS.rolesDelete]),
+    ).resolves.toBe(false);
+    expect(repository.findEffectivePermissions).toHaveBeenCalledWith(identity);
+  });
+
+  it('rejects stale role versions before any mutation or audit write', async () => {
+    repository.findRole.mockResolvedValue(
+      roleFixture({ id: randomUUID(), type: 'TENANT', version: 3 }) as never,
+    );
+
+    await expect(
+      service.updateRole(identity, randomUUID(), 2, { description: 'New description' }),
+    ).rejects.toThrow(PreconditionFailedException);
+    expect(repository.updateRoleVersioned).not.toHaveBeenCalled();
+    expect(auditWriter.appendTenantUser).not.toHaveBeenCalled();
+  });
+
+  it('keeps built-in roles immutable', async () => {
+    repository.findRole.mockResolvedValue(
+      roleFixture({
+        id: randomUUID(),
+        name: TENANT_ADMINISTRATOR_ROLE,
+        type: 'SYSTEM',
+      }) as never,
+    );
+
+    await expect(
+      service.updateRole(identity, randomUUID(), 1, { name: 'RENAMED_ADMINISTRATOR' }),
+    ).rejects.toThrow(ForbiddenException);
+    expect(repository.updateRoleVersioned).not.toHaveBeenCalled();
+    expect(repository.replaceRolePermissions).not.toHaveBeenCalled();
+  });
+
+  it('does not remove the last active tenant administrator', async () => {
+    const membershipId = randomUUID();
+    const roleId = randomUUID();
+    repository.findMembership.mockResolvedValue({ id: membershipId, status: 'ACTIVE' } as never);
+    repository.findRole.mockResolvedValue(
+      roleFixture({
+        id: roleId,
+        name: TENANT_ADMINISTRATOR_ROLE,
+        type: 'SYSTEM',
+      }) as never,
+    );
+    repository.findAssignment.mockResolvedValue({ id: randomUUID() });
+    repository.countActiveTenantAdministrators.mockResolvedValue(1);
+
+    await expect(service.removeAssignment(identity, membershipId, roleId)).rejects.toThrow(
+      ConflictException,
+    );
+    expect(repository.bumpTenantVersion).toHaveBeenCalledWith(transaction, identity.tenantId);
+    expect(repository.removeAssignment).not.toHaveBeenCalled();
+    expect(auditWriter.appendTenantUser).not.toHaveBeenCalled();
+  });
+
+  it('writes assignment removal evidence in the same transaction', async () => {
+    const membershipId = randomUUID();
+    const roleId = randomUUID();
+    repository.findMembership.mockResolvedValue({ id: membershipId, status: 'ACTIVE' } as never);
+    repository.findRole.mockResolvedValue(
+      roleFixture({ id: roleId, name: 'PHARMACY_MANAGER', type: 'TENANT' }) as never,
+    );
+    repository.findAssignment.mockResolvedValue({ id: randomUUID() });
+    repository.removeAssignment.mockResolvedValue({ count: 1 });
+
+    await service.removeAssignment(identity, membershipId, roleId, {
+      requestId: 'request-remove-1',
+    });
+
+    expect(repository.removeAssignment).toHaveBeenCalledWith(
+      transaction,
+      identity.tenantId,
+      membershipId,
+      roleId,
+    );
+    expect(auditWriter.appendTenantUser).toHaveBeenCalledWith(
+      transaction,
+      expect.objectContaining({
+        tenantId: identity.tenantId,
+        actorMembershipId: identity.membershipId,
+        eventType: 'authorization.assignment.removed',
+        request: { requestId: 'request-remove-1' },
+      }),
+    );
+  });
+
+  function roleFixture(
+    overrides: Partial<{
+      id: string;
+      name: string;
+      type: 'SYSTEM' | 'TENANT';
+      version: number;
+    }> = {},
+  ) {
+    return {
+      id: overrides.id ?? randomUUID(),
+      name: overrides.name ?? 'CUSTOM_ROLE',
+      description: null,
+      type: overrides.type ?? ('TENANT' as const),
+      version: overrides.version ?? 1,
+      rolePermissions: [],
+      _count: { roleAssignments: 0 },
+    };
+  }
+});
