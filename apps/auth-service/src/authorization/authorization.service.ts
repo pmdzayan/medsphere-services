@@ -9,7 +9,7 @@ import {
 import { Prisma } from '@medsphere/database';
 import { AuthenticatedIdentity, RequestMetadata } from '../auth/auth.types';
 import { AuditWriter } from '../audit/audit-writer.service';
-import { withSerializableRetry } from '../prisma/transaction.util';
+import { hasPrismaCode, withSerializableRetry } from '../prisma/transaction.util';
 import { AuthorizationRepository } from './authorization.repository';
 import { AuthorizationListQueryDto } from './dto/authorization-list-query.dto';
 import { CreateRoleDto } from './dto/create-role.dto';
@@ -71,47 +71,54 @@ export class AuthorizationService {
     dto: CreateRoleDto,
     request: RequestMetadata = {},
   ): Promise<RoleResponseDto> {
-    return withSerializableRetry(this.repository.transactionClient, async (transaction) => {
-      if (dto.name === TENANT_ADMINISTRATOR_ROLE) {
-        throw new ConflictException('Role name is reserved');
-      }
-      if (await this.repository.findRoleByName(transaction, identity.tenantId, dto.name)) {
+    try {
+      return await withSerializableRetry(this.repository.transactionClient, async (transaction) => {
+        if (dto.name === TENANT_ADMINISTRATOR_ROLE) {
+          throw new ConflictException('Role name is reserved');
+        }
+        if (await this.repository.findRoleByName(transaction, identity.tenantId, dto.name)) {
+          throw new ConflictException('Role already exists');
+        }
+
+        const permissions = await this.requirePermissionCatalogue(transaction, dto.permissionKeys);
+        const created = await this.repository.createRole(transaction, {
+          tenantId: identity.tenantId,
+          name: dto.name,
+          description: dto.description,
+        });
+        await this.repository.replaceRolePermissions(
+          transaction,
+          identity.tenantId,
+          created.id,
+          permissions.map((permission) => permission.id),
+        );
+        await this.auditWriter.appendTenantUser(transaction, {
+          tenantId: identity.tenantId,
+          actorMembershipId: identity.membershipId,
+          eventType: 'authorization.role.created',
+          outcome: 'SUCCEEDED',
+          resourceType: 'authorization-role',
+          resourceId: created.id,
+          metadata: {
+            roleName: dto.name,
+            roleVersion: created.version,
+            permissionCount: permissions.length,
+          },
+          request,
+        });
+
+        const role = await this.repository.findRole(transaction, identity.tenantId, created.id);
+        if (!role) {
+          throw new Error('Created role was not readable inside its transaction');
+        }
+        return this.mapRole(role);
+      });
+    } catch (error) {
+      if (hasPrismaCode(error, 'P2002')) {
         throw new ConflictException('Role already exists');
       }
-
-      const permissions = await this.requirePermissionCatalogue(transaction, dto.permissionKeys);
-      const created = await this.repository.createRole(transaction, {
-        tenantId: identity.tenantId,
-        name: dto.name,
-        description: dto.description,
-      });
-      await this.repository.replaceRolePermissions(
-        transaction,
-        identity.tenantId,
-        created.id,
-        permissions.map((permission) => permission.id),
-      );
-      await this.auditWriter.appendTenantUser(transaction, {
-        tenantId: identity.tenantId,
-        actorMembershipId: identity.membershipId,
-        eventType: 'authorization.role.created',
-        outcome: 'SUCCEEDED',
-        resourceType: 'authorization-role',
-        resourceId: created.id,
-        metadata: {
-          roleName: dto.name,
-          roleVersion: created.version,
-          permissionCount: permissions.length,
-        },
-        request,
-      });
-
-      const role = await this.repository.findRole(transaction, identity.tenantId, created.id);
-      if (!role) {
-        throw new Error('Created role was not readable inside its transaction');
-      }
-      return this.mapRole(role);
-    });
+      throw error;
+    }
   }
 
   async updateRole(
@@ -129,62 +136,69 @@ export class AuthorizationService {
       throw new BadRequestException('At least one role field must be supplied');
     }
 
-    return withSerializableRetry(this.repository.transactionClient, async (transaction) => {
-      const existing = await this.requireMutableRole(transaction, identity.tenantId, roleId);
-      if (existing.version !== expectedVersion) {
-        throw new PreconditionFailedException('Role version is stale');
-      }
-      if (
-        dto.name !== undefined &&
-        dto.name !== existing.name &&
-        (await this.repository.findRoleByName(transaction, identity.tenantId, dto.name))
-      ) {
+    try {
+      return await withSerializableRetry(this.repository.transactionClient, async (transaction) => {
+        const existing = await this.requireMutableRole(transaction, identity.tenantId, roleId);
+        if (existing.version !== expectedVersion) {
+          throw new PreconditionFailedException('Role version is stale');
+        }
+        if (
+          dto.name !== undefined &&
+          dto.name !== existing.name &&
+          (await this.repository.findRoleByName(transaction, identity.tenantId, dto.name))
+        ) {
+          throw new ConflictException('Role already exists');
+        }
+
+        const permissions =
+          dto.permissionKeys === undefined
+            ? undefined
+            : await this.requirePermissionCatalogue(transaction, dto.permissionKeys);
+        const update = await this.repository.updateRoleVersioned(transaction, {
+          tenantId: identity.tenantId,
+          roleId,
+          expectedVersion,
+          name: dto.name,
+          description: dto.description,
+        });
+        if (update.count !== 1) {
+          throw new PreconditionFailedException('Role version is stale');
+        }
+        if (permissions !== undefined) {
+          await this.repository.replaceRolePermissions(
+            transaction,
+            identity.tenantId,
+            roleId,
+            permissions.map((permission) => permission.id),
+          );
+        }
+
+        const role = await this.repository.findRole(transaction, identity.tenantId, roleId);
+        if (!role) {
+          throw new Error('Updated role was not readable inside its transaction');
+        }
+        await this.auditWriter.appendTenantUser(transaction, {
+          tenantId: identity.tenantId,
+          actorMembershipId: identity.membershipId,
+          eventType: 'authorization.role.updated',
+          outcome: 'SUCCEEDED',
+          resourceType: 'authorization-role',
+          resourceId: roleId,
+          metadata: {
+            roleName: role.name,
+            roleVersion: role.version,
+            permissionCount: role.rolePermissions.length,
+          },
+          request,
+        });
+        return this.mapRole(role);
+      });
+    } catch (error) {
+      if (hasPrismaCode(error, 'P2002')) {
         throw new ConflictException('Role already exists');
       }
-
-      const permissions =
-        dto.permissionKeys === undefined
-          ? undefined
-          : await this.requirePermissionCatalogue(transaction, dto.permissionKeys);
-      const update = await this.repository.updateRoleVersioned(transaction, {
-        tenantId: identity.tenantId,
-        roleId,
-        expectedVersion,
-        name: dto.name,
-        description: dto.description,
-      });
-      if (update.count !== 1) {
-        throw new PreconditionFailedException('Role version is stale');
-      }
-      if (permissions !== undefined) {
-        await this.repository.replaceRolePermissions(
-          transaction,
-          identity.tenantId,
-          roleId,
-          permissions.map((permission) => permission.id),
-        );
-      }
-
-      const role = await this.repository.findRole(transaction, identity.tenantId, roleId);
-      if (!role) {
-        throw new Error('Updated role was not readable inside its transaction');
-      }
-      await this.auditWriter.appendTenantUser(transaction, {
-        tenantId: identity.tenantId,
-        actorMembershipId: identity.membershipId,
-        eventType: 'authorization.role.updated',
-        outcome: 'SUCCEEDED',
-        resourceType: 'authorization-role',
-        resourceId: roleId,
-        metadata: {
-          roleName: role.name,
-          roleVersion: role.version,
-          permissionCount: role.rolePermissions.length,
-        },
-        request,
-      });
-      return this.mapRole(role);
-    });
+      throw error;
+    }
   }
 
   async deleteRole(
@@ -265,25 +279,27 @@ export class AuthorizationService {
         roleId,
       );
       if (!existing) {
-        await this.repository.createAssignment(
+        const created = await this.repository.createAssignment(
           transaction,
           identity.tenantId,
           membershipId,
           roleId,
         );
-        await this.auditWriter.appendTenantUser(transaction, {
-          tenantId: identity.tenantId,
-          actorMembershipId: identity.membershipId,
-          eventType: 'authorization.assignment.added',
-          outcome: 'SUCCEEDED',
-          resourceType: 'membership-role-assignment',
-          resourceId: `${membershipId}:${roleId}`,
-          metadata: {
-            targetMembershipId: membershipId,
-            roleName: role.name,
-          },
-          request,
-        });
+        if (created.count === 1) {
+          await this.auditWriter.appendTenantUser(transaction, {
+            tenantId: identity.tenantId,
+            actorMembershipId: identity.membershipId,
+            eventType: 'authorization.assignment.added',
+            outcome: 'SUCCEEDED',
+            resourceType: 'membership-role-assignment',
+            resourceId: `${membershipId}:${roleId}`,
+            metadata: {
+              targetMembershipId: membershipId,
+              roleName: role.name,
+            },
+            request,
+          });
+        }
       }
       return { membershipId, roleId, roleName: role.name };
     });

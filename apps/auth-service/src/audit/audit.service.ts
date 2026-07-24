@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { AuthenticatedIdentity } from '../auth/auth.types';
+import { validateAuditMetadata } from './audit-metadata';
 import { AuditRepository } from './audit.repository';
 import { AuditEventQueryDto } from './dto/audit-event-query.dto';
 import { AuditEventListResponseDto, AuditEventResponseDto } from './dto/audit-event-response.dto';
@@ -57,6 +58,7 @@ export class AuditService {
     metadata: unknown;
     occurredAt: Date;
   }): AuditEventResponseDto {
+    const metadata = validateAuditMetadata(event.eventType, event.metadata);
     return {
       id: event.id,
       eventType: event.eventType,
@@ -65,7 +67,7 @@ export class AuditService {
       resourceType: event.resourceType,
       resourceId: event.resourceId,
       requestId: event.requestId,
-      metadata: event.metadata as Record<string, string | number | boolean | null>,
+      metadata,
       occurredAt: event.occurredAt.toISOString(),
     };
   }

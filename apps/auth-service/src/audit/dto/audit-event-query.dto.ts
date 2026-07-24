@@ -9,6 +9,7 @@ import {
   Max,
   MaxLength,
   Min,
+  MinLength,
 } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { AUDIT_EVENT_TYPES, AuditEventType } from '../audit.constants';
@@ -32,12 +33,14 @@ export class AuditEventQueryDto {
   @ApiPropertyOptional({ maxLength: 80 })
   @IsOptional()
   @IsString()
+  @MinLength(1)
   @MaxLength(80)
   resourceType?: string;
 
   @ApiPropertyOptional({ maxLength: 120 })
   @IsOptional()
   @IsString()
+  @MinLength(1)
   @MaxLength(120)
   resourceId?: string;
 

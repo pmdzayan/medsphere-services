@@ -222,6 +222,34 @@ describeAuthorizationInfra('S0.4 PostgreSQL authorization and durable-audit inte
     ).rejects.toBeDefined();
   });
 
+  it('keeps the permission catalogue migration-owned and built-in role shape constrained', async () => {
+    await expect(
+      prisma.client.permission.update({
+        where: { name: PERMISSIONS.rolesRead },
+        data: { description: 'Runtime mutation must fail' },
+      }),
+    ).rejects.toBeDefined();
+
+    await expect(
+      prisma.client.role.create({
+        data: {
+          tenantId: tenantAId,
+          name: 'UNREVIEWED_SYSTEM_ROLE',
+          type: 'SYSTEM',
+        },
+      }),
+    ).rejects.toBeDefined();
+    await expect(
+      prisma.client.role.create({
+        data: {
+          tenantId: tenantAId,
+          name: TENANT_ADMINISTRATOR_ROLE,
+          type: 'TENANT',
+        },
+      }),
+    ).rejects.toBeDefined();
+  });
+
   it('rejects cross-tenant actors and direct audit update or delete', async () => {
     await expect(
       auditWriter.appendTenantUser(prisma.client, {
@@ -350,6 +378,37 @@ describeAuthorizationInfra('S0.4 PostgreSQL authorization and durable-audit inte
           tenantId: tenantAId,
           eventType: 'authorization.role.updated',
           resourceId: role.id,
+        },
+      }),
+    ).resolves.toBe(1);
+  });
+
+  it('keeps concurrent assignment PUT semantics idempotent with one audit event', async () => {
+    const role = await prisma.client.role.create({
+      data: {
+        tenantId: tenantAId,
+        name: `ASSIGNMENT_PROBE_${randomUUID().replaceAll('-', '').slice(0, 12).toUpperCase()}`,
+        type: 'TENANT',
+      },
+    });
+
+    const results = await Promise.allSettled([
+      authorizationService.addAssignment(identityA, membershipA2Id, role.id),
+      authorizationService.addAssignment(identityA, membershipA2Id, role.id),
+    ]);
+
+    expect(results.every((result) => result.status === 'fulfilled')).toBe(true);
+    await expect(
+      prisma.client.membershipRole.count({
+        where: { tenantId: tenantAId, membershipId: membershipA2Id, roleId: role.id },
+      }),
+    ).resolves.toBe(1);
+    await expect(
+      prisma.client.auditEvent.count({
+        where: {
+          tenantId: tenantAId,
+          eventType: 'authorization.assignment.added',
+          resourceId: `${membershipA2Id}:${role.id}`,
         },
       }),
     ).resolves.toBe(1);

@@ -71,6 +71,20 @@ ON "TenantMembership"("id", "tenantId");
 CREATE UNIQUE INDEX "Role_id_tenantId_key"
 ON "Role"("id", "tenantId");
 
+ALTER TABLE "Role"
+ADD CONSTRAINT "Role_builtin_shape_check" CHECK (
+  (
+    "type" = 'SYSTEM'
+    AND "name" = 'TENANT_ADMINISTRATOR'
+    AND "deletedAt" IS NULL
+  )
+  OR
+  (
+    "type" = 'TENANT'
+    AND "name" <> 'TENANT_ADMINISTRATOR'
+  )
+);
+
 -- Move role assignment ownership from global User to TenantMembership.
 ALTER TABLE "UserRole"
 ADD COLUMN "tenantId" UUID,
@@ -291,6 +305,20 @@ FROM "Role" r
 CROSS JOIN "Permission" p
 WHERE r."name" = 'TENANT_ADMINISTRATOR'
   AND r."type" = 'SYSTEM';
+
+CREATE FUNCTION reject_permission_catalog_mutation()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  RAISE EXCEPTION 'Permission catalogue is migration-owned';
+END;
+$$;
+
+CREATE TRIGGER "Permission_reject_insert_update_delete"
+BEFORE INSERT OR UPDATE OR DELETE ON "Permission"
+FOR EACH ROW
+EXECUTE FUNCTION reject_permission_catalog_mutation();
 
 -- Replace the unaccepted mutable audit prototype with typed append-only events.
 DROP TABLE "AuditLog";

@@ -52,4 +52,28 @@ describe('AuditService tenant read boundary', () => {
     await expect(service.listTenantEvents(identity, cursor)).rejects.toThrow(BadRequestException);
     expect(repository.listTenantEvents).toHaveBeenCalledWith(identity.tenantId, cursor);
   });
+
+  it('fails closed instead of exposing corrupted persisted metadata', async () => {
+    repository.findTenantEvent.mockResolvedValue({
+      id: randomUUID(),
+      scope: 'TENANT',
+      actorType: 'TENANT_USER',
+      outcome: 'DENIED',
+      tenantId: identity.tenantId,
+      actorMembershipId: identity.membershipId,
+      platformActorUserId: null,
+      eventType: 'authorization.permission.denied',
+      resourceType: null,
+      resourceId: null,
+      requestId: null,
+      ipAddress: null,
+      userAgent: null,
+      metadata: { unexpectedPayload: { private: true } },
+      occurredAt: new Date(),
+    } as never);
+
+    await expect(service.findTenantEvent(identity, randomUUID())).rejects.toThrow(
+      'unsupported key',
+    );
+  });
 });

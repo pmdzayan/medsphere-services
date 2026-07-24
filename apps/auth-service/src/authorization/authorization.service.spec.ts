@@ -75,6 +75,17 @@ describe('AuthorizationService', () => {
     expect(auditWriter.appendTenantUser).not.toHaveBeenCalled();
   });
 
+  it('translates concurrent role-name uniqueness conflicts into a safe domain conflict', async () => {
+    transactionClient.$transaction.mockRejectedValueOnce({ code: 'P2002' });
+
+    await expect(
+      service.createRole(identity, {
+        name: 'DUPLICATE_ROLE',
+        permissionKeys: [],
+      }),
+    ).rejects.toThrow(ConflictException);
+  });
+
   it('keeps built-in roles immutable', async () => {
     repository.findRole.mockResolvedValue(
       roleFixture({

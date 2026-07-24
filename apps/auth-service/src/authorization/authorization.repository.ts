@@ -63,7 +63,10 @@ export class AuthorizationRepository {
   }
 
   async listPermissions() {
-    return this.prisma.client.permission.findMany({ orderBy: { name: 'asc' } });
+    return this.prisma.client.permission.findMany({
+      select: { id: true, name: true, description: true },
+      orderBy: { name: 'asc' },
+    });
   }
 
   async findPermissions(database: AuthorizationDatabase, permissionKeys: readonly PermissionKey[]) {
@@ -97,7 +100,7 @@ export class AuthorizationRepository {
 
   async findRoleByName(database: AuthorizationDatabase, tenantId: string, name: string) {
     return database.role.findFirst({
-      where: { tenantId, name, deletedAt: null },
+      where: { tenantId, name },
       select: { id: true },
     });
   }
@@ -233,9 +236,9 @@ export class AuthorizationRepository {
     membershipId: string,
     roleId: string,
   ) {
-    return database.membershipRole.create({
-      data: { tenantId, membershipId, roleId },
-      select: { id: true },
+    return database.membershipRole.createMany({
+      data: [{ tenantId, membershipId, roleId }],
+      skipDuplicates: true,
     });
   }
 

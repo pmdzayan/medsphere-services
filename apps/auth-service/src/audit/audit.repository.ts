@@ -3,6 +3,18 @@ import { Prisma } from '@medsphere/database';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditEventQueryDto } from './dto/audit-event-query.dto';
 
+const auditEventSelect = {
+  id: true,
+  eventType: true,
+  outcome: true,
+  actorMembershipId: true,
+  resourceType: true,
+  resourceId: true,
+  requestId: true,
+  metadata: true,
+  occurredAt: true,
+} as const;
+
 @Injectable()
 export class AuditRepository {
   constructor(private readonly prisma: PrismaService) {}
@@ -10,11 +22,7 @@ export class AuditRepository {
   async findTenantEvent(tenantId: string, eventId: string) {
     return this.prisma.client.auditEvent.findFirst({
       where: { id: eventId, tenantId, scope: 'TENANT' },
-      include: {
-        actorMembership: {
-          select: { id: true, userId: true },
-        },
-      },
+      select: auditEventSelect,
     });
   }
 
@@ -68,11 +76,7 @@ export class AuditRepository {
 
     const data = await this.prisma.client.auditEvent.findMany({
       where,
-      include: {
-        actorMembership: {
-          select: { id: true, userId: true },
-        },
-      },
+      select: auditEventSelect,
       orderBy: [{ occurredAt: 'desc' }, { id: 'desc' }],
       take: query.limit + 1,
     });
