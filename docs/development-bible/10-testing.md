@@ -1,7 +1,7 @@
 # Volume 10 — Testing Bible
 
-**Status:** S0.4 local verification complete; infrastructure and CI acceptance
-pending
+**Status:** S0.4 technical acceptance evidence complete; final documentation CI
+and merge pending
 
 **Runtime contract:** Node.js 20.11.1, PNPM 9.15.0, PostgreSQL 16, and Redis 7
 
@@ -74,15 +74,15 @@ The evidence table must be updated with CI links before CTO acceptance.
 executed on commit `067ce63` with PostgreSQL 16, Redis 7, and
 `RUN_AUTH_INFRASTRUCTURE_TESTS=true`.
 
-| Check                               | Result                                                  |
-| ----------------------------------- | ------------------------------------------------------- |
-| Clean four-migration deployment     | Passed                                                  |
-| Migration status and schema drift   | Passed; database current and no difference detected     |
-| Auth PostgreSQL/Redis suites        | Passed — 20/20 suites, 120/120 tests, zero skipped      |
-| Repository lint                     | Passed — 15/15 Turbo tasks                              |
-| Repository tests                    | Passed — 17/17 Turbo tasks                              |
-| Repository build                    | Passed — 15/15 Turbo tasks                              |
-| Populated S0.3 migration conversion | Not covered by the initial run; new gate awaiting rerun |
+| Check                               | Result                                               |
+| ----------------------------------- | ---------------------------------------------------- |
+| Clean four-migration deployment     | Passed                                               |
+| Migration status and schema drift   | Passed; database current and no difference detected  |
+| Auth PostgreSQL/Redis suites        | Passed — 20/20 suites, 120/120 tests, zero skipped   |
+| Repository lint                     | Passed — 15/15 Turbo tasks                           |
+| Repository tests                    | Passed — 17/17 Turbo tasks                           |
+| Repository build                    | Passed — 15/15 Turbo tasks                           |
+| Populated S0.3 migration conversion | Initial gap; covered by strengthened run 30131410814 |
 
 The logged PostgreSQL error stating that the permission catalogue is
 migration-owned is expected negative-test evidence; the test and workflow
@@ -104,6 +104,17 @@ temporary databases and verifies:
 7. rejection of cross-tenant role-permission mappings;
 8. rejection of role assignments without an unambiguous same-tenant
    membership.
+
+## Strengthened PR #7 acceptance evidence
+
+[Workflow run 30131410814](https://github.com/pmdzayan/medsphere-services/actions/runs/30131410814)
+executed on commit `4f10eef`. It passed the clean database gate and all six
+populated-upgrade scenarios: one valid conversion and five independent
+fail-closed cases. It also reported no drift, 20/20 auth suites with 120/120
+tests and zero skips, 15/15 lint tasks, 17/17 test tasks, and 15/15 build tasks.
+
+This evidence satisfies the S0.4 technical acceptance rule. The final
+documentation commit must pass the same workflow before PR #7 merges.
 
 ## CI acceptance sequence
 

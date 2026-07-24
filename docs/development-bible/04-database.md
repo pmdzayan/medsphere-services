@@ -1,6 +1,6 @@
 # Volume 04 — Database Bible
 
-**Baseline:** S0.2 and S0.3 accepted; S0.4 candidate migration implemented
+**Baseline:** S0.2 and S0.3 accepted; S0.4 CTO-accepted for merge
 
 **Engine:** PostgreSQL 16
 
@@ -12,11 +12,11 @@
 
 ## Acceptance boundary
 
-This volume documents the declared database shape and the S0.4 candidate
-migration. S0.4 is not accepted until PostgreSQL 16 deploy, drift, constraint,
-trigger, atomicity, and concurrency tests pass in CI. Inventory integrity,
-consent, privacy, retention, and the remaining product domains continue through
-their dependency-ordered sprints.
+This volume documents the declared database shape and the CTO-accepted S0.4
+migration. PostgreSQL 16 clean deploy, populated S0.3 upgrade, drift,
+constraint, trigger, atomicity, and concurrency tests passed in PR #7.
+Inventory integrity, consent, privacy, retention, and the remaining product
+domains continue through their dependency-ordered sprints.
 
 No production or real healthcare data is approved.
 
@@ -66,16 +66,16 @@ pnpm db:verify
 
 ## Provisional model ownership
 
-| Module                     | Models                                                             | Current acceptance                              |
-| -------------------------- | ------------------------------------------------------------------ | ----------------------------------------------- |
-| Tenancy and Identity       | `Tenant`, `User`, `TenantMembership`, `UserPrivacy`, `UserSession` | S0.3 accepted; S0.4 session audit candidate     |
-| Access Control             | `Role`, `Permission`, `MembershipRole`, `RolePermission`           | S0.4 implemented; PostgreSQL acceptance pending |
-| Provider Registry          | `Provider`, `ProviderVerification`                                 | Prototype; verification workflow blocked        |
-| Medicine Catalog           | `Product`                                                          | Prototype                                       |
-| Inventory and Stock Ledger | `Inventory`, `Batch`, `StockMovement`, `InventoryHistory`          | Reproducible prototype; integrity rejected      |
-| Audit and Policy           | `AuditEvent`                                                       | S0.4 implemented; PostgreSQL acceptance pending |
-| Patient Records            | `MedicalRecord`                                                    | Blocked by authentication, consent, and privacy |
-| Reservation and Fulfilment | `Reservation`                                                      | Reproducible prototype; workflow rejected       |
+| Module                     | Models                                                             | Current acceptance                                 |
+| -------------------------- | ------------------------------------------------------------------ | -------------------------------------------------- |
+| Tenancy and Identity       | `Tenant`, `User`, `TenantMembership`, `UserPrivacy`, `UserSession` | S0.3 accepted; S0.4 session audit accepted         |
+| Access Control             | `Role`, `Permission`, `MembershipRole`, `RolePermission`           | S0.4 accepted with PostgreSQL integration evidence |
+| Provider Registry          | `Provider`, `ProviderVerification`                                 | Prototype; verification workflow blocked           |
+| Medicine Catalog           | `Product`                                                          | Prototype                                          |
+| Inventory and Stock Ledger | `Inventory`, `Batch`, `StockMovement`, `InventoryHistory`          | Reproducible prototype; integrity rejected         |
+| Audit and Policy           | `AuditEvent`                                                       | S0.4 accepted with PostgreSQL integration evidence |
+| Patient Records            | `MedicalRecord`                                                    | Blocked by authentication, consent, and privacy    |
+| Reservation and Fulfilment | `Reservation`                                                      | Reproducible prototype; workflow rejected          |
 
 Ownership is provisional until bounded-context and persistence-boundary work is accepted. Existing service folders do not establish ownership.
 

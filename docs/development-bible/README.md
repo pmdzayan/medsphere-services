@@ -13,10 +13,10 @@ The Development Bible is the long-term engineering source of truth. It describes
 |     01 | Vision and Business  | This index and `PRODUCT_ROADMAP.md`                             | Foundation draft     |
 |     02 | Product Requirements | Roadmap module scopes; detailed PRDs pending                    | Incremental          |
 |     03 | System Architecture  | ADR-001 and architecture section below                          | Active redesign      |
-|     04 | Database             | [Database Bible](04-database.md), Prisma schema, and migrations | S0.4 candidate       |
-|     05 | Backend              | [Identity, Authorization, and Audit Bible](05-backend.md)       | S0.4 candidate       |
+|     04 | Database             | [Database Bible](04-database.md), Prisma schema, and migrations | Accepted for merge   |
+|     05 | Backend              | [Identity, Authorization, and Audit Bible](05-backend.md)       | Accepted for merge   |
 |     06 | Frontend             | Frontend specification pending repository adoption              | Planned              |
-|     07 | Security             | [Identity, Authorization, and Audit Security](07-security.md)   | S0.4 candidate       |
+|     07 | Security             | [Identity, Authorization, and Audit Security](07-security.md)   | Accepted for merge   |
 |     08 | Compliance           | Control mapping pending qualified review                        | Planned              |
 |     09 | AI Version 2         | `PRODUCT_ROADMAP.md`; detailed AI Bible deferred                | Planned              |
 |     10 | Testing              | [Testing Bible](10-testing.md) and `PROJECT_RULES.md`           | Active               |

@@ -2,8 +2,7 @@
 
 **Decisions:** ADR-003 and ADR-004
 
-**Status:** S0.3 accepted; S0.4 implementation and local review complete;
-PostgreSQL/Redis CI acceptance pending
+**Status:** S0.3 accepted; S0.4 CTO-accepted for merge
 
 ## Security invariants
 
@@ -124,8 +123,8 @@ concurrency. Redis tests remain authoritative for shared counters.
 ## Accepted limitations
 
 - MFA, recovery, email verification delivery, invitations, device management, OIDC/SAML, ABHA/ABDM, and break-glass workflows are not implemented.
-- S0.4 remains a release candidate until PostgreSQL 16, Redis 7, migration,
-  drift, constraint, trigger, atomicity, concurrency, and full CI gates pass.
+- S0.4 PostgreSQL 16, Redis 7, populated-upgrade, drift, constraint, trigger,
+  atomicity, concurrency, and full CI gates passed on the accepted candidate.
 - Tenant-administrator assignment is deliberately not automatic. A reviewed
   onboarding/bootstrap workflow is required before tenant self-administration.
 - ABAC, consent, privacy, data retention, legal hold, audit export,

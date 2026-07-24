@@ -1,10 +1,10 @@
 # Volume 05 — Backend Bible: Identity, Authorization, and Audit
 
-**Sprints:** S0.3 accepted; S0.4 implementation and local review complete
+**Sprints:** S0.3 accepted; S0.4 CTO-accepted for merge
 
 **Decisions:** ADR-003 and ADR-004
 
-**Status:** S0.4 candidate; PostgreSQL/CI acceptance pending; not production-approved
+**Status:** S0.4 accepted for merge; not production-approved
 
 ## Purpose and boundary
 

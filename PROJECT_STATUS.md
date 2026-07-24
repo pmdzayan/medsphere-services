@@ -14,8 +14,8 @@
 
 ### Stabilization Sprint S0.4 — Tenant-Safe RBAC and Audit Integration
 
-**Status:** Implementation and local review complete; PostgreSQL/Redis CI
-acceptance pending
+**Status:** CTO acceptance approved; final documentation CI and PR #7 merge
+pending
 
 **Dependency:** S0.3 Authentication and Trusted Tenant Context accepted and merged
 
@@ -38,21 +38,21 @@ acceptance pending
 
 ## CTO acceptance ledger
 
-| Area                        | Repository evidence                                                 | CTO status             |
-| --------------------------- | ------------------------------------------------------------------- | ---------------------- |
-| Planning and architecture   | ADR-001 and S0.1 governance merged in PR #1                         | Accepted baseline      |
-| Monorepo/tooling foundation | PNPM, Turbo, TypeScript, NestJS, Prisma, shared packages exist      | Partially accepted     |
-| Database reproducibility    | PR #2 migration and clean-database gates CI-verified and merged     | Accepted base          |
-| Inventory foundation        | Batch, stock, availability, FEFO, and search scaffolding exists     | Prototype only         |
-| Reservation                 | Competing implementations and unsafe transaction boundaries         | Rejected               |
-| Task 11 — Identity/RBAC     | S0.3 identity accepted; S0.4 tenant-safe RBAC candidate implemented | Candidate — CI pending |
-| Task 12 — Audit Logging     | S0.4 durable, integrated, append-only audit candidate implemented   | Candidate — CI pending |
-| Task 13 onward              | Dependencies are not complete                                       | Blocked                |
+| Area                        | Repository evidence                                             | CTO status         |
+| --------------------------- | --------------------------------------------------------------- | ------------------ |
+| Planning and architecture   | ADR-001 and S0.1 governance merged in PR #1                     | Accepted baseline  |
+| Monorepo/tooling foundation | PNPM, Turbo, TypeScript, NestJS, Prisma, shared packages exist  | Partially accepted |
+| Database reproducibility    | PR #2 migration and clean-database gates CI-verified and merged | Accepted base      |
+| Inventory foundation        | Batch, stock, availability, FEFO, and search scaffolding exists | Prototype only     |
+| Reservation                 | Competing implementations and unsafe transaction boundaries     | Rejected           |
+| Task 11 — Identity/RBAC     | S0.3 identity and S0.4 tenant-safe authorization verified in CI | Accepted for merge |
+| Task 12 — Audit Logging     | S0.4 durable, integrated, append-only audit verified in CI      | Accepted for merge |
+| Task 13 onward              | Dependencies are not complete                                   | Blocked            |
 
 ## Critical blockers
 
-1. S0.4 database constraints, triggers, transactions, and concurrency have not
-   yet executed on PostgreSQL 16; Redis and full CI evidence are also pending.
+1. PR #7 has not yet merged; S0.5 remains blocked until the final
+   documentation commit passes CI and S0.4 reaches the accepted base branch.
 2. Non-atomic reservation and inventory mutations.
 3. Competing inventory/batch sources of truth.
 4. Durable audit currently covers accepted S0.4 authorization and
@@ -60,7 +60,7 @@ acceptance pending
    it in their own dependency-ordered sprints.
 5. Medical-record functionality remains blocked before consent/privacy controls.
 6. Repository-wide integration, security, and tenant-isolation coverage remains
-   insufficient beyond the S0.4 candidate boundary.
+   insufficient beyond the accepted S0.4 boundary.
 
 The supporting evidence is recorded in [the baseline audit](docs/audits/2026-07-20-cto-baseline.md).
 
@@ -69,9 +69,10 @@ The supporting evidence is recorded in [the baseline audit](docs/audits/2026-07-
 1. **S0.1 Architecture and governance** — accepted and merged in PR #1
 2. **S0.2 Reproducible database baseline** — accepted and squash-merged in PR #2
 3. **S0.3 Authentication and trusted tenant context** — accepted and squash-merged in PR #3
-4. **S0.4 Tenant-safe RBAC and durable audit** — current (implementation and
-   local review complete; PostgreSQL/Redis CI acceptance pending)
-5. **S0.5 Inventory ledger and reservation integrity** — blocked by S0.4
+4. **S0.4 Tenant-safe RBAC and durable audit** — CTO acceptance approved;
+   final documentation CI and PR #7 merge pending
+5. **S0.5 Inventory ledger and reservation integrity** — blocked until PR #7
+   merges
 6. Reassess remaining Inventory and Compliance roadmap work
 
 Only one recovery sprint may be active at a time. Exact boundaries may be refined through an ADR, but dependencies must not be skipped.
@@ -138,10 +139,10 @@ PR #3 was accepted and squash-merged into `feature/database-architecture`.
 
 ## S0.4 local verification evidence
 
-S0.4 is implemented on `cto/s0.4-tenant-safe-rbac-durable-audit` in local
-commits `9603f5b`, `a8b2128`, and `993324b`, followed by the final
-documentation/evidence commit. These commits are not accepted until they are
-published, reviewed, and proven by the pull-request workflow.
+S0.4 is implemented on `cto/s0.4-tenant-safe-rbac-durable-audit` in commits
+`9603f5b`, `a8b2128`, `993324b`, `067ce63`, and `4f10eef`. The implementation
+and strengthened verification gates have been published, reviewed, and proven
+by the pull-request workflow.
 
 | Check                                 | Result                                                                  |
 | ------------------------------------- | ----------------------------------------------------------------------- |
@@ -156,8 +157,8 @@ published, reviewed, and proven by the pull-request workflow.
 | Build                                 | Passed locally — 15/15 Turbo tasks                                      |
 | PostgreSQL 16 and Redis 7 integration | Passed in initial PR #7 workflow — 120/120 auth tests, zero skipped     |
 | Clean deploy, status, and drift       | Passed in initial PR #7 workflow                                        |
-| Populated S0.3 upgrade verification   | Gate added after final contract review; rerun pending                   |
-| Pull-request workflow                 | Initial run passed; strengthened migration-safety rerun pending         |
+| Populated S0.3 upgrade verification   | Passed all six isolated scenarios in strengthened PR #7 workflow        |
+| Pull-request workflow                 | Strengthened run passed on exact commit `4f10eef`                       |
 
 The initial [PR #7 workflow run](https://github.com/pmdzayan/medsphere-services/actions/runs/30130479231)
 proved the clean four-migration deployment, no drift, PostgreSQL and Redis
@@ -165,8 +166,24 @@ integration, 20/20 auth suites with 120/120 tests and zero skips, 15/15 lint
 tasks, 17/17 test tasks, and 15/15 build tasks on commit `067ce63`.
 
 Final contract review found that a clean migration chain did not prove a
-populated S0.3 upgrade. Acceptance remains withheld while the new
-`db:verify-upgrade` gate proves preservation of valid legacy membership-role and
-role-permission data and fail-closed rejection of legacy audit rows, unknown
-permissions, invalid built-in roles, cross-tenant role-permission mappings, and
-ambiguous role assignments. S0.5 remains blocked.
+populated S0.3 upgrade. The strengthened
+[workflow run 30131410814](https://github.com/pmdzayan/medsphere-services/actions/runs/30131410814)
+closed that gap on commit `4f10eef`: valid legacy membership-role and
+role-permission data survived; legacy audit rows, unknown permissions, invalid
+built-in roles, cross-tenant role-permission mappings, and ambiguous role
+assignments each failed closed in isolated databases. The same run reported no
+schema drift, 20/20 auth suites with 120/120 tests and zero skips, 15/15 lint
+tasks, 17/17 test tasks, and 15/15 build tasks.
+
+## S0.4 CTO acceptance decision
+
+S0.4 satisfies ADR-004 and its sprint completion criteria. Architecture,
+database integrity, tenant isolation, authorization failure behavior, audit
+atomicity and immutability, concurrency, migration safety, validation,
+duplication, security, and documentation have no unresolved acceptance
+findings.
+
+CTO acceptance is approved for PR #7. The final documentation-only commit must
+pass the same workflow before the PR is marked ready and merged. S0.5 remains
+blocked until that merge completes. This is not production or legal-compliance
+approval.
