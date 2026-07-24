@@ -14,7 +14,8 @@
 
 ### Stabilization Sprint S0.4 — Tenant-Safe RBAC and Audit Integration
 
-**Status:** Architecture accepted; implementation in progress
+**Status:** Implementation and local review complete; PostgreSQL/Redis CI
+acceptance pending
 
 **Dependency:** S0.3 Authentication and Trusted Tenant Context accepted and merged
 
@@ -37,25 +38,29 @@
 
 ## CTO acceptance ledger
 
-| Area                        | Repository evidence                                                 | CTO status                |
-| --------------------------- | ------------------------------------------------------------------- | ------------------------- |
-| Planning and architecture   | ADR-001 and S0.1 governance merged in PR #1                         | Accepted baseline         |
-| Monorepo/tooling foundation | PNPM, Turbo, TypeScript, NestJS, Prisma, shared packages exist      | Partially accepted        |
-| Database reproducibility    | PR #2 migration and clean-database gates CI-verified and merged     | Accepted base             |
-| Inventory foundation        | Batch, stock, availability, FEFO, and search scaffolding exists     | Prototype only            |
-| Reservation                 | Competing implementations and unsafe transaction boundaries         | Rejected                  |
-| Task 11 — Identity/RBAC     | S0.3 identity, auth, and tenant-context accepted; RBAC remains S0.4 | Partial — auth layer done |
-| Task 12 — Audit Logging     | Storage scaffolding exists; integration and isolation absent        | Rejected                  |
-| Task 13 onward              | Dependencies are not complete                                       | Blocked                   |
+| Area                        | Repository evidence                                                 | CTO status             |
+| --------------------------- | ------------------------------------------------------------------- | ---------------------- |
+| Planning and architecture   | ADR-001 and S0.1 governance merged in PR #1                         | Accepted baseline      |
+| Monorepo/tooling foundation | PNPM, Turbo, TypeScript, NestJS, Prisma, shared packages exist      | Partially accepted     |
+| Database reproducibility    | PR #2 migration and clean-database gates CI-verified and merged     | Accepted base          |
+| Inventory foundation        | Batch, stock, availability, FEFO, and search scaffolding exists     | Prototype only         |
+| Reservation                 | Competing implementations and unsafe transaction boundaries         | Rejected               |
+| Task 11 — Identity/RBAC     | S0.3 identity accepted; S0.4 tenant-safe RBAC candidate implemented | Candidate — CI pending |
+| Task 12 — Audit Logging     | S0.4 durable, integrated, append-only audit candidate implemented   | Candidate — CI pending |
+| Task 13 onward              | Dependencies are not complete                                       | Blocked                |
 
 ## Critical blockers
 
-1. Cross-tenant RBAC risks remain and cannot be repaired before S0.4 code implementation.
+1. S0.4 database constraints, triggers, transactions, and concurrency have not
+   yet executed on PostgreSQL 16; Redis and full CI evidence are also pending.
 2. Non-atomic reservation and inventory mutations.
 3. Competing inventory/batch sources of truth.
-4. Audit logging not integrated into business operations.
+4. Durable audit currently covers accepted S0.4 authorization and
+   authentication session events only; later business modules must integrate
+   it in their own dependency-ordered sprints.
 5. Medical-record functionality remains blocked before consent/privacy controls.
-6. Repository-wide integration, security, and tenant-isolation coverage remains insufficient beyond S0.3.
+6. Repository-wide integration, security, and tenant-isolation coverage remains
+   insufficient beyond the S0.4 candidate boundary.
 
 The supporting evidence is recorded in [the baseline audit](docs/audits/2026-07-20-cto-baseline.md).
 
@@ -64,7 +69,8 @@ The supporting evidence is recorded in [the baseline audit](docs/audits/2026-07-
 1. **S0.1 Architecture and governance** — accepted and merged in PR #1
 2. **S0.2 Reproducible database baseline** — accepted and squash-merged in PR #2
 3. **S0.3 Authentication and trusted tenant context** — accepted and squash-merged in PR #3
-4. **S0.4 Tenant-safe RBAC and durable audit** — current (architecture accepted; implementation in progress)
+4. **S0.4 Tenant-safe RBAC and durable audit** — current (implementation and
+   local review complete; PostgreSQL/Redis CI acceptance pending)
 5. **S0.5 Inventory ledger and reservation integrity** — blocked by S0.4
 6. Reassess remaining Inventory and Compliance roadmap work
 
@@ -129,3 +135,30 @@ PR #2 was accepted and squash-merged into `feature/database-architecture`.
 Reference: [PR #3](https://github.com/pmdzayan/medsphere-services/pull/3) (squash-merge `7872e57982f0ba2f0681ece9fc445fa63ed320c4`), [PR #4](https://github.com/pmdzayan/medsphere-services/pull/4) (integration gate, merge `edc74d6eddee303b87f1ed09b4c2178d6fb3ee0e`), workflow runs [29746017664](https://github.com/pmdzayan/medsphere-services/actions/runs/29746017664) and [29747026515](https://github.com/pmdzayan/medsphere-services/actions/runs/29747026515).
 
 PR #3 was accepted and squash-merged into `feature/database-architecture`.
+
+## S0.4 local verification evidence
+
+S0.4 is implemented on `cto/s0.4-tenant-safe-rbac-durable-audit` in local
+commits `9603f5b`, `a8b2128`, and `993324b`, followed by the final
+documentation/evidence commit. These commits are not accepted until they are
+published, reviewed, and proven by the pull-request workflow.
+
+| Check                                    | Result                                                                  |
+| ---------------------------------------- | ----------------------------------------------------------------------- |
+| Locked dependency installation           | Passed with PNPM 9.15.0                                                 |
+| Prisma schema validation                 | Passed                                                                  |
+| Prisma client generation                 | Passed                                                                  |
+| Static Prisma schema comparison          | Passed for modeled objects; not a live migration/trigger result         |
+| Formatting                               | Passed                                                                  |
+| Lint                                     | Passed locally — 15/15 Turbo tasks                                      |
+| Tests                                    | Passed locally — 17/17 Turbo tasks; infrastructure suites skipped       |
+| Auth strict test type-check and Jest     | Passed after final review — 104 passed, 16 infrastructure tests skipped |
+| Build                                    | Passed locally — 15/15 Turbo tasks                                      |
+| PostgreSQL 16 and Redis 7 integration    | Pending CI; unavailable locally                                         |
+| Clean deploy, upgrade, status, and drift | Pending CI; unavailable locally                                         |
+| Pull-request workflow                    | Pending publication                                                     |
+
+Skipped infrastructure suites are not acceptance evidence. The exact next
+checkpoint is to publish the branch, open a draft pull request, run the complete
+quality workflow with `RUN_AUTH_INFRASTRUCTURE_TESTS=true`, fix only S0.4
+failures, record workflow links, and complete CTO review. S0.5 remains blocked.

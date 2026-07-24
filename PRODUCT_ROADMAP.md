@@ -17,8 +17,8 @@ Ordered sprints:
 1. S0.1 Architecture and repository governance — accepted
 2. S0.2 Reproducible database baseline — accepted and merged
 3. S0.3 Authentication and trusted tenant context — accepted and merged
-4. S0.4 Tenant-safe RBAC and durable audit — current (architecture accepted;
-   implementation in progress)
+4. S0.4 Tenant-safe RBAC and durable audit — current (implementation and local
+   review complete; PostgreSQL/Redis CI acceptance pending)
 5. S0.5 Inventory ledger and reservation integrity — blocked by S0.4
 
 **Completion gate:** Accepted ADRs; protected review flow; clean migrations; deny-by-default authentication; tenant-isolation tests; integrated audit trail; atomic stock/reservation behavior; mandatory lint/test/build passing.

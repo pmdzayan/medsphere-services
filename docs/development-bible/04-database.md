@@ -1,6 +1,6 @@
 # Volume 04 — Database Bible
 
-**Baseline:** S0.2 reproducible database baseline plus S0.3 trusted-auth migration accepted
+**Baseline:** S0.2 and S0.3 accepted; S0.4 candidate migration implemented
 
 **Engine:** PostgreSQL 16
 
@@ -12,17 +12,22 @@
 
 ## Acceptance boundary
 
-This volume documents the database shape that the repository can reproduce. It does not mark every model as safe or feature-complete. Authentication, tenant enforcement, RBAC/audit integration, inventory integrity, consent, privacy, and retention remain subject to their dependency-ordered stabilization sprints.
+This volume documents the declared database shape and the S0.4 candidate
+migration. S0.4 is not accepted until PostgreSQL 16 deploy, drift, constraint,
+trigger, atomicity, and concurrency tests pass in CI. Inventory integrity,
+consent, privacy, retention, and the remaining product domains continue through
+their dependency-ordered sprints.
 
 No production or real healthcare data is approved.
 
 ## Migration chain
 
-| Order | Migration                                              | Purpose                                                                |
-| ----: | ------------------------------------------------------ | ---------------------------------------------------------------------- |
-|     1 | `20260715163416_init_auth_schema`                      | Tenant, user, session, role, permission, and assignment foundation     |
-|     2 | `20260720020000_complete_reproducible_baseline`        | Additive migration from the auth state to the complete declared schema |
-|     3 | `20260720120000_trusted_authentication_tenant_context` | Global identity, tenant memberships, and secure rotated sessions       |
+| Order | Migration                                                | Purpose                                                                |
+| ----: | -------------------------------------------------------- | ---------------------------------------------------------------------- |
+|     1 | `20260715163416_init_auth_schema`                        | Tenant, user, session, role, permission, and assignment foundation     |
+|     2 | `20260720020000_complete_reproducible_baseline`          | Additive migration from the auth state to the complete declared schema |
+|     3 | `20260720120000_trusted_authentication_tenant_context`   | Global identity, tenant memberships, and secure rotated sessions       |
+|     4 | `20260725120000_tenant_safe_authorization_durable_audit` | Membership RBAC, global permissions, and append-only audit events      |
 
 Migration history is append-only under ADR-002. Applied migrations are never edited or deleted. Shared databases use `prisma migrate deploy`; `prisma db push` is prohibited.
 
@@ -45,7 +50,9 @@ pnpm db:verify
 | `UserStatus`         | `ACTIVE`, `INACTIVE`, `SUSPENDED`, `PENDING_VERIFICATION`                                                                                        |
 | `SessionStatus`      | `ACTIVE`, `ROTATED`, `EXPIRED`, `REVOKED`, `COMPROMISED`                                                                                         |
 | `MembershipStatus`   | `PENDING`, `ACTIVE`, `SUSPENDED`, `REVOKED`                                                                                                      |
-| `AuditAction`        | `CREATE`, `UPDATE`, `DELETE`, `ACCESS`                                                                                                           |
+| `AuditActorType`     | `TENANT_USER`, `PLATFORM_USER`, `SYSTEM`                                                                                                         |
+| `AuditScope`         | `TENANT`, `PLATFORM`                                                                                                                             |
+| `AuditOutcome`       | `SUCCEEDED`, `DENIED`, `FAILED`                                                                                                                  |
 | `ProviderType`       | `PHARMACY`, `HOSPITAL`                                                                                                                           |
 | `VerificationStatus` | `PENDING`, `UNDER_REVIEW`, `APPROVED`, `REJECTED`, `SUSPENDED`, `EXPIRED`                                                                        |
 | `ProductCategory`    | `MEDICINE`, `OTC`, `COSMETIC`, `AYURVEDIC`, `SUPPLEMENT`, `BABY_CARE`, `PERSONAL_CARE`, `MEDICAL_DEVICE`                                         |
@@ -57,18 +64,16 @@ pnpm db:verify
 | `ReservationType`    | `MEDICINE_PICKUP`, `HOSPITAL_APPOINTMENT`, `LAB_TEST`, `VACCINATION`                                                                             |
 | `ReservationStatus`  | `PENDING`, `CONFIRMED`, `READY`, `COMPLETED`, `CANCELLED`, `EXPIRED`                                                                             |
 
-`AuditAction` is declared but `AuditLog.action` is currently free text. S0.4 must reconcile the accepted audit vocabulary rather than assuming the enum is enforced.
-
 ## Provisional model ownership
 
 | Module                     | Models                                                             | Current acceptance                              |
 | -------------------------- | ------------------------------------------------------------------ | ----------------------------------------------- |
-| Tenancy and Identity       | `Tenant`, `User`, `TenantMembership`, `UserPrivacy`, `UserSession` | S0.3 accepted; RBAC/audit remains S0.4          |
-| Access Control             | `Role`, `Permission`, `UserRole`, `RolePermission`                 | Reproducible; tenant-safe RBAC rejected         |
+| Tenancy and Identity       | `Tenant`, `User`, `TenantMembership`, `UserPrivacy`, `UserSession` | S0.3 accepted; S0.4 session audit candidate     |
+| Access Control             | `Role`, `Permission`, `MembershipRole`, `RolePermission`           | S0.4 implemented; PostgreSQL acceptance pending |
 | Provider Registry          | `Provider`, `ProviderVerification`                                 | Prototype; verification workflow blocked        |
 | Medicine Catalog           | `Product`                                                          | Prototype                                       |
 | Inventory and Stock Ledger | `Inventory`, `Batch`, `StockMovement`, `InventoryHistory`          | Reproducible prototype; integrity rejected      |
-| Audit and Policy           | `AuditLog`                                                         | Storage prototype; integration rejected         |
+| Audit and Policy           | `AuditEvent`                                                       | S0.4 implemented; PostgreSQL acceptance pending |
 | Patient Records            | `MedicalRecord`                                                    | Blocked by authentication, consent, and privacy |
 | Reservation and Fulfilment | `Reservation`                                                      | Reproducible prototype; workflow rejected       |
 
@@ -81,7 +86,7 @@ Types below describe the PostgreSQL representation. Columns are required unless 
 ### `Tenant`
 
 - Columns: `id UUID PK`; `name text`; normalized `slug text unique`; `email text? unique`; `isActive boolean=true`; `selfRegistrationEnabled boolean=false`; `version integer=1`; `createdAt timestamp=now`; `updatedAt timestamp`; `deletedAt timestamp?`.
-- Relationships: parent of memberships, roles, permissions, provider verifications, and providers.
+- Relationships: parent of memberships, roles, tenant audit events, provider verifications, and providers.
 - Constraints: unique slug and optional email; normalized lowercase-hyphen slug check in the S0.3 migration.
 - Indexes: unique `slug`; unique `email`; `slug` index.
 - Sensitive/audit notes: email may be personal or organizational contact data. Public onboarding is denied by default. Soft deletion exists; retention policy is not accepted.
@@ -89,7 +94,7 @@ Types below describe the PostgreSQL representation. Columns are required unless 
 ### `User`
 
 - Columns: `id UUID PK`; `email citext global unique`; `passwordHash text`; `firstName text`; `lastName text`; `phone text?`; `preferredLanguage text='en'`; `status UserStatus=ACTIVE`; `version integer=1`; `createdAt timestamp=now`; `updatedAt timestamp`; `deletedAt timestamp?`.
-- Relationships: global identity parent of memberships, role assignments, and one privacy record.
+- Relationships: global identity parent of memberships, platform audit events, and one privacy record.
 - Constraints: case-insensitive global unique email.
 - Indexes: unique `email`.
 - Migration behavior: normalized duplicate emails stop the migration without exposing email values; no automatic identity merge occurs.
@@ -98,11 +103,17 @@ Types below describe the PostgreSQL representation. Columns are required unless 
 ### `TenantMembership`
 
 - Columns: `id UUID PK`; `tenantId UUID`; `userId UUID`; `status MembershipStatus=PENDING`; `isDefault boolean=false`; `joinedAt timestamp?`; `endedAt timestamp?`; `version integer=1`; `createdAt timestamp=now`; `updatedAt timestamp`; `deletedAt timestamp?`.
-- Relationships: joins global `User` to `Tenant`; parent of sessions.
-- Constraints: `tenantId → Tenant.id` delete restrict; `userId → User.id` cascade delete; unique `(tenantId, userId)`; partial unique default membership per non-deleted user.
-- Indexes: `(userId, status)`; `(tenantId, status)`; unique tenant/user; partial unique default.
+- Relationships: joins global `User` to `Tenant`; parent of sessions,
+  membership-role assignments, and attributable tenant audit events.
+- Constraints: `tenantId → Tenant.id` delete restrict; `userId → User.id`
+  cascade delete; unique `(tenantId, userId)`; candidate key `(id, tenantId)`;
+  partial unique default membership per non-deleted user.
+- Indexes: `(userId, status)`; `(tenantId, status)`; unique tenant/user; unique
+  identifier/tenant; partial unique default.
 - Migration behavior: one deterministic default membership is backfilled from every S0.2 tenant-bound user. Status maps conservatively; ambiguous global emails abort instead of merging.
-- Security note: this is the sole authoritative tenant context for authentication. Role assignment remains S0.4 work.
+- Security note: this is the authoritative tenant context for authentication
+  and authorization. Composite foreign keys use `(id, tenantId)` to prove
+  assignment and audit actor scope.
 
 ### `UserPrivacy`
 
@@ -115,34 +126,54 @@ Types below describe the PostgreSQL representation. Columns are required unless 
 ### `Role`
 
 - Columns: `id UUID PK`; `tenantId UUID`; `name text`; `description text?`; `type RoleType=TENANT`; `version integer=1`; `createdAt timestamp=now`; `updatedAt timestamp`; `deletedAt timestamp?`.
-- Relationships: belongs to `Tenant`; parent of user-role and role-permission assignments.
-- Constraints: foreign key `tenantId → Tenant.id` with delete restrict; unique `(tenantId, name)`.
-- Indexes: `tenantId`; composite unique `(tenantId, name)`.
-- Acceptance note: cross-tenant assignment prevention is not fully enforced and remains S0.4 work.
+- Relationships: belongs to `Tenant`; parent of membership-role and
+  role-permission assignments.
+- Constraints: foreign key `tenantId → Tenant.id` with delete restrict; unique
+  `(tenantId, name)`; candidate key `(id, tenantId)`; built-in shape check
+  permits only non-deleted `SYSTEM/TENANT_ADMINISTRATOR` or non-reserved
+  `TENANT` roles.
+- Indexes: `tenantId`; composite unique tenant/name and identifier/tenant.
+- Security note: built-in roles are immutable through the accepted API. Custom
+  role names remain reserved after soft deletion so historical identifiers are
+  not silently reused.
 
 ### `Permission`
 
-- Columns: `id UUID PK`; `tenantId UUID`; `name text`; `description text?`; `version integer=1`; `createdAt timestamp=now`; `updatedAt timestamp`; `deletedAt timestamp?`.
-- Relationships: belongs to `Tenant`; parent of role-permission assignments.
-- Constraints: foreign key `tenantId → Tenant.id` with delete restrict; unique `(tenantId, name)`.
-- Indexes: `tenantId`; composite unique `(tenantId, name)`.
-- Acceptance note: permission vocabulary and policy mapping remain S0.4 work.
+- Columns: `id UUID PK`; `name varchar(120)`; `description varchar(240)`;
+  `createdAt timestamp=now`.
+- Relationships: global capability catalogue; parent of role-permission
+  assignments.
+- Constraints: global unique name. A database trigger rejects runtime
+  `INSERT`, `UPDATE`, and `DELETE`; future catalogue changes require a reviewed
+  forward migration.
+- Catalogue: exactly the eight keys recorded in ADR-004, with deterministic
+  migration-owned UUIDs.
 
-### `UserRole`
+### `MembershipRole`
 
-- Columns: `id UUID PK`; `userId UUID`; `roleId UUID`; `createdAt timestamp=now`.
-- Relationships: joins `User` to `Role`.
-- Constraints: `userId → User.id` cascade delete; `roleId → Role.id` delete restrict; unique `(userId, roleId)`.
-- Indexes: `userId`; `roleId`; composite unique `(userId, roleId)`.
-- Gap: the database does not prove that the user and role belong to the same tenant. S0.4 must enforce and negatively test this invariant.
+- Columns: `id UUID PK`; `tenantId UUID`; `membershipId UUID`; `roleId UUID`;
+  `createdAt timestamp=now`.
+- Relationships: joins one tenant membership to one role in the same tenant.
+- Constraints: composite
+  `(membershipId, tenantId) → TenantMembership(id, tenantId)` cascade delete;
+  composite `(roleId, tenantId) → Role(id, tenantId)` delete restrict; unique
+  `(membershipId, roleId)`.
+- Indexes: `(tenantId, membershipId)`; `(tenantId, roleId)`; unique
+  membership/role.
+- Security note: PostgreSQL, rather than application convention, rejects
+  cross-tenant role assignments.
 
 ### `RolePermission`
 
-- Columns: `id UUID PK`; `roleId UUID`; `permissionId UUID`; `createdAt timestamp=now`.
-- Relationships: joins `Role` to `Permission`.
-- Constraints: `roleId → Role.id` cascade delete; `permissionId → Permission.id` delete restrict; unique `(roleId, permissionId)`.
-- Indexes: `roleId`; `permissionId`; composite unique `(roleId, permissionId)`.
-- Gap: the database does not prove that the role and permission belong to the same tenant. S0.4 owns this invariant.
+- Columns: `id UUID PK`; `tenantId UUID`; `roleId UUID`; `permissionId UUID`;
+  `createdAt timestamp=now`.
+- Relationships: joins a tenant role to one global permission.
+- Constraints: composite `(roleId, tenantId) → Role(id, tenantId)` cascade
+  delete; `permissionId → Permission.id` delete restrict; unique
+  `(roleId, permissionId)`.
+- Indexes: `(tenantId, roleId)`; `permissionId`; unique role/permission.
+- Security note: the redundant tenant key proves the role boundary and prevents
+  a caller from relabeling a foreign role mapping.
 
 ### `UserSession`
 
@@ -207,12 +238,26 @@ Types below describe the PostgreSQL representation. Columns are required unless 
 - Indexes: `inventoryId`; `providerId`; `productId`; `batchId`; `type`; `createdAt`.
 - Gap: this competes with `StockMovement` as history. S0.5 must choose one authoritative ledger and preserve required evidence before deletion.
 
-### `AuditLog`
+### `AuditEvent`
 
-- Columns: `id UUID PK`; `organizationId UUID`; `userId UUID`; `module text`; `action text`; `resourceType text`; `resourceId text`; `oldValue jsonb?`; `newValue jsonb?`; `ipAddress text?`; `userAgent text?`; `requestId text?`; `deviceType text?`; `createdAt timestamp=now`.
-- Relationships: no database foreign keys are declared.
-- Indexes: `userId`; `organizationId`; `module`; `resourceType`; `createdAt`; `(organizationId, createdAt)`.
-- Sensitive/audit notes: old/new JSON may contain sensitive data and requires minimization and redaction. Immutability, tenant scope, actor integrity, retention, and event integration remain rejected until S0.4.
+- Columns: `id UUID PK`; `scope AuditScope`; `actorType AuditActorType`;
+  `outcome AuditOutcome`; `tenantId UUID?`; `actorMembershipId UUID?`;
+  `platformActorUserId UUID?`; `eventType varchar(120)`; paired
+  `resourceType varchar(80)?` and `resourceId varchar(120)?`;
+  `requestId varchar(120)?`; `ipAddress inet?`; `userAgent varchar(512)?`;
+  `metadata jsonb`; `occurredAt timestamp=now`.
+- Relationships: tenant events reference `Tenant`; tenant-user events use the
+  composite membership/tenant foreign key; platform-user events reference the
+  global `User`.
+- Constraints: actor/scope shape; paired resource fields; JSON object; maximum
+  16 KiB metadata; exact event vocabulary. A trigger rejects every `UPDATE`
+  and `DELETE`.
+- Indexes: stable tenant cursor `(tenantId, occurredAt DESC, id DESC)`;
+  tenant/event/time; actor/time; platform actor/time; resource/time.
+- Sensitive/audit notes: application writes accept only event-specific,
+  bounded scalar metadata and reject credentials, contact data, clinical
+  content, bodies, snapshots, and arbitrary payloads. Tenant APIs select only
+  response fields and never return platform events.
 
 ### `MedicalRecord`
 
@@ -232,12 +277,14 @@ Types below describe the PostgreSQL representation. Columns are required unless 
 
 The following are deliberately documented rather than silently accepted:
 
-- Cross-tenant RBAC relationships are not enforced by composite foreign keys; S0.4 must migrate role assignment from global-user ambiguity to membership-safe ownership.
+- S0.4 PostgreSQL 16 migration, trigger, atomicity, and concurrency evidence
+  remains mandatory before its candidate schema is accepted.
 - Several identifier columns have no foreign keys.
 - Inventory and batch quantities lack database check constraints.
 - `Inventory` and `Batch` are competing stock sources of truth.
 - `StockMovement` and `InventoryHistory` are competing ledger/history sources.
-- Audit records are not immutable or integrated with business mutations.
+- Audit retention, legal hold, archival, export, partitioning, correction
+  events, and cryptographic signing remain future compliance work.
 - Consent, purpose, retention, legal hold, archival, and deletion rules are not modeled.
 - Country and data-residency partitioning are not designed.
 - Seed data is intentionally absent; permission and taxonomy seeds require reviewed, idempotent specifications.

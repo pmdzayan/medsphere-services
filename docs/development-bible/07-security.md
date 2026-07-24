@@ -1,8 +1,9 @@
-# Volume 07 — Security Bible: Authentication and Sessions
+# Volume 07 — Security Bible: Identity, Authorization, and Audit
 
-**Decision:** ADR-003
+**Decisions:** ADR-003 and ADR-004
 
-**Status:** S0.3 implementation in progress
+**Status:** S0.3 accepted; S0.4 implementation and local review complete;
+PostgreSQL/Redis CI acceptance pending
 
 ## Security invariants
 
@@ -21,6 +22,23 @@
     checks cannot drift across code paths.
 12. Account throttle locators use the same canonicalization as login and
     registration DTOs even though guards execute before request pipes.
+13. Authorization is derived from the current active membership and tenant in
+    PostgreSQL on every guarded request; access tokens never carry permissions.
+14. Role and assignment tenant boundaries are enforced by composite foreign
+    keys, not only by application filters.
+15. Missing or unknown permission metadata denies access. There are no
+    wildcard, client-defined, or runtime-seeded permissions.
+16. The permission catalogue is migration-owned and protected from runtime
+    insert, update, and delete.
+17. The tenant administrator role is protected, and serializable transactions
+    preserve at least one active administrator under concurrent removals.
+18. Required role, assignment, and session audit evidence commits atomically
+    with the protected mutation.
+19. Durable audit events are attributable, bounded, append-only, and validated
+    at both the application and database boundaries.
+20. Platform-scoped events are never returned through tenant audit APIs.
+21. Request identifiers and bounded network/client metadata are propagated for
+    correlation without recording credentials or request bodies.
 
 ## Required configuration
 
@@ -77,27 +95,40 @@ Each rotation creates a new session ID in the same family, preserves absolute ex
 
 ## Threat-control evidence
 
-| Threat                      | Control                                                | Evidence target                       |
-| --------------------------- | ------------------------------------------------------ | ------------------------------------- |
-| Algorithm/token confusion   | RS256 allowlist, access type, issuer/audience/key ID   | Token negative unit/API tests         |
-| Client tenant impersonation | Membership-derived tenant and exact claim-chain lookup | Cross-tenant PostgreSQL test          |
-| Database credential leak    | HMAC digest only with external pepper                  | Schema/repository assertion           |
-| Refresh replay              | Single-use predecessor plus family compromise          | Sequential replay PostgreSQL test     |
-| Concurrent refresh          | Serializable transaction and bounded retry             | Parallel PostgreSQL test              |
-| Logout bypass               | Live session lookup on every protected request         | Protected-route lifecycle test        |
-| Account enumeration         | Generic responses and dummy password verification      | Response and service tests            |
-| Credential guessing         | Redis network plus account/session counters            | Redis integration and API limit tests |
-| Secret disclosure in logs   | Allowlisted event shape                                | Log capture/review                    |
-| Prototype route exposure    | Unmounted modules plus deny-by-default guard           | Route inventory test                  |
+| Threat                           | Control                                                        | Evidence target                        |
+| -------------------------------- | -------------------------------------------------------------- | -------------------------------------- |
+| Algorithm/token confusion        | RS256 allowlist, access type, issuer/audience/key ID           | Token negative unit/API tests          |
+| Client tenant impersonation      | Membership-derived tenant and exact claim-chain lookup         | Cross-tenant PostgreSQL test           |
+| Cross-tenant privilege injection | Membership/role composite tenant foreign keys                  | Invalid-assignment PostgreSQL tests    |
+| Stale or forged authorization    | Current database lookup; no JWT permissions or client context  | Multi-tenant permission tests          |
+| Missing policy annotation        | Guard denies when permission metadata is absent or unknown     | Guard unit and application tests       |
+| Last-administrator race          | Serializable transaction plus tenant version serialization     | Concurrent PostgreSQL test             |
+| Permission-catalogue mutation    | Migration ownership plus database mutation-rejection trigger   | Trigger integration tests              |
+| Audit tampering                  | Append-only database trigger and no update/delete API          | PostgreSQL immutability tests          |
+| Audit sensitive-data disclosure  | Event allowlists, bounded scalar metadata, minimized API reads | Writer/service tests and manual review |
+| Database credential leak         | HMAC digest only with external pepper                          | Schema/repository assertion            |
+| Refresh replay                   | Single-use predecessor plus family compromise                  | Sequential replay PostgreSQL test      |
+| Concurrent refresh               | Serializable transaction and bounded retry                     | Parallel PostgreSQL test               |
+| Logout bypass                    | Live session lookup on every protected request                 | Protected-route lifecycle test         |
+| Account enumeration              | Generic responses and dummy password verification              | Response and service tests             |
+| Credential guessing              | Redis network plus account/session counters                    | Redis integration and API limit tests  |
+| Secret disclosure in logs        | Allowlisted event shape                                        | Log capture/review                     |
+| Prototype route exposure         | Unmounted modules plus deny-by-default guard                   | Route inventory test                   |
 
 The HTTP security suite complements, but does not replace, the real adapter
-tests. It verifies the assembled Nest application and actual HTTP behavior;
-PostgreSQL tests remain authoritative for session rotation, replay, and tenant
-chain queries, while Redis tests remain authoritative for shared counters.
+tests. It verifies the assembled Nest application and actual HTTP behavior.
+PostgreSQL tests remain authoritative for session rotation, replay, tenant
+chains, authorization isolation, audit atomicity, database constraints, and
+concurrency. Redis tests remain authoritative for shared counters.
 
 ## Accepted limitations
 
 - MFA, recovery, email verification delivery, invitations, device management, OIDC/SAML, ABHA/ABDM, and break-glass workflows are not implemented.
-- S0.3 event logs are not the final healthcare audit trail.
-- RBAC permissions and policy evaluation remain blocked until S0.4.
+- S0.4 remains a release candidate until PostgreSQL 16, Redis 7, migration,
+  drift, constraint, trigger, atomicity, concurrency, and full CI gates pass.
+- Tenant-administrator assignment is deliberately not automatic. A reviewed
+  onboarding/bootstrap workflow is required before tenant self-administration.
+- ABAC, consent, privacy, data retention, legal hold, audit export,
+  partitioning, cryptographic signing, and break-glass policy remain future
+  dependency-ordered work.
 - Legal compliance certification and production readiness are not claimed.

@@ -2,7 +2,8 @@
 
 **Last updated:** 2026-07-25
 
-**Current sprint:** S0.4 — Tenant-Safe RBAC and Durable Audit (implementation authorized)
+**Current sprint:** S0.4 — Tenant-Safe RBAC and Durable Audit (local
+implementation complete; infrastructure acceptance pending)
 
 **Next feature work:** Blocked by S0.4
 
@@ -36,13 +37,21 @@ The migration must be incremental:
 ## Current risk context
 
 - The S0.3 authentication, trusted tenant context, and session boundary are accepted and merged.
-- Prototype RBAC, audit, provider, product, and inventory controllers remain deliberately unmounted.
-- RBAC operations are not reliably tenant-scoped — S0.4 must repair this.
-- The S0.2 and S0.3 database baselines are accepted, but the models' domain controls beyond authentication remain unaccepted.
+- The unsafe prototype RBAC and audit implementations were removed. Only the
+  reviewed S0.4 authorization administration and tenant-audit APIs are mounted.
+- S0.4 tenant-safe authorization and durable audit are implemented locally, but
+  their PostgreSQL constraints, triggers, atomicity, concurrency, Redis
+  integration, and migration/drift behavior still require CI proof.
+- Provider, product, inventory, reservation, and medical-record controllers
+  remain deliberately unmounted.
+- The S0.2 and S0.3 database baselines are accepted. S0.4 remains a candidate.
 - Reservation and stock operations contain transaction/concurrency defects.
-- Audit logging is not connected to business mutations — S0.4 work.
+- Durable audit covers S0.4 authorization and accepted authentication session
+  mutations. Future business modules must add atomic audit coverage when their
+  own sprints are accepted.
 - Medical-record functionality precedes consent and privacy foundations.
-- Automated coverage outside the S0.3 identity/session boundary remains insufficient for the current risk.
+- Automated infrastructure coverage exists for S0.4 but has not yet executed
+  on the required PostgreSQL 16 and Redis 7 services.
 
 See `docs/audits/2026-07-20-cto-baseline.md` for the accepted baseline.
 
@@ -50,8 +59,9 @@ See `docs/audits/2026-07-20-cto-baseline.md` for the accepted baseline.
 
 - S0.3 is accepted and merged. Its documentation handoff is the verified branch
   dependency for S0.4.
-- ADR-004 and the S0.4 sprint contract are accepted. S0.4 implementation is
-  authorized on `cto/s0.4-tenant-safe-rbac-durable-audit`.
+- ADR-004 and the S0.4 sprint contract are accepted. S0.4 implementation and
+  local review are complete on
+  `cto/s0.4-tenant-safe-rbac-durable-audit`.
 - S0.4 covers tenant-safe roles, permissions, membership assignments,
   authorization policy, and durable append-only audit integration.
 - Inventory and reservation integrity remain S0.5.
@@ -61,15 +71,40 @@ See `docs/audits/2026-07-20-cto-baseline.md` for the accepted baseline.
 
 ## S0.4 checkpoint state
 
-1. Architecture and sprint contract — completed locally
-2. Database schema and migration — in progress
-3. Authorization implementation — pending
-4. Durable audit and authentication integration — pending
-5. Infrastructure/security verification — pending
-6. Acceptance documentation and PR — pending
+1. Architecture and sprint contract — completed in local commit `9603f5b`
+2. Database schema and migration — implemented in `a8b2128` and hardened in
+   `993324b`; PostgreSQL deploy/drift/constraint proof pending
+3. Authorization implementation — completed and locally reviewed
+4. Durable audit and authentication integration — completed and locally
+   reviewed
+5. Local security verification — format, Prisma validation/generation, lint,
+   non-infrastructure tests, strict auth test type-check, and build completed;
+   PostgreSQL/Redis suites pending
+6. Acceptance documentation — completed locally; final evidence commit,
+   publication, pull request, CI, and CTO acceptance pending
 
 If ownership transfers after a checkpoint, resume at the first pending item.
 Never restart from the oversized `cline/s0.4-rbac-audit` branch.
+
+## Exact continuation point
+
+Do not implement S0.5 or ask Cline to begin another feature. First:
+
+1. publish `cto/s0.4-tenant-safe-rbac-durable-audit`;
+2. open a draft pull request into `feature/database-architecture`;
+3. confirm CI uses PostgreSQL 16, Redis 7, Node.js 20.11.1, PNPM 9.15.0, and
+   `RUN_AUTH_INFRASTRUCTURE_TESTS=true`;
+4. run and inspect `pnpm db:verify`, format, lint, test, and build;
+5. fix only evidenced S0.4 failures with a bounded task;
+6. record workflow links and exact executed/skipped counts in
+   `PROJECT_STATUS.md` and the Testing Bible;
+7. perform final CTO architecture, security, duplication, validation,
+   performance, and migration review;
+8. accept and merge S0.4 only when every gate is green.
+
+If CI fails, Cline may receive one complete, narrowly scoped prompt for the
+specific failure set. Cline must not redesign the schema, permission model,
+audit contract, or tenant boundary.
 
 ## Agent routing
 
