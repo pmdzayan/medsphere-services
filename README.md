@@ -49,9 +49,16 @@ Start the local PostgreSQL 16 database and verify the full migration chain:
 ```bash
 docker compose --env-file .env -f compose/docker-compose.database.yml up -d
 pnpm db:verify
+pnpm db:verify-upgrade
 ```
 
 `db:verify` validates the Prisma schema, deploys every migration, checks migration status, and fails if the deployed database drifts from the declared schema. Never use `prisma db push` on a shared database.
+
+`db:verify-upgrade` is an infrastructure-only S0.4 gate. It creates isolated
+temporary PostgreSQL databases, proves conversion of a populated valid S0.3
+authorization state, proves that five unsafe legacy-data categories fail
+closed, and removes every temporary database. Never run it against a database
+account that cannot safely create and remove isolated test databases.
 
 Run the same mandatory gates used in pull requests:
 

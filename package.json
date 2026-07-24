@@ -19,8 +19,9 @@
     "db:status": "pnpm --filter @medsphere/database prisma:status",
     "db:drift": "pnpm --filter @medsphere/database prisma:drift",
     "db:verify": "pnpm --filter @medsphere/database prisma:verify",
-    "format": "prettier --write \"**/*.{ts,js,json,md,yml,yaml}\"",
-    "format:check": "prettier --check \"**/*.{ts,js,json,md,yml,yaml}\"",
+    "db:verify-upgrade": "pnpm --filter @medsphere/database prisma:verify-upgrade",
+    "format": "prettier --write \"**/*.{ts,js,mjs,json,md,yml,yaml}\"",
+    "format:check": "prettier --check \"**/*.{ts,js,mjs,json,md,yml,yaml}\"",
     "clean": "turbo run clean && rimraf node_modules .turbo",
     "prepare": "husky"
   },

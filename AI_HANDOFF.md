@@ -79,9 +79,11 @@ See `docs/audits/2026-07-20-cto-baseline.md` for the accepted baseline.
    reviewed
 5. Local security verification — format, Prisma validation/generation, lint,
    non-infrastructure tests, strict auth test type-check, and build completed;
-   PostgreSQL/Redis suites pending
-6. Acceptance documentation — completed locally; final evidence commit,
-   publication, pull request, CI, and CTO acceptance pending
+   PostgreSQL/Redis suites passed in workflow run `30130479231`
+6. Populated S0.3 upgrade verification — final contract review found this gap;
+   `db:verify-upgrade` implementation and CI rerun in progress
+7. Acceptance documentation — initial evidence recorded; strengthened CI,
+   final evidence commit, and CTO acceptance pending
 
 If ownership transfers after a checkpoint, resume at the first pending item.
 Never restart from the oversized `cline/s0.4-rbac-audit` branch.
@@ -90,13 +92,14 @@ Never restart from the oversized `cline/s0.4-rbac-audit` branch.
 
 Do not implement S0.5 or ask Cline to begin another feature. First:
 
-1. publish `cto/s0.4-tenant-safe-rbac-durable-audit`;
-2. open a draft pull request into `feature/database-architecture`;
-3. confirm CI uses PostgreSQL 16, Redis 7, Node.js 20.11.1, PNPM 9.15.0, and
-   `RUN_AUTH_INFRASTRUCTURE_TESTS=true`;
-4. run and inspect `pnpm db:verify`, format, lint, test, and build;
-5. fix only evidenced S0.4 failures with a bounded task;
-6. record workflow links and exact executed/skipped counts in
+1. Keep [PR #7](https://github.com/pmdzayan/medsphere-services/pull/7) in draft.
+2. Publish the populated S0.3 upgrade-verification gate.
+3. Confirm CI uses PostgreSQL 16, Redis 7, Node.js 20.11.1, PNPM 9.15.0, and
+   `RUN_AUTH_INFRASTRUCTURE_TESTS=true`.
+4. Run and inspect `pnpm db:verify`, `pnpm db:verify-upgrade`, format, lint,
+   test, and build.
+5. Fix only evidenced S0.4 failures with a bounded task.
+6. Record the strengthened workflow link and exact executed/skipped counts in
    `PROJECT_STATUS.md` and the Testing Bible;
 7. perform final CTO architecture, security, duplication, validation,
    performance, and migration review;

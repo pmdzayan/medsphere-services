@@ -143,22 +143,30 @@ commits `9603f5b`, `a8b2128`, and `993324b`, followed by the final
 documentation/evidence commit. These commits are not accepted until they are
 published, reviewed, and proven by the pull-request workflow.
 
-| Check                                    | Result                                                                  |
-| ---------------------------------------- | ----------------------------------------------------------------------- |
-| Locked dependency installation           | Passed with PNPM 9.15.0                                                 |
-| Prisma schema validation                 | Passed                                                                  |
-| Prisma client generation                 | Passed                                                                  |
-| Static Prisma schema comparison          | Passed for modeled objects; not a live migration/trigger result         |
-| Formatting                               | Passed                                                                  |
-| Lint                                     | Passed locally — 15/15 Turbo tasks                                      |
-| Tests                                    | Passed locally — 17/17 Turbo tasks; infrastructure suites skipped       |
-| Auth strict test type-check and Jest     | Passed after final review — 104 passed, 16 infrastructure tests skipped |
-| Build                                    | Passed locally — 15/15 Turbo tasks                                      |
-| PostgreSQL 16 and Redis 7 integration    | Pending CI; unavailable locally                                         |
-| Clean deploy, upgrade, status, and drift | Pending CI; unavailable locally                                         |
-| Pull-request workflow                    | Pending publication                                                     |
+| Check                                 | Result                                                                  |
+| ------------------------------------- | ----------------------------------------------------------------------- |
+| Locked dependency installation        | Passed with PNPM 9.15.0                                                 |
+| Prisma schema validation              | Passed                                                                  |
+| Prisma client generation              | Passed                                                                  |
+| Static Prisma schema comparison       | Passed for modeled objects; not a live migration/trigger result         |
+| Formatting                            | Passed                                                                  |
+| Lint                                  | Passed locally — 15/15 Turbo tasks                                      |
+| Tests                                 | Passed locally — 17/17 Turbo tasks; infrastructure suites skipped       |
+| Auth strict test type-check and Jest  | Passed after final review — 104 passed, 16 infrastructure tests skipped |
+| Build                                 | Passed locally — 15/15 Turbo tasks                                      |
+| PostgreSQL 16 and Redis 7 integration | Passed in initial PR #7 workflow — 120/120 auth tests, zero skipped     |
+| Clean deploy, status, and drift       | Passed in initial PR #7 workflow                                        |
+| Populated S0.3 upgrade verification   | Gate added after final contract review; rerun pending                   |
+| Pull-request workflow                 | Initial run passed; strengthened migration-safety rerun pending         |
 
-Skipped infrastructure suites are not acceptance evidence. The exact next
-checkpoint is to publish the branch, open a draft pull request, run the complete
-quality workflow with `RUN_AUTH_INFRASTRUCTURE_TESTS=true`, fix only S0.4
-failures, record workflow links, and complete CTO review. S0.5 remains blocked.
+The initial [PR #7 workflow run](https://github.com/pmdzayan/medsphere-services/actions/runs/30130479231)
+proved the clean four-migration deployment, no drift, PostgreSQL and Redis
+integration, 20/20 auth suites with 120/120 tests and zero skips, 15/15 lint
+tasks, 17/17 test tasks, and 15/15 build tasks on commit `067ce63`.
+
+Final contract review found that a clean migration chain did not prove a
+populated S0.3 upgrade. Acceptance remains withheld while the new
+`db:verify-upgrade` gate proves preservation of valid legacy membership-role and
+role-permission data and fail-closed rejection of legacy audit rows, unknown
+permissions, invalid built-in roles, cross-tenant role-permission mappings, and
+ambiguous role assignments. S0.5 remains blocked.

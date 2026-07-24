@@ -44,6 +44,7 @@ The infrastructure suite is activated only by
 | Platform isolation     | Platform events cannot appear in tenant reads                                  |
 | Session lifecycle      | Create, refresh, replay response, logout, and logout-all evidence is atomic    |
 | Redis throttling       | Shared counters behave correctly and infrastructure failure is not bypassed    |
+| Populated S0.3 upgrade | Valid assignments survive; five unsafe legacy-data categories fail closed      |
 
 ## Local S0.4 verification evidence
 
@@ -67,6 +68,43 @@ are not described as passing.
 
 The evidence table must be updated with CI links before CTO acceptance.
 
+## Initial PR #7 infrastructure evidence
+
+[Workflow run 30130479231](https://github.com/pmdzayan/medsphere-services/actions/runs/30130479231)
+executed on commit `067ce63` with PostgreSQL 16, Redis 7, and
+`RUN_AUTH_INFRASTRUCTURE_TESTS=true`.
+
+| Check                               | Result                                                  |
+| ----------------------------------- | ------------------------------------------------------- |
+| Clean four-migration deployment     | Passed                                                  |
+| Migration status and schema drift   | Passed; database current and no difference detected     |
+| Auth PostgreSQL/Redis suites        | Passed — 20/20 suites, 120/120 tests, zero skipped      |
+| Repository lint                     | Passed — 15/15 Turbo tasks                              |
+| Repository tests                    | Passed — 17/17 Turbo tasks                              |
+| Repository build                    | Passed — 15/15 Turbo tasks                              |
+| Populated S0.3 migration conversion | Not covered by the initial run; new gate awaiting rerun |
+
+The logged PostgreSQL error stating that the permission catalogue is
+migration-owned is expected negative-test evidence; the test and workflow
+passed.
+
+The post-run contract review correctly withheld acceptance because deploying
+all four migrations onto an empty database does not prove conversion of
+populated S0.3 authorization data. `db:verify-upgrade` now creates isolated
+temporary databases and verifies:
+
+1. preservation of a valid legacy user-role assignment as a tenant membership
+   role;
+2. preservation of a valid accepted role-permission mapping;
+3. creation of exactly eight global permissions and one fully granted tenant
+   administrator role;
+4. rejection of mutable legacy audit rows;
+5. rejection of unsupported or deleted legacy permissions;
+6. rejection of invalid built-in roles;
+7. rejection of cross-tenant role-permission mappings;
+8. rejection of role assignments without an unambiguous same-tenant
+   membership.
+
 ## CI acceptance sequence
 
 The pull-request workflow must:
@@ -75,10 +113,11 @@ The pull-request workflow must:
 2. start PostgreSQL 16 and Redis 7;
 3. set `RUN_AUTH_INFRASTRUCTURE_TESTS=true`;
 4. run `pnpm db:verify`;
-5. run `pnpm format:check`;
-6. run `pnpm lint`;
-7. run `pnpm test`;
-8. run `pnpm build`.
+5. run `pnpm db:verify-upgrade`;
+6. run `pnpm format:check`;
+7. run `pnpm lint`;
+8. run `pnpm test`;
+9. run `pnpm build`.
 
 Any skipped infrastructure suite, migration drift, flaky concurrency result,
 lint warning promoted to error, test failure, or build failure blocks
