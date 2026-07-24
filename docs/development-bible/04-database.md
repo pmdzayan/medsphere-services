@@ -1,6 +1,6 @@
 # Volume 04 — Database Bible
 
-**Baseline:** S0.2 reproducible database baseline plus S0.3 trusted-auth migration under review
+**Baseline:** S0.2 reproducible database baseline plus S0.3 trusted-auth migration accepted
 
 **Engine:** PostgreSQL 16
 
@@ -63,7 +63,7 @@ pnpm db:verify
 
 | Module                     | Models                                                             | Current acceptance                              |
 | -------------------------- | ------------------------------------------------------------------ | ----------------------------------------------- |
-| Tenancy and Identity       | `Tenant`, `User`, `TenantMembership`, `UserPrivacy`, `UserSession` | S0.3 implementation under review                |
+| Tenancy and Identity       | `Tenant`, `User`, `TenantMembership`, `UserPrivacy`, `UserSession` | S0.3 accepted; RBAC/audit remains S0.4          |
 | Access Control             | `Role`, `Permission`, `UserRole`, `RolePermission`                 | Reproducible; tenant-safe RBAC rejected         |
 | Provider Registry          | `Provider`, `ProviderVerification`                                 | Prototype; verification workflow blocked        |
 | Medicine Catalog           | `Product`                                                          | Prototype                                       |

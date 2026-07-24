@@ -2,9 +2,9 @@
 
 **Last updated:** 2026-07-20
 
-**Current sprint:** S0.3 — Authentication and Trusted Tenant Context (implementation in progress)
+**Current sprint:** S0.4 — Tenant-Safe RBAC and Audit Integration (CTO design preparation; code not yet authorized)
 
-**Next feature work:** Blocked by S0.3
+**Next feature work:** Blocked by S0.4
 
 ## Mandatory startup sequence
 
@@ -23,7 +23,7 @@ If a required document is missing or conflicts with an accepted ADR, stop implem
 
 ## Current architectural context
 
-ADR-001 selects a modular monolith for Version 1. ADR-002 preserves append-only migration history and requires clean PostgreSQL deployment and drift verification. ADR-003 defines global identity, explicit tenant membership, asymmetric access JWTs, opaque rotated refresh credentials, and deny-by-default authentication. The repository still contains seven NestJS applications sharing a Prisma database. Do not treat those deployment boundaries as approved domain boundaries, and do not add another service.
+ADR-001 selects a modular monolith for Version 1. ADR-002 preserves append-only migration history and requires clean PostgreSQL deployment and drift verification. ADR-003 defines global identity, explicit tenant membership, asymmetric access JWTs, opaque rotated refresh credentials, and deny-by-default authentication — all accepted and merged. The repository still contains seven NestJS applications sharing a Prisma database. Do not treat those deployment boundaries as approved domain boundaries, and do not add another service.
 
 The migration must be incremental:
 
@@ -35,25 +35,24 @@ The migration must be incremental:
 
 ## Current risk context
 
-- S0.3 now contains the authentication implementation, but it is not accepted until clean migration, integration, route, negative API, quality-gate, and CI evidence passes.
-- Prototype RBAC, audit, provider, product, and inventory controllers are deliberately unmounted rather than treated as safe.
-- RBAC operations are not reliably tenant-scoped.
-- The S0.2 database baseline is accepted and merged. The database is reproducible through append-only migrations, but the models' security, tenant-isolation, and domain controls remain unaccepted.
+- The S0.3 authentication, trusted tenant context, and session boundary are accepted and merged.
+- Prototype RBAC, audit, provider, product, and inventory controllers remain deliberately unmounted.
+- RBAC operations are not reliably tenant-scoped — S0.4 must repair this.
+- The S0.2 and S0.3 database baselines are accepted, but the models' domain controls beyond authentication remain unaccepted.
 - Reservation and stock operations contain transaction/concurrency defects.
-- Audit logging is not connected to business mutations.
+- Audit logging is not connected to business mutations — S0.4 work.
 - Medical-record functionality precedes consent and privacy foundations.
 - Automated coverage outside the S0.3 identity/session boundary remains insufficient for the current risk.
 
 See `docs/audits/2026-07-20-cto-baseline.md` for the accepted baseline.
 
-## Current S0.3 boundary
+## Current S0.4 boundary
 
-- S0.2 is accepted and merged. S0.3 is the current sprint.
-- Follow ADR-003 and `docs/sprints/S0.3-authentication-and-trusted-tenant-context.md`.
-- Read `docs/development-bible/05-backend.md` and `docs/development-bible/07-security.md` before touching authentication.
-- ChatGPT / Codex owns the database, cryptography, session, tenant-context, and global-guard implementation.
-- Cline may implement only explicitly assigned bounded support work.
-- S0.4 and later work remain blocked until S0.3 is accepted and merged.
+- S0.3 is accepted and merged. S0.4 is the current sprint.
+- S0.4 code implementation is not yet authorized — ADR-004 and the S0.4 sprint contract must be accepted first.
+- S0.4 covers tenant-safe roles, permissions, assignments, authorization policy, and durable audit integration.
+- Inventory and reservation integrity remain S0.5.
+- The CTO owns ADR-004 and the S0.4 architecture design.
 
 ## Agent routing
 
