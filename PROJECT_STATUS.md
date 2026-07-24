@@ -4,37 +4,41 @@
 
 **Baseline commit:** `75e4d45855d5e99eab355c41a5e424bbda602a9b`
 
-**Accepted stabilization baseline:** `7872e57982f0ba2f0681ece9fc445fa63ed320c4`
+**Accepted stabilization baseline:** `4ea55a17e188410ddee45fa3ea6c016e22d6617a`
 
-**Current remediation branch:** `cto/s0.4-tenant-safe-rbac-durable-audit`
+**Current remediation branch:** `cto/s0.5-inventory-reservation-integrity`
 
 **Release state:** Not approved for production or real healthcare data
 
 ## Current sprint
 
-### Stabilization Sprint S0.4 — Tenant-Safe RBAC and Audit Integration
+### Stabilization Sprint S0.5 — Inventory Ledger and Reservation Integrity
 
-**Status:** CTO acceptance approved; final documentation CI and PR #7 merge
+**Status:** Architecture accepted; architecture checkpoint publication and CI
 pending
 
-**Dependency:** S0.3 Authentication and Trusted Tenant Context accepted and merged
+**Dependency:** S0.4 Tenant-Safe RBAC and Durable Audit accepted and merged
 
-**Implementation authority:** ADR-004 and the S0.4 sprint contract are accepted.
+**Implementation authority:** ADR-005 and the S0.5 sprint contract are accepted.
 
 **In scope**
 
-- Membership-scoped roles and assignments
-- Migration-owned permission catalogue
-- Fail-closed tenant-safe permission enforcement
-- Concurrent last-administrator protection
-- Typed, append-only, tenant-isolated durable audit events
-- Atomic audit integration for authorization and authentication session events
+- One inventory bounded-context owner
+- Batch as the sole physical and held quantity state
+- Append-only stock movement ledger
+- Deterministic, transactional FEFO
+- Typed medicine reservation header, items, and exact batch allocations
+- Serializable, idempotent, tenant-safe stock and reservation mutations
+- Atomic durable audit integration
+- Clean and populated migration verification
 
 **Out of scope**
 
-- S0.3 authentication work — accepted and merged
-- S0.5 inventory and reservation integrity
+- S0.4 authorization and audit — accepted and merged
+- Hospital, laboratory, and vaccination scheduling
+- Supplier procurement and goods receipt
 - Marketplace, delivery, payment, frontend, and controlled-medicine work
+- Patient self-service reservation exposure
 
 ## CTO acceptance ledger
 
@@ -45,21 +49,24 @@ pending
 | Database reproducibility    | PR #2 migration and clean-database gates CI-verified and merged | Accepted base      |
 | Inventory foundation        | Batch, stock, availability, FEFO, and search scaffolding exists | Prototype only     |
 | Reservation                 | Competing implementations and unsafe transaction boundaries     | Rejected           |
-| Task 11 — Identity/RBAC     | S0.3 identity and S0.4 tenant-safe authorization verified in CI | Accepted for merge |
-| Task 12 — Audit Logging     | S0.4 durable, integrated, append-only audit verified in CI      | Accepted for merge |
+| Task 11 — Identity/RBAC     | S0.3 identity and S0.4 tenant-safe authorization merged         | Accepted           |
+| Task 12 — Audit Logging     | S0.4 durable, integrated, append-only audit merged              | Accepted           |
 | Task 13 onward              | Dependencies are not complete                                   | Blocked            |
 
 ## Critical blockers
 
-1. PR #7 has not yet merged; S0.5 remains blocked until the final
-   documentation commit passes CI and S0.4 reaches the accepted base branch.
-2. Non-atomic reservation and inventory mutations.
-3. Competing inventory/batch sources of truth.
-4. Durable audit currently covers accepted S0.4 authorization and
+1. Inventory and batch are competing quantity authorities.
+2. Existing transaction callbacks use repositories bound to the root Prisma
+   client and therefore do not prove atomic writes.
+3. Reservation structure is stored in JSON and duplicated across two
+   applications.
+4. Stock and reservation rows lack database-enforced tenant scope,
+   idempotency, and concurrency safety.
+5. Durable audit currently covers accepted S0.4 authorization and
    authentication session events only; later business modules must integrate
    it in their own dependency-ordered sprints.
-5. Medical-record functionality remains blocked before consent/privacy controls.
-6. Repository-wide integration, security, and tenant-isolation coverage remains
+6. Medical-record functionality remains blocked before consent/privacy controls.
+7. Repository-wide integration, security, and tenant-isolation coverage remains
    insufficient beyond the accepted S0.4 boundary.
 
 The supporting evidence is recorded in [the baseline audit](docs/audits/2026-07-20-cto-baseline.md).
@@ -69,10 +76,10 @@ The supporting evidence is recorded in [the baseline audit](docs/audits/2026-07-
 1. **S0.1 Architecture and governance** — accepted and merged in PR #1
 2. **S0.2 Reproducible database baseline** — accepted and squash-merged in PR #2
 3. **S0.3 Authentication and trusted tenant context** — accepted and squash-merged in PR #3
-4. **S0.4 Tenant-safe RBAC and durable audit** — CTO acceptance approved;
-   final documentation CI and PR #7 merge pending
-5. **S0.5 Inventory ledger and reservation integrity** — blocked until PR #7
-   merges
+4. **S0.4 Tenant-safe RBAC and durable audit** — accepted and squash-merged in
+   PR #7
+5. **S0.5 Inventory ledger and reservation integrity** — current; architecture
+   accepted, checkpoint publication and CI pending
 6. Reassess remaining Inventory and Compliance roadmap work
 
 Only one recovery sprint may be active at a time. Exact boundaries may be refined through an ADR, but dependencies must not be skipped.
@@ -137,7 +144,7 @@ Reference: [PR #3](https://github.com/pmdzayan/medsphere-services/pull/3) (squas
 
 PR #3 was accepted and squash-merged into `feature/database-architecture`.
 
-## S0.4 local verification evidence
+## S0.4 verification evidence
 
 S0.4 is implemented on `cto/s0.4-tenant-safe-rbac-durable-audit` in commits
 `9603f5b`, `a8b2128`, `993324b`, `067ce63`, and `4f10eef`. The implementation
@@ -159,6 +166,8 @@ by the pull-request workflow.
 | Clean deploy, status, and drift       | Passed in initial PR #7 workflow                                        |
 | Populated S0.3 upgrade verification   | Passed all six isolated scenarios in strengthened PR #7 workflow        |
 | Pull-request workflow                 | Strengthened run passed on exact commit `4f10eef`                       |
+| Final documentation workflow          | Passed on exact commit `f2cd0df` in run `30132631443`                   |
+| Merge                                 | PR #7 squash-merged as `4ea55a1`                                        |
 
 The initial [PR #7 workflow run](https://github.com/pmdzayan/medsphere-services/actions/runs/30130479231)
 proved the clean four-migration deployment, no drift, PostgreSQL and Redis
@@ -183,7 +192,10 @@ atomicity and immutability, concurrency, migration safety, validation,
 duplication, security, and documentation have no unresolved acceptance
 findings.
 
-CTO acceptance is approved for PR #7. The final documentation-only commit must
-pass the same workflow before the PR is marked ready and merged. S0.5 remains
-blocked until that merge completes. This is not production or legal-compliance
-approval.
+The final documentation-only commit passed
+[workflow run 30132631443](https://github.com/pmdzayan/medsphere-services/actions/runs/30132631443).
+PR #7 was squash-merged into `feature/database-architecture` as
+`4ea55a17e188410ddee45fa3ea6c016e22d6617a`.
+
+S0.4 is accepted and closed. S0.5 may proceed under ADR-005 and its sprint
+contract. This is not production or legal-compliance approval.

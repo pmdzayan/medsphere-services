@@ -1,10 +1,10 @@
 # Volume 05 — Backend Bible: Identity, Authorization, and Audit
 
-**Sprints:** S0.3 accepted; S0.4 CTO-accepted for merge
+**Sprints:** S0.3 and S0.4 accepted and merged; S0.5 architecture active
 
-**Decisions:** ADR-003 and ADR-004
+**Decisions:** ADR-003, ADR-004, and ADR-005
 
-**Status:** S0.4 accepted for merge; not production-approved
+**Status:** S0.4 accepted; S0.5 target not yet implemented; not production-approved
 
 ## Purpose and boundary
 
@@ -173,3 +173,30 @@ identity providers, authorization caching, delegated policy, audit
 partitioning/export, and a measured revocation cache. None may weaken
 membership-derived tenant context, bypass session revocation, or mutate
 historical audit evidence.
+
+## S0.5 inventory and medicine reservation target
+
+**Status:** Architecture accepted under ADR-005; implementation not yet accepted
+
+The Inventory bounded context will own provider-product configuration, batches,
+stock movements, availability, FEFO, medicine reservations, items, and exact
+batch allocations. The current inventory-service location is temporary and does
+not establish a separately deployable service boundary.
+
+Application commands must use one explicit `Prisma.TransactionClient` through
+every repository call. Root-client writes inside transaction callbacks, nested
+root transactions, read-then-write quantity updates, clamped underflow, and
+time-derived idempotency identifiers are prohibited.
+
+The implementation order is:
+
+1. schema and populated migration verification;
+2. focused shared transaction and audit primitives;
+3. batch stock and append-only movement ledger;
+4. deterministic FEFO and availability reads;
+5. medicine reservation header, items, allocations, and lifecycle;
+6. accepted identity/RBAC/audit application boundary; and
+7. infrastructure, security, duplication, and acceptance review.
+
+Public patient reservation creation and every delivery, payment, supplier,
+clinical, and controlled-medicine workflow remain unmounted.

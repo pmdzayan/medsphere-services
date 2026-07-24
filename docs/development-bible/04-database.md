@@ -1,6 +1,6 @@
 # Volume 04 — Database Bible
 
-**Baseline:** S0.2 and S0.3 accepted; S0.4 CTO-accepted for merge
+**Baseline:** S0.2 through S0.4 accepted and merged
 
 **Engine:** PostgreSQL 16
 
@@ -12,10 +12,11 @@
 
 ## Acceptance boundary
 
-This volume documents the declared database shape and the CTO-accepted S0.4
-migration. PostgreSQL 16 clean deploy, populated S0.3 upgrade, drift,
-constraint, trigger, atomicity, and concurrency tests passed in PR #7.
-Inventory integrity, consent, privacy, retention, and the remaining product
+This volume documents the accepted database through S0.4 and the ADR-005 target
+for S0.5. PostgreSQL 16 clean deploy, populated S0.3 upgrade, drift, constraint,
+trigger, atomicity, and concurrency tests passed in PR #7. Existing inventory
+and reservation tables remain rejected prototypes until the S0.5 migration and
+integrity gates pass. Consent, privacy, retention, and the remaining product
 domains continue through their dependency-ordered sprints.
 
 No production or real healthcare data is approved.
@@ -72,12 +73,32 @@ pnpm db:verify
 | Access Control             | `Role`, `Permission`, `MembershipRole`, `RolePermission`           | S0.4 accepted with PostgreSQL integration evidence |
 | Provider Registry          | `Provider`, `ProviderVerification`                                 | Prototype; verification workflow blocked           |
 | Medicine Catalog           | `Product`                                                          | Prototype                                          |
-| Inventory and Stock Ledger | `Inventory`, `Batch`, `StockMovement`, `InventoryHistory`          | Reproducible prototype; integrity rejected         |
+| Inventory and Stock Ledger | `Inventory`, `Batch`, `StockMovement`, `InventoryHistory`          | S0.5 redesign active under ADR-005                 |
 | Audit and Policy           | `AuditEvent`                                                       | S0.4 accepted with PostgreSQL integration evidence |
 | Patient Records            | `MedicalRecord`                                                    | Blocked by authentication, consent, and privacy    |
-| Reservation and Fulfilment | `Reservation`                                                      | Reproducible prototype; workflow rejected          |
+| Reservation and Fulfilment | `Reservation`                                                      | S0.5 replacement active under ADR-005              |
 
 Ownership is provisional until bounded-context and persistence-boundary work is accepted. Existing service folders do not establish ownership.
+
+## S0.5 target model
+
+ADR-005 accepts the following target. It is not implemented or database-
+accepted until the forward migration and infrastructure gates pass.
+
+| Target model                            | Authority and purpose                                                             |
+| --------------------------------------- | --------------------------------------------------------------------------------- |
+| `Inventory`                             | One tenant/provider/product listing; commercial and visibility configuration only |
+| `Batch`                                 | Sole mutable on-hand and held quantity state; expiry and lot identity             |
+| `StockMovement`                         | Append-only, tenant-scoped on-hand ledger with signed delta and idempotency       |
+| `MedicineReservation`                   | Provider-scoped medicine hold header and lifecycle                                |
+| `MedicineReservationItem`               | Typed product and requested quantity                                              |
+| `MedicineReservationAllocation`         | Exact FEFO batch hold, release, or consumption                                    |
+| legacy `InventoryHistory`/`Reservation` | Removed only through verified forward migration; ambiguous data blocks deployment |
+
+Required database invariants include non-negative on-hand and held quantities,
+held quantity not exceeding on-hand quantity, movement arithmetic equality,
+same-tenant composite foreign keys, deterministic uniqueness, immutable
+movement rows, explicit reservation transitions, and tenant-scoped idempotency.
 
 ## Table catalogue
 

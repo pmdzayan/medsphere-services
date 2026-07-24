@@ -1,8 +1,8 @@
 # Volume 07 — Security Bible: Identity, Authorization, and Audit
 
-**Decisions:** ADR-003 and ADR-004
+**Decisions:** ADR-003, ADR-004, and ADR-005
 
-**Status:** S0.3 accepted; S0.4 CTO-accepted for merge
+**Status:** S0.3 and S0.4 accepted and merged; S0.5 security target active
 
 ## Security invariants
 
@@ -131,3 +131,21 @@ concurrency. Redis tests remain authoritative for shared counters.
   partitioning, cryptographic signing, and break-glass policy remain future
   dependency-ordered work.
 - Legal compliance certification and production readiness are not claimed.
+
+## S0.5 security target
+
+ADR-005 requires explicit tenant keys and composite same-tenant relationships
+for inventory, batches, movements, medicine reservations, items, allocations,
+providers, and actor memberships. Tenant and actor authority continue to come
+only from the accepted authenticated identity.
+
+Stock and reservation commands must be serializable, idempotent, versioned
+where state transitions occur, and atomic with their durable audit event.
+Automatic expiry may use a tenant-scoped `SYSTEM` audit actor only when tenant
+scope is explicit and user actor fields are absent.
+
+S0.5 does not authorize public patient reservation creation. That boundary
+requires a later Marketplace decision for global-user attribution, patient
+self-access, abuse controls, and tenant-scoped audit visibility. No header,
+zero UUID, system actor, or client-supplied tenant may be used as a temporary
+identity fallback.

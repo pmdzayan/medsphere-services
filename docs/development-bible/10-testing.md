@@ -1,7 +1,6 @@
 # Volume 10 — Testing Bible
 
-**Status:** S0.4 technical acceptance evidence complete; final documentation CI
-and merge pending
+**Status:** S0.4 accepted and merged; S0.5 evidence contract active
 
 **Runtime contract:** Node.js 20.11.1, PNPM 9.15.0, PostgreSQL 16, and Redis 7
 
@@ -113,8 +112,9 @@ populated-upgrade scenarios: one valid conversion and five independent
 fail-closed cases. It also reported no drift, 20/20 auth suites with 120/120
 tests and zero skips, 15/15 lint tasks, 17/17 test tasks, and 15/15 build tasks.
 
-This evidence satisfies the S0.4 technical acceptance rule. The final
-documentation commit must pass the same workflow before PR #7 merges.
+This evidence satisfied the S0.4 technical acceptance rule. Final workflow
+`30132631443` passed on commit `f2cd0df`, and PR #7 was squash-merged as
+`4ea55a1`.
 
 ## CI acceptance sequence
 
@@ -146,10 +146,29 @@ acceptance.
 - Keep infrastructure gating explicit so local skips cannot be mistaken for CI
   evidence.
 
-## S0.4 completion rule
+## S0.4 completion
 
-S0.4 can be accepted only after the local gates remain green, the pull-request
-workflow executes every infrastructure suite on PostgreSQL 16 and Redis 7,
-database deployment and drift checks pass, the final code/security review has
-no unresolved findings, and the evidence links are recorded in
-`PROJECT_STATUS.md`.
+S0.4 passed the local and pull-request gates, executed its PostgreSQL 16 and
+Redis 7 infrastructure suites without skips, passed migration and drift checks,
+received final CTO review, and was merged in PR #7.
+
+## S0.5 required evidence
+
+S0.5 must add real PostgreSQL tests for:
+
+- valid populated S0.4 migration and each fail-closed corruption class;
+- same-tenant composite keys and quantity checks;
+- append-only stock movement triggers;
+- transaction-client propagation and rollback on any protected write failure;
+- concurrent reservation without oversell;
+- concurrent complete, cancel, and expiry with one winner;
+- concurrent stock changes without lost updates;
+- exact allocation consumption and release;
+- deterministic FEFO under equal expiry and contention;
+- tenant-scoped idempotency; and
+- atomic stock/reservation audit evidence.
+
+HTTP tests must prove trusted identity, permission denial, tenant isolation,
+version and idempotency validation, bounded queries, and continued 404 behavior
+for every unaccepted prototype route. Mock-only transaction tests are not
+acceptance evidence.
