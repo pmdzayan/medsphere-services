@@ -1,12 +1,12 @@
 # MedSphere Project Status
 
-**Status date:** 2026-07-20
+**Status date:** 2026-07-25
 
 **Baseline commit:** `75e4d45855d5e99eab355c41a5e424bbda602a9b`
 
 **Accepted stabilization baseline:** `7872e57982f0ba2f0681ece9fc445fa63ed320c4`
 
-**Current remediation branch:** `feature/database-architecture`
+**Current remediation branch:** `cto/s0.4-tenant-safe-rbac-durable-audit`
 
 **Release state:** Not approved for production or real healthcare data
 
@@ -14,19 +14,26 @@
 
 ### Stabilization Sprint S0.4 — Tenant-Safe RBAC and Audit Integration
 
-**Status:** CTO architecture and design preparation
+**Status:** Architecture accepted; implementation in progress
 
 **Dependency:** S0.3 Authentication and Trusted Tenant Context accepted and merged
 
-**Code implementation not yet authorized** — ADR-004 and the S0.4 sprint contract must be accepted first.
+**Implementation authority:** ADR-004 and the S0.4 sprint contract are accepted.
 
 **In scope**
 
-- To be defined in ADR-004 and the S0.4 sprint contract
+- Membership-scoped roles and assignments
+- Migration-owned permission catalogue
+- Fail-closed tenant-safe permission enforcement
+- Concurrent last-administrator protection
+- Typed, append-only, tenant-isolated durable audit events
+- Atomic audit integration for authorization and authentication session events
 
 **Out of scope**
 
 - S0.3 authentication work — accepted and merged
+- S0.5 inventory and reservation integrity
+- Marketplace, delivery, payment, frontend, and controlled-medicine work
 
 ## CTO acceptance ledger
 
@@ -57,7 +64,7 @@ The supporting evidence is recorded in [the baseline audit](docs/audits/2026-07-
 1. **S0.1 Architecture and governance** — accepted and merged in PR #1
 2. **S0.2 Reproducible database baseline** — accepted and squash-merged in PR #2
 3. **S0.3 Authentication and trusted tenant context** — accepted and squash-merged in PR #3
-4. **S0.4 Tenant-safe RBAC and audit integration** — current (CTO architecture/design preparation; code not yet authorized)
+4. **S0.4 Tenant-safe RBAC and durable audit** — current (architecture accepted; implementation in progress)
 5. **S0.5 Inventory ledger and reservation integrity** — blocked by S0.4
 6. Reassess remaining Inventory and Compliance roadmap work
 

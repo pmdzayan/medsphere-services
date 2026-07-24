@@ -1,8 +1,8 @@
 # MedSphere AI Handoff
 
-**Last updated:** 2026-07-20
+**Last updated:** 2026-07-25
 
-**Current sprint:** S0.4 — Tenant-Safe RBAC and Audit Integration (CTO design preparation; code not yet authorized)
+**Current sprint:** S0.4 — Tenant-Safe RBAC and Durable Audit (implementation authorized)
 
 **Next feature work:** Blocked by S0.4
 
@@ -48,11 +48,28 @@ See `docs/audits/2026-07-20-cto-baseline.md` for the accepted baseline.
 
 ## Current S0.4 boundary
 
-- S0.3 is accepted and merged. S0.4 is the current sprint.
-- S0.4 code implementation is not yet authorized — ADR-004 and the S0.4 sprint contract must be accepted first.
-- S0.4 covers tenant-safe roles, permissions, assignments, authorization policy, and durable audit integration.
+- S0.3 is accepted and merged. Its documentation handoff is the verified branch
+  dependency for S0.4.
+- ADR-004 and the S0.4 sprint contract are accepted. S0.4 implementation is
+  authorized on `cto/s0.4-tenant-safe-rbac-durable-audit`.
+- S0.4 covers tenant-safe roles, permissions, membership assignments,
+  authorization policy, and durable append-only audit integration.
 - Inventory and reservation integrity remain S0.5.
-- The CTO owns ADR-004 and the S0.4 architecture design.
+- Marketplace, delivery, payment, frontend, and controlled-medicine work remain
+  blocked.
+- The CTO owns the S0.4 implementation and acceptance review.
+
+## S0.4 checkpoint state
+
+1. Architecture and sprint contract — completed locally
+2. Database schema and migration — in progress
+3. Authorization implementation — pending
+4. Durable audit and authentication integration — pending
+5. Infrastructure/security verification — pending
+6. Acceptance documentation and PR — pending
+
+If ownership transfers after a checkpoint, resume at the first pending item.
+Never restart from the oversized `cline/s0.4-rbac-audit` branch.
 
 ## Agent routing
 
