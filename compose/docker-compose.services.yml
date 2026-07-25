@@ -56,6 +56,8 @@ services:
           memory: 512M
 
   inventory-service:
+    profiles:
+      - unaccepted-prototypes
     image: medsphere-inventory-service:local
     container_name: medsphere-inventory-app
     restart: unless-stopped
@@ -70,6 +72,7 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER:?POSTGRES_USER is required}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/${POSTGRES_DB:?POSTGRES_DB is required}?schema=public
       REDIS_CLUSTER_URL: redis://:${REDIS_PASSWORD:?REDIS_PASSWORD is required}@redis:6379
       KAFKA_BROKERS: kafka:9092
+      ENABLE_UNACCEPTED_PROTOTYPE_SERVICES: 'true'
     networks:
       - medsphere-infra
       - medsphere-apps
@@ -80,6 +83,8 @@ services:
           memory: 512M
 
   reservation-service:
+    profiles:
+      - unaccepted-prototypes
     image: medsphere-reservation-service:local
     container_name: medsphere-reservation-app
     restart: unless-stopped
@@ -94,6 +99,7 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER:?POSTGRES_USER is required}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/${POSTGRES_DB:?POSTGRES_DB is required}?schema=public
       REDIS_CLUSTER_URL: redis://:${REDIS_PASSWORD:?REDIS_PASSWORD is required}@redis:6379
       KAFKA_BROKERS: kafka:9092
+      ENABLE_UNACCEPTED_PROTOTYPE_SERVICES: 'true'
     networks:
       - medsphere-infra
       - medsphere-apps
@@ -153,6 +159,8 @@ services:
           memory: 256M
 
   search-service:
+    profiles:
+      - unaccepted-prototypes
     image: medsphere-search-service:local
     container_name: medsphere-search-app
     restart: unless-stopped
@@ -166,6 +174,7 @@ services:
       PORT: 3000
       DATABASE_URL: postgresql://${POSTGRES_USER:?POSTGRES_USER is required}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/${POSTGRES_DB:?POSTGRES_DB is required}?schema=public
       REDIS_CLUSTER_URL: redis://:${REDIS_PASSWORD:?REDIS_PASSWORD is required}@redis:6379
+      ENABLE_UNACCEPTED_PROTOTYPE_SERVICES: 'true'
     networks:
       - medsphere-infra
       - medsphere-apps

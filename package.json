@@ -8,12 +8,19 @@
     "pnpm": ">=9.0.0"
   },
   "packageManager": "pnpm@9.15.0",
+  "pnpm": {
+    "overrides": {
+      "@nestjs/swagger>js-yaml": "5.2.2",
+      "express>qs": "6.15.3"
+    }
+  },
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev",
     "test": "turbo run test --concurrency=1",
     "test:cov": "turbo run test:cov --concurrency=1",
     "lint": "turbo run lint",
+    "audit:prod": "pnpm audit --prod --audit-level moderate",
     "db:validate": "pnpm --filter @medsphere/database prisma:validate",
     "db:deploy": "pnpm --filter @medsphere/database prisma:deploy",
     "db:status": "pnpm --filter @medsphere/database prisma:status",

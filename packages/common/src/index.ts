@@ -6,3 +6,5 @@ export * from './filters/global-exception.filter';
 export * from './auth/public-endpoint.decorator';
 export * from './health/health.controller';
 export * from './health/health.module';
+export * from './http/request-id';
+export * from './http/security-headers';

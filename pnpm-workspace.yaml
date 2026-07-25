@@ -1,3 +1,9 @@
 packages:
   - 'apps/*'
   - 'packages/*'
+
+# PNPM 10+ reads workspace settings here. The root package.json retains the
+# same overrides for the CI-pinned PNPM 9 line.
+overrides:
+  '@nestjs/swagger>js-yaml': 5.2.2
+  'express>qs': 6.15.3
