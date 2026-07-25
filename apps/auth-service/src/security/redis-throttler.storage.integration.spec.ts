@@ -22,7 +22,29 @@ describeRedisInfra('RedisThrottlerStorage integration', () => {
 
   it('atomically shares a fixed-window counter', async () => {
     const key = `integration:${randomUUID()}`;
-    await expect(storage.increment(key, 60_000)).resolves.toMatchObject({ totalHits: 1 });
-    await expect(storage.increment(key, 60_000)).resolves.toMatchObject({ totalHits: 2 });
+    await expect(storage.increment(key, 60_000, 10, 60_000, 'integration')).resolves.toMatchObject({
+      totalHits: 1,
+      isBlocked: false,
+    });
+    await expect(storage.increment(key, 60_000, 10, 60_000, 'integration')).resolves.toMatchObject({
+      totalHits: 2,
+      isBlocked: false,
+    });
+  });
+
+  it('blocks atomically and does not increase a blocked counter', async () => {
+    const key = `integration:${randomUUID()}`;
+    await expect(storage.increment(key, 60_000, 1, 60_000, 'integration')).resolves.toMatchObject({
+      totalHits: 1,
+      isBlocked: false,
+    });
+    await expect(storage.increment(key, 60_000, 1, 60_000, 'integration')).resolves.toMatchObject({
+      totalHits: 2,
+      isBlocked: true,
+    });
+    await expect(storage.increment(key, 60_000, 1, 60_000, 'integration')).resolves.toMatchObject({
+      totalHits: 2,
+      isBlocked: true,
+    });
   });
 });

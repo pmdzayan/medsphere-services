@@ -2,7 +2,7 @@
 
 **Sprints:** S0.3 and S0.4 accepted and merged; S0.5 architecture active
 
-**Decisions:** ADR-003, ADR-004, and ADR-005
+**Decisions:** ADR-003, ADR-004, ADR-005, and ADR-006
 
 **Status:** S0.4 accepted; S0.5 target not yet implemented; not production-approved
 
@@ -117,6 +117,9 @@ metadata before returning it.
 - Production bootstrap and HTTP-boundary tests call the same
   `configureAuthApplication` function so global filters, validation, and
   opt-in OpenAPI behavior cannot drift between runtime and test setup.
+- Every HTTP application installs shared security headers before routes.
+- Validation messages remain bounded strings, unsafe request IDs are dropped,
+  and server-side failure details are never returned.
 - Tenant slugs and email locators are trimmed and lowercased; passwords are never transformed.
 - Passwords allow Unicode and passphrases, with 15–128 character bounds while MFA is unavailable.
 - All external strings are bounded.
@@ -134,6 +137,9 @@ Redis-backed counters apply across instances. Health checks are excluded; other 
 | Refresh  | 30 per minute    | 10 per minute           |
 
 Generated storage keys contain route-scoped, domain-separated HMAC digests rather than raw emails, IP addresses, user IDs, passwords, refresh credentials, or authorization headers. Redis failure prevents the service from starting or authorizing an unmetered request.
+
+NestJS 11 supplies limit, window, block duration, and throttler name to the
+storage. Redis server time and one atomic script own counter and block state.
 
 Account rate-limit tracking canonicalizes tenant slugs and email addresses
 with the same trim-and-lowercase rule as the authentication DTOs. This is

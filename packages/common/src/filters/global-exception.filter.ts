@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { DomainException } from '../exceptions/domain.exception';
+import { normalizeRequestId } from '../http/request-id';
 
 export interface ErrorEnvelope {
   error: {
@@ -15,6 +16,39 @@ export interface ErrorEnvelope {
     message: string;
     requestId?: string;
   };
+}
+
+const MAX_CLIENT_ERROR_MESSAGE_LENGTH = 512;
+
+function boundedMessage(value: string, fallback: string): string {
+  const normalized = value.trim();
+  return (normalized || fallback).slice(0, MAX_CLIENT_ERROR_MESSAGE_LENGTH);
+}
+
+function normalizeHttpExceptionMessage(body: string | object, fallback: string): string {
+  if (typeof body === 'string') {
+    return boundedMessage(body, fallback);
+  }
+
+  const value = (body as Record<string, unknown>).message;
+  if (typeof value === 'string') {
+    return boundedMessage(value, fallback);
+  }
+
+  if (Array.isArray(value)) {
+    const messages = value.filter(
+      (item): item is string => typeof item === 'string' && item.trim().length > 0,
+    );
+    if (messages.length > 0) {
+      return boundedMessage(messages.join('; '), fallback);
+    }
+  }
+
+  return boundedMessage(fallback, 'Request failed.');
+}
+
+function isServerErrorStatus(status: number): boolean {
+  return Number.isInteger(status) && status >= 500 && status <= 599;
 }
 
 /**
@@ -33,27 +67,36 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
     const request = ctx.getRequest<Request>();
-    const requestId = request.headers?.['x-request-id'] as string | undefined;
+    const requestId = normalizeRequestId(request.headers?.['x-request-id']);
 
     let status: number = HttpStatus.INTERNAL_SERVER_ERROR;
     let envelope: ErrorEnvelope = {
       error: { code: 'INTERNAL_ERROR', message: 'Something went wrong.', requestId },
     };
 
-    if (exception instanceof DomainException) {
+    if (exception instanceof DomainException && exception.httpStatus < 500) {
       status = exception.httpStatus;
-      envelope = { error: { code: exception.code, message: exception.message, requestId } };
-    } else if (exception instanceof HttpException) {
+      envelope = {
+        error: {
+          code: exception.code,
+          message: boundedMessage(exception.message, 'Request failed.'),
+          requestId,
+        },
+      };
+    } else if (exception instanceof HttpException && exception.getStatus() < 500) {
       status = exception.getStatus();
       const body = exception.getResponse();
-      const message =
-        typeof body === 'string'
-          ? body
-          : (((body as Record<string, unknown>).message as string) ?? exception.message);
+      const message = normalizeHttpExceptionMessage(body, exception.message);
       envelope = { error: { code: exception.name, message, requestId } };
     } else {
-      // Unknown/unexpected error: full detail goes to the server-side log
-      // only. The client only ever sees the generic message above.
+      if (exception instanceof HttpException && isServerErrorStatus(exception.getStatus())) {
+        status = exception.getStatus();
+      } else if (
+        exception instanceof DomainException &&
+        isServerErrorStatus(exception.httpStatus)
+      ) {
+        status = exception.httpStatus;
+      }
       this.logger.error(exception instanceof Error ? exception.stack : String(exception));
     }
 

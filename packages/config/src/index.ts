@@ -17,3 +17,27 @@ export function loadEnv<T extends string>(required: readonly T[]): Record<T, str
     {} as Record<T, string>,
   );
 }
+
+interface RuntimeEnvironment {
+  readonly NODE_ENV?: string;
+  readonly ENABLE_UNACCEPTED_PROTOTYPE_SERVICES?: string;
+}
+
+export function assertUnacceptedPrototypeRuntimeAllowed(
+  serviceName: string,
+  environment: RuntimeEnvironment = process.env,
+): void {
+  if (environment.NODE_ENV === 'production') {
+    throw new Error(
+      `${serviceName} contains unaccepted prototype routes and cannot run in production`,
+    );
+  }
+  if (environment.NODE_ENV !== 'development') {
+    throw new Error(`${serviceName} prototype routes are available only in direct development`);
+  }
+  if (environment.ENABLE_UNACCEPTED_PROTOTYPE_SERVICES !== 'true') {
+    throw new Error(
+      `${serviceName} is disabled until its authenticated application boundary is accepted`,
+    );
+  }
+}

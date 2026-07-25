@@ -1,6 +1,6 @@
 import { INestApplication } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-import { GlobalExceptionFilter } from '@medsphere/common';
+import { configureHttpSecurityHeaders, GlobalExceptionFilter } from '@medsphere/common';
 import { createValidationPipe } from '@medsphere/validation';
 
 /**
@@ -9,6 +9,9 @@ import { createValidationPipe } from '@medsphere/validation';
  * validation, or OpenAPI configuration than the running service uses.
  */
 export function configureAuthApplication(app: INestApplication): void {
+  configureHttpSecurityHeaders(app, {
+    interactiveDocumentation: process.env.ENABLE_SWAGGER === 'true',
+  });
   app.useGlobalFilters(new GlobalExceptionFilter());
   app.useGlobalPipes(createValidationPipe());
 

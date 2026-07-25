@@ -4,9 +4,9 @@
 
 **Baseline commit:** `75e4d45855d5e99eab355c41a5e424bbda602a9b`
 
-**Accepted stabilization baseline:** `4ea55a17e188410ddee45fa3ea6c016e22d6617a`
+**Accepted stabilization baseline:** `5ffc36bf45b5fb2aea541b0920f650cc32fd1405`
 
-**Current remediation branch:** `cto/s0.5-inventory-reservation-integrity`
+**Current remediation branch:** `cto/s0.5-integrity-remediation`
 
 **Release state:** Not approved for production or real healthcare data
 
@@ -14,8 +14,8 @@
 
 ### Stabilization Sprint S0.5 — Inventory Ledger and Reservation Integrity
 
-**Status:** Architecture accepted; architecture checkpoint publication and CI
-pending
+**Status:** Architecture accepted and merged; ADR-006 runtime/security
+prerequisite CI-verified in PR #9 and awaiting merge
 
 **Dependency:** S0.4 Tenant-Safe RBAC and Durable Audit accepted and merged
 
@@ -79,7 +79,7 @@ The supporting evidence is recorded in [the baseline audit](docs/audits/2026-07-
 4. **S0.4 Tenant-safe RBAC and durable audit** — accepted and squash-merged in
    PR #7
 5. **S0.5 Inventory ledger and reservation integrity** — current; architecture
-   accepted, checkpoint publication and CI pending
+   accepted in PR #8; ADR-006 prerequisite under review
 6. Reassess remaining Inventory and Compliance roadmap work
 
 Only one recovery sprint may be active at a time. Exact boundaries may be refined through an ADR, but dependencies must not be skipped.
@@ -199,3 +199,28 @@ PR #7 was squash-merged into `feature/database-architecture` as
 
 S0.4 is accepted and closed. S0.5 may proceed under ADR-005 and its sprint
 contract. This is not production or legal-compliance approval.
+
+## ADR-006 runtime and security verification evidence
+
+ADR-006 is implemented on `cto/s0.5-integrity-remediation` at commit
+`a409f052f00224130da796db951d6afdbcaa0726`.
+
+| Check                                     | Result                                  |
+| ----------------------------------------- | --------------------------------------- |
+| Locked PNPM 9.15.0 installation           | Passed                                  |
+| Production dependency audit               | Passed — zero known vulnerabilities     |
+| Clean PostgreSQL 16 migration and drift   | Passed                                  |
+| Populated S0.3 to S0.4 upgrade safety     | Passed                                  |
+| Formatting                                | Passed                                  |
+| Lint                                      | Passed — 15/15 Turbo tasks              |
+| PostgreSQL and Redis infrastructure tests | Passed without local-only substitutions |
+| Tests                                     | Passed — 17/17 Turbo tasks              |
+| Build                                     | Passed — 15/15 Turbo tasks              |
+| Exact-commit pull-request workflow        | Passed                                  |
+
+Evidence: [PR #9](https://github.com/pmdzayan/medsphere-services/pull/9) and
+[workflow run 30147083613](https://github.com/pmdzayan/medsphere-services/actions/runs/30147083613).
+
+ADR-006 implementation and verification are CTO-accepted. S0.5 stock and
+reservation implementation remains blocked until PR #9 is squash-merged into
+`feature/database-architecture`.

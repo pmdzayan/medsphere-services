@@ -22,3 +22,4 @@ Every ADR includes decision, reason/context, alternatives, consequences, impleme
 | [ADR-003](0003-trusted-authentication-and-tenant-context.md)       | Trusted authentication and tenant context   | Accepted | 2026-07-20 |
 | [ADR-004](0004-tenant-safe-authorization-and-durable-audit.md)     | Tenant-safe authorization and durable audit | Accepted | 2026-07-25 |
 | [ADR-005](0005-batch-ledger-and-medicine-reservation-integrity.md) | Batch ledger and reservation integrity      | Accepted | 2026-07-25 |
+| [ADR-006](0006-supported-runtime-and-secure-http-baseline.md)      | Supported runtime and secure HTTP baseline  | Accepted | 2026-07-25 |

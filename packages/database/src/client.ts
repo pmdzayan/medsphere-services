@@ -6,10 +6,13 @@ declare global {
   var prisma: PrismaClient | undefined;
 }
 
+const queryLoggingEnabled =
+  process.env.NODE_ENV !== 'production' && process.env.ENABLE_PRISMA_QUERY_LOGGING === 'true';
+
 const prisma =
   global.prisma ??
   new PrismaClient({
-    log: process.env.NODE_ENV === 'production' ? ['warn', 'error'] : ['query', 'warn', 'error'],
+    log: queryLoggingEnabled ? ['query', 'warn', 'error'] : ['warn', 'error'],
   });
 
 if (process.env.NODE_ENV !== 'production') {

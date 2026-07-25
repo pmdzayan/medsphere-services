@@ -1,6 +1,6 @@
 # Volume 07 — Security Bible: Identity, Authorization, and Audit
 
-**Decisions:** ADR-003, ADR-004, and ADR-005
+**Decisions:** ADR-003, ADR-004, ADR-005, and ADR-006
 
 **Status:** S0.3 and S0.4 accepted and merged; S0.5 security target active
 
@@ -38,6 +38,10 @@
 20. Platform-scoped events are never returned through tenant audit APIs.
 21. Request identifiers and bounded network/client metadata are propagated for
     correlation without recording credentials or request bodies.
+22. Rejected prototype applications cannot start outside explicit development.
+23. HTTP security headers and safe error/request-ID handling are shared.
+24. Prisma query logging is default-off and forbidden in production.
+25. Moderate-or-higher production dependency advisories block acceptance.
 
 ## Required configuration
 

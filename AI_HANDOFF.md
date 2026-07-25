@@ -3,7 +3,8 @@
 **Last updated:** 2026-07-25
 
 **Current sprint:** S0.5 — Inventory Ledger and Medicine Reservation Integrity
-(architecture accepted; checkpoint publication and CI pending)
+(architecture accepted; ADR-006 runtime/security prerequisite CI-verified in
+PR #9 and awaiting merge)
 
 **Next feature work:** Blocked by S0.5
 
@@ -30,7 +31,9 @@ verification. ADR-003 defines global identity, explicit tenant membership,
 asymmetric access JWTs, opaque rotated refresh credentials, and deny-by-default
 authentication. ADR-004 defines tenant-safe authorization and durable audit.
 ADR-005 defines batch stock, the movement ledger, and medicine reservation
-integrity. The repository still contains seven NestJS applications sharing a
+integrity. ADR-006 defines the supported runtime, dependency audit, rejected
+prototype process gate, Redis throttle contract, security headers, safe error
+boundary, and query-logging policy. The repository still contains seven NestJS applications sharing a
 Prisma database. Do not treat those deployment boundaries as approved domain
 boundaries, and do not add another service.
 
@@ -89,14 +92,15 @@ See `docs/audits/2026-07-20-cto-baseline.md` for the accepted baseline.
 ## S0.5 checkpoint state
 
 1. Acceptance synchronization — completed
-2. Architecture and sprint contract — locally complete; publication and CI
-   pending
-3. Database schema and populated migration verification — pending
-4. Shared transaction and audit primitives — pending
-5. Stock model, ledger, FEFO, and availability — pending
-6. Medicine reservation hold lifecycle — pending
-7. Application boundary and accepted route inventory — pending
-8. Infrastructure evidence and CTO acceptance — pending
+2. Architecture and sprint contract — completed and merged in PR #8
+3. ADR-006 runtime/security prerequisite — implementation and CI verification
+   complete; PR #9 merge pending
+4. Database schema and populated migration verification — pending
+5. Shared transaction and audit primitives — pending
+6. Stock model, ledger, FEFO, and availability — pending
+7. Medicine reservation hold lifecycle — pending
+8. Application boundary and accepted route inventory — pending
+9. Infrastructure evidence and CTO acceptance — pending
 
 If ownership transfers, resume at the first pending checkpoint. Do not use
 `cline/s0.4-rbac-audit` or
@@ -104,10 +108,12 @@ If ownership transfers, resume at the first pending checkpoint. Do not use
 
 ## Exact continuation point
 
-Do not implement stock or reservation code until the S0.5 architecture
-checkpoint is published and reviewed. Then:
+Do not implement stock or reservation code until the CI-verified ADR-006
+prerequisite is squash-merged from PR #9. Then:
 
-1. design the Prisma target and forward migration from `4ea55a1`;
+1. continue from the resulting `feature/database-architecture` merge commit and
+   design the forward migration from the S0.4 schema state introduced by
+   `4ea55a1`;
 2. define populated upgrade and fail-closed corruption fixtures;
 3. extract focused transaction and audit primitives without copying S0.4 code;
 4. implement stock before medicine reservation;

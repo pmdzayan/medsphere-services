@@ -1,9 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import { request as httpRequest } from 'node:http';
 import { AddressInfo } from 'node:net';
-import { INestApplication } from '@nestjs/common';
+import { Controller, Get, HttpException, HttpStatus, INestApplication } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { Test, TestingModule } from '@nestjs/testing';
+import { DomainException, PublicEndpoint } from '@medsphere/common';
 
 import { AppModule } from './app.module';
 import { configureAuthApplication } from './app.bootstrap';
@@ -21,12 +22,35 @@ import { UsersService } from './users/users.service';
 interface ApiResponse {
   readonly status: number;
   readonly body: unknown;
+  readonly headers: Readonly<Record<string, string | string[] | undefined>>;
 }
 
 interface RequestOptions {
   readonly method?: 'GET' | 'POST' | 'PATCH';
   readonly headers?: Readonly<Record<string, string>>;
   readonly body?: unknown;
+}
+
+@Controller('__e2e/errors')
+@PublicEndpoint()
+class ErrorBoundaryTestController {
+  @Get('domain')
+  domainError(): never {
+    throw new DomainException('BOUNDED_CLIENT_ERROR', 'x'.repeat(800), HttpStatus.BAD_REQUEST);
+  }
+
+  @Get('server')
+  serverError(): never {
+    throw new HttpException(
+      'database connection detail must remain private',
+      HttpStatus.BAD_GATEWAY,
+    );
+  }
+
+  @Get('invalid-server-status')
+  invalidServerStatus(): never {
+    throw new HttpException('invalid status detail must remain private', 700);
+  }
 }
 
 describe('S0.4 authentication and authorization HTTP security boundary', () => {
@@ -47,7 +71,12 @@ describe('S0.4 authentication and authorization HTTP security boundary', () => {
     getPrivacy,
   } as unknown as UsersService;
   const rateLimitStorage = {
-    increment: jest.fn().mockResolvedValue({ totalHits: 1, timeToExpire: 60 }),
+    increment: jest.fn().mockResolvedValue({
+      totalHits: 1,
+      timeToExpire: 60,
+      isBlocked: false,
+      timeToBlockExpire: 0,
+    }),
   } as unknown as RedisThrottlerStorage;
   const hasAllPermissions = jest.fn();
   const listRoles = jest.fn();
@@ -80,7 +109,10 @@ describe('S0.4 authentication and authorization HTTP security boundary', () => {
     }
     process.env.ENABLE_SWAGGER = 'false';
 
-    module = await Test.createTestingModule({ imports: [AppModule] })
+    module = await Test.createTestingModule({
+      imports: [AppModule],
+      controllers: [ErrorBoundaryTestController],
+    })
       .overrideProvider(SessionRepository)
       .useValue(sessionRepository)
       .overrideProvider(UsersService)
@@ -137,10 +169,16 @@ describe('S0.4 authentication and authorization HTTP security boundary', () => {
   });
 
   it('keeps only accepted metadata and health endpoints public', async () => {
-    await expect(sendRequest('/health/live')).resolves.toMatchObject({
+    const health = await sendRequest('/health/live');
+    expect(health).toMatchObject({
       status: 200,
       body: { status: 'ok' },
     });
+    expect(health.headers).toMatchObject({
+      'content-security-policy': expect.any(String),
+      'x-content-type-options': 'nosniff',
+    });
+    expect(health.headers['x-powered-by']).toBeUndefined();
 
     const languages = await sendRequest('/localization/languages');
     expect(languages.status).toBe(200);
@@ -158,13 +196,24 @@ describe('S0.4 authentication and authorization HTTP security boundary', () => {
       method: 'POST',
       body: {},
     });
-    expect(publicLoginBoundary.status).toBe(400);
+    expect(publicLoginBoundary).toMatchObject({
+      status: 400,
+      body: {
+        error: {
+          code: 'BadRequestException',
+          message: expect.any(String),
+        },
+      },
+    });
+    expect(typeof (publicLoginBoundary.body as { error: { message: unknown } }).error.message).toBe(
+      'string',
+    );
   });
 
   it('denies a protected route without a bearer token using the shared error envelope', async () => {
     const response = await sendRequest('/users/me/privacy');
 
-    expect(response).toEqual({
+    expect(response).toMatchObject({
       status: 401,
       body: {
         error: {
@@ -174,6 +223,67 @@ describe('S0.4 authentication and authorization HTTP security boundary', () => {
       },
     });
     expect(getPrivacy).not.toHaveBeenCalled();
+  });
+
+  it('echoes only bounded, log-safe request identifiers in error envelopes', async () => {
+    await expect(
+      sendRequest('/users/me/privacy', {
+        headers: { 'x-request-id': 'gateway:request-123' },
+      }),
+    ).resolves.toMatchObject({
+      status: 401,
+      body: { error: { requestId: 'gateway:request-123' } },
+    });
+
+    const unsafe = await sendRequest('/users/me/privacy', {
+      headers: { 'x-request-id': 'patient@example.test' },
+    });
+    expect(unsafe.status).toBe(401);
+    expect(unsafe.body).not.toEqual(
+      expect.objectContaining({
+        error: expect.objectContaining({ requestId: expect.anything() }),
+      }),
+    );
+  });
+
+  it('never exposes server-side exception detail through the HTTP boundary', async () => {
+    await expect(
+      sendRequest('/__e2e/errors/server', {
+        headers: { 'x-request-id': 'gateway:error-123' },
+      }),
+    ).resolves.toMatchObject({
+      status: 502,
+      body: {
+        error: {
+          code: 'INTERNAL_ERROR',
+          message: 'Something went wrong.',
+          requestId: 'gateway:error-123',
+        },
+      },
+    });
+
+    await expect(sendRequest('/__e2e/errors/invalid-server-status')).resolves.toMatchObject({
+      status: 500,
+      body: {
+        error: {
+          code: 'INTERNAL_ERROR',
+          message: 'Something went wrong.',
+        },
+      },
+    });
+  });
+
+  it('bounds accepted client-facing domain error messages', async () => {
+    const response = await sendRequest('/__e2e/errors/domain');
+
+    expect(response.status).toBe(400);
+    expect(response.body).toMatchObject({
+      error: {
+        code: 'BOUNDED_CLIENT_ERROR',
+        message: expect.any(String),
+      },
+    });
+    expect((response.body as { error: { message: string } }).error.message).toHaveLength(512);
   });
 
   it('rejects an algorithm-substitution token before trusted-identity lookup', async () => {
@@ -465,6 +575,7 @@ describe('S0.4 authentication and authorization HTTP security boundary', () => {
             resolve({
               status: response.statusCode ?? 0,
               body: rawBody ? (JSON.parse(rawBody) as unknown) : undefined,
+              headers: response.headers,
             });
           });
         },

@@ -121,14 +121,15 @@ This evidence satisfied the S0.4 technical acceptance rule. Final workflow
 The pull-request workflow must:
 
 1. install the locked dependency graph with PNPM 9.15.0;
-2. start PostgreSQL 16 and Redis 7;
-3. set `RUN_AUTH_INFRASTRUCTURE_TESTS=true`;
-4. run `pnpm db:verify`;
-5. run `pnpm db:verify-upgrade`;
-6. run `pnpm format:check`;
-7. run `pnpm lint`;
-8. run `pnpm test`;
-9. run `pnpm build`.
+2. run `pnpm audit:prod`;
+3. start PostgreSQL 16 and Redis 7;
+4. set `RUN_AUTH_INFRASTRUCTURE_TESTS=true`;
+5. run `pnpm db:verify`;
+6. run `pnpm db:verify-upgrade`;
+7. run `pnpm format:check`;
+8. run `pnpm lint`;
+9. run `pnpm test`;
+10. run `pnpm build`.
 
 Any skipped infrastructure suite, migration drift, flaky concurrency result,
 lint warning promoted to error, test failure, or build failure blocks
