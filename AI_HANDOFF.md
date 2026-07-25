@@ -3,7 +3,8 @@
 **Last updated:** 2026-07-25
 
 **Current sprint:** S0.5 — Inventory Ledger and Medicine Reservation Integrity
-(architecture accepted; ADR-006 runtime/security prerequisite awaiting CI)
+(architecture accepted; ADR-006 runtime/security prerequisite CI-verified in
+PR #9 and awaiting merge)
 
 **Next feature work:** Blocked by S0.5
 
@@ -92,7 +93,8 @@ See `docs/audits/2026-07-20-cto-baseline.md` for the accepted baseline.
 
 1. Acceptance synchronization — completed
 2. Architecture and sprint contract — completed and merged in PR #8
-3. ADR-006 runtime/security prerequisite — implementation complete; CI pending
+3. ADR-006 runtime/security prerequisite — implementation and CI verification
+   complete; PR #9 merge pending
 4. Database schema and populated migration verification — pending
 5. Shared transaction and audit primitives — pending
 6. Stock model, ledger, FEFO, and availability — pending
@@ -106,11 +108,12 @@ If ownership transfers, resume at the first pending checkpoint. Do not use
 
 ## Exact continuation point
 
-Do not implement stock or reservation code until the ADR-006 prerequisite
-passes pull-request CI and CTO review. Then:
+Do not implement stock or reservation code until the CI-verified ADR-006
+prerequisite is squash-merged from PR #9. Then:
 
-1. continue from accepted repository base `5ffc36b` and design the forward
-   migration from the S0.4 schema state introduced by `4ea55a1`;
+1. continue from the resulting `feature/database-architecture` merge commit and
+   design the forward migration from the S0.4 schema state introduced by
+   `4ea55a1`;
 2. define populated upgrade and fail-closed corruption fixtures;
 3. extract focused transaction and audit primitives without copying S0.4 code;
 4. implement stock before medicine reservation;
