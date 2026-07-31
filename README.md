@@ -4,6 +4,103 @@ MedSphere is a planned multi-tenant healthcare ecosystem for patients, pharmacie
 
 > **Current status: stabilization prototype.** This repository is not approved for production deployment or for real patient, prescription, identity, or medicine-inventory data. See [PROJECT_STATUS.md](PROJECT_STATUS.md) before making changes.
 
+## Verified project progress
+
+**Status date:** 2026-08-01
+
+**Evidence baseline:** `6f61e1d` on `cto/frontend-foundation`
+
+**Full-roadmap estimate:** **30% complete / 70% remaining**
+
+This is an engineering progress estimate against the complete MedSphere roadmap,
+including stabilization, healthcare-domain workflows, frontend applications,
+production operations, and planned Gates 10–20. It is not a release-readiness,
+regulatory-compliance, or legal-approval percentage. Placeholder services, Prisma
+models without accepted workflows, preview data, and unmounted routes do not count
+as completed modules.
+
+The estimate is weighted by roadmap scope rather than averaged from the table
+below. Most of the product value sits in healthcare workflows that have not yet
+been built, so a strong foundation does not make the overall platform nearly
+finished.
+
+| Area                                                             | Verified state                                                                                                                                                                       | Estimated completion |
+| ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------: |
+| Architecture, governance, monorepo, and database baseline        | ADR process, PNPM/Turbo tooling, shared packages, forward migrations, drift checks, and CI gates exist                                                                               |                  85% |
+| Authentication, tenant context, RBAC, and durable audit          | S0.3 and S0.4 accepted; authenticated frontend, role administration, effective permissions, and audit workspace implemented                                                          |                  85% |
+| Inventory ledger and medicine reservation integrity              | S0.5 schema, migration, stock ledger, FEFO, reservation aggregate, lifecycle services, and tests implemented; accepted production HTTP boundary and live frontend integration remain |                  65% |
+| Frontend                                                         | Landing, login, responsive shell, team/RBAC, and audit are connected; pharmacy dashboard and inventory remain previews; most healthcare modules are absent                           |                  32% |
+| Compliance beyond RBAC and audit                                 | Consent, privacy operations, verification, retention, legal hold, and policy enforcement remain incomplete                                                                           |                  10% |
+| Supplier, procurement, pharmacy, billing, and delivery workflows | Existing deployables are mostly health-only placeholders or unaccepted prototypes                                                                                                    |                   5% |
+| Hospital, doctor, laboratory, patient, and clinical journeys     | Some schema foundations exist, but accepted end-to-end application workflows are not implemented                                                                                     |                   2% |
+| Production operations and release readiness                      | Pull-request quality gates and a deployment freeze exist; deployment, observability, backup/restore, disaster recovery, performance evidence, and operational acceptance remain      |                  10% |
+| Gates 10–20 and AI/network expansion                             | Planned but not implemented as accepted product capabilities                                                                                                                         |                   0% |
+
+### Substantially completed and verified foundations
+
+- S0.1 architecture and repository governance.
+- S0.2 reproducible PostgreSQL migration baseline.
+- S0.3 authentication, trusted tenant context, refresh rotation, replay
+  protection, and rate limiting.
+- S0.4 tenant-safe authorization and append-only durable audit.
+- S0.5 inventory-ledger and medicine-reservation integrity implementation on
+  the current feature history, including the forward migration and domain
+  tests. Final pull-request acceptance and live product exposure remain open.
+- Premium frontend foundation: public landing page, login, authenticated and
+  responsive application shell, and pharmacy operations visual language.
+- Connected frontend administration: team membership, role lifecycle, role
+  assignment, effective-permission behavior, and tenant audit evidence.
+- Latest Task 10 local gates: formatting passed, lint 16/16, tests 19/19,
+  builds 16/16, and web tests 59/59. Infrastructure-dependent suites require
+  CI evidence on the exact remote commit.
+
+### Remaining work
+
+1. **Close stabilization acceptance:** pass CI and merge the combined S0.5 and
+   frontend pull request; synchronize `PROJECT_STATUS.md`, sprint evidence, and
+   accepted branch references.
+2. **Expose accepted inventory operations:** add the reviewed HTTP controllers,
+   DTOs, Swagger contracts, permissions, tenant isolation, idempotency, and
+   integration tests; replace inventory and pharmacy preview data with live
+   read models and mutations.
+3. **Complete inventory operations:** expiry management, transfers, damaged
+   stock, returns, recalls/quarantine, operational analytics, and production
+   worker behavior where accepted by dedicated sprints.
+4. **Complete reservation operations:** staff reservation creation, lifecycle,
+   expiry processing, fulfilment UI, and later patient-safe exposure. Delivery
+   and payment must remain separate bounded sprints.
+5. **Finish the compliance foundation:** consent management, provider
+   verification, privacy center, retention, legal hold, and policy engine.
+6. **Build supplier and procurement:** supplier profiles, verification,
+   purchase orders, approval, goods receipt, batch capture, and procurement
+   dashboards.
+7. **Build complete pharmacy workflows:** catalog operations, dispensing,
+   sales, invoices, reports, staff operations, and analytics.
+8. **Build hospital, doctor, laboratory, and patient journeys:** departments,
+   beds, schedules, appointments, encounters, SOAP notes, prescriptions,
+   orders, samples, reports, consent-aware records, and role-specific
+   dashboards.
+9. **Build platform services:** billing and insurance, notifications,
+   documents and signatures, workflow approvals, reporting, exports, feature
+   flags, settings, and analytics. The current billing and notification apps
+   are health-only scaffolds, not finished services.
+10. **Finish cross-cutting frontend quality:** live API integration for every
+    accepted module, accessibility verification, dark mode, PWA/offline rules,
+    responsive device testing, and browser end-to-end coverage.
+11. **Implement planned Gates 10–20:** universal inventory migration, medicine
+    marketplace, hospital discovery, live healthcare availability,
+    appointments and queues, laboratory information system, radiology/PACS,
+    governed clinical decision support, patient mobile app, analytics, and the
+    national healthcare network.
+12. **Earn production release approval:** secure deployment environments,
+    secrets management, observability, alerting, backups, restore tests,
+    disaster recovery, performance/load testing, penetration testing,
+    operational runbooks, and compliance-control review.
+
+The percentage must be revised only when repository evidence and milestone
+acceptance change. Adding files, models, disabled navigation, or preview screens
+does not by itself increase completion.
+
 ## Version 1 architecture
 
 MedSphere Version 1 is being consolidated into a **modular monolith** with explicit bounded modules and future service-extraction seams. The current repository still contains multiple service applications that share one database; they are migration inputs, not the approved target architecture.
