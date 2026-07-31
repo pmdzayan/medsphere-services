@@ -12,10 +12,7 @@
     "@nestjs/common": "^11.1.28",
     "@nestjs/core": "^11.1.28",
     "@nestjs/platform-express": "^11.1.28",
-    "kafkajs": "^2.2.4",
     "@medsphere/common": "workspace:*",
-    "@medsphere/config": "workspace:*",
-    "@medsphere/database": "workspace:*",
     "@medsphere/logger": "workspace:*",
     "@medsphere/validation": "workspace:*"
   },
