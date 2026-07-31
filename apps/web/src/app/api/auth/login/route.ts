@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import type { LoginRequest, LoginResponse } from '@/lib/auth-contract';
 import { normalizeTenantSlug, validateLoginRequest } from '@/lib/auth-contract';
+import { setSessionCookies } from '@/lib/session-cookies';
 
 const authApiUrl = process.env.AUTH_API_URL ?? 'http://localhost:3000';
 
@@ -70,19 +71,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     user: session.user,
     context: session.context,
   });
-  const secure = process.env.NODE_ENV === 'production';
-  response.cookies.set('medsphere_access', session.accessToken, {
-    httpOnly: true,
-    secure,
-    sameSite: 'lax',
-    path: '/',
-    maxAge: session.expiresIn,
-  });
-  response.cookies.set('medsphere_refresh', session.refreshToken, {
-    httpOnly: true,
-    secure,
-    sameSite: 'strict',
-    path: '/api/auth',
+  setSessionCookies(response, session, {
+    tenantSlug: normalized.tenantSlug,
+    expiresIn: session.expiresIn,
+    user: session.user,
+    context: session.context,
   });
   return response;
 }

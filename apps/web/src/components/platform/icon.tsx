@@ -13,13 +13,16 @@ export type IconName =
   | 'filter'
   | 'help'
   | 'inventory'
+  | 'key'
   | 'menu'
   | 'more'
   | 'plus'
   | 'reservations'
+  | 'refresh'
   | 'scan'
   | 'search'
   | 'settings'
+  | 'shield'
   | 'team'
   | 'trend'
   | 'warning';
@@ -101,6 +104,12 @@ const iconPaths: Record<IconName, ReactNode> = {
       <path d="m4 7 8 4 8-4v10l-8 4-8-4zM12 11v10" />
     </>
   ),
+  key: (
+    <>
+      <circle cx="8" cy="15" r="4" />
+      <path d="m11 12 9-9M16 7l3 3M14 9l3 3" />
+    </>
+  ),
   menu: <path d="M4 7h16M4 12h16M4 17h16" />,
   more: (
     <>
@@ -114,6 +123,13 @@ const iconPaths: Record<IconName, ReactNode> = {
     <>
       <rect x="3" y="5" width="18" height="16" rx="2" />
       <path d="M8 3v4M16 3v4M3 10h18M8 15h3" />
+    </>
+  ),
+  refresh: (
+    <>
+      <path d="M20 7v5h-5" />
+      <path d="M4 17v-5h5" />
+      <path d="M6.1 8a7 7 0 0 1 11.5-2.1L20 8M4 16l2.4 2.1A7 7 0 0 0 17.9 16" />
     </>
   ),
   scan: (
@@ -132,6 +148,12 @@ const iconPaths: Record<IconName, ReactNode> = {
     <>
       <circle cx="12" cy="12" r="3" />
       <path d="M19.4 15a1.8 1.8 0 0 0 .4 2l.1.1-2.8 2.8-.1-.1a1.8 1.8 0 0 0-2-.4 1.8 1.8 0 0 0-1.1 1.7V21h-4v-.1A1.8 1.8 0 0 0 8.8 19a1.8 1.8 0 0 0-2 .4l-.1.1-2.8-2.8.1-.1a1.8 1.8 0 0 0 .4-2 1.8 1.8 0 0 0-1.7-1.1H2v-4h.7a1.8 1.8 0 0 0 1.7-1.1 1.8 1.8 0 0 0-.4-2l-.1-.1 2.8-2.8.1.1a1.8 1.8 0 0 0 2 .4A1.8 1.8 0 0 0 9.9 2.3V2h4v.3A1.8 1.8 0 0 0 15 4a1.8 1.8 0 0 0 2-.4l.1-.1 2.8 2.8-.1.1a1.8 1.8 0 0 0-.4 2 1.8 1.8 0 0 0 1.7 1.1h.9v4h-.9a1.8 1.8 0 0 0-1.7 1.5Z" />
+    </>
+  ),
+  shield: (
+    <>
+      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z" />
+      <path d="m9 12 2 2 4-4" />
     </>
   ),
   team: (

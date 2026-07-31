@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { normalizeTenantSlug, validateLoginRequest } from './auth-contract';
+import { isTokenResponse, normalizeTenantSlug, validateLoginRequest } from './auth-contract';
 
 describe('accepted login contract', () => {
   it('normalizes the tenant locator without inventing a tenant identity', () => {
@@ -28,5 +28,16 @@ describe('accepted login contract', () => {
       email: expect.any(String),
       password: expect.any(String),
     });
+  });
+
+  it('validates rotated credential responses without accepting partial tokens', () => {
+    expect(
+      isTokenResponse({
+        accessToken: 'new-access',
+        refreshToken: 'new-refresh',
+        expiresIn: 900,
+      }),
+    ).toBe(true);
+    expect(isTokenResponse({ accessToken: 'new-access', expiresIn: 900 })).toBe(false);
   });
 });

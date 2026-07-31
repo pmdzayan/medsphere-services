@@ -1,12 +1,14 @@
 'use client';
 
 import { FormEvent, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { login } from '@/lib/api-client';
 import { normalizeTenantSlug, validateLoginRequest } from '@/lib/auth-contract';
 
 type Fields = 'tenantSlug' | 'email' | 'password';
 
 export function LoginForm() {
+  const router = useRouter();
   const [errors, setErrors] = useState<Partial<Record<Fields | 'form', string>>>({});
   const [pending, setPending] = useState(false);
 
@@ -30,7 +32,8 @@ export function LoginForm() {
     setErrors({});
     try {
       await login(request);
-      setErrors({ form: 'Signed in securely. Your workspace is being prepared.' });
+      router.replace('/dashboard');
+      router.refresh();
     } catch (error) {
       setErrors({ form: error instanceof Error ? error.message : 'Sign-in failed.' });
     } finally {
@@ -64,8 +67,8 @@ export function LoginForm() {
       />
       {errors.form ? (
         <p
-          className="rounded-xl border border-[#10201c]/[.08] bg-[#f3f1e9] px-4 py-3 text-sm text-[#50605b]"
-          role="status"
+          className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
+          role="alert"
         >
           {errors.form}
         </p>

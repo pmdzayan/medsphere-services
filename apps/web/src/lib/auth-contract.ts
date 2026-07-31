@@ -22,7 +22,29 @@ export interface LoginResponse {
   };
 }
 
+export interface TokenResponse {
+  accessToken: string;
+  refreshToken: string;
+  expiresIn: number;
+}
+
 export type AuthenticatedSession = Omit<LoginResponse, 'accessToken' | 'refreshToken'>;
+
+export function isTokenResponse(value: unknown): value is TokenResponse {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+  const candidate = value as Partial<TokenResponse>;
+  return (
+    typeof candidate.accessToken === 'string' &&
+    candidate.accessToken.length > 0 &&
+    typeof candidate.refreshToken === 'string' &&
+    candidate.refreshToken.length > 0 &&
+    typeof candidate.expiresIn === 'number' &&
+    Number.isSafeInteger(candidate.expiresIn) &&
+    candidate.expiresIn > 0
+  );
+}
 
 export function normalizeTenantSlug(value: string): string {
   return value.trim().toLowerCase();

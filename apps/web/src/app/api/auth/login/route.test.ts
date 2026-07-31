@@ -51,6 +51,7 @@ describe('login session boundary', () => {
     expect(body).not.toHaveProperty('accessToken');
     expect(body).not.toHaveProperty('refreshToken');
     expect(response.headers.getSetCookie().join(';')).toContain('HttpOnly');
+    expect(response.headers.getSetCookie().join(';')).toContain('medsphere_profile=');
   });
 
   it('returns a bounded error when authentication is unavailable', async () => {

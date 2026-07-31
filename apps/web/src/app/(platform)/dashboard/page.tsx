@@ -118,7 +118,7 @@ export default function DashboardPage() {
             </span>
           </div>
           <h1 className="mt-3 font-[var(--font-display)] text-3xl font-bold tracking-[-.045em] text-[#10271f] sm:text-[2.45rem]">
-            Good morning, Aisha
+            Operations overview
           </h1>
           <p className="mt-2 text-sm text-[#71817c]">
             {formattedDate} · Here is today&apos;s operating picture.
