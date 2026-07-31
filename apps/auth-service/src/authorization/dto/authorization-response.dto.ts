@@ -11,6 +11,11 @@ export class PermissionResponseDto {
   description!: string;
 }
 
+export class EffectivePermissionsResponseDto {
+  @ApiProperty({ type: [String] })
+  permissionKeys!: string[];
+}
+
 export class RoleResponseDto {
   @ApiProperty({ format: 'uuid' })
   id!: string;

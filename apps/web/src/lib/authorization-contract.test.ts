@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+  hasAuthorizationPermission,
   isAuthorizationCatalogue,
+  isEffectivePermissionsResponse,
   isMembershipCatalogue,
   normalizeRoleName,
   validateCreateRole,
@@ -63,9 +65,29 @@ describe('authorization contract', () => {
           },
         ],
         total: 1,
+        effectivePermissions: ['authorization.roles.read'],
       }),
     ).toBe(true);
     expect(isAuthorizationCatalogue({ roles: [], permissions: [], total: -1 })).toBe(false);
+  });
+
+  it('accepts only unique permission keys from the reviewed authorization vocabulary', () => {
+    const effective = { permissionKeys: ['authorization.roles.read'] } as const;
+    expect(isEffectivePermissionsResponse(effective)).toBe(true);
+    expect(
+      hasAuthorizationPermission(
+        { effectivePermissions: ['authorization.roles.read'] },
+        'authorization.roles.read',
+      ),
+    ).toBe(true);
+    expect(isEffectivePermissionsResponse({ permissionKeys: ['unreviewed.permission'] })).toBe(
+      false,
+    );
+    expect(
+      isEffectivePermissionsResponse({
+        permissionKeys: ['authorization.roles.read', 'authorization.roles.read'],
+      }),
+    ).toBe(false);
   });
 
   it('validates the tenant membership directory contract', () => {

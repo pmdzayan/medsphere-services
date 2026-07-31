@@ -16,6 +16,7 @@ import { CreateRoleDto } from './dto/create-role.dto';
 import { UpdateRoleDto } from './dto/update-role.dto';
 import {
   AssignmentResponseDto,
+  EffectivePermissionsResponseDto,
   MembershipListResponseDto,
   RoleListResponseDto,
   RoleResponseDto,
@@ -36,6 +37,13 @@ export class AuthorizationService {
     const permissions = await this.repository.findEffectivePermissions(identity);
     const effective = new Set<PermissionKey>(permissions);
     return requiredPermissions.every((permission) => effective.has(permission));
+  }
+
+  async listEffectivePermissions(
+    identity: AuthenticatedIdentity,
+  ): Promise<EffectivePermissionsResponseDto> {
+    const permissionKeys = await this.repository.findEffectivePermissions(identity);
+    return { permissionKeys: [...new Set(permissionKeys)].sort() };
   }
 
   listPermissions() {

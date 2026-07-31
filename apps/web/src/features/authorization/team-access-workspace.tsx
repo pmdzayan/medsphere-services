@@ -6,6 +6,8 @@ import { SectionCard, StatusBadge } from '@/components/platform/dashboard-primit
 import { ApiError, createRole, getAuthorizationCatalogue } from '@/lib/api-client';
 import { MembershipDirectory, RoleEditorPanel } from './role-lifecycle-panels';
 import {
+  AUTHORIZATION_PERMISSIONS,
+  hasAuthorizationPermission,
   normalizeRoleName,
   validateCreateRole,
   type AuthorizationCatalogue,
@@ -25,6 +27,32 @@ export function TeamAccessWorkspace() {
   const [filter, setFilter] = useState<RoleFilter>('ALL');
   const [createOpen, setCreateOpen] = useState(false);
   const [editingRole, setEditingRole] = useState<Role | null>(null);
+
+  const canReadRoles = Boolean(
+    catalogue && hasAuthorizationPermission(catalogue, AUTHORIZATION_PERMISSIONS.rolesRead),
+  );
+  const canReadPermissions = Boolean(
+    catalogue && hasAuthorizationPermission(catalogue, AUTHORIZATION_PERMISSIONS.permissionsRead),
+  );
+  const canCreateRoles = Boolean(
+    catalogue &&
+    canReadPermissions &&
+    hasAuthorizationPermission(catalogue, AUTHORIZATION_PERMISSIONS.rolesCreate),
+  );
+  const canUpdateRoles = Boolean(
+    catalogue && hasAuthorizationPermission(catalogue, AUTHORIZATION_PERMISSIONS.rolesUpdate),
+  );
+  const canDeleteRoles = Boolean(
+    catalogue && hasAuthorizationPermission(catalogue, AUTHORIZATION_PERMISSIONS.rolesDelete),
+  );
+  const canReadAssignments = Boolean(
+    catalogue && hasAuthorizationPermission(catalogue, AUTHORIZATION_PERMISSIONS.assignmentsRead),
+  );
+  const canManageAssignments = Boolean(
+    catalogue &&
+    canReadRoles &&
+    hasAuthorizationPermission(catalogue, AUTHORIZATION_PERMISSIONS.assignmentsManage),
+  );
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -104,22 +132,25 @@ export function TeamAccessWorkspace() {
               <Icon name="refresh" className={`size-4 ${loading ? 'animate-spin' : ''}`} />
               Refresh
             </button>
-            <button
-              type="button"
-              onClick={() => setCreateOpen(true)}
-              disabled={!catalogue}
-              className="inline-flex items-center gap-2 rounded-xl bg-emerald-300 px-4 py-2.5 text-xs font-black text-[#08231d] shadow-[0_14px_28px_-16px_rgba(110,231,183,.75)] transition hover:-translate-y-0.5 hover:bg-emerald-200 disabled:cursor-not-allowed disabled:opacity-45"
-            >
-              <Icon name="plus" className="size-4" />
-              Create custom role
-            </button>
+            {canCreateRoles ? (
+              <button
+                type="button"
+                onClick={() => setCreateOpen(true)}
+                className="inline-flex items-center gap-2 rounded-xl bg-emerald-300 px-4 py-2.5 text-xs font-black text-[#08231d] shadow-[0_14px_28px_-16px_rgba(110,231,183,.75)] transition hover:-translate-y-0.5 hover:bg-emerald-200"
+              >
+                <Icon name="plus" className="size-4" />
+                Create custom role
+              </button>
+            ) : null}
           </div>
         </div>
       </header>
 
-      {catalogue ? <AccessMetrics catalogue={catalogue} /> : null}
+      {catalogue && canReadRoles ? (
+        <AccessMetrics catalogue={catalogue} canReadPermissions={canReadPermissions} />
+      ) : null}
 
-      {createOpen && catalogue ? (
+      {createOpen && catalogue && canCreateRoles ? (
         <CreateRolePanel
           permissions={catalogue.permissions}
           onCancel={() => setCreateOpen(false)}
@@ -127,10 +158,13 @@ export function TeamAccessWorkspace() {
         />
       ) : null}
 
-      {editingRole && catalogue ? (
+      {editingRole && catalogue && (canUpdateRoles || canDeleteRoles) ? (
         <RoleEditorPanel
           role={editingRole}
           permissions={catalogue.permissions}
+          canUpdate={canUpdateRoles}
+          canDelete={canDeleteRoles}
+          canReadPermissions={canReadPermissions}
           onCancel={() => setEditingRole(null)}
           onSaved={(role) => {
             setCatalogue((current) =>
@@ -168,58 +202,76 @@ export function TeamAccessWorkspace() {
               Tenant roles
             </h2>
           </div>
-          <div className="flex flex-col gap-2.5 sm:flex-row">
-            <label className="relative min-w-64">
-              <span className="sr-only">Search roles</span>
-              <Icon
-                name="search"
-                className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-[#82918c]"
-              />
-              <input
-                type="search"
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder="Search roles"
-                className="h-10 w-full rounded-xl border border-[#dbe4e0] bg-[#fbfcfb] pl-10 pr-3 text-xs text-[#18352c] placeholder:text-[#93a09c] focus:border-emerald-500"
-              />
-            </label>
-            <div className="flex rounded-xl border border-[#dbe4e0] bg-[#f7f9f8] p-1">
-              {(['ALL', 'SYSTEM', 'TENANT'] as const).map((value) => (
-                <button
-                  key={value}
-                  type="button"
-                  onClick={() => setFilter(value)}
-                  className={`rounded-lg px-3 py-2 text-[10px] font-extrabold transition ${
-                    filter === value
-                      ? 'bg-white text-emerald-800 shadow-sm'
-                      : 'text-[#7b8b85] hover:text-[#3e5b51]'
-                  }`}
-                >
-                  {value === 'ALL' ? 'All' : value === 'SYSTEM' ? 'System' : 'Custom'}
-                </button>
-              ))}
+          {canReadRoles ? (
+            <div className="flex flex-col gap-2.5 sm:flex-row">
+              <label className="relative min-w-64">
+                <span className="sr-only">Search roles</span>
+                <Icon
+                  name="search"
+                  className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-[#82918c]"
+                />
+                <input
+                  type="search"
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder="Search roles"
+                  className="h-10 w-full rounded-xl border border-[#dbe4e0] bg-[#fbfcfb] pl-10 pr-3 text-xs text-[#18352c] placeholder:text-[#93a09c] focus:border-emerald-500"
+                />
+              </label>
+              <div className="flex rounded-xl border border-[#dbe4e0] bg-[#f7f9f8] p-1">
+                {(['ALL', 'SYSTEM', 'TENANT'] as const).map((value) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => setFilter(value)}
+                    className={`rounded-lg px-3 py-2 text-[10px] font-extrabold transition ${
+                      filter === value
+                        ? 'bg-white text-emerald-800 shadow-sm'
+                        : 'text-[#7b8b85] hover:text-[#3e5b51]'
+                    }`}
+                  >
+                    {value === 'ALL' ? 'All' : value === 'SYSTEM' ? 'System' : 'Custom'}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          ) : null}
         </div>
 
         {loading && !catalogue ? <LoadingState /> : null}
         {error && !catalogue ? <ErrorState error={error} onRetry={load} /> : null}
-        {catalogue && visibleRoles.length > 0 ? (
-          <RoleTable roles={visibleRoles} onEdit={setEditingRole} />
+        {catalogue && !canReadRoles ? (
+          <AccessUnavailable message="Your current role cannot read the tenant role registry." />
         ) : null}
-        {catalogue && visibleRoles.length === 0 ? (
+        {catalogue && canReadRoles && visibleRoles.length > 0 ? (
+          <RoleTable
+            roles={visibleRoles}
+            onEdit={setEditingRole}
+            canUpdate={canUpdateRoles}
+            canDelete={canDeleteRoles}
+          />
+        ) : null}
+        {catalogue && canReadRoles && visibleRoles.length === 0 ? (
           <div className="px-6 py-16 text-center">
             <p className="text-sm font-bold text-[#28463c]">No matching roles</p>
             <p className="mt-2 text-xs text-[#7c8c86]">Adjust the search or role type filter.</p>
           </div>
         ) : null}
       </SectionCard>
-      {catalogue ? <MembershipDirectory roles={catalogue.roles} /> : null}
+      {catalogue && canReadAssignments ? (
+        <MembershipDirectory roles={catalogue.roles} canManage={canManageAssignments} />
+      ) : null}
     </div>
   );
 }
 
-function AccessMetrics({ catalogue }: { catalogue: AuthorizationCatalogue }) {
+function AccessMetrics({
+  catalogue,
+  canReadPermissions,
+}: {
+  catalogue: AuthorizationCatalogue;
+  canReadPermissions: boolean;
+}) {
   const systemRoles = catalogue.roles.filter((role) => role.type === 'SYSTEM').length;
   const customRoles = catalogue.roles.filter((role) => role.type === 'TENANT').length;
   const assignments = catalogue.roles.reduce((total, role) => total + role.assignmentCount, 0);
@@ -240,7 +292,9 @@ function AccessMetrics({ catalogue }: { catalogue: AuthorizationCatalogue }) {
     {
       label: 'Assignments',
       value: assignments,
-      detail: `${catalogue.permissions.length} permissions available`,
+      detail: canReadPermissions
+        ? `${catalogue.permissions.length} permissions available`
+        : 'Permission catalogue restricted',
       icon: 'trend' as const,
     },
   ];
@@ -269,7 +323,17 @@ function AccessMetrics({ catalogue }: { catalogue: AuthorizationCatalogue }) {
   );
 }
 
-function RoleTable({ roles, onEdit }: { roles: readonly Role[]; onEdit: (role: Role) => void }) {
+function RoleTable({
+  roles,
+  onEdit,
+  canUpdate,
+  canDelete,
+}: {
+  roles: readonly Role[];
+  onEdit: (role: Role) => void;
+  canUpdate: boolean;
+  canDelete: boolean;
+}) {
   return (
     <div className="overflow-x-auto">
       <table className="w-full min-w-[820px] border-collapse text-left">
@@ -328,14 +392,16 @@ function RoleTable({ roles, onEdit }: { roles: readonly Role[]; onEdit: (role: R
               </td>
               <td className="px-4 py-4 text-sm font-bold text-[#405a52]">{role.assignmentCount}</td>
               <td className="px-6 py-4 text-right">
-                {role.type === 'TENANT' ? (
+                {role.type === 'TENANT' && (canUpdate || canDelete) ? (
                   <button
                     type="button"
                     onClick={() => onEdit(role)}
                     className="rounded-xl border border-[#dbe4e0] bg-white px-3 py-2 text-[10px] font-bold text-emerald-800 hover:bg-emerald-50"
                   >
-                    Edit · v{role.version}
+                    Manage · v{role.version}
                   </button>
+                ) : role.type === 'TENANT' ? (
+                  <span className="text-[10px] font-semibold text-[#93a09c]">Read only</span>
                 ) : (
                   <span className="text-[10px] font-semibold text-[#93a09c]">Protected</span>
                 )}
@@ -344,6 +410,16 @@ function RoleTable({ roles, onEdit }: { roles: readonly Role[]; onEdit: (role: R
           ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+function AccessUnavailable({ message }: { message: string }) {
+  return (
+    <div className="px-6 py-14 text-center">
+      <Icon name="shield" className="mx-auto size-6 text-[#9aa7a2]" />
+      <p className="mt-3 text-sm font-bold text-[#28463c]">Limited access</p>
+      <p className="mt-2 text-xs text-[#7c8c86]">{message}</p>
     </div>
   );
 }

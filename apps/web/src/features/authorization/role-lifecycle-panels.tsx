@@ -15,17 +15,24 @@ import {
   type Membership,
   type Permission,
   type Role,
+  type UpdateRoleRequest,
 } from '@/lib/authorization-contract';
 
 export function RoleEditorPanel({
   role,
   permissions,
+  canUpdate,
+  canDelete,
+  canReadPermissions,
   onCancel,
   onSaved,
   onDeleted,
 }: {
   role: Role;
   permissions: readonly Permission[];
+  canUpdate: boolean;
+  canDelete: boolean;
+  canReadPermissions: boolean;
   onCancel: () => void;
   onSaved: (role: Role) => void;
   onDeleted: (roleId: string) => void;
@@ -39,14 +46,17 @@ export function RoleEditorPanel({
 
   async function save(event: FormEvent) {
     event.preventDefault();
-    const request = {
+    if (!canUpdate) return;
+    const editable = {
       name: normalizeRoleName(name),
       ...(description.trim() ? { description: description.trim() } : {}),
-      permissionKeys: selected,
     };
     const errors = validateCreateRole(
-      request,
-      permissions.map((permission) => permission.name),
+      {
+        ...editable,
+        permissionKeys: canReadPermissions ? selected : [],
+      },
+      canReadPermissions ? permissions.map((permission) => permission.name) : [],
     );
     if (Object.keys(errors).length) {
       setError(Object.values(errors)[0] ?? 'Invalid role.');
@@ -55,7 +65,12 @@ export function RoleEditorPanel({
     setPending(true);
     setError('');
     try {
-      onSaved(await updateRole(role.id, { ...request, version: role.version }));
+      const request: UpdateRoleRequest = {
+        ...editable,
+        ...(canReadPermissions ? { permissionKeys: selected } : {}),
+        version: role.version,
+      };
+      onSaved(await updateRole(role.id, request));
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : 'Unable to update role.');
     } finally {
@@ -89,7 +104,7 @@ export function RoleEditorPanel({
             <p className="text-[10px] font-extrabold uppercase tracking-[.18em] text-amber-700">
               Version-safe mutation · v{role.version}
             </p>
-            <h2 className="mt-1 text-xl font-bold text-[#173128]">Edit custom role</h2>
+            <h2 className="mt-1 text-xl font-bold text-[#173128]">Manage custom role</h2>
           </div>
           <button
             type="button"
@@ -106,6 +121,7 @@ export function RoleEditorPanel({
               Role name
               <input
                 value={name}
+                disabled={!canUpdate}
                 onChange={(event) => setName(event.target.value)}
                 onBlur={() => setName(normalizeRoleName(name))}
                 className="mt-2 w-full rounded-xl border border-[#dbe4e0] bg-[#fbfcfb] px-4 py-3 text-sm"
@@ -115,6 +131,7 @@ export function RoleEditorPanel({
               Description
               <textarea
                 value={description}
+                disabled={!canUpdate}
                 onChange={(event) => setDescription(event.target.value)}
                 maxLength={240}
                 rows={4}
@@ -122,35 +139,54 @@ export function RoleEditorPanel({
               />
             </label>
           </div>
-          <fieldset>
-            <legend className="text-xs font-bold text-[#435951]">
-              Permissions · {selected.length} selected
-            </legend>
-            <div className="mt-3 grid gap-2 sm:grid-cols-2">
-              {permissions.map((permission) => (
-                <label
-                  key={permission.id}
-                  className="flex gap-2 rounded-xl border border-[#e1e8e5] p-3 text-[10px]"
-                >
-                  <input
-                    type="checkbox"
-                    checked={selected.includes(permission.name)}
-                    onChange={(event) =>
-                      setSelected((current) =>
-                        event.target.checked
-                          ? [...current, permission.name]
-                          : current.filter((key) => key !== permission.name),
-                      )
-                    }
-                  />
-                  <span>
-                    <strong className="block font-mono text-[#315247]">{permission.name}</strong>
-                    <span className="mt-1 block text-[#85938e]">{permission.description}</span>
+          {canUpdate && canReadPermissions ? (
+            <fieldset>
+              <legend className="text-xs font-bold text-[#435951]">
+                Permissions · {selected.length} selected
+              </legend>
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                {permissions.map((permission) => (
+                  <label
+                    key={permission.id}
+                    className="flex gap-2 rounded-xl border border-[#e1e8e5] p-3 text-[10px]"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selected.includes(permission.name)}
+                      onChange={(event) =>
+                        setSelected((current) =>
+                          event.target.checked
+                            ? [...current, permission.name]
+                            : current.filter((key) => key !== permission.name),
+                        )
+                      }
+                    />
+                    <span>
+                      <strong className="block font-mono text-[#315247]">{permission.name}</strong>
+                      <span className="mt-1 block text-[#85938e]">{permission.description}</span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+          ) : (
+            <div>
+              <p className="text-xs font-bold text-[#435951]">Current permissions</p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {role.permissionKeys.map((permission) => (
+                  <span
+                    key={permission}
+                    className="rounded-lg bg-[#f0f5f3] px-2 py-1 font-mono text-[9px] text-[#4d685e]"
+                  >
+                    {permission}
                   </span>
-                </label>
-              ))}
+                ))}
+                {role.permissionKeys.length === 0 ? (
+                  <span className="text-xs text-[#8a9893]">No permissions assigned.</span>
+                ) : null}
+              </div>
             </div>
-          </fieldset>
+          )}
         </div>
         {error ? (
           <p
@@ -161,14 +197,18 @@ export function RoleEditorPanel({
           </p>
         ) : null}
         <div className="flex flex-wrap justify-between gap-3 border-t border-[#edf1ef] bg-[#fbfcfb] px-6 py-4">
-          <button
-            type="button"
-            disabled={pending}
-            onClick={() => void remove()}
-            className="rounded-xl border border-rose-200 px-4 py-2.5 text-xs font-bold text-rose-700"
-          >
-            {confirmDelete ? 'Confirm permanent removal' : 'Delete role'}
-          </button>
+          {canDelete ? (
+            <button
+              type="button"
+              disabled={pending}
+              onClick={() => void remove()}
+              className="rounded-xl border border-rose-200 px-4 py-2.5 text-xs font-bold text-rose-700"
+            >
+              {confirmDelete ? 'Confirm permanent removal' : 'Delete role'}
+            </button>
+          ) : (
+            <span />
+          )}
           <div className="flex gap-2">
             <button
               type="button"
@@ -177,13 +217,15 @@ export function RoleEditorPanel({
             >
               Cancel
             </button>
-            <button
-              type="submit"
-              disabled={pending}
-              className="rounded-xl bg-[#0b5f4b] px-5 py-2.5 text-xs font-bold text-white"
-            >
-              {pending ? 'Saving…' : 'Save changes'}
-            </button>
+            {canUpdate ? (
+              <button
+                type="submit"
+                disabled={pending}
+                className="rounded-xl bg-[#0b5f4b] px-5 py-2.5 text-xs font-bold text-white"
+              >
+                {pending ? 'Saving…' : 'Save changes'}
+              </button>
+            ) : null}
           </div>
         </div>
       </form>
@@ -191,7 +233,13 @@ export function RoleEditorPanel({
   );
 }
 
-export function MembershipDirectory({ roles }: { roles: readonly Role[] }) {
+export function MembershipDirectory({
+  roles,
+  canManage,
+}: {
+  roles: readonly Role[];
+  canManage: boolean;
+}) {
   const [members, setMembers] = useState<Membership[] | null>(null);
   const [selected, setSelected] = useState<Membership | null>(null);
   const [error, setError] = useState('');
@@ -279,30 +327,53 @@ export function MembershipDirectory({ roles }: { roles: readonly Role[] }) {
                   Manage {selected.firstName}&apos;s roles
                 </h3>
                 <p className="mt-1 text-xs text-[#85938f]">
-                  Changes are enforced and audited immediately.
+                  {canManage
+                    ? 'Changes are enforced and audited immediately.'
+                    : 'Your current role has read-only assignment access.'}
                 </p>
                 <div className="mt-4 space-y-2">
-                  {roles.map((role) => {
-                    const assigned = selected.roles.some((item) => item.id === role.id);
-                    const key = `${selected.id}:${role.id}`;
-                    return (
-                      <label
-                        key={role.id}
-                        className="flex items-center gap-3 rounded-xl border border-[#dfe7e3] bg-white p-3"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={assigned}
-                          disabled={pending === key || (selected.status !== 'ACTIVE' && !assigned)}
-                          onChange={(event) => void toggle(role, event.target.checked)}
-                        />
-                        <span className="flex-1 text-xs font-bold text-[#315247]">{role.name}</span>
-                        <span className="text-[9px] text-[#899691]">
-                          {role.type === 'SYSTEM' ? 'Protected role' : 'Custom'}
-                        </span>
-                      </label>
-                    );
-                  })}
+                  {canManage
+                    ? roles.map((role) => {
+                        const assigned = selected.roles.some((item) => item.id === role.id);
+                        const key = `${selected.id}:${role.id}`;
+                        return (
+                          <label
+                            key={role.id}
+                            className="flex items-center gap-3 rounded-xl border border-[#dfe7e3] bg-white p-3"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={assigned}
+                              disabled={
+                                pending === key || (selected.status !== 'ACTIVE' && !assigned)
+                              }
+                              onChange={(event) => void toggle(role, event.target.checked)}
+                            />
+                            <span className="flex-1 text-xs font-bold text-[#315247]">
+                              {role.name}
+                            </span>
+                            <span className="text-[9px] text-[#899691]">
+                              {role.type === 'SYSTEM' ? 'Protected role' : 'Custom'}
+                            </span>
+                          </label>
+                        );
+                      })
+                    : selected.roles.map((role) => (
+                        <div
+                          key={role.id}
+                          className="flex items-center gap-3 rounded-xl border border-[#dfe7e3] bg-white p-3"
+                        >
+                          <span className="flex-1 text-xs font-bold text-[#315247]">
+                            {role.name}
+                          </span>
+                          <span className="text-[9px] text-[#899691]">Assigned</span>
+                        </div>
+                      ))}
+                  {!canManage && selected.roles.length === 0 ? (
+                    <p className="rounded-xl border border-dashed border-[#dfe7e3] p-4 text-xs text-[#899691]">
+                      No roles assigned.
+                    </p>
+                  ) : null}
                 </div>
               </>
             ) : (

@@ -5,7 +5,11 @@ import {
   publicUpstreamStatus,
   upstreamHeaders,
 } from '@/lib/auth-api';
-import { isAuthorizationCatalogue } from '@/lib/authorization-contract';
+import {
+  AUTHORIZATION_PERMISSIONS,
+  isAuthorizationCatalogue,
+  isEffectivePermissionsResponse,
+} from '@/lib/authorization-contract';
 import { ACCESS_COOKIE } from '@/lib/session-profile';
 
 export const dynamic = 'force-dynamic';
@@ -16,40 +20,72 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     return noStore({ message: 'Your session has expired. Sign in again.' }, 401);
   }
 
-  let rolesResponse: Response;
-  let permissionsResponse: Response;
+  let effectiveResponse: Response;
   try {
-    [rolesResponse, permissionsResponse] = await Promise.all([
-      fetch(authApiUrl('/authorization/roles?limit=100&offset=0'), {
-        headers: upstreamHeaders(request, accessToken),
-        cache: 'no-store',
-      }),
-      fetch(authApiUrl('/authorization/permissions'), {
-        headers: upstreamHeaders(request, accessToken),
-        cache: 'no-store',
-      }),
-    ]);
+    effectiveResponse = await fetch(authApiUrl('/authorization/effective-permissions'), {
+      headers: upstreamHeaders(request, accessToken),
+      cache: 'no-store',
+    });
   } catch {
     return noStore({ message: 'Authorization service is unavailable.' }, 503);
   }
 
-  const failed = [rolesResponse, permissionsResponse].find((response) => !response.ok);
-  if (failed) {
-    const message = await boundedUpstreamMessage(failed, 'Unable to load access controls.');
-    return noStore({ message }, publicUpstreamStatus(failed.status));
+  if (!effectiveResponse.ok) {
+    const message = await boundedUpstreamMessage(
+      effectiveResponse,
+      'Unable to resolve your access controls.',
+    );
+    return noStore({ message }, publicUpstreamStatus(effectiveResponse.status));
   }
 
   try {
-    const rolesPayload: unknown = await rolesResponse.json();
-    const permissionsPayload: unknown = await permissionsResponse.json();
-    if (!rolesPayload || typeof rolesPayload !== 'object') {
-      throw new Error('Invalid role catalogue');
+    const effectivePayload: unknown = await effectiveResponse.json();
+    if (!isEffectivePermissionsResponse(effectivePayload)) {
+      throw new Error('Invalid effective permissions');
     }
+
+    const effective = new Set(effectivePayload.permissionKeys);
+    let rolesResponse: Response | null;
+    let permissionsResponse: Response | null;
+    try {
+      [rolesResponse, permissionsResponse] = await Promise.all([
+        effective.has(AUTHORIZATION_PERMISSIONS.rolesRead)
+          ? fetch(authApiUrl('/authorization/roles?limit=100&offset=0'), {
+              headers: upstreamHeaders(request, accessToken),
+              cache: 'no-store',
+            })
+          : Promise.resolve(null),
+        effective.has(AUTHORIZATION_PERMISSIONS.permissionsRead)
+          ? fetch(authApiUrl('/authorization/permissions'), {
+              headers: upstreamHeaders(request, accessToken),
+              cache: 'no-store',
+            })
+          : Promise.resolve(null),
+      ]);
+    } catch {
+      return noStore({ message: 'Authorization service is unavailable.' }, 503);
+    }
+
+    const failed = [rolesResponse, permissionsResponse].find(
+      (response): response is Response => response !== null && !response.ok,
+    );
+    if (failed) {
+      const message = await boundedUpstreamMessage(failed, 'Unable to load access controls.');
+      return noStore({ message }, publicUpstreamStatus(failed.status));
+    }
+
+    const rolesPayload: unknown = rolesResponse
+      ? await rolesResponse.json()
+      : { data: [], total: 0 };
+    const permissionsPayload: unknown = permissionsResponse ? await permissionsResponse.json() : [];
+    if (!rolesPayload || typeof rolesPayload !== 'object')
+      throw new Error('Invalid role catalogue');
     const roles = rolesPayload as { data?: unknown; total?: unknown };
     const catalogue: unknown = {
       roles: roles.data,
       permissions: permissionsPayload,
       total: roles.total,
+      effectivePermissions: effectivePayload.permissionKeys,
     };
     if (!isAuthorizationCatalogue(catalogue)) {
       throw new Error('Invalid authorization contract');

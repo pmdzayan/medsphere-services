@@ -64,6 +64,19 @@ describe('AuthorizationService', () => {
     expect(repository.findEffectivePermissions).toHaveBeenCalledWith(identity);
   });
 
+  it('returns a stable effective-permission snapshot for only the active membership', async () => {
+    repository.findEffectivePermissions.mockResolvedValue([
+      PERMISSIONS.rolesUpdate,
+      PERMISSIONS.rolesRead,
+      PERMISSIONS.rolesUpdate,
+    ]);
+
+    await expect(service.listEffectivePermissions(identity)).resolves.toEqual({
+      permissionKeys: [PERMISSIONS.rolesRead, PERMISSIONS.rolesUpdate],
+    });
+    expect(repository.findEffectivePermissions).toHaveBeenCalledWith(identity);
+  });
+
   it('rejects stale role versions before any mutation or audit write', async () => {
     repository.findRole.mockResolvedValue(
       roleFixture({ id: randomUUID(), type: 'TENANT', version: 3 }) as never,

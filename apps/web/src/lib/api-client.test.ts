@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { getAuthorizationCatalogue } from './api-client';
 
-const catalogue = { roles: [], permissions: [], total: 0 };
+const catalogue = { roles: [], permissions: [], total: 0, effectivePermissions: [] };
 
 afterEach(() => {
   vi.unstubAllGlobals();

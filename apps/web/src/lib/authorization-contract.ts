@@ -4,6 +4,26 @@ export interface Permission {
   description: string;
 }
 
+export const AUTHORIZATION_PERMISSIONS = {
+  rolesRead: 'authorization.roles.read',
+  rolesCreate: 'authorization.roles.create',
+  rolesUpdate: 'authorization.roles.update',
+  rolesDelete: 'authorization.roles.delete',
+  permissionsRead: 'authorization.permissions.read',
+  assignmentsRead: 'authorization.assignments.read',
+  assignmentsManage: 'authorization.assignments.manage',
+  auditEventsRead: 'audit.events.read',
+} as const;
+
+export type AuthorizationPermission =
+  (typeof AUTHORIZATION_PERMISSIONS)[keyof typeof AUTHORIZATION_PERMISSIONS];
+
+const authorizationPermissionKeys = new Set<string>(Object.values(AUTHORIZATION_PERMISSIONS));
+
+export interface EffectivePermissionsResponse {
+  permissionKeys: AuthorizationPermission[];
+}
+
 export interface Role {
   id: string;
   name: string;
@@ -18,6 +38,7 @@ export interface AuthorizationCatalogue {
   roles: Role[];
   permissions: Permission[];
   total: number;
+  effectivePermissions: AuthorizationPermission[];
 }
 
 export interface CreateRoleRequest {
@@ -26,8 +47,11 @@ export interface CreateRoleRequest {
   permissionKeys: string[];
 }
 
-export interface UpdateRoleRequest extends CreateRoleRequest {
+export interface UpdateRoleRequest {
   version: number;
+  name?: string;
+  description?: string;
+  permissionKeys?: string[];
 }
 
 export interface MembershipRole {
@@ -97,8 +121,30 @@ export function isAuthorizationCatalogue(value: unknown): value is Authorization
     Array.isArray(candidate.permissions) &&
     candidate.permissions.every(isPermission) &&
     Number.isSafeInteger(candidate.total) &&
-    Number(candidate.total) >= candidate.roles.length
+    Number(candidate.total) >= candidate.roles.length &&
+    Array.isArray(candidate.effectivePermissions) &&
+    candidate.effectivePermissions.every(isAuthorizationPermission) &&
+    new Set(candidate.effectivePermissions).size === candidate.effectivePermissions.length
   );
+}
+
+export function isEffectivePermissionsResponse(
+  value: unknown,
+): value is EffectivePermissionsResponse {
+  if (!value || typeof value !== 'object') return false;
+  const candidate = value as Partial<EffectivePermissionsResponse>;
+  return (
+    Array.isArray(candidate.permissionKeys) &&
+    candidate.permissionKeys.every(isAuthorizationPermission) &&
+    new Set(candidate.permissionKeys).size === candidate.permissionKeys.length
+  );
+}
+
+export function hasAuthorizationPermission(
+  catalogue: Pick<AuthorizationCatalogue, 'effectivePermissions'>,
+  permission: AuthorizationPermission,
+): boolean {
+  return catalogue.effectivePermissions.includes(permission);
 }
 
 export function isRole(value: unknown): value is Role {
@@ -156,6 +202,10 @@ function isPermission(value: unknown): value is Permission {
   }
   const permission = value as Partial<Permission>;
   return isString(permission.id) && isString(permission.name) && isString(permission.description);
+}
+
+function isAuthorizationPermission(value: unknown): value is AuthorizationPermission {
+  return typeof value === 'string' && authorizationPermissionKeys.has(value);
 }
 
 function isString(value: unknown): value is string {
