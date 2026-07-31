@@ -3,6 +3,7 @@ dist/
 .turbo/
 coverage/
 *.tsbuildinfo
+node-compile-cache/
 .env
 .env.local
 *.log
