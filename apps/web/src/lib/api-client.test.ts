@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { getAuthorizationCatalogue } from './api-client';
+import { getAuditEvents, getAuthorizationCatalogue } from './api-client';
 
 const catalogue = { roles: [], permissions: [], total: 0, effectivePermissions: [] };
 
@@ -36,6 +36,17 @@ describe('authenticated API client', () => {
     await expect(getAuthorizationCatalogue()).rejects.toMatchObject({
       message: 'Session expired',
       status: 401,
+    });
+  });
+
+  it('requests audit evidence with bounded query parameters', async () => {
+    const page = { data: [], nextCursor: null };
+    const fetchMock = vi.fn().mockResolvedValue(Response.json(page));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(getAuditEvents({ outcome: 'FAILED', limit: 25 })).resolves.toEqual(page);
+    expect(fetchMock).toHaveBeenCalledWith('/api/audit/events?outcome=FAILED&limit=25', {
+      cache: 'no-store',
     });
   });
 });

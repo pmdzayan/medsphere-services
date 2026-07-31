@@ -1,4 +1,5 @@
 import type { AuthenticatedSession, LoginRequest } from './auth-contract';
+import { toAuditSearchParams, type AuditEventFilters, type AuditEventPage } from './audit-contract';
 import type {
   AuthorizationCatalogue,
   CreateRoleRequest,
@@ -39,6 +40,12 @@ export async function login(request: LoginRequest): Promise<AuthenticatedSession
 
 export async function getAuthorizationCatalogue(): Promise<AuthorizationCatalogue> {
   return requestJson<AuthorizationCatalogue>('/api/authorization/catalogue');
+}
+
+export async function getAuditEvents(filters: AuditEventFilters = {}): Promise<AuditEventPage> {
+  const search = toAuditSearchParams(filters);
+  const query = search.toString();
+  return requestJson<AuditEventPage>(`/api/audit/events${query ? `?${query}` : ''}`);
 }
 
 export async function createRole(request: CreateRoleRequest): Promise<Role> {

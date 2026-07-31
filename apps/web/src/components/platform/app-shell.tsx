@@ -17,6 +17,7 @@ const primaryNavigation: NavigationItem[] = [
 
 const organizationNavigation: NavigationItem[] = [
   { label: 'Team & access', href: '/team', icon: 'team' },
+  { label: 'Audit trail', href: '/audit', icon: 'audit' },
   { label: 'Settings', href: '/settings', icon: 'settings', available: false },
 ];
 

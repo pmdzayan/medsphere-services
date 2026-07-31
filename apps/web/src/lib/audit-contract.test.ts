@@ -1,0 +1,72 @@
+import { describe, expect, it } from 'vitest';
+import { isAuditEventPage, toAuditSearchParams } from './audit-contract';
+
+const event = {
+  id: 'f63f50dd-49b0-4a77-bc04-f7d00db58dd5',
+  eventType: 'authorization.role.updated',
+  outcome: 'SUCCEEDED',
+  actorMembershipId: 'fcb65cb7-9071-40eb-ab52-878978d9031c',
+  resourceType: 'Role',
+  resourceId: 'role-1',
+  requestId: 'request-1',
+  metadata: { roleName: 'PHARMACY_MANAGER', roleVersion: 2 },
+  occurredAt: '2026-07-31T18:00:00.000Z',
+};
+
+describe('audit frontend contract', () => {
+  it('accepts a bounded audit page', () => {
+    expect(isAuditEventPage({ data: [event], nextCursor: null })).toBe(true);
+  });
+
+  it('rejects unknown event types and outcomes', () => {
+    expect(
+      isAuditEventPage({ data: [{ ...event, eventType: 'patient.exported' }], nextCursor: null }),
+    ).toBe(false);
+    expect(isAuditEventPage({ data: [{ ...event, outcome: 'UNKNOWN' }], nextCursor: null })).toBe(
+      false,
+    );
+  });
+
+  it('rejects nested or unbounded metadata', () => {
+    expect(
+      isAuditEventPage({
+        data: [{ ...event, metadata: { payload: { private: true } } }],
+        nextCursor: null,
+      }),
+    ).toBe(false);
+    expect(
+      isAuditEventPage({
+        data: [{ ...event, metadata: { roleName: 'x'.repeat(241) } }],
+        nextCursor: null,
+      }),
+    ).toBe(false);
+  });
+
+  it('rejects scalar metadata keys not reviewed for the event type', () => {
+    expect(
+      isAuditEventPage({
+        data: [
+          { ...event, metadata: { roleName: 'PHARMACY_MANAGER', email: 'private@example.test' } },
+        ],
+        nextCursor: null,
+      }),
+    ).toBe(false);
+  });
+
+  it('rejects invalid cursor and timestamp values', () => {
+    expect(isAuditEventPage({ data: [event], nextCursor: 'not-a-cursor' })).toBe(false);
+    expect(
+      isAuditEventPage({ data: [{ ...event, occurredAt: 'yesterday' }], nextCursor: null }),
+    ).toBe(false);
+  });
+
+  it('serializes only explicitly supplied filters', () => {
+    const params = toAuditSearchParams({
+      outcome: 'DENIED',
+      resourceType: 'Role',
+      resourceId: 'role-1',
+      limit: 25,
+    });
+    expect(params.toString()).toBe('outcome=DENIED&resourceType=Role&resourceId=role-1&limit=25');
+  });
+});
