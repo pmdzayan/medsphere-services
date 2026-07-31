@@ -288,7 +288,27 @@ describeAuthorizationInfra('S0.4 PostgreSQL authorization and durable-audit inte
     ).rejects.toBeDefined();
   });
 
-  it('enforces actor shape and metadata bounds below the application layer', async () => {
+  it('enforces accepted actor shapes and metadata bounds below the application layer', async () => {
+    await expect(
+      prisma.client.auditEvent.create({
+        data: {
+          id: randomUUID(),
+          scope: 'TENANT',
+          actorType: 'SYSTEM',
+          outcome: 'SUCCEEDED',
+          tenantId: tenantAId,
+          eventType: 'inventory.reservation.expired',
+          metadata: {},
+        },
+      }),
+    ).resolves.toMatchObject({
+      scope: 'TENANT',
+      actorType: 'SYSTEM',
+      tenantId: tenantAId,
+      actorMembershipId: null,
+      platformActorUserId: null,
+    });
+
     await expect(
       prisma.client.auditEvent.create({
         data: {
@@ -297,7 +317,8 @@ describeAuthorizationInfra('S0.4 PostgreSQL authorization and durable-audit inte
           actorType: 'SYSTEM',
           outcome: 'FAILED',
           tenantId: tenantAId,
-          eventType: 'authentication.session.refresh.failed',
+          actorMembershipId: membershipAId,
+          eventType: 'inventory.reservation.expired',
           metadata: {},
         },
       }),
