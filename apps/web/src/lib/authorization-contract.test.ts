@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   isAuthorizationCatalogue,
+  isMembershipCatalogue,
   normalizeRoleName,
   validateCreateRole,
 } from './authorization-contract';
@@ -65,5 +66,27 @@ describe('authorization contract', () => {
       }),
     ).toBe(true);
     expect(isAuthorizationCatalogue({ roles: [], permissions: [], total: -1 })).toBe(false);
+  });
+
+  it('validates the tenant membership directory contract', () => {
+    expect(
+      isMembershipCatalogue({
+        data: [
+          {
+            id: 'membership',
+            userId: 'user',
+            email: 'a@example.com',
+            firstName: 'Aisha',
+            lastName: 'Zahra',
+            status: 'ACTIVE',
+            roles: [{ id: 'role', name: 'ADMIN' }],
+          },
+        ],
+        total: 1,
+        limit: 100,
+        offset: 0,
+      }),
+    ).toBe(true);
+    expect(isMembershipCatalogue({ data: [], total: -1, limit: 100, offset: 0 })).toBe(false);
   });
 });

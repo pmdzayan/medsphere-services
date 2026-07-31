@@ -26,6 +26,32 @@ export interface CreateRoleRequest {
   permissionKeys: string[];
 }
 
+export interface UpdateRoleRequest extends CreateRoleRequest {
+  version: number;
+}
+
+export interface MembershipRole {
+  id: string;
+  name: string;
+}
+
+export interface Membership {
+  id: string;
+  userId: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  status: 'PENDING' | 'ACTIVE' | 'SUSPENDED' | 'REVOKED';
+  roles: MembershipRole[];
+}
+
+export interface MembershipCatalogue {
+  data: Membership[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
 export type CreateRoleErrors = Partial<Record<'name' | 'description' | 'permissionKeys', string>>;
 
 export function normalizeRoleName(value: string): string {
@@ -91,6 +117,36 @@ export function isRole(value: unknown): value is Role {
     role.permissionKeys.every(isString) &&
     Number.isSafeInteger(role.assignmentCount) &&
     Number(role.assignmentCount) >= 0
+  );
+}
+
+export function isMembershipCatalogue(value: unknown): value is MembershipCatalogue {
+  if (!value || typeof value !== 'object') return false;
+  const candidate = value as Partial<MembershipCatalogue>;
+  return (
+    Array.isArray(candidate.data) &&
+    candidate.data.every(isMembership) &&
+    Number.isSafeInteger(candidate.total) &&
+    Number(candidate.total) >= candidate.data.length &&
+    Number.isSafeInteger(candidate.limit) &&
+    Number.isSafeInteger(candidate.offset)
+  );
+}
+
+export function isMembership(value: unknown): value is Membership {
+  if (!value || typeof value !== 'object') return false;
+  const member = value as Partial<Membership>;
+  return (
+    isString(member.id) &&
+    isString(member.userId) &&
+    isString(member.email) &&
+    isString(member.firstName) &&
+    isString(member.lastName) &&
+    ['PENDING', 'ACTIVE', 'SUSPENDED', 'REVOKED'].includes(String(member.status)) &&
+    Array.isArray(member.roles) &&
+    member.roles.every((role) =>
+      Boolean(role && typeof role === 'object' && isString(role.id) && isString(role.name)),
+    )
   );
 }
 

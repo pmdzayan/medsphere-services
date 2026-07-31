@@ -33,6 +33,7 @@ import { AuthorizationService } from './authorization.service';
 import { AuthorizationListQueryDto } from './dto/authorization-list-query.dto';
 import {
   AssignmentResponseDto,
+  MembershipListResponseDto,
   PermissionResponseDto,
   RoleListResponseDto,
   RoleResponseDto,
@@ -147,6 +148,17 @@ export class AuthorizationController {
     @Param('membershipId', uuid) membershipId: string,
   ) {
     return this.authorizationService.listMembershipRoles(identity, membershipId);
+  }
+
+  @Get('memberships')
+  @RequirePermissions(PERMISSIONS.assignmentsRead)
+  @ApiOperation({ summary: 'List memberships and role assignments in the authenticated tenant' })
+  @ApiOkResponse({ type: MembershipListResponseDto })
+  listMemberships(
+    @CurrentIdentity() identity: AuthenticatedIdentity,
+    @Query() query: AuthorizationListQueryDto,
+  ) {
+    return this.authorizationService.listMemberships(identity, query);
   }
 
   @Put('memberships/:membershipId/roles/:roleId')

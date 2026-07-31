@@ -4,6 +4,7 @@ import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { Icon } from '@/components/platform/icon';
 import { SectionCard, StatusBadge } from '@/components/platform/dashboard-primitives';
 import { ApiError, createRole, getAuthorizationCatalogue } from '@/lib/api-client';
+import { MembershipDirectory, RoleEditorPanel } from './role-lifecycle-panels';
 import {
   normalizeRoleName,
   validateCreateRole,
@@ -23,6 +24,7 @@ export function TeamAccessWorkspace() {
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<RoleFilter>('ALL');
   const [createOpen, setCreateOpen] = useState(false);
+  const [editingRole, setEditingRole] = useState<Role | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -125,6 +127,37 @@ export function TeamAccessWorkspace() {
         />
       ) : null}
 
+      {editingRole && catalogue ? (
+        <RoleEditorPanel
+          role={editingRole}
+          permissions={catalogue.permissions}
+          onCancel={() => setEditingRole(null)}
+          onSaved={(role) => {
+            setCatalogue((current) =>
+              current
+                ? {
+                    ...current,
+                    roles: current.roles.map((item) => (item.id === role.id ? role : item)),
+                  }
+                : current,
+            );
+            setEditingRole(null);
+          }}
+          onDeleted={(roleId) => {
+            setCatalogue((current) =>
+              current
+                ? {
+                    ...current,
+                    roles: current.roles.filter((role) => role.id !== roleId),
+                    total: current.total - 1,
+                  }
+                : current,
+            );
+            setEditingRole(null);
+          }}
+        />
+      ) : null}
+
       <SectionCard>
         <div className="flex flex-col gap-4 border-b border-[#edf1ef] px-5 py-5 sm:px-6 lg:flex-row lg:items-center">
           <div className="min-w-0 flex-1">
@@ -171,7 +204,9 @@ export function TeamAccessWorkspace() {
 
         {loading && !catalogue ? <LoadingState /> : null}
         {error && !catalogue ? <ErrorState error={error} onRetry={load} /> : null}
-        {catalogue && visibleRoles.length > 0 ? <RoleTable roles={visibleRoles} /> : null}
+        {catalogue && visibleRoles.length > 0 ? (
+          <RoleTable roles={visibleRoles} onEdit={setEditingRole} />
+        ) : null}
         {catalogue && visibleRoles.length === 0 ? (
           <div className="px-6 py-16 text-center">
             <p className="text-sm font-bold text-[#28463c]">No matching roles</p>
@@ -179,6 +214,7 @@ export function TeamAccessWorkspace() {
           </div>
         ) : null}
       </SectionCard>
+      {catalogue ? <MembershipDirectory roles={catalogue.roles} /> : null}
     </div>
   );
 }
@@ -233,7 +269,7 @@ function AccessMetrics({ catalogue }: { catalogue: AuthorizationCatalogue }) {
   );
 }
 
-function RoleTable({ roles }: { roles: readonly Role[] }) {
+function RoleTable({ roles, onEdit }: { roles: readonly Role[]; onEdit: (role: Role) => void }) {
   return (
     <div className="overflow-x-auto">
       <table className="w-full min-w-[820px] border-collapse text-left">
@@ -252,7 +288,7 @@ function RoleTable({ roles }: { roles: readonly Role[] }) {
               Assignments
             </th>
             <th className="px-6 py-3.5" scope="col">
-              Version
+              <span className="sr-only">Actions</span>
             </th>
           </tr>
         </thead>
@@ -291,8 +327,18 @@ function RoleTable({ roles }: { roles: readonly Role[] }) {
                 </div>
               </td>
               <td className="px-4 py-4 text-sm font-bold text-[#405a52]">{role.assignmentCount}</td>
-              <td className="px-6 py-4 font-mono text-xs font-semibold text-[#6d7f78]">
-                v{role.version}
+              <td className="px-6 py-4 text-right">
+                {role.type === 'TENANT' ? (
+                  <button
+                    type="button"
+                    onClick={() => onEdit(role)}
+                    className="rounded-xl border border-[#dbe4e0] bg-white px-3 py-2 text-[10px] font-bold text-emerald-800 hover:bg-emerald-50"
+                  >
+                    Edit · v{role.version}
+                  </button>
+                ) : (
+                  <span className="text-[10px] font-semibold text-[#93a09c]">Protected</span>
+                )}
               </td>
             </tr>
           ))}

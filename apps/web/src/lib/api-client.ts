@@ -1,5 +1,11 @@
 import type { AuthenticatedSession, LoginRequest } from './auth-contract';
-import type { AuthorizationCatalogue, CreateRoleRequest, Role } from './authorization-contract';
+import type {
+  AuthorizationCatalogue,
+  CreateRoleRequest,
+  MembershipCatalogue,
+  Role,
+  UpdateRoleRequest,
+} from './authorization-contract';
 
 export class ApiError extends Error {
   constructor(
@@ -43,6 +49,36 @@ export async function createRole(request: CreateRoleRequest): Promise<Role> {
   });
 }
 
+export async function updateRole(roleId: string, request: UpdateRoleRequest): Promise<Role> {
+  return requestJson<Role>(`/api/authorization/roles/${roleId}`, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(request),
+  });
+}
+
+export async function deleteRole(roleId: string, version: number): Promise<void> {
+  await requestJson<void>(`/api/authorization/roles/${roleId}`, {
+    method: 'DELETE',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ version }),
+  });
+}
+
+export async function getMembershipCatalogue(): Promise<MembershipCatalogue> {
+  return requestJson<MembershipCatalogue>('/api/authorization/memberships');
+}
+
+export async function setRoleAssignment(
+  membershipId: string,
+  roleId: string,
+  assigned: boolean,
+): Promise<void> {
+  await requestJson<void>(`/api/authorization/memberships/${membershipId}/roles/${roleId}`, {
+    method: assigned ? 'PUT' : 'DELETE',
+  });
+}
+
 async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
   let response = await fetch(url, { ...init, cache: 'no-store' });
   if (response.status === 401) {
@@ -69,5 +105,5 @@ async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
     }
     throw new ApiError(message, response.status);
   }
-  return (await response.json()) as T;
+  return response.status === 204 ? (undefined as T) : ((await response.json()) as T);
 }
