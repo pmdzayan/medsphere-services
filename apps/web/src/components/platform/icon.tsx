@@ -9,12 +9,15 @@ export type IconName =
   | 'close'
   | 'dashboard'
   | 'documents'
+  | 'download'
+  | 'filter'
   | 'help'
   | 'inventory'
   | 'menu'
   | 'more'
   | 'plus'
   | 'reservations'
+  | 'scan'
   | 'search'
   | 'settings'
   | 'team'
@@ -79,6 +82,13 @@ const iconPaths: Record<IconName, ReactNode> = {
       <path d="M14 2v5h5M9 13h6M9 17h6" />
     </>
   ),
+  download: (
+    <>
+      <path d="M12 3v12M7 10l5 5 5-5" />
+      <path d="M5 21h14" />
+    </>
+  ),
+  filter: <path d="M4 6h16M7 12h10M10 18h4" />,
   help: (
     <>
       <circle cx="12" cy="12" r="9" />
@@ -104,6 +114,12 @@ const iconPaths: Record<IconName, ReactNode> = {
     <>
       <rect x="3" y="5" width="18" height="16" rx="2" />
       <path d="M8 3v4M16 3v4M3 10h18M8 15h3" />
+    </>
+  ),
+  scan: (
+    <>
+      <path d="M3 8V5a2 2 0 0 1 2-2h3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M8 21H5a2 2 0 0 1-2-2v-3" />
+      <path d="M7 12h10" />
     </>
   ),
   search: (
