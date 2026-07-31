@@ -143,17 +143,18 @@ model Tenant {
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
-  memberships            TenantMembership[]
-  roles                  Role[]
-  auditEvents            AuditEvent[]
-  providerVerifications  ProviderVerification[]
-  providers              Provider[]
-  inventory              Inventory[]
-  batches                Batch[]
-  stockMovements         StockMovement[]
-  medicineReservations   MedicineReservation[]
-  reservationItems       MedicineReservationItem[]
-  reservationAllocations MedicineReservationAllocation[]
+  memberships                    TenantMembership[]
+  roles                          Role[]
+  auditEvents                    AuditEvent[]
+  providerVerifications          ProviderVerification[]
+  providers                      Provider[]
+  inventory                      Inventory[]
+  batches                        Batch[]
+  stockMovements                 StockMovement[]
+  inventoryConfigurationCommands InventoryConfigurationCommand[]
+  medicineReservations           MedicineReservation[]
+  reservationItems               MedicineReservationItem[]
+  reservationAllocations         MedicineReservationAllocation[]
 
   @@index([slug])
 }
@@ -470,13 +471,33 @@ model Inventory {
 
   batches                Batch[]
   stockMovements         StockMovement[]
+  configurationCommands  InventoryConfigurationCommand[]
   reservationAllocations MedicineReservationAllocation[]
 
+  @@unique([id, tenantId])
   @@unique([id, tenantId, providerId, productId])
   @@unique([tenantId, providerId, productId])
   @@index([tenantId, providerId, productId])
   @@index([productId])
   @@index([tenantId, providerId, isVisible])
+}
+
+model InventoryConfigurationCommand {
+  id String @id @default(uuid()) @db.Uuid
+
+  tenantId String @db.Uuid
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+
+  inventoryId String    @db.Uuid
+  inventory   Inventory @relation(fields: [inventoryId, tenantId], references: [id, tenantId], onDelete: Restrict)
+
+  idempotencyKey    String   @db.VarChar(120)
+  configurationHash String   @db.VarChar(64)
+  resultingVersion  Int
+  createdAt         DateTime @default(now())
+
+  @@unique([tenantId, idempotencyKey])
+  @@index([tenantId, inventoryId, createdAt(sort: Desc)])
 }
 
 model Batch {

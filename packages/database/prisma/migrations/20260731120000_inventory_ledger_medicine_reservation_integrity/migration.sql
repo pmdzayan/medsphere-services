@@ -265,9 +265,22 @@ CREATE TABLE "MedicineReservationAllocation" (
   CONSTRAINT "MedicineReservationAllocation_pkey" PRIMARY KEY ("id")
 );
 
+CREATE TABLE "InventoryConfigurationCommand" (
+  "id" UUID NOT NULL,
+  "tenantId" UUID NOT NULL,
+  "inventoryId" UUID NOT NULL,
+  "idempotencyKey" VARCHAR(120) NOT NULL,
+  "configurationHash" VARCHAR(64) NOT NULL,
+  "resultingVersion" INTEGER NOT NULL,
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT "InventoryConfigurationCommand_pkey" PRIMARY KEY ("id")
+);
+
 CREATE UNIQUE INDEX "Provider_id_tenantId_key" ON "Provider"("id", "tenantId");
 CREATE UNIQUE INDEX "Inventory_id_tenantId_providerId_productId_key"
   ON "Inventory"("id", "tenantId", "providerId", "productId");
+CREATE UNIQUE INDEX "Inventory_id_tenantId_key"
+  ON "Inventory"("id", "tenantId");
 CREATE UNIQUE INDEX "Inventory_tenantId_providerId_productId_key"
   ON "Inventory"("tenantId", "providerId", "productId");
 CREATE INDEX "Inventory_tenantId_providerId_productId_idx"
@@ -294,6 +307,11 @@ CREATE INDEX "StockMovement_tenantId_providerId_productId_occurredAt_idx"
   ON "StockMovement"("tenantId", "providerId", "productId", "occurredAt" DESC);
 CREATE INDEX "StockMovement_actorMembershipId_occurredAt_idx"
   ON "StockMovement"("actorMembershipId", "occurredAt" DESC);
+
+CREATE UNIQUE INDEX "InventoryConfigurationCommand_tenantId_idempotencyKey_key"
+  ON "InventoryConfigurationCommand"("tenantId", "idempotencyKey");
+CREATE INDEX "InventoryConfigurationCommand_tenantId_inventoryId_createdA_idx"
+  ON "InventoryConfigurationCommand"("tenantId", "inventoryId", "createdAt" DESC);
 
 CREATE UNIQUE INDEX "MedicineReservation_tenantId_idempotencyKey_key"
   ON "MedicineReservation"("tenantId", "idempotencyKey");
@@ -355,6 +373,8 @@ ALTER TABLE "MedicineReservationAllocation" ADD CONSTRAINT "MedicineReservationA
 ALTER TABLE "MedicineReservationAllocation" ADD CONSTRAINT "MedicineReservationAllocation_batchId_tenantId_inventoryId_fkey" FOREIGN KEY ("batchId", "tenantId", "inventoryId", "providerId", "productId") REFERENCES "Batch"("id", "tenantId", "inventoryId", "providerId", "productId") ON DELETE RESTRICT ON UPDATE CASCADE;
 ALTER TABLE "MedicineReservationAllocation" ADD CONSTRAINT "MedicineReservationAllocation_providerId_tenantId_fkey" FOREIGN KEY ("providerId", "tenantId") REFERENCES "Provider"("id", "tenantId") ON DELETE RESTRICT ON UPDATE CASCADE;
 ALTER TABLE "MedicineReservationAllocation" ADD CONSTRAINT "MedicineReservationAllocation_productId_fkey" FOREIGN KEY ("productId") REFERENCES "Product"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "InventoryConfigurationCommand" ADD CONSTRAINT "InventoryConfigurationCommand_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "InventoryConfigurationCommand" ADD CONSTRAINT "InventoryConfigurationCommand_inventoryId_tenantId_fkey" FOREIGN KEY ("inventoryId", "tenantId") REFERENCES "Inventory"("id", "tenantId") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- ADR-005 permits a tenant-scoped SYSTEM actor only for reviewed workers such
 -- as reservation expiry. All user actor identifiers remain absent.
@@ -394,6 +414,7 @@ ALTER TABLE "AuditEvent" ADD CONSTRAINT "AuditEvent_event_type_check" CHECK (
     'authentication.session.refresh.replayed',
     'authentication.session.logout.succeeded',
     'authentication.sessions.logout.succeeded',
+    'inventory.listing.configured',
     'inventory.batch.received',
     'inventory.stock.adjusted',
     'inventory.reservation.created',
@@ -408,6 +429,9 @@ ALTER TABLE "AuditEvent" ADD CONSTRAINT "AuditEvent_event_type_check" CHECK (
 ALTER TABLE "Inventory" ADD CONSTRAINT "Inventory_values_check" CHECK (
   "sellingPrice" >= 0 AND "mrp" >= 0 AND "discountPercentage" BETWEEN 0 AND 100
   AND "taxPercentage" BETWEEN 0 AND 100 AND "minimumStockLevel" >= 0 AND "version" > 0
+);
+ALTER TABLE "InventoryConfigurationCommand" ADD CONSTRAINT "InventoryConfigurationCommand_values_check" CHECK (
+  "resultingVersion" > 0 AND "configurationHash" ~ '^[0-9a-f]{64}$'
 );
 ALTER TABLE "Batch" ADD CONSTRAINT "Batch_quantities_check" CHECK (
   "receivedQuantity" > 0 AND "onHandQuantity" >= 0 AND "heldQuantity" >= 0
