@@ -1,15 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { LoginIdentity } from '../auth/auth.types';
-
-function hasPrismaCode(error: unknown, code: string): boolean {
-  return (
-    typeof error === 'object' &&
-    error !== null &&
-    'code' in error &&
-    (error as { code?: unknown }).code === code
-  );
-}
+import { hasPrismaCode, withSerializableRetry } from '../prisma/transaction.util';
 
 @Injectable()
 export class UsersRepository {
@@ -74,65 +66,57 @@ export class UsersRepository {
     firstName: string;
     lastName: string;
   }): Promise<void> {
-    for (let attempt = 1; attempt <= 3; attempt += 1) {
-      try {
-        await this.prisma.client.$transaction(
-          async (transaction) => {
-            const tenant = await transaction.tenant.findFirst({
-              where: {
-                slug: data.tenantSlug,
-                isActive: true,
-                selfRegistrationEnabled: true,
-                deletedAt: null,
-              },
-              select: { id: true },
-            });
-
-            if (!tenant) {
-              return;
-            }
-
-            const existingUser = await transaction.user.findUnique({
-              where: { email: data.email },
-              select: { id: true },
-            });
-
-            if (existingUser) {
-              return;
-            }
-
-            const user = await transaction.user.create({
-              data: {
-                email: data.email,
-                passwordHash: data.passwordHash,
-                firstName: data.firstName,
-                lastName: data.lastName,
-                status: 'PENDING_VERIFICATION',
-              },
-              select: { id: true },
-            });
-
-            await transaction.tenantMembership.create({
-              data: {
-                tenantId: tenant.id,
-                userId: user.id,
-                status: 'PENDING',
-              },
-            });
+    try {
+      await withSerializableRetry(this.prisma.client, async (transaction) => {
+        const tenant = await transaction.tenant.findFirst({
+          where: {
+            slug: data.tenantSlug,
+            isActive: true,
+            selfRegistrationEnabled: true,
+            deletedAt: null,
           },
-          { isolationLevel: 'Serializable' },
-        );
-        return;
-      } catch (error) {
-        // A concurrent request may win the global-email uniqueness race. The
-        // public response remains deliberately identical to avoid enumeration.
-        if (hasPrismaCode(error, 'P2002')) {
+          select: { id: true },
+        });
+
+        if (!tenant) {
           return;
         }
-        if (!hasPrismaCode(error, 'P2034') || attempt === 3) {
-          throw error;
+
+        const existingUser = await transaction.user.findUnique({
+          where: { email: data.email },
+          select: { id: true },
+        });
+
+        if (existingUser) {
+          return;
         }
+
+        const user = await transaction.user.create({
+          data: {
+            email: data.email,
+            passwordHash: data.passwordHash,
+            firstName: data.firstName,
+            lastName: data.lastName,
+            status: 'PENDING_VERIFICATION',
+          },
+          select: { id: true },
+        });
+
+        await transaction.tenantMembership.create({
+          data: {
+            tenantId: tenant.id,
+            userId: user.id,
+            status: 'PENDING',
+          },
+        });
+      });
+    } catch (error) {
+      // A concurrent request may win the global-email uniqueness race. The
+      // public response remains deliberately identical to avoid enumeration.
+      if (hasPrismaCode(error, 'P2002')) {
+        return;
       }
+      throw error;
     }
   }
 
