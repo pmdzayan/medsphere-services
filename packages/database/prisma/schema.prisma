@@ -112,6 +112,29 @@ enum StockMovementType {
   DAMAGED
 }
 
+enum MedicineReservationStatus {
+  PENDING
+  CONFIRMED
+  READY
+  COMPLETED
+  CANCELLED
+  EXPIRED
+}
+
+enum MedicineAllocationStatus {
+  HELD
+  CONSUMED
+  RELEASED
+}
+
+enum MedicineReservationCommandType {
+  CONFIRM
+  READY
+  COMPLETE
+  CANCEL
+  EXPIRE
+}
+
 model Tenant {
   id String @id @default(uuid()) @db.Uuid
 
@@ -128,11 +151,19 @@ model Tenant {
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
-  memberships           TenantMembership[]
-  roles                 Role[]
-  auditEvents           AuditEvent[]
-  providerVerifications ProviderVerification[]
-  providers             Provider[]
+  memberships                    TenantMembership[]
+  roles                          Role[]
+  auditEvents                    AuditEvent[]
+  providerVerifications          ProviderVerification[]
+  providers                      Provider[]
+  inventory                      Inventory[]
+  batches                        Batch[]
+  stockMovements                 StockMovement[]
+  inventoryConfigurationCommands InventoryConfigurationCommand[]
+  medicineReservations           MedicineReservation[]
+  reservationItems               MedicineReservationItem[]
+  reservationAllocations         MedicineReservationAllocation[]
+  reservationCommands            MedicineReservationCommand[]
 
   @@index([slug])
 }
@@ -158,9 +189,10 @@ model User {
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
-  memberships         TenantMembership[]
-  platformAuditEvents AuditEvent[]
-  privacy             UserPrivacy?
+  memberships          TenantMembership[]
+  platformAuditEvents  AuditEvent[]
+  privacy              UserPrivacy?
+  medicineReservations MedicineReservation[]
 }
 
 model TenantMembership {
@@ -186,6 +218,7 @@ model TenantMembership {
   sessions        UserSession[]
   roleAssignments MembershipRole[]
   auditEvents     AuditEvent[]
+  stockMovements  StockMovement[]
 
   @@unique([tenantId, userId])
   @@unique([id, tenantId])
@@ -368,8 +401,12 @@ model Provider {
   isVerified Boolean @default(false)
   isActive   Boolean @default(true)
 
-  inventory Inventory[]
-  batches   Batch[]
+  inventory              Inventory[]
+  batches                Batch[]
+  stockMovements         StockMovement[]
+  medicineReservations   MedicineReservation[]
+  reservationItems       MedicineReservationItem[]
+  reservationAllocations MedicineReservationAllocation[]
 
   version Int @default(1)
 
@@ -377,6 +414,7 @@ model Provider {
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
+  @@unique([id, tenantId])
   @@index([tenantId])
   @@index([providerType])
   @@index([email])
@@ -397,9 +435,12 @@ model Product {
   barcode              String?
   requiresPrescription Boolean         @default(false)
 
-  isActive  Boolean     @default(true)
-  inventory Inventory[]
-  batches   Batch[]
+  isActive               Boolean                         @default(true)
+  inventory              Inventory[]
+  batches                Batch[]
+  stockMovements         StockMovement[]
+  reservationItems       MedicineReservationItem[]
+  reservationAllocations MedicineReservationAllocation[]
 
   version Int @default(1)
 
@@ -415,138 +456,138 @@ model Product {
 model Inventory {
   id String @id @default(uuid()) @db.Uuid
 
+  tenantId String @db.Uuid
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+
   providerId String   @db.Uuid
-  provider   Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  provider   Provider @relation(fields: [providerId, tenantId], references: [id, tenantId], onDelete: Restrict)
 
   productId String  @db.Uuid
   product   Product @relation(fields: [productId], references: [id], onDelete: Restrict)
 
-  sku                String?
-  batchNumber        String
-  expiryDate         DateTime
-  quantity           Int
-  reservedQuantity   Int      @default(0)
-  sellingPrice       Decimal  @db.Decimal(10, 2)
-  mrp                Decimal  @db.Decimal(10, 2)
-  discountPercentage Decimal  @db.Decimal(5, 2)
-  taxPercentage      Decimal  @db.Decimal(5, 2)
-  minimumStockLevel  Int      @default(10)
-
-  inStock   Boolean @default(true)
-  isVisible Boolean @default(true)
-
-  version Int @default(1)
+  sku                String? @db.VarChar(120)
+  sellingPrice       Decimal @db.Decimal(10, 2)
+  mrp                Decimal @db.Decimal(10, 2)
+  discountPercentage Decimal @db.Decimal(5, 2)
+  taxPercentage      Decimal @db.Decimal(5, 2)
+  minimumStockLevel  Int     @default(10)
+  isVisible          Boolean @default(true)
+  version            Int     @default(1)
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
-  stockMovements StockMovement[]
+  batches                Batch[]
+  stockMovements         StockMovement[]
+  configurationCommands  InventoryConfigurationCommand[]
+  reservationAllocations MedicineReservationAllocation[]
 
-  @@index([providerId])
+  @@unique([id, tenantId])
+  @@unique([id, tenantId, providerId, productId])
+  @@unique([tenantId, providerId, productId])
+  @@index([tenantId, providerId, productId])
   @@index([productId])
-  @@index([expiryDate])
-  @@index([providerId, inStock])
+  @@index([tenantId, providerId, isVisible])
+}
+
+model InventoryConfigurationCommand {
+  id String @id @default(uuid()) @db.Uuid
+
+  tenantId String @db.Uuid
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+
+  inventoryId String    @db.Uuid
+  inventory   Inventory @relation(fields: [inventoryId, tenantId], references: [id, tenantId], onDelete: Restrict)
+
+  idempotencyKey    String   @db.VarChar(120)
+  configurationHash String   @db.VarChar(64)
+  resultingVersion  Int
+  createdAt         DateTime @default(now())
+
+  @@unique([tenantId, idempotencyKey])
+  @@index([tenantId, inventoryId, createdAt(sort: Desc)])
 }
 
 model Batch {
   id String @id @default(uuid()) @db.Uuid
 
+  tenantId String @db.Uuid
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+
+  inventoryId String    @db.Uuid
+  inventory   Inventory @relation(fields: [inventoryId, tenantId, providerId, productId], references: [id, tenantId, providerId, productId], onDelete: Restrict)
+
   providerId String   @db.Uuid
-  provider   Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  provider   Provider @relation(fields: [providerId, tenantId], references: [id, tenantId], onDelete: Restrict)
 
   productId String  @db.Uuid
   product   Product @relation(fields: [productId], references: [id], onDelete: Restrict)
 
-  batchNumber       String
+  batchNumber       String      @db.VarChar(120)
   manufacturingDate DateTime?
   expiryDate        DateTime
-  initialQuantity   Int
-  currentQuantity   Int
+  receivedQuantity  Int
+  onHandQuantity    Int
+  heldQuantity      Int         @default(0)
   purchasePrice     Decimal     @db.Decimal(10, 2)
   sellingPrice      Decimal     @db.Decimal(10, 2)
   status            BatchStatus @default(ACTIVE)
-
-  version Int @default(1)
+  version           Int         @default(1)
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
-  stockMovements StockMovement[]
+  stockMovements         StockMovement[]
+  reservationAllocations MedicineReservationAllocation[]
 
-  @@unique([providerId, productId, batchNumber])
-  @@index([providerId])
-  @@index([productId])
-  @@index([expiryDate])
-  @@index([status])
+  @@unique([tenantId, providerId, productId, batchNumber])
+  @@unique([id, tenantId, inventoryId, providerId, productId])
+  @@index([tenantId, providerId, productId, status, expiryDate, manufacturingDate, createdAt, id])
+  @@index([inventoryId, status, expiryDate])
 }
 
 model StockMovement {
   id String @id @default(uuid()) @db.Uuid
 
+  tenantId String @db.Uuid
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+
   inventoryId String    @db.Uuid
-  inventory   Inventory @relation(fields: [inventoryId], references: [id], onDelete: Restrict)
+  inventory   Inventory @relation(fields: [inventoryId, tenantId, providerId, productId], references: [id, tenantId, providerId, productId], onDelete: Restrict)
 
-  batchId String? @db.Uuid
-  batch   Batch?  @relation(fields: [batchId], references: [id], onDelete: Restrict)
+  batchId String @db.Uuid
+  batch   Batch  @relation(fields: [batchId, tenantId, inventoryId, providerId, productId], references: [id, tenantId, inventoryId, providerId, productId], onDelete: Restrict)
 
-  providerId String @db.Uuid
-  productId  String @db.Uuid
+  providerId String   @db.Uuid
+  provider   Provider @relation(fields: [providerId, tenantId], references: [id, tenantId], onDelete: Restrict)
 
-  type           StockMovementType
-  quantity       Int
-  quantityBefore Int
-  quantityAfter  Int
+  productId String  @db.Uuid
+  product   Product @relation(fields: [productId], references: [id], onDelete: Restrict)
 
-  referenceType String?
-  referenceId   String?
-  reason        String?
-  notes         String?
+  type         StockMovementType
+  delta        Int
+  onHandBefore Int
+  onHandAfter  Int
 
-  userId String @db.Uuid
+  referenceType  String? @db.VarChar(80)
+  referenceId    String? @db.VarChar(120)
+  reason         String? @db.VarChar(500)
+  idempotencyKey String  @db.VarChar(120)
 
-  version Int @default(1)
+  actorType         AuditActorType
+  actorMembershipId String?           @db.Uuid
+  actorMembership   TenantMembership? @relation(fields: [actorMembershipId, tenantId], references: [id, tenantId], onDelete: Restrict)
 
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  deletedAt DateTime?
+  occurredAt DateTime @default(now())
+  createdAt  DateTime @default(now())
 
-  @@index([inventoryId])
-  @@index([batchId])
-  @@index([providerId])
-  @@index([productId])
-  @@index([type])
-  @@index([createdAt])
-}
-
-model InventoryHistory {
-  id String @id @default(uuid()) @db.Uuid
-
-  inventoryId String  @db.Uuid
-  providerId  String  @db.Uuid
-  productId   String  @db.Uuid
-  batchId     String? @db.Uuid
-
-  type           StockMovementType
-  quantity       Int
-  quantityBefore Int
-  quantityAfter  Int
-  referenceType  String?
-  referenceId    String?
-  reason         String?
-  notes          String?
-
-  userId String @db.Uuid
-
-  createdAt DateTime @default(now())
-
-  @@index([inventoryId])
-  @@index([providerId])
-  @@index([productId])
-  @@index([batchId])
-  @@index([type])
-  @@index([createdAt])
+  @@unique([tenantId, idempotencyKey])
+  @@index([tenantId, inventoryId, occurredAt(sort: Desc), id(sort: Desc)])
+  @@index([tenantId, batchId, occurredAt(sort: Desc), id(sort: Desc)])
+  @@index([tenantId, providerId, productId, occurredAt(sort: Desc)])
+  @@index([actorMembershipId, occurredAt(sort: Desc)])
 }
 
 model AuditEvent {
@@ -616,42 +657,122 @@ model MedicalRecord {
   @@index([recordType])
 }
 
-enum ReservationType {
-  MEDICINE_PICKUP
-  HOSPITAL_APPOINTMENT
-  LAB_TEST
-  VACCINATION
-}
-
-enum ReservationStatus {
-  PENDING
-  CONFIRMED
-  READY
-  COMPLETED
-  CANCELLED
-  EXPIRED
-}
-
-model Reservation {
+model MedicineReservation {
   id String @id @default(uuid()) @db.Uuid
 
-  userId     String @db.Uuid
+  tenantId String @db.Uuid
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+
+  providerId String   @db.Uuid
+  provider   Provider @relation(fields: [providerId, tenantId], references: [id, tenantId], onDelete: Restrict)
+
+  subjectUserId String @db.Uuid
+  subjectUser   User   @relation(fields: [subjectUserId], references: [id], onDelete: Restrict)
+
+  status         MedicineReservationStatus @default(PENDING)
+  expiresAt      DateTime
+  confirmedAt    DateTime?
+  readyAt        DateTime?
+  completedAt    DateTime?
+  cancelledAt    DateTime?
+  expiredAt      DateTime?
+  notes          String?                   @db.VarChar(500)
+  idempotencyKey String                    @db.VarChar(120)
+  creationHash   String                    @db.VarChar(64)
+  version        Int                       @default(1)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items       MedicineReservationItem[]
+  allocations MedicineReservationAllocation[]
+  commands    MedicineReservationCommand[]
+
+  @@unique([tenantId, idempotencyKey])
+  @@unique([id, tenantId, providerId])
+  @@index([tenantId, providerId, status, expiresAt, id])
+  @@index([subjectUserId, createdAt(sort: Desc), id(sort: Desc)])
+  @@index([tenantId, status, expiresAt, id])
+}
+
+model MedicineReservationCommand {
+  id String @id @default(uuid()) @db.Uuid
+
+  tenantId String @db.Uuid
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+
+  reservationId String              @db.Uuid
+  reservation   MedicineReservation @relation(fields: [reservationId, tenantId, providerId], references: [id, tenantId, providerId], onDelete: Restrict)
+
   providerId String @db.Uuid
 
-  reservationType ReservationType
-  status          ReservationStatus @default(PENDING)
+  commandType      MedicineReservationCommandType
+  idempotencyKey   String                         @db.VarChar(120)
+  commandHash      String                         @db.VarChar(64)
+  resultingStatus  MedicineReservationStatus
+  resultingVersion Int
+  createdAt        DateTime                       @default(now())
 
-  scheduledAt DateTime
-  notes       String?
+  @@unique([tenantId, idempotencyKey])
+  @@index([tenantId, reservationId, createdAt(sort: Desc)])
+}
 
-  version Int @default(1)
+model MedicineReservationItem {
+  id String @id @default(uuid()) @db.Uuid
 
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  deletedAt DateTime?
+  tenantId String @db.Uuid
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
 
-  @@index([userId])
-  @@index([providerId])
-  @@index([status])
-  @@index([scheduledAt])
+  reservationId String              @db.Uuid
+  reservation   MedicineReservation @relation(fields: [reservationId, tenantId, providerId], references: [id, tenantId, providerId], onDelete: Restrict)
+
+  providerId String   @db.Uuid
+  provider   Provider @relation(fields: [providerId, tenantId], references: [id, tenantId], onDelete: Restrict)
+
+  productId String  @db.Uuid
+  product   Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  quantity  Int
+  createdAt DateTime @default(now())
+
+  allocations MedicineReservationAllocation[]
+
+  @@unique([reservationId, productId])
+  @@unique([id, tenantId, reservationId, providerId, productId])
+  @@index([tenantId, providerId, productId])
+}
+
+model MedicineReservationAllocation {
+  id String @id @default(uuid()) @db.Uuid
+
+  tenantId String @db.Uuid
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+
+  reservationId String              @db.Uuid
+  reservation   MedicineReservation @relation(fields: [reservationId, tenantId, providerId], references: [id, tenantId, providerId], onDelete: Restrict)
+
+  itemId String                  @db.Uuid
+  item   MedicineReservationItem @relation(fields: [itemId, tenantId, reservationId, providerId, productId], references: [id, tenantId, reservationId, providerId, productId], onDelete: Restrict)
+
+  inventoryId String    @db.Uuid
+  inventory   Inventory @relation(fields: [inventoryId, tenantId, providerId, productId], references: [id, tenantId, providerId, productId], onDelete: Restrict)
+
+  batchId String @db.Uuid
+  batch   Batch  @relation(fields: [batchId, tenantId, inventoryId, providerId, productId], references: [id, tenantId, inventoryId, providerId, productId], onDelete: Restrict)
+
+  providerId String   @db.Uuid
+  provider   Provider @relation(fields: [providerId, tenantId], references: [id, tenantId], onDelete: Restrict)
+
+  productId String  @db.Uuid
+  product   Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  quantity   Int
+  status     MedicineAllocationStatus @default(HELD)
+  consumedAt DateTime?
+  releasedAt DateTime?
+  createdAt  DateTime                 @default(now())
+
+  @@unique([itemId, batchId])
+  @@index([tenantId, reservationId, status])
+  @@index([tenantId, batchId, status])
 }

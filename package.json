@@ -30,6 +30,7 @@
     "format": "prettier --write \"**/*.{ts,js,mjs,json,md,yml,yaml}\"",
     "format:check": "prettier --check \"**/*.{ts,js,mjs,json,md,yml,yaml}\"",
     "clean": "turbo run clean && rimraf node_modules .turbo",
+    "postinstall": "pnpm --filter @medsphere/database prisma:generate",
     "prepare": "husky"
   },
   "devDependencies": {

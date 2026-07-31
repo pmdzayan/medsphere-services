@@ -14,10 +14,6 @@
     "@nestjs/common": "^11.1.28",
     "@nestjs/core": "^11.1.28",
     "@nestjs/platform-express": "^11.1.28",
-    "class-transformer": "^0.5.1",
-    "class-validator": "^0.14.1",
-    "ioredis": "^5.3.2",
-    "kafkajs": "^2.2.4",
     "@medsphere/common": "workspace:*",
     "@medsphere/config": "workspace:*",
     "@medsphere/database": "workspace:*",
@@ -26,7 +22,6 @@
   },
   "devDependencies": {
     "@nestjs/cli": "^11.0.24",
-    "@nestjs/testing": "^11.1.28",
     "@types/jest": "^30.0.0",
     "jest": "^30.4.2",
     "ts-jest": "^29.4.11",

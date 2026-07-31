@@ -13,13 +13,11 @@
     "@nestjs/core": "^11.1.28",
     "@nestjs/platform-express": "^11.1.28",
     "@medsphere/common": "workspace:*",
-    "@medsphere/config": "workspace:*",
     "@medsphere/logger": "workspace:*",
     "@medsphere/validation": "workspace:*"
   },
   "devDependencies": {
     "@nestjs/cli": "^11.0.24",
-    "@nestjs/testing": "^11.1.28",
     "typescript": "^5.3.3"
   }
 }
