@@ -20,10 +20,13 @@ const baselineMigrations = [
   '20260720120000_trusted_authentication_tenant_context',
   '20260725120000_tenant_safe_authorization_durable_audit',
 ];
-const s05Migration = '20260731120000_inventory_ledger_medicine_reservation_integrity';
+const s05Migrations = [
+  '20260731120000_inventory_ledger_medicine_reservation_integrity',
+  '20260801000000_align_medicine_reservation_command_fk_name',
+];
 const pnpmCommand = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm';
 
-for (const migrationName of [...baselineMigrations, s05Migration]) {
+for (const migrationName of [...baselineMigrations, ...s05Migrations]) {
   if (!existsSync(join(sourceMigrations, migrationName, 'migration.sql'))) {
     throw new Error(`Required migration is missing: ${migrationName}`);
   }
@@ -128,9 +131,11 @@ function verifyScenario({ label, seedSql, assertionSql, expectedFailure }) {
     executeSql(project.schemaFile, databaseUrl.toString(), `CREATE DATABASE "${name}";`);
     runPrisma(['migrate', 'deploy', '--schema', project.schemaFile], scopedDatabaseUrl);
     executeSql(project.schemaFile, scopedDatabaseUrl, seedSql);
-    cpSync(join(sourceMigrations, s05Migration), join(project.migrationsRoot, s05Migration), {
-      recursive: true,
-    });
+    for (const migrationName of s05Migrations) {
+      cpSync(join(sourceMigrations, migrationName), join(project.migrationsRoot, migrationName), {
+        recursive: true,
+      });
+    }
     runPrisma(['migrate', 'deploy', '--schema', project.schemaFile], scopedDatabaseUrl, {
       expectedFailure,
     });
@@ -278,6 +283,15 @@ BEGIN
   END IF;
   IF to_regclass('"InventoryHistory"') IS NOT NULL OR to_regclass('"Reservation"') IS NOT NULL THEN
     RAISE EXCEPTION 'Rejected prototype tables were not retired';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conrelid = '"MedicineReservationCommand"'::regclass
+      AND contype = 'f'
+      AND conname = 'MedicineReservationCommand_reservationId_tenantId_provider_fkey'
+  ) THEN
+    RAISE EXCEPTION 'Medicine reservation command foreign-key name was not repaired';
   END IF;
 END $$;
 INSERT INTO "AuditEvent" (
