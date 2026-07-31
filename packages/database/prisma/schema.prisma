@@ -669,6 +669,7 @@ model MedicineReservation {
   expiredAt      DateTime?
   notes          String?                   @db.VarChar(500)
   idempotencyKey String                    @db.VarChar(120)
+  creationHash   String                    @db.VarChar(64)
   version        Int                       @default(1)
 
   createdAt DateTime @default(now())

@@ -2,19 +2,24 @@ import { createHash, randomUUID } from 'node:crypto';
 import {
   BadRequestException,
   ConflictException,
-  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { AuditWriter, Prisma, hasPrismaCode, withSerializableRetry } from '@medsphere/database';
+import {
+  AuditWriter,
+  Prisma,
+  SerializableRetryError,
+  hasPrismaCode,
+  withSerializableRetry,
+} from '@medsphere/database';
 import { PrismaService } from '../prisma/prisma.service';
+import { assertActiveTenantActor } from './tenant-actor';
 import type {
   AdjustBatchCommand,
   ConfigureInventoryCommand,
   InventoryConfigurationResult,
   ReceiveBatchCommand,
   StockMutationResult,
-  TrustedTenantActor,
 } from './stock.types';
 
 const RECEIVE_REFERENCE = 'inventory.batch.receive';
@@ -56,7 +61,7 @@ export class StockService {
         );
         if (replay) return replay;
 
-        await this.assertActiveActor(transaction, command.actor);
+        await assertActiveTenantActor(transaction, command.actor);
         const [provider, product] = await Promise.all([
           transaction.provider.findFirst({
             where: {
@@ -130,7 +135,7 @@ export class StockService {
             data: { ...data, version: { increment: 1 } },
           });
           if (updated.count !== 1) {
-            throw new ConflictException('Concurrent inventory configuration update detected');
+            throw new SerializableRetryError('Concurrent inventory configuration update detected');
           }
         }
 
@@ -188,7 +193,7 @@ export class StockService {
           );
           if (replay) return replay;
 
-          await this.assertActiveActor(transaction, command.actor);
+          await assertActiveTenantActor(transaction, command.actor);
           const inventory = await transaction.inventory.findFirst({
             where: {
               id: command.inventoryId,
@@ -306,7 +311,7 @@ export class StockService {
           );
           if (replay) return replay;
 
-          await this.assertActiveActor(transaction, command.actor);
+          await assertActiveTenantActor(transaction, command.actor);
           const batch = await transaction.batch.findFirst({
             where: {
               id: command.batchId,
@@ -361,7 +366,7 @@ export class StockService {
             },
           });
           if (updated.count !== 1) {
-            throw new ConflictException('Concurrent batch update detected');
+            throw new SerializableRetryError('Concurrent batch update detected');
           }
 
           const movementId = randomUUID();
@@ -498,25 +503,6 @@ export class StockService {
       batchVersion: movement.batch.version,
       replayed: true,
     };
-  }
-
-  private async assertActiveActor(
-    transaction: Prisma.TransactionClient,
-    actor: TrustedTenantActor,
-  ): Promise<void> {
-    const membership = await transaction.tenantMembership.findFirst({
-      where: {
-        id: actor.membershipId,
-        tenantId: actor.tenantId,
-        status: 'ACTIVE',
-        deletedAt: null,
-        tenant: { isActive: true, deletedAt: null },
-      },
-      select: { id: true },
-    });
-    if (!membership) {
-      throw new ForbiddenException('Active tenant membership required');
-    }
   }
 
   private validateReceive(command: ReceiveBatchCommand): void {

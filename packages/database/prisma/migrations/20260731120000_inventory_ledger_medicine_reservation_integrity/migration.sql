@@ -242,6 +242,7 @@ CREATE TABLE "MedicineReservation" (
   "confirmedAt" TIMESTAMP(3), "readyAt" TIMESTAMP(3),
   "completedAt" TIMESTAMP(3), "cancelledAt" TIMESTAMP(3), "expiredAt" TIMESTAMP(3),
   "notes" VARCHAR(500), "idempotencyKey" VARCHAR(120) NOT NULL,
+  "creationHash" VARCHAR(64) NOT NULL,
   "version" INTEGER NOT NULL DEFAULT 1,
   "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
   "updatedAt" TIMESTAMP(3) NOT NULL,

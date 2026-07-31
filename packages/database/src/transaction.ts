@@ -2,6 +2,15 @@ import { Prisma } from '@prisma/client';
 
 const DEFAULT_SERIALIZABLE_ATTEMPTS = 3;
 
+export class SerializableRetryError extends Error {
+  public readonly code = 'P2034';
+
+  constructor(message = 'Concurrent serializable update detected') {
+    super(message);
+    this.name = 'SerializableRetryError';
+  }
+}
+
 export interface TransactionHost {
   $transaction<T>(
     operation: (transaction: Prisma.TransactionClient) => Promise<T>,

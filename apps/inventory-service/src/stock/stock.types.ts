@@ -71,6 +71,7 @@ export interface FefoCandidate {
   readonly manufacturingDate: Date | null;
   readonly onHandQuantity: number;
   readonly heldQuantity: number;
+  readonly version?: number;
   readonly status: 'ACTIVE' | 'EXPIRED' | 'EXHAUSTED';
   readonly createdAt: Date;
   readonly deletedAt: Date | null;

@@ -1,4 +1,4 @@
-import { ConflictException } from '@nestjs/common';
+import { SerializableRetryError } from '@medsphere/database';
 import { StockService } from './stock.service';
 
 function createHarness() {
@@ -321,7 +321,7 @@ describe('StockService', () => {
         idempotencyKey: 'adjust-1',
         reason: 'Verified cycle count',
       }),
-    ).rejects.toBeInstanceOf(ConflictException);
+    ).rejects.toBeInstanceOf(SerializableRetryError);
     expect(harness.transaction.stockMovement.create).not.toHaveBeenCalled();
     expect(harness.audit.appendTenantUser).not.toHaveBeenCalled();
   });
