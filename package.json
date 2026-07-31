@@ -11,7 +11,9 @@
   "pnpm": {
     "overrides": {
       "@nestjs/swagger>js-yaml": "5.2.2",
-      "express>qs": "6.15.3"
+      "express>qs": "6.15.3",
+      "postcss": "8.5.18",
+      "sharp": "0.35.0"
     }
   },
   "scripts": {
