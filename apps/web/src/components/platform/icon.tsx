@@ -1,20 +1,25 @@
-import type { SVGProps } from 'react';
+import type { ReactNode, SVGProps } from 'react';
 
 export type IconName =
   | 'bell'
   | 'billing'
+  | 'calendar'
   | 'chevron'
+  | 'clock'
   | 'close'
   | 'dashboard'
   | 'documents'
   | 'help'
   | 'inventory'
   | 'menu'
+  | 'more'
   | 'plus'
   | 'reservations'
   | 'search'
   | 'settings'
-  | 'team';
+  | 'team'
+  | 'trend'
+  | 'warning';
 
 export function Icon({ name, ...props }: { name: IconName } & SVGProps<SVGSVGElement>) {
   return (
@@ -33,7 +38,7 @@ export function Icon({ name, ...props }: { name: IconName } & SVGProps<SVGSVGEle
   );
 }
 
-const iconPaths: Record<IconName, React.ReactNode> = {
+const iconPaths: Record<IconName, ReactNode> = {
   bell: (
     <>
       <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" />
@@ -46,7 +51,19 @@ const iconPaths: Record<IconName, React.ReactNode> = {
       <path d="M3 10h18M7 15h3" />
     </>
   ),
+  calendar: (
+    <>
+      <rect x="3" y="5" width="18" height="16" rx="2" />
+      <path d="M8 3v4M16 3v4M3 10h18" />
+    </>
+  ),
   chevron: <path d="m9 18 6-6-6-6" />,
+  clock: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7v5l3 2" />
+    </>
+  ),
   close: <path d="m6 6 12 12M18 6 6 18" />,
   dashboard: (
     <>
@@ -75,6 +92,13 @@ const iconPaths: Record<IconName, React.ReactNode> = {
     </>
   ),
   menu: <path d="M4 7h16M4 12h16M4 17h16" />,
+  more: (
+    <>
+      <circle cx="5" cy="12" r="1" fill="currentColor" stroke="none" />
+      <circle cx="12" cy="12" r="1" fill="currentColor" stroke="none" />
+      <circle cx="19" cy="12" r="1" fill="currentColor" stroke="none" />
+    </>
+  ),
   plus: <path d="M12 5v14M5 12h14" />,
   reservations: (
     <>
@@ -99,6 +123,18 @@ const iconPaths: Record<IconName, React.ReactNode> = {
       <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
       <circle cx="9" cy="7" r="4" />
       <path d="M22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8" />
+    </>
+  ),
+  trend: (
+    <>
+      <path d="m3 17 6-6 4 4 8-8" />
+      <path d="M15 7h6v6" />
+    </>
+  ),
+  warning: (
+    <>
+      <path d="M10.3 3.6 2.7 17a2 2 0 0 0 1.8 3h15a2 2 0 0 0 1.8-3L13.7 3.6a2 2 0 0 0-3.4 0Z" />
+      <path d="M12 9v4M12 17h.01" />
     </>
   ),
 };
