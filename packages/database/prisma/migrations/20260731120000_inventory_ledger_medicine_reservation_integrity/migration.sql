@@ -7,6 +7,7 @@ CREATE TYPE "MedicineReservationStatus" AS ENUM (
   'PENDING', 'CONFIRMED', 'READY', 'COMPLETED', 'CANCELLED', 'EXPIRED'
 );
 CREATE TYPE "MedicineAllocationStatus" AS ENUM ('HELD', 'CONSUMED', 'RELEASED');
+CREATE TYPE "MedicineReservationCommandType" AS ENUM ('CONFIRM', 'READY', 'COMPLETE', 'CANCEL', 'EXPIRE');
 
 DO $$
 BEGIN
@@ -266,6 +267,20 @@ CREATE TABLE "MedicineReservationAllocation" (
   CONSTRAINT "MedicineReservationAllocation_pkey" PRIMARY KEY ("id")
 );
 
+CREATE TABLE "MedicineReservationCommand" (
+  "id" UUID NOT NULL,
+  "tenantId" UUID NOT NULL,
+  "reservationId" UUID NOT NULL,
+  "providerId" UUID NOT NULL,
+  "commandType" "MedicineReservationCommandType" NOT NULL,
+  "idempotencyKey" VARCHAR(120) NOT NULL,
+  "commandHash" VARCHAR(64) NOT NULL,
+  "resultingStatus" "MedicineReservationStatus" NOT NULL,
+  "resultingVersion" INTEGER NOT NULL,
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT "MedicineReservationCommand_pkey" PRIMARY KEY ("id")
+);
+
 CREATE TABLE "InventoryConfigurationCommand" (
   "id" UUID NOT NULL,
   "tenantId" UUID NOT NULL,
@@ -336,6 +351,10 @@ CREATE INDEX "MedicineReservationAllocation_tenantId_reservationId_status_idx"
   ON "MedicineReservationAllocation"("tenantId", "reservationId", "status");
 CREATE INDEX "MedicineReservationAllocation_tenantId_batchId_status_idx"
   ON "MedicineReservationAllocation"("tenantId", "batchId", "status");
+CREATE UNIQUE INDEX "MedicineReservationCommand_tenantId_idempotencyKey_key"
+  ON "MedicineReservationCommand"("tenantId", "idempotencyKey");
+CREATE INDEX "MedicineReservationCommand_tenantId_reservationId_createdAt_idx"
+  ON "MedicineReservationCommand"("tenantId", "reservationId", "createdAt" DESC);
 
 ALTER TABLE "Inventory" ADD CONSTRAINT "Inventory_tenantId_fkey"
   FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -374,6 +393,8 @@ ALTER TABLE "MedicineReservationAllocation" ADD CONSTRAINT "MedicineReservationA
 ALTER TABLE "MedicineReservationAllocation" ADD CONSTRAINT "MedicineReservationAllocation_batchId_tenantId_inventoryId_fkey" FOREIGN KEY ("batchId", "tenantId", "inventoryId", "providerId", "productId") REFERENCES "Batch"("id", "tenantId", "inventoryId", "providerId", "productId") ON DELETE RESTRICT ON UPDATE CASCADE;
 ALTER TABLE "MedicineReservationAllocation" ADD CONSTRAINT "MedicineReservationAllocation_providerId_tenantId_fkey" FOREIGN KEY ("providerId", "tenantId") REFERENCES "Provider"("id", "tenantId") ON DELETE RESTRICT ON UPDATE CASCADE;
 ALTER TABLE "MedicineReservationAllocation" ADD CONSTRAINT "MedicineReservationAllocation_productId_fkey" FOREIGN KEY ("productId") REFERENCES "Product"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "MedicineReservationCommand" ADD CONSTRAINT "MedicineReservationCommand_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "MedicineReservationCommand" ADD CONSTRAINT "MedicineReservationCommand_reservationId_tenantId_providerId_fkey" FOREIGN KEY ("reservationId", "tenantId", "providerId") REFERENCES "MedicineReservation"("id", "tenantId", "providerId") ON DELETE RESTRICT ON UPDATE CASCADE;
 ALTER TABLE "InventoryConfigurationCommand" ADD CONSTRAINT "InventoryConfigurationCommand_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 ALTER TABLE "InventoryConfigurationCommand" ADD CONSTRAINT "InventoryConfigurationCommand_inventoryId_tenantId_fkey" FOREIGN KEY ("inventoryId", "tenantId") REFERENCES "Inventory"("id", "tenantId") ON DELETE RESTRICT ON UPDATE CASCADE;
 
@@ -478,6 +499,9 @@ ALTER TABLE "MedicineReservationAllocation" ADD CONSTRAINT "MedicineReservationA
     OR ("status" = 'CONSUMED' AND "consumedAt" IS NOT NULL AND "releasedAt" IS NULL)
     OR ("status" = 'RELEASED' AND "consumedAt" IS NULL AND "releasedAt" IS NOT NULL)
   )
+);
+ALTER TABLE "MedicineReservationCommand" ADD CONSTRAINT "MedicineReservationCommand_values_check" CHECK (
+  "resultingVersion" > 1
 );
 
 CREATE OR REPLACE FUNCTION reject_stock_movement_mutation()

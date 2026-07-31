@@ -127,6 +127,14 @@ enum MedicineAllocationStatus {
   RELEASED
 }
 
+enum MedicineReservationCommandType {
+  CONFIRM
+  READY
+  COMPLETE
+  CANCEL
+  EXPIRE
+}
+
 model Tenant {
   id String @id @default(uuid()) @db.Uuid
 
@@ -155,6 +163,7 @@ model Tenant {
   medicineReservations           MedicineReservation[]
   reservationItems               MedicineReservationItem[]
   reservationAllocations         MedicineReservationAllocation[]
+  reservationCommands            MedicineReservationCommand[]
 
   @@index([slug])
 }
@@ -677,12 +686,35 @@ model MedicineReservation {
 
   items       MedicineReservationItem[]
   allocations MedicineReservationAllocation[]
+  commands    MedicineReservationCommand[]
 
   @@unique([tenantId, idempotencyKey])
   @@unique([id, tenantId, providerId])
   @@index([tenantId, providerId, status, expiresAt, id])
   @@index([subjectUserId, createdAt(sort: Desc), id(sort: Desc)])
   @@index([tenantId, status, expiresAt, id])
+}
+
+model MedicineReservationCommand {
+  id String @id @default(uuid()) @db.Uuid
+
+  tenantId String @db.Uuid
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+
+  reservationId String              @db.Uuid
+  reservation   MedicineReservation @relation(fields: [reservationId, tenantId, providerId], references: [id, tenantId, providerId], onDelete: Restrict)
+
+  providerId String @db.Uuid
+
+  commandType      MedicineReservationCommandType
+  idempotencyKey   String                         @db.VarChar(120)
+  commandHash      String                         @db.VarChar(64)
+  resultingStatus  MedicineReservationStatus
+  resultingVersion Int
+  createdAt        DateTime                       @default(now())
+
+  @@unique([tenantId, idempotencyKey])
+  @@index([tenantId, reservationId, createdAt(sort: Desc)])
 }
 
 model MedicineReservationItem {

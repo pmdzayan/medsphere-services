@@ -25,3 +25,26 @@ export interface MedicineReservationResult {
   readonly totalQuantity: number;
   readonly replayed: boolean;
 }
+
+export type MedicineReservationTransition = 'CONFIRM' | 'READY' | 'COMPLETE' | 'CANCEL' | 'EXPIRE';
+
+export type MedicineReservationLifecycleStatus =
+  'CONFIRMED' | 'READY' | 'COMPLETED' | 'CANCELLED' | 'EXPIRED';
+
+export interface TransitionMedicineReservationCommand {
+  readonly actor: TrustedTenantActor;
+  readonly reservationId: string;
+  readonly providerId: string;
+  readonly transition: MedicineReservationTransition;
+  readonly expectedVersion: number;
+  readonly idempotencyKey: string;
+  readonly request?: AuditRequestContext;
+}
+
+export interface MedicineReservationTransitionResult {
+  readonly reservationId: string;
+  readonly status: MedicineReservationLifecycleStatus;
+  readonly version: number;
+  readonly totalQuantity: number;
+  readonly replayed: boolean;
+}

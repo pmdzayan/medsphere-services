@@ -31,6 +31,9 @@ export class MedicineReservationService {
   async create(command: CreateMedicineReservationCommand): Promise<MedicineReservationResult> {
     const items = this.validateAndNormalize(command);
     const totalQuantity = items.reduce((total, item) => total + item.quantity, 0);
+    if (!Number.isSafeInteger(totalQuantity)) {
+      throw new BadRequestException('Total reservation quantity exceeds the safe integer limit');
+    }
     const creationHash = this.creationHash(command, items);
 
     try {
@@ -251,8 +254,6 @@ export class MedicineReservationService {
       where: { tenantId_idempotencyKey: { tenantId, idempotencyKey } },
       select: {
         id: true,
-        status: true,
-        version: true,
         creationHash: true,
         items: { select: { quantity: true } },
       },
@@ -261,13 +262,10 @@ export class MedicineReservationService {
     if (reservation.creationHash !== creationHash) {
       throw new ConflictException('Idempotency key is already used by another reservation');
     }
-    if (reservation.status !== 'PENDING') {
-      throw new ConflictException('Reservation has advanced beyond its creation result');
-    }
     return {
       reservationId: reservation.id,
       status: 'PENDING',
-      version: reservation.version,
+      version: 1,
       itemCount: reservation.items.length,
       totalQuantity: reservation.items.reduce((total, item) => total + item.quantity, 0),
       replayed: true,
