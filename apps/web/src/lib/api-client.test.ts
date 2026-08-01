@@ -4,9 +4,11 @@ import {
   getAuthorizationCatalogue,
   getPrivacyPreferences,
   getSupportedLanguages,
+  register,
   updatePreferredLanguage,
   updatePrivacyPreferences,
 } from './api-client';
+import { REGISTRATION_CONFIRMATION_MESSAGE } from './auth-contract';
 
 const catalogue = { roles: [], permissions: [], total: 0, effectivePermissions: [] };
 
@@ -106,5 +108,59 @@ describe('authenticated API client', () => {
         },
       ],
     ]);
+  });
+});
+
+describe('public onboarding API client', () => {
+  it('submits only the accepted registration contract without starting a session', async () => {
+    const request = {
+      tenantSlug: 'central-pharmacy',
+      email: 'operator@example.com',
+      password: 'a-secure-password',
+      firstName: 'Mira',
+      lastName: 'Patel',
+    };
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(Response.json({ message: REGISTRATION_CONFIRMATION_MESSAGE }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(register(request)).resolves.toEqual({
+      message: REGISTRATION_CONFIRMATION_MESSAGE,
+    });
+    expect(fetchMock).toHaveBeenCalledWith('/api/auth/register', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(request),
+      cache: 'no-store',
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('surfaces a bounded registration error', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValue(
+          Response.json(
+            { message: 'Too many onboarding requests. Try again later.' },
+            { status: 429 },
+          ),
+        ),
+    );
+
+    await expect(
+      register({
+        tenantSlug: 'central-pharmacy',
+        email: 'operator@example.com',
+        password: 'a-secure-password',
+        firstName: 'Mira',
+        lastName: 'Patel',
+      }),
+    ).rejects.toMatchObject({
+      message: 'Too many onboarding requests. Try again later.',
+      status: 429,
+    });
   });
 });

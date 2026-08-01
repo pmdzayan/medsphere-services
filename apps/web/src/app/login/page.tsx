@@ -31,6 +31,12 @@ export default function LoginPage() {
               Use the organization identity issued by your administrator to continue.
             </p>
             <LoginForm />
+            <p className="mt-5 text-center text-xs leading-5 text-[#71807b]">
+              Need an organization membership?{' '}
+              <Link href="/register" className="font-bold text-emerald-800 hover:text-emerald-600">
+                Request onboarding
+              </Link>
+            </p>
             <div className="mt-7 flex items-start gap-3 border-t border-[#10201c]/[.08] pt-5 text-xs leading-5 text-[#71807b]">
               <span className="mt-1 size-1.5 shrink-0 rounded-full bg-[#d7b56d]" />
               This stabilization environment must not contain real patient or clinical data.

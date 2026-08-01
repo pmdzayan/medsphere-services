@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { isTokenResponse, normalizeTenantSlug, validateLoginRequest } from './auth-contract';
+import {
+  isRegistrationRequest,
+  isRegistrationResponse,
+  isTokenResponse,
+  normalizeRegistrationRequest,
+  normalizeTenantSlug,
+  REGISTRATION_CONFIRMATION_MESSAGE,
+  validateLoginRequest,
+  validateRegistrationRequest,
+} from './auth-contract';
 
 describe('accepted login contract', () => {
   it('normalizes the tenant locator without inventing a tenant identity', () => {
@@ -39,5 +48,60 @@ describe('accepted login contract', () => {
       }),
     ).toBe(true);
     expect(isTokenResponse({ accessToken: 'new-access', expiresIn: 900 })).toBe(false);
+  });
+});
+
+describe('accepted registration contract', () => {
+  const request = {
+    tenantSlug: 'central-pharmacy',
+    email: 'operator@example.com',
+    password: 'a-secure-password',
+    firstName: 'Mira',
+    lastName: 'Patel',
+  };
+
+  it('normalizes public locators and names without changing the password', () => {
+    expect(
+      normalizeRegistrationRequest({
+        ...request,
+        tenantSlug: ' Central-Pharmacy ',
+        email: ' OPERATOR@EXAMPLE.COM ',
+        firstName: ' Mira ',
+        lastName: ' Patel ',
+      }),
+    ).toEqual(request);
+  });
+
+  it('accepts the exact backend request and generic response contracts', () => {
+    expect(isRegistrationRequest(request)).toBe(true);
+    expect(validateRegistrationRequest(request)).toEqual({});
+    expect(isRegistrationResponse({ message: REGISTRATION_CONFIRMATION_MESSAGE })).toBe(true);
+  });
+
+  it('rejects client-controlled identity fields and malformed successful responses', () => {
+    expect(isRegistrationRequest({ ...request, tenantId: 'client-controlled' })).toBe(false);
+    expect(isRegistrationRequest({ ...request, password: 42 })).toBe(false);
+    expect(
+      isRegistrationResponse({ message: REGISTRATION_CONFIRMATION_MESSAGE, userId: 'leaked' }),
+    ).toBe(false);
+    expect(isRegistrationResponse({ message: 'Account created' })).toBe(false);
+  });
+
+  it('rejects invalid names, locators, and passwords', () => {
+    expect(
+      validateRegistrationRequest({
+        tenantSlug: 'Invalid Tenant',
+        email: 'invalid',
+        password: 'short',
+        firstName: '',
+        lastName: 'x'.repeat(101),
+      }),
+    ).toEqual({
+      tenantSlug: expect.any(String),
+      email: expect.any(String),
+      password: expect.any(String),
+      firstName: expect.any(String),
+      lastName: expect.any(String),
+    });
   });
 });

@@ -31,6 +31,12 @@ export default function HomePage() {
                 Foundation online
               </span>
               <Link
+                href="/register"
+                className="hidden rounded-full px-3 py-2 text-xs font-semibold text-white/60 transition hover:text-emerald-200 sm:inline-flex"
+              >
+                Request access
+              </Link>
+              <Link
                 href="/login"
                 className="rounded-full border border-white/15 bg-white/[.07] px-5 py-2.5 text-sm font-semibold text-white backdrop-blur-xl transition hover:border-emerald-300/50 hover:bg-white/[.12]"
               >
@@ -64,6 +70,12 @@ export default function HomePage() {
                   >
                     →
                   </span>
+                </Link>
+                <Link
+                  href="/register"
+                  className="inline-flex items-center justify-center rounded-full border border-white/15 bg-white/[.05] px-6 py-3.5 text-sm font-bold text-white/75 transition hover:border-emerald-300/40 hover:text-emerald-200"
+                >
+                  Request access
                 </Link>
                 <span className="px-3 text-center text-xs leading-5 text-white/38 sm:text-left">
                   Stabilization environment
