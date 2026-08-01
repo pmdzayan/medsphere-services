@@ -45,6 +45,48 @@ export interface TokenResponse {
 
 export type AuthenticatedSession = Omit<LoginResponse, 'accessToken' | 'refreshToken'>;
 
+export function normalizeLoginRequest(input: LoginRequest): LoginRequest {
+  return {
+    tenantSlug: normalizeTenantSlug(input.tenantSlug),
+    email: input.email.trim().toLowerCase(),
+    password: input.password,
+  };
+}
+
+export function isLoginRequest(value: unknown): value is LoginRequest {
+  return hasExactStringKeys(value, ['email', 'password', 'tenantSlug']);
+}
+
+export function isLoginResponse(value: unknown): value is LoginResponse {
+  if (!hasExactKeys(value, ['accessToken', 'context', 'expiresIn', 'refreshToken', 'user'])) {
+    return false;
+  }
+
+  const candidate = value as Record<string, unknown>;
+  if (
+    typeof candidate.accessToken !== 'string' ||
+    candidate.accessToken.length === 0 ||
+    typeof candidate.refreshToken !== 'string' ||
+    candidate.refreshToken.length === 0 ||
+    typeof candidate.expiresIn !== 'number' ||
+    !Number.isSafeInteger(candidate.expiresIn) ||
+    candidate.expiresIn <= 0 ||
+    !hasExactStringKeys(candidate.user, ['email', 'firstName', 'id', 'lastName']) ||
+    !hasExactStringKeys(candidate.context, ['membershipId', 'tenantId'])
+  ) {
+    return false;
+  }
+
+  const user = candidate.user;
+  const context = candidate.context;
+  return (
+    user.id.length > 0 &&
+    user.email.length > 0 &&
+    context.membershipId.length > 0 &&
+    context.tenantId.length > 0
+  );
+}
+
 export function isTokenResponse(value: unknown): value is TokenResponse {
   if (!value || typeof value !== 'object') {
     return false;
@@ -76,17 +118,7 @@ export function normalizeRegistrationRequest(input: RegistrationRequest): Regist
 }
 
 export function isRegistrationRequest(value: unknown): value is RegistrationRequest {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    return false;
-  }
-  const candidate = value as Record<string, unknown>;
-  const expectedKeys = ['email', 'firstName', 'lastName', 'password', 'tenantSlug'];
-  const actualKeys = Object.keys(candidate).sort();
-  return (
-    actualKeys.length === expectedKeys.length &&
-    actualKeys.every((key, index) => key === expectedKeys[index]) &&
-    expectedKeys.every((key) => typeof candidate[key] === 'string')
-  );
+  return hasExactStringKeys(value, ['email', 'firstName', 'lastName', 'password', 'tenantSlug']);
 }
 
 export function isRegistrationResponse(value: unknown): value is RegistrationResponse {
@@ -130,4 +162,25 @@ export function validateLoginRequest(
     errors.password = 'Password must be between 15 and 128 characters.';
   }
   return errors;
+}
+
+function hasExactStringKeys<T extends string>(
+  value: unknown,
+  expectedKeys: readonly T[],
+): value is Record<T, string> {
+  return (
+    hasExactKeys(value, expectedKeys) &&
+    expectedKeys.every((key) => typeof (value as Record<T, unknown>)[key] === 'string')
+  );
+}
+
+function hasExactKeys(value: unknown, expectedKeys: readonly string[]): value is object {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return false;
+  }
+  const actualKeys = Object.keys(value).sort();
+  return (
+    actualKeys.length === expectedKeys.length &&
+    actualKeys.every((key, index) => key === expectedKeys[index])
+  );
 }

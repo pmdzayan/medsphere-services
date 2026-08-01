@@ -1,55 +1,58 @@
 import { NextRequest, NextResponse } from 'next/server';
-import type { LoginRequest, LoginResponse } from '@/lib/auth-contract';
-import { normalizeTenantSlug, validateLoginRequest } from '@/lib/auth-contract';
+import type { LoginResponse } from '@/lib/auth-contract';
+import {
+  isLoginRequest,
+  isLoginResponse,
+  normalizeLoginRequest,
+  validateLoginRequest,
+} from '@/lib/auth-contract';
+import { authApiUrl, isSameOriginMutation, upstreamHeaders } from '@/lib/auth-api';
 import { setSessionCookies } from '@/lib/session-cookies';
 
-const authApiUrl = process.env.AUTH_API_URL ?? 'http://localhost:3000';
-
 export async function POST(request: NextRequest): Promise<NextResponse> {
-  let body: LoginRequest;
-  try {
-    body = (await request.json()) as LoginRequest;
-  } catch {
-    return NextResponse.json({ message: 'Invalid request body.' }, { status: 400 });
+  if (!isSameOriginMutation(request)) {
+    return noStore({ message: 'Cross-origin request rejected.' }, 403);
   }
 
-  const normalized = {
-    tenantSlug: normalizeTenantSlug(typeof body.tenantSlug === 'string' ? body.tenantSlug : ''),
-    email: typeof body.email === 'string' ? body.email.trim().toLowerCase() : '',
-    password: typeof body.password === 'string' ? body.password : '',
-  };
+  let payload: unknown;
+  try {
+    payload = await request.json();
+  } catch {
+    return noStore({ message: 'Invalid sign-in request.' }, 400);
+  }
+
+  if (!isLoginRequest(payload)) {
+    return noStore({ message: 'Invalid sign-in request.' }, 400);
+  }
+
+  const normalized = normalizeLoginRequest(payload);
   if (Object.keys(validateLoginRequest(normalized)).length > 0) {
-    return NextResponse.json({ message: 'Invalid sign-in request.' }, { status: 400 });
+    return noStore({ message: 'Invalid sign-in request.' }, 400);
   }
 
   let upstream: Response;
   try {
-    upstream = await fetch(`${authApiUrl}/auth/login`, {
+    const headers = upstreamHeaders(request);
+    headers.set('content-type', 'application/json');
+    upstream = await fetch(authApiUrl('/auth/login'), {
       method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'user-agent': request.headers.get('user-agent') ?? 'medsphere-web',
-        'x-request-id': request.headers.get('x-request-id') ?? crypto.randomUUID(),
-      },
+      headers,
       body: JSON.stringify(normalized),
       cache: 'no-store',
     });
   } catch {
-    return NextResponse.json(
-      { message: 'Authentication service is unavailable.' },
-      { status: 503 },
-    );
+    return noStore({ message: 'Authentication service is unavailable.' }, 503);
   }
 
   if (!upstream.ok) {
-    return NextResponse.json(
+    return noStore(
       {
         message:
           upstream.status === 401
             ? 'The organization, email, or password is incorrect.'
             : 'Sign-in failed. Try again.',
       },
-      { status: upstream.status >= 500 ? 502 : upstream.status },
+      upstream.status >= 500 ? 502 : upstream.status,
     );
   }
 
@@ -61,16 +64,16 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
     session = payload;
   } catch {
-    return NextResponse.json(
-      { message: 'Authentication service returned an invalid response.' },
-      { status: 502 },
-    );
+    return noStore({ message: 'Authentication service returned an invalid response.' }, 502);
   }
-  const response = NextResponse.json({
-    expiresIn: session.expiresIn,
-    user: session.user,
-    context: session.context,
-  });
+  const response = noStore(
+    {
+      expiresIn: session.expiresIn,
+      user: session.user,
+      context: session.context,
+    },
+    200,
+  );
   setSessionCookies(response, session, {
     tenantSlug: normalized.tenantSlug,
     expiresIn: session.expiresIn,
@@ -80,21 +83,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   return response;
 }
 
-function isLoginResponse(value: unknown): value is LoginResponse {
-  if (!value || typeof value !== 'object') {
-    return false;
-  }
-  const candidate = value as Partial<LoginResponse>;
-  return (
-    typeof candidate.accessToken === 'string' &&
-    candidate.accessToken.length > 0 &&
-    typeof candidate.refreshToken === 'string' &&
-    candidate.refreshToken.length > 0 &&
-    typeof candidate.expiresIn === 'number' &&
-    Number.isSafeInteger(candidate.expiresIn) &&
-    candidate.expiresIn > 0 &&
-    Boolean(candidate.user && typeof candidate.user.id === 'string') &&
-    Boolean(candidate.context && typeof candidate.context.tenantId === 'string') &&
-    Boolean(candidate.context && typeof candidate.context.membershipId === 'string')
-  );
+function noStore(body: unknown, status: number): NextResponse {
+  return NextResponse.json(body, { status, headers: { 'cache-control': 'no-store' } });
 }

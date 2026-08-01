@@ -8,7 +8,7 @@ MedSphere is a planned multi-tenant healthcare ecosystem for patients, pharmacie
 
 **Status date:** 2026-08-01
 
-**Evidence baseline:** `6f61e1d` on `cto/frontend-foundation`
+**Audited evidence baseline:** `5535422` on `cto/frontend-foundation`
 
 **Full-roadmap estimate:** **30% complete / 70% remaining**
 
@@ -24,10 +24,15 @@ below. Most of the product value sits in healthcare workflows that have not yet
 been built, so a strong foundation does not make the overall platform nearly
 finished.
 
+The evidence-based [Gates 1–20 verification](docs/audits/2026-08-01-gates-1-20-verification.md)
+rejects the claim that the full roadmap is complete: Gate 1 is an accepted
+foundation, Gate 3 is substantially implemented but not accepted/live, and
+Gates 2 and 4–20 are not complete.
+
 | Area                                                             | Verified state                                                                                                                                                                       | Estimated completion |
 | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------: |
 | Architecture, governance, monorepo, and database baseline        | ADR process, PNPM/Turbo tooling, shared packages, forward migrations, drift checks, and CI gates exist                                                                               |                  85% |
-| Authentication, tenant context, RBAC, and durable audit          | S0.3 and S0.4 accepted; authenticated frontend, role administration, effective permissions, and audit workspace implemented                                                          |                  85% |
+| Authentication, tenant context, RBAC, and durable audit          | S0.3 and S0.4 accepted; authenticated frontend, role administration, effective permissions, audit, policy-controlled onboarding, and personal privacy settings implemented           |                  85% |
 | Inventory ledger and medicine reservation integrity              | S0.5 schema, migration, stock ledger, FEFO, reservation aggregate, lifecycle services, and tests implemented; accepted production HTTP boundary and live frontend integration remain |                  65% |
 | Frontend                                                         | Landing, login, responsive shell, team/RBAC, and audit are connected; pharmacy dashboard and inventory remain previews; most healthcare modules are absent                           |                  32% |
 | Compliance beyond RBAC and audit                                 | Consent, privacy operations, verification, retention, legal hold, and policy enforcement remain incomplete                                                                           |                  10% |
@@ -50,15 +55,17 @@ finished.
   responsive application shell, and pharmacy operations visual language.
 - Connected frontend administration: team membership, role lifecycle, role
   assignment, effective-permission behavior, and tenant audit evidence.
-- Latest Task 10 local gates: formatting passed, lint 16/16, tests 19/19,
-  builds 16/16, and web tests 59/59. Infrastructure-dependent suites require
-  CI evidence on the exact remote commit.
+- Frontend Tasks 11–12 add personal privacy settings and policy-controlled
+  onboarding without claiming that the wider compliance milestone is complete.
+- Exact Task 12 commit `5535422` passed the pull-request workflow in
+  [run 30709965855](https://github.com/pmdzayan/medsphere-services/actions/runs/30709965855).
+  PR review and merge acceptance remain open.
 
 ### Remaining work
 
-1. **Close stabilization acceptance:** pass CI and merge the combined S0.5 and
-   frontend pull request; synchronize `PROJECT_STATUS.md`, sprint evidence, and
-   accepted branch references.
+1. **Close stabilization acceptance:** review and merge the combined S0.5 and
+   frontend pull request after the current audit remediation passes exact-commit
+   CI; synchronize accepted branch references.
 2. **Expose accepted inventory operations:** add the reviewed HTTP controllers,
    DTOs, Swagger contracts, permissions, tenant isolation, idempotency, and
    integration tests; replace inventory and pharmacy preview data with live

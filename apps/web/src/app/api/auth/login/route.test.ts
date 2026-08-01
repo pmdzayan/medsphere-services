@@ -15,11 +15,34 @@ afterEach(() => {
 });
 
 describe('login session boundary', () => {
+  it('rejects cross-origin requests before forwarding credentials', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await POST(createRequest(validRequest, 'https://attacker.example'));
+
+    expect(response.status).toBe(403);
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it('rejects invalid input before calling the authentication service', async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal('fetch', fetchMock);
 
     const response = await POST(createRequest({ ...validRequest, password: 'short' }));
+
+    expect(response.status).toBe(400);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects client-controlled tenant identity fields before forwarding credentials', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await POST(
+      createRequest({ ...validRequest, tenantId: 'client-controlled-tenant' }),
+    );
 
     expect(response.status).toBe(400);
     expect(fetchMock).not.toHaveBeenCalled();
@@ -48,6 +71,7 @@ describe('login session boundary', () => {
     const body = await response.json();
 
     expect(response.status).toBe(200);
+    expect(response.headers.get('cache-control')).toBe('no-store');
     expect(body).not.toHaveProperty('accessToken');
     expect(body).not.toHaveProperty('refreshToken');
     expect(response.headers.getSetCookie().join(';')).toContain('HttpOnly');
@@ -76,12 +100,38 @@ describe('login session boundary', () => {
       message: 'Authentication service returned an invalid response.',
     });
   });
+
+  it('rejects over-broad successful responses without setting credentials', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        Response.json({
+          accessToken: 'access-secret',
+          refreshToken: 'refresh-secret',
+          expiresIn: 900,
+          user: {
+            id: 'user-id',
+            email: validRequest.email,
+            firstName: 'Test',
+            lastName: 'User',
+            permissions: ['unsafe-upstream-field'],
+          },
+          context: { membershipId: 'membership-id', tenantId: 'tenant-id' },
+        }),
+      ),
+    );
+
+    const response = await POST(createRequest(validRequest));
+
+    expect(response.status).toBe(502);
+    expect(response.headers.getSetCookie()).toEqual([]);
+  });
 });
 
-function createRequest(body: unknown): NextRequest {
+function createRequest(body: unknown, origin = 'http://localhost'): NextRequest {
   return new NextRequest('http://localhost/api/auth/login', {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers: { 'content-type': 'application/json', origin },
     body: JSON.stringify(body),
   });
 }

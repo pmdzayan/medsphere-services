@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
+  isLoginRequest,
+  isLoginResponse,
   isRegistrationRequest,
   isRegistrationResponse,
   isTokenResponse,
+  normalizeLoginRequest,
   normalizeRegistrationRequest,
   normalizeTenantSlug,
   REGISTRATION_CONFIRMATION_MESSAGE,
@@ -23,6 +26,48 @@ describe('accepted login contract', () => {
         password: 'a-secure-password',
       }),
     ).toEqual({});
+  });
+
+  it('normalizes only public locators and preserves the password', () => {
+    expect(
+      normalizeLoginRequest({
+        tenantSlug: ' Central-Pharmacy ',
+        email: ' USER@EXAMPLE.COM ',
+        password: ' a-secure-password ',
+      }),
+    ).toEqual({
+      tenantSlug: 'central-pharmacy',
+      email: 'user@example.com',
+      password: ' a-secure-password ',
+    });
+  });
+
+  it('rejects over-broad login requests and responses', () => {
+    const request = {
+      tenantSlug: 'central-pharmacy',
+      email: 'user@example.com',
+      password: 'a-secure-password',
+    };
+    const response = {
+      accessToken: 'access-token',
+      refreshToken: 'refresh-token',
+      expiresIn: 900,
+      user: {
+        id: 'user-id',
+        email: request.email,
+        firstName: 'Test',
+        lastName: 'User',
+      },
+      context: { membershipId: 'membership-id', tenantId: 'tenant-id' },
+    };
+
+    expect(isLoginRequest(request)).toBe(true);
+    expect(isLoginRequest({ ...request, tenantId: 'client-controlled' })).toBe(false);
+    expect(isLoginResponse(response)).toBe(true);
+    expect(isLoginResponse({ ...response, permissions: ['unexpected'] })).toBe(false);
+    expect(
+      isLoginResponse({ ...response, user: { ...response.user, permissions: ['unexpected'] } }),
+    ).toBe(false);
   });
 
   it('rejects malformed tenant, email, and short password values', () => {
