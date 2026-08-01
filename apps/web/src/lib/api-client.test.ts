@@ -1,5 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { getAuditEvents, getAuthorizationCatalogue } from './api-client';
+import {
+  getAuditEvents,
+  getAuthorizationCatalogue,
+  getPrivacyPreferences,
+  getSupportedLanguages,
+  updatePreferredLanguage,
+  updatePrivacyPreferences,
+} from './api-client';
 
 const catalogue = { roles: [], permissions: [], total: 0, effectivePermissions: [] };
 
@@ -48,5 +55,56 @@ describe('authenticated API client', () => {
     expect(fetchMock).toHaveBeenCalledWith('/api/audit/events?outcome=FAILED&limit=25', {
       cache: 'no-store',
     });
+  });
+
+  it('loads and updates account settings through same-origin endpoints', async () => {
+    const privacy = {
+      sharePhone: false,
+      shareEmail: false,
+      allowInAppChat: true,
+      privatePickup: false,
+      hideSensitiveNotifications: true,
+    };
+    const languages = [{ code: 'en', name: 'English' }];
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(Response.json(privacy))
+      .mockResolvedValueOnce(Response.json(languages))
+      .mockResolvedValueOnce(Response.json({ ...privacy, privatePickup: true }))
+      .mockResolvedValueOnce(Response.json({ message: 'Language updated' }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(getPrivacyPreferences()).resolves.toEqual(privacy);
+    await expect(getSupportedLanguages()).resolves.toEqual(languages);
+    await expect(updatePrivacyPreferences({ privatePickup: true })).resolves.toEqual({
+      ...privacy,
+      privatePickup: true,
+    });
+    await expect(updatePreferredLanguage({ preferredLanguage: 'en' })).resolves.toEqual({
+      message: 'Language updated',
+    });
+
+    expect(fetchMock.mock.calls).toEqual([
+      ['/api/settings/privacy', { cache: 'no-store' }],
+      ['/api/settings/languages', { cache: 'no-store' }],
+      [
+        '/api/settings/privacy',
+        {
+          method: 'PATCH',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ privatePickup: true }),
+          cache: 'no-store',
+        },
+      ],
+      [
+        '/api/settings/language',
+        {
+          method: 'PATCH',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ preferredLanguage: 'en' }),
+          cache: 'no-store',
+        },
+      ],
+    ]);
   });
 });

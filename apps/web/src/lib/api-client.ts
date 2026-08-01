@@ -7,6 +7,13 @@ import type {
   Role,
   UpdateRoleRequest,
 } from './authorization-contract';
+import type {
+  LanguageUpdateRequest,
+  LanguageUpdateResponse,
+  PrivacyPreferences,
+  PrivacyPreferenceUpdate,
+  SupportedLanguage,
+} from './settings-contract';
 
 export class ApiError extends Error {
   constructor(
@@ -46,6 +53,34 @@ export async function getAuditEvents(filters: AuditEventFilters = {}): Promise<A
   const search = toAuditSearchParams(filters);
   const query = search.toString();
   return requestJson<AuditEventPage>(`/api/audit/events${query ? `?${query}` : ''}`);
+}
+
+export async function getPrivacyPreferences(): Promise<PrivacyPreferences> {
+  return requestJson<PrivacyPreferences>('/api/settings/privacy');
+}
+
+export async function updatePrivacyPreferences(
+  request: PrivacyPreferenceUpdate,
+): Promise<PrivacyPreferences> {
+  return requestJson<PrivacyPreferences>('/api/settings/privacy', {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(request),
+  });
+}
+
+export async function getSupportedLanguages(): Promise<SupportedLanguage[]> {
+  return requestJson<SupportedLanguage[]>('/api/settings/languages');
+}
+
+export async function updatePreferredLanguage(
+  request: LanguageUpdateRequest,
+): Promise<LanguageUpdateResponse> {
+  return requestJson<LanguageUpdateResponse>('/api/settings/language', {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(request),
+  });
 }
 
 export async function createRole(request: CreateRoleRequest): Promise<Role> {
