@@ -14,41 +14,41 @@ import {
 } from '@medsphere/database';
 import type { AuditMetadata } from '@medsphere/database';
 import { PrismaService } from '../prisma/prisma.service';
-import { assertActiveTenantActor } from '../stock/tenant-actor';
+import { assertTrustedProviderAccess } from './inventory-access';
 import type {
-  MedicineReservationLifecycleStatus,
-  MedicineReservationTransition,
-  MedicineReservationTransitionResult,
-  TransitionMedicineReservationCommand,
-} from './medicine-reservation.types';
+  ProviderReservationResultStatus,
+  ProviderReservationTransition,
+  ProviderReservationTransitionResult,
+  TransitionProviderReservationCommand,
+} from './reservation.types';
 
 type ActiveReservationStatus = 'PENDING' | 'CONFIRMED' | 'READY';
 
 const TRANSITIONS: Record<
-  MedicineReservationTransition,
-  { from: readonly ActiveReservationStatus[]; to: MedicineReservationLifecycleStatus }
+  ProviderReservationTransition,
+  { from: readonly ActiveReservationStatus[]; to: ProviderReservationResultStatus }
 > = {
   CONFIRM: { from: ['PENDING'], to: 'CONFIRMED' },
   READY: { from: ['CONFIRMED'], to: 'READY' },
   COMPLETE: { from: ['READY'], to: 'COMPLETED' },
   CANCEL: { from: ['PENDING', 'CONFIRMED', 'READY'], to: 'CANCELLED' },
-  EXPIRE: { from: ['PENDING', 'CONFIRMED', 'READY'], to: 'EXPIRED' },
 };
 
 @Injectable()
-export class MedicineReservationLifecycleService {
+export class ReservationLifecycleService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditWriter,
   ) {}
 
   async transition(
-    command: TransitionMedicineReservationCommand,
-  ): Promise<MedicineReservationTransitionResult> {
+    command: TransitionProviderReservationCommand,
+  ): Promise<ProviderReservationTransitionResult> {
     this.validate(command);
     const commandHash = this.commandHash(command);
     try {
       return await withSerializableRetry(this.prisma.client, async (transaction) => {
+        await assertTrustedProviderAccess(transaction, command.actor, command.providerId);
         const replay = await this.findReplay(
           transaction,
           command.actor.tenantId,
@@ -57,7 +57,6 @@ export class MedicineReservationLifecycleService {
         );
         if (replay) return replay;
 
-        await assertActiveTenantActor(transaction, command.actor);
         const reservation = await transaction.medicineReservation.findFirst({
           where: {
             id: command.reservationId,
@@ -91,7 +90,7 @@ export class MedicineReservationLifecycleService {
             },
           },
         });
-        if (!reservation) throw new NotFoundException('Medicine reservation not found in tenant');
+        if (!reservation) throw new NotFoundException('Medicine reservation not found');
         if (reservation.version !== command.expectedVersion) {
           throw new ConflictException('Medicine reservation version conflict');
         }
@@ -103,11 +102,8 @@ export class MedicineReservationLifecycleService {
           );
         }
         const now = new Date();
-        if (command.transition === 'EXPIRE' && reservation.expiresAt.getTime() > now.getTime()) {
-          throw new ConflictException('Medicine reservation has not expired');
-        }
-        if (command.transition !== 'EXPIRE' && reservation.expiresAt.getTime() <= now.getTime()) {
-          throw new ConflictException('Expired medicine reservation must be expired first');
+        if (reservation.expiresAt.getTime() <= now.getTime()) {
+          throw new ConflictException('Expired medicine reservation awaits system expiry');
         }
 
         const totalQuantity = reservation.allocations.reduce(
@@ -121,9 +117,16 @@ export class MedicineReservationLifecycleService {
         if (totalQuantity !== requestedQuantity) {
           throw new ConflictException('Medicine reservation holds are incomplete');
         }
+
         if (command.transition === 'COMPLETE') {
-          await this.consumeAllocations(transaction, command, reservation.allocations, now);
-        } else if (command.transition === 'CANCEL' || command.transition === 'EXPIRE') {
+          await this.consumeAllocations(
+            transaction,
+            command,
+            reservation.allocations,
+            commandHash,
+            now,
+          );
+        } else if (command.transition === 'CANCEL') {
           await this.releaseAllocations(transaction, command, reservation.allocations, now);
         }
 
@@ -178,6 +181,7 @@ export class MedicineReservationLifecycleService {
       });
     } catch (error) {
       if (!hasPrismaCode(error, 'P2002')) throw error;
+      await assertTrustedProviderAccess(this.prisma.client, command.actor, command.providerId);
       const replay = await this.findReplay(
         this.prisma.client,
         command.actor.tenantId,
@@ -191,8 +195,9 @@ export class MedicineReservationLifecycleService {
 
   private async consumeAllocations(
     transaction: Prisma.TransactionClient,
-    command: TransitionMedicineReservationCommand,
+    command: TransitionProviderReservationCommand,
     allocations: readonly AllocationRecord[],
+    commandHash: string,
     now: Date,
   ): Promise<void> {
     for (const allocation of allocations) {
@@ -233,6 +238,7 @@ export class MedicineReservationLifecycleService {
           referenceId: command.reservationId,
           reason: 'Medicine reservation completed',
           idempotencyKey: this.movementKey(command.idempotencyKey, allocation.id),
+          commandHash,
           actorType: 'TENANT_USER',
           actorMembershipId: command.actor.membershipId,
         },
@@ -243,7 +249,7 @@ export class MedicineReservationLifecycleService {
 
   private async releaseAllocations(
     transaction: Prisma.TransactionClient,
-    command: TransitionMedicineReservationCommand,
+    command: TransitionProviderReservationCommand,
     allocations: readonly AllocationRecord[],
     now: Date,
   ): Promise<void> {
@@ -262,7 +268,7 @@ export class MedicineReservationLifecycleService {
     }
   }
 
-  private batchMatch(command: TransitionMedicineReservationCommand, allocation: AllocationRecord) {
+  private batchMatch(command: TransitionProviderReservationCommand, allocation: AllocationRecord) {
     return {
       id: allocation.batchId,
       tenantId: command.actor.tenantId,
@@ -293,14 +299,14 @@ export class MedicineReservationLifecycleService {
 
   private async appendAudit(
     transaction: Prisma.TransactionClient,
-    command: TransitionMedicineReservationCommand,
+    command: TransitionProviderReservationCommand,
     previousStatus: string,
-    resultingStatus: MedicineReservationLifecycleStatus,
+    resultingStatus: ProviderReservationResultStatus,
     version: number,
     totalQuantity: number,
   ): Promise<void> {
     const suffix = resultingStatus.toLowerCase() as
-      'confirmed' | 'ready' | 'completed' | 'cancelled' | 'expired';
+      'confirmed' | 'ready' | 'completed' | 'cancelled';
     const metadata: AuditMetadata =
       resultingStatus === 'CONFIRMED' || resultingStatus === 'READY'
         ? { previousStatus, version }
@@ -317,7 +323,7 @@ export class MedicineReservationLifecycleService {
     });
   }
 
-  private transitionTimestamp(transition: MedicineReservationTransition, now: Date) {
+  private transitionTimestamp(transition: ProviderReservationTransition, now: Date) {
     switch (transition) {
       case 'CONFIRM':
         return { confirmedAt: now };
@@ -327,8 +333,6 @@ export class MedicineReservationLifecycleService {
         return { completedAt: now };
       case 'CANCEL':
         return { cancelledAt: now };
-      case 'EXPIRE':
-        return { expiredAt: now };
     }
   }
 
@@ -337,7 +341,7 @@ export class MedicineReservationLifecycleService {
     tenantId: string,
     idempotencyKey: string,
     commandHash: string,
-  ): Promise<MedicineReservationTransitionResult | null> {
+  ): Promise<ProviderReservationTransitionResult | null> {
     const receipt = await database.medicineReservationCommand.findUnique({
       where: { tenantId_idempotencyKey: { tenantId, idempotencyKey } },
       select: {
@@ -345,9 +349,7 @@ export class MedicineReservationLifecycleService {
         commandHash: true,
         resultingStatus: true,
         resultingVersion: true,
-        reservation: {
-          select: { allocations: { select: { quantity: true } } },
-        },
+        reservation: { select: { allocations: { select: { quantity: true } } } },
       },
     });
     if (!receipt) return null;
@@ -356,7 +358,7 @@ export class MedicineReservationLifecycleService {
     }
     return {
       reservationId: receipt.reservationId,
-      status: receipt.resultingStatus as MedicineReservationLifecycleStatus,
+      status: receipt.resultingStatus as ProviderReservationResultStatus,
       version: receipt.resultingVersion,
       totalQuantity: receipt.reservation.allocations.reduce(
         (total, allocation) => total + allocation.quantity,
@@ -366,19 +368,23 @@ export class MedicineReservationLifecycleService {
     };
   }
 
-  private validate(command: TransitionMedicineReservationCommand): void {
+  private validate(command: TransitionProviderReservationCommand): void {
     if (command.reservationId.length === 0 || command.providerId.length === 0) {
       throw new BadRequestException('Reservation and provider identifiers are required');
     }
     if (!Number.isSafeInteger(command.expectedVersion) || command.expectedVersion < 1) {
       throw new BadRequestException('Expected version must be a positive safe integer');
     }
-    if (command.idempotencyKey.length === 0 || command.idempotencyKey.length > 120) {
-      throw new BadRequestException('Idempotency key must contain 1 to 120 characters');
+    if (
+      command.idempotencyKey.trim() !== command.idempotencyKey ||
+      command.idempotencyKey.length === 0 ||
+      command.idempotencyKey.length > 120
+    ) {
+      throw new BadRequestException('Idempotency key must contain 1 to 120 trimmed characters');
     }
   }
 
-  private commandHash(command: TransitionMedicineReservationCommand): string {
+  private commandHash(command: TransitionProviderReservationCommand): string {
     return createHash('sha256')
       .update(
         JSON.stringify({

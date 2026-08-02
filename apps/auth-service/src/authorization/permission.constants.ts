@@ -13,6 +13,8 @@ export const PERMISSIONS = {
   inventoryListingsManage: 'inventory.listings.manage',
   inventoryStockReceive: 'inventory.stock.receive',
   inventoryStockAdjust: 'inventory.stock.adjust',
+  inventoryReservationsRead: 'inventory.reservations.read',
+  inventoryReservationsManage: 'inventory.reservations.manage',
 } as const;
 
 export const PERMISSION_KEYS = Object.values(PERMISSIONS);

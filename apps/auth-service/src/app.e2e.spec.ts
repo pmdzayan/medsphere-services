@@ -20,6 +20,8 @@ import { RedisThrottlerStorage } from './security/redis-throttler.storage';
 import { UsersService } from './users/users.service';
 import { InventoryCommandService } from './inventory/inventory-command.service';
 import { InventoryService } from './inventory/inventory.service';
+import { ReservationLifecycleService } from './inventory/reservation-lifecycle.service';
+import { ReservationService } from './inventory/reservation.service';
 
 interface ApiResponse {
   readonly status: number;
@@ -106,6 +108,16 @@ describe('S0.4 authentication and authorization HTTP security boundary', () => {
     receiveBatch,
     adjustBatch,
   } as unknown as InventoryCommandService;
+  const listReservations = jest.fn();
+  const getReservation = jest.fn();
+  const reservationService = {
+    list: listReservations,
+    get: getReservation,
+  } as unknown as ReservationService;
+  const transitionReservation = jest.fn();
+  const reservationLifecycleService = {
+    transition: transitionReservation,
+  } as unknown as ReservationLifecycleService;
 
   let app: INestApplication;
   let module: TestingModule;
@@ -141,6 +153,10 @@ describe('S0.4 authentication and authorization HTTP security boundary', () => {
       .useValue(inventoryService)
       .overrideProvider(InventoryCommandService)
       .useValue(inventoryCommandService)
+      .overrideProvider(ReservationService)
+      .useValue(reservationService)
+      .overrideProvider(ReservationLifecycleService)
+      .useValue(reservationLifecycleService)
       .compile();
 
     app = module.createNestApplication();
@@ -179,6 +195,9 @@ describe('S0.4 authentication and authorization HTTP security boundary', () => {
     configureInventory.mockReset();
     receiveBatch.mockReset();
     adjustBatch.mockReset();
+    listReservations.mockReset();
+    getReservation.mockReset();
+    transitionReservation.mockReset();
     getPrivacy.mockResolvedValue({
       sharePhone: false,
       shareEmail: false,
@@ -440,6 +459,91 @@ describe('S0.4 authentication and authorization HTTP security boundary', () => {
       providerId,
       expect.objectContaining({ limit: 25, query: 'medicine' }),
     );
+  });
+
+  it('uses trusted identity and no-store caching for provider reservation reads', async () => {
+    const issued = issueAccessToken();
+    const providerId = randomUUID();
+    const identity: AuthenticatedIdentity = {
+      userId,
+      membershipId,
+      tenantId,
+      sessionId,
+      tokenId: issued.tokenId,
+    };
+    validateAccessIdentity.mockResolvedValue(identity);
+    hasAllPermissions.mockResolvedValue(true);
+    listReservations.mockResolvedValue({ data: [], total: 0, limit: 25, offset: 0 });
+
+    const response = await sendRequest(
+      `/inventory/providers/${providerId}/reservations?limit=25&status=READY`,
+      { headers: { authorization: `Bearer ${issued.value}` } },
+    );
+
+    expect(response).toMatchObject({
+      status: 200,
+      body: { data: [], total: 0, limit: 25, offset: 0 },
+      headers: { 'cache-control': 'private, no-store' },
+    });
+    expect(hasAllPermissions).toHaveBeenCalledWith(identity, ['inventory.reservations.read']);
+    expect(listReservations).toHaveBeenCalledWith(
+      identity,
+      providerId,
+      expect.objectContaining({ limit: 25, status: 'READY' }),
+    );
+  });
+
+  it('maps a bounded staff reservation transition and rejects worker-only expiry', async () => {
+    const issued = issueAccessToken();
+    const providerId = randomUUID();
+    const reservationId = randomUUID();
+    const identity: AuthenticatedIdentity = {
+      userId,
+      membershipId,
+      tenantId,
+      sessionId,
+      tokenId: issued.tokenId,
+    };
+    validateAccessIdentity.mockResolvedValue(identity);
+    hasAllPermissions.mockResolvedValue(true);
+    transitionReservation.mockResolvedValue({
+      reservationId,
+      status: 'CONFIRMED',
+      version: 2,
+      totalQuantity: 4,
+      replayed: false,
+    });
+
+    const path = `/inventory/providers/${providerId}/reservations/${reservationId}/transitions`;
+    const response = await sendRequest(path, {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${issued.value}`,
+        'x-request-id': 'reservation-transition-1',
+      },
+      body: { transition: 'CONFIRM', expectedVersion: 1, idempotencyKey: 'confirm-1' },
+    });
+
+    expect(response.status).toBe(200);
+    expect(hasAllPermissions).toHaveBeenCalledWith(identity, ['inventory.reservations.manage']);
+    expect(transitionReservation).toHaveBeenCalledWith(
+      expect.objectContaining({
+        actor: identity,
+        providerId,
+        reservationId,
+        transition: 'CONFIRM',
+        request: expect.objectContaining({ requestId: 'reservation-transition-1' }),
+      }),
+    );
+
+    transitionReservation.mockClear();
+    const expiry = await sendRequest(path, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${issued.value}` },
+      body: { transition: 'EXPIRE', expectedVersion: 1, idempotencyKey: 'expire-1' },
+    });
+    expect(expiry.status).toBe(400);
+    expect(transitionReservation).not.toHaveBeenCalled();
   });
 
   it('passes trusted identity and bounded request metadata to inventory configuration', async () => {

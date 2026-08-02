@@ -1,6 +1,6 @@
 # Volume 10 — Testing Bible
 
-**Status:** S0.4–S0.5 and G3.1 accepted; G3.2 evidence contract active
+**Status:** S0.4–S0.5 and G3.1–G3.2 accepted; G3.3 evidence contract active
 
 **Runtime contract:** Node.js 20.11.1, PNPM 9.15.0, PostgreSQL 16, and Redis 7
 
@@ -182,3 +182,13 @@ one-winner expected-version concurrency. Pull-request CI must execute these
 tests with `RUN_AUTH_INFRASTRUCTURE_TESTS=true`, deploy the G3.2 migration on a
 clean database, verify the populated upgrade path and command-hash constraint,
 and report zero skipped infrastructure tests before acceptance.
+
+## G3.3 required evidence
+
+G3.3 adds HTTP tests for trusted identity, dedicated permissions, bounded
+status/transition validation, no-store reads, and rejection of staff expiry.
+Unit tests prove authorization occurs before replay and verify exact completion
+and cancellation effects. Real PostgreSQL tests must prove atomic stock
+consumption, command/movement hash binding, durable audit attribution,
+unauthorized replay concealment, and one-winner expected-version concurrency.
+These infrastructure tests must execute with zero skips in exact-commit CI.
