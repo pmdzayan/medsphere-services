@@ -1,6 +1,6 @@
 # Volume 10 — Testing Bible
 
-**Status:** S0.4 accepted and merged; S0.5 evidence contract active
+**Status:** S0.4–S0.5 and G3.1 accepted; G3.2 evidence contract active
 
 **Runtime contract:** Node.js 20.11.1, PNPM 9.15.0, PostgreSQL 16, and Redis 7
 
@@ -173,3 +173,12 @@ HTTP tests must prove trusted identity, permission denial, tenant isolation,
 version and idempotency validation, bounded queries, and continued 404 behavior
 for every unaccepted prototype route. Mock-only transaction tests are not
 acceptance evidence.
+
+## G3.2 required evidence
+
+G3.2 adds real PostgreSQL coverage for atomic listing configuration, batch
+receipt, adjustment, typed audit evidence, unauthorized replay concealment, and
+one-winner expected-version concurrency. Pull-request CI must execute these
+tests with `RUN_AUTH_INFRASTRUCTURE_TESTS=true`, deploy the G3.2 migration on a
+clean database, verify the populated upgrade path and command-hash constraint,
+and report zero skipped infrastructure tests before acceptance.

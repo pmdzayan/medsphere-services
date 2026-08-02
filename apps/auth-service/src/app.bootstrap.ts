@@ -17,9 +17,11 @@ export function configureAuthApplication(app: INestApplication): void {
 
   if (process.env.ENABLE_SWAGGER === 'true') {
     const openApiConfig = new DocumentBuilder()
-      .setTitle('MedSphere Authentication API')
-      .setDescription('Accepted S0.3 authentication and trusted tenant-context endpoints')
-      .setVersion('0.3.0')
+      .setTitle('MedSphere Platform API')
+      .setDescription(
+        'Accepted identity, authorization, audit, provider-scope, and bounded inventory endpoints',
+      )
+      .setVersion('0.5.0')
       .addBearerAuth({ type: 'http', scheme: 'bearer', bearerFormat: 'JWT' })
       .build();
     const openApiDocument = SwaggerModule.createDocument(app, openApiConfig);

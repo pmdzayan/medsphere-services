@@ -1,11 +1,12 @@
+import { createHash } from 'node:crypto';
 import { SerializableRetryError } from '@medsphere/database';
-import { StockService } from './stock.service';
+import { InventoryCommandService } from './inventory-command.service';
 
 function createHarness() {
   const transaction = {
     stockMovement: { findUnique: jest.fn(), create: jest.fn() },
     inventoryConfigurationCommand: { findUnique: jest.fn(), create: jest.fn() },
-    tenantMembership: { findFirst: jest.fn() },
+    membershipProviderAccess: { findFirst: jest.fn() },
     provider: { findFirst: jest.fn() },
     product: { findFirst: jest.fn() },
     inventory: {
@@ -29,20 +30,52 @@ function createHarness() {
     ),
   };
   const audit = { appendTenantUser: jest.fn() };
-  const service = new StockService({ client } as never, audit as never);
+  const service = new InventoryCommandService({ client } as never, audit as never);
   return { audit, client, service, transaction };
 }
 
-const actor = { tenantId: 'tenant-1', membershipId: 'membership-1' };
+const actor = { tenantId: 'tenant-1', membershipId: 'membership-1', userId: 'user-1' };
 
-describe('StockService', () => {
+describe('InventoryCommandService', () => {
   beforeEach(() => jest.useFakeTimers().setSystemTime(new Date('2026-07-31T00:00:00.000Z')));
   afterEach(() => jest.useRealTimers());
 
+  it('conceals idempotency receipts from memberships without live provider access', async () => {
+    const harness = createHarness();
+    harness.transaction.membershipProviderAccess.findFirst.mockResolvedValue(null);
+    harness.transaction.stockMovement.findUnique.mockResolvedValue({
+      id: 'movement-1',
+      type: 'STOCK_IN',
+      inventoryId: 'inventory-1',
+      batchId: 'batch-1',
+      delta: 20,
+      onHandBefore: 0,
+      onHandAfter: 20,
+      referenceType: 'inventory.batch.receive',
+      referenceId: 'batch-1',
+      batch: { version: 1 },
+    });
+
+    await expect(
+      harness.service.receiveBatch({
+        actor,
+        providerId: 'provider-1',
+        productId: 'product-1',
+        batchNumber: 'BATCH-001',
+        expiryDate: new Date('2027-12-31T00:00:00.000Z'),
+        quantity: 20,
+        purchasePrice: '10.00',
+        sellingPrice: '12.00',
+        idempotencyKey: 'receive-1',
+      }),
+    ).rejects.toThrow('Provider inventory not found');
+    expect(harness.transaction.stockMovement.findUnique).not.toHaveBeenCalled();
+  });
+
   it('creates an inventory configuration with an atomic command receipt and audit', async () => {
     const harness = createHarness();
+    harness.transaction.membershipProviderAccess.findFirst.mockResolvedValue({ id: 'access-1' });
     harness.transaction.inventoryConfigurationCommand.findUnique.mockResolvedValue(null);
-    harness.transaction.tenantMembership.findFirst.mockResolvedValue({ id: actor.membershipId });
     harness.transaction.provider.findFirst.mockResolvedValue({ id: 'provider-1' });
     harness.transaction.product.findFirst.mockResolvedValue({ id: 'product-1' });
     harness.transaction.inventory.findUnique.mockResolvedValue(null);
@@ -91,6 +124,7 @@ describe('StockService', () => {
 
   it('returns a matching configuration receipt without repeating the mutation', async () => {
     const harness = createHarness();
+    harness.transaction.membershipProviderAccess.findFirst.mockResolvedValue({ id: 'access-1' });
     let capturedHash = '';
     const command = {
       actor,
@@ -106,7 +140,6 @@ describe('StockService', () => {
       idempotencyKey: 'configure-1',
     } as const;
     harness.transaction.inventoryConfigurationCommand.findUnique.mockResolvedValue(null);
-    harness.transaction.tenantMembership.findFirst.mockResolvedValue({ id: actor.membershipId });
     harness.transaction.provider.findFirst.mockResolvedValue({ id: 'provider-1' });
     harness.transaction.product.findFirst.mockResolvedValue({ id: 'product-1' });
     harness.transaction.inventory.findUnique.mockResolvedValue({
@@ -137,8 +170,8 @@ describe('StockService', () => {
 
   it('receives a batch, movement, and audit in one serializable transaction', async () => {
     const harness = createHarness();
+    harness.transaction.membershipProviderAccess.findFirst.mockResolvedValue({ id: 'access-1' });
     harness.transaction.stockMovement.findUnique.mockResolvedValue(null);
-    harness.transaction.tenantMembership.findFirst.mockResolvedValue({ id: actor.membershipId });
     harness.transaction.inventory.findFirst.mockResolvedValue({ id: 'inventory-1' });
     harness.transaction.batch.findUnique.mockResolvedValue(null);
     harness.transaction.batch.create.mockResolvedValue({ id: 'batch-created' });
@@ -146,7 +179,6 @@ describe('StockService', () => {
 
     const result = await harness.service.receiveBatch({
       actor,
-      inventoryId: 'inventory-1',
       providerId: 'provider-1',
       productId: 'product-1',
       batchNumber: 'BATCH-001',
@@ -186,8 +218,40 @@ describe('StockService', () => {
     expect(result).toEqual(expect.objectContaining({ onHandAfter: 20, replayed: false }));
   });
 
+  it('rejects a future manufacturing date before starting a transaction', async () => {
+    const harness = createHarness();
+
+    await expect(
+      harness.service.receiveBatch({
+        actor,
+        providerId: 'provider-1',
+        productId: 'product-1',
+        batchNumber: 'BATCH-001',
+        manufacturingDate: new Date('2026-08-01T00:00:00.000Z'),
+        expiryDate: new Date('2027-12-31T00:00:00.000Z'),
+        quantity: 20,
+        purchasePrice: '10.00',
+        sellingPrice: '12.00',
+        idempotencyKey: 'receive-future-manufacture',
+      }),
+    ).rejects.toThrow('Manufacturing date cannot be in the future');
+    expect(harness.client.$transaction).not.toHaveBeenCalled();
+  });
+
   it('returns an idempotent receipt replay without repeating writes or audit', async () => {
     const harness = createHarness();
+    harness.transaction.membershipProviderAccess.findFirst.mockResolvedValue({ id: 'access-1' });
+    const command = {
+      actor,
+      providerId: 'provider-1',
+      productId: 'product-1',
+      batchNumber: 'BATCH-001',
+      expiryDate: new Date('2027-12-31T00:00:00.000Z'),
+      quantity: 20,
+      purchasePrice: '10.00',
+      sellingPrice: '12.00',
+      idempotencyKey: 'receive-1',
+    } as const;
     harness.transaction.stockMovement.findUnique.mockResolvedValue({
       id: 'movement-1',
       type: 'STOCK_IN',
@@ -198,32 +262,36 @@ describe('StockService', () => {
       onHandAfter: 20,
       referenceType: 'inventory.batch.receive',
       referenceId: 'batch-1',
+      commandHash: createHash('sha256')
+        .update(
+          JSON.stringify({
+            tenantId: actor.tenantId,
+            providerId: command.providerId,
+            productId: command.productId,
+            batchNumber: command.batchNumber,
+            manufacturingDate: null,
+            expiryDate: command.expiryDate.toISOString(),
+            quantity: command.quantity,
+            purchasePrice: command.purchasePrice,
+            sellingPrice: command.sellingPrice,
+            reason: null,
+          }),
+        )
+        .digest('hex'),
       batch: { version: 1 },
     });
 
-    const result = await harness.service.receiveBatch({
-      actor,
-      inventoryId: 'inventory-1',
-      providerId: 'provider-1',
-      productId: 'product-1',
-      batchNumber: 'BATCH-001',
-      expiryDate: new Date('2027-12-31T00:00:00.000Z'),
-      quantity: 20,
-      purchasePrice: '10.00',
-      sellingPrice: '12.00',
-      idempotencyKey: 'receive-1',
-    });
+    const result = await harness.service.receiveBatch(command);
 
     expect(result.replayed).toBe(true);
-    expect(harness.transaction.tenantMembership.findFirst).not.toHaveBeenCalled();
     expect(harness.transaction.batch.create).not.toHaveBeenCalled();
     expect(harness.audit.appendTenantUser).not.toHaveBeenCalled();
   });
 
   it('rejects an adjustment that would consume held stock before any write', async () => {
     const harness = createHarness();
+    harness.transaction.membershipProviderAccess.findFirst.mockResolvedValue({ id: 'access-1' });
     harness.transaction.stockMovement.findUnique.mockResolvedValue(null);
-    harness.transaction.tenantMembership.findFirst.mockResolvedValue({ id: actor.membershipId });
     harness.transaction.batch.findFirst.mockResolvedValue({
       id: 'batch-1',
       inventoryId: 'inventory-1',
@@ -252,8 +320,8 @@ describe('StockService', () => {
 
   it('uses an optimistic conditional update and records the exact adjustment equation', async () => {
     const harness = createHarness();
+    harness.transaction.membershipProviderAccess.findFirst.mockResolvedValue({ id: 'access-1' });
     harness.transaction.stockMovement.findUnique.mockResolvedValue(null);
-    harness.transaction.tenantMembership.findFirst.mockResolvedValue({ id: actor.membershipId });
     harness.transaction.batch.findFirst.mockResolvedValue({
       id: 'batch-1',
       inventoryId: 'inventory-1',
@@ -297,8 +365,8 @@ describe('StockService', () => {
 
   it('rejects a lost optimistic update and leaves movement/audit unwritten', async () => {
     const harness = createHarness();
+    harness.transaction.membershipProviderAccess.findFirst.mockResolvedValue({ id: 'access-1' });
     harness.transaction.stockMovement.findUnique.mockResolvedValue(null);
-    harness.transaction.tenantMembership.findFirst.mockResolvedValue({ id: actor.membershipId });
     harness.transaction.batch.findFirst.mockResolvedValue({
       id: 'batch-1',
       inventoryId: 'inventory-1',

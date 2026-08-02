@@ -6,27 +6,28 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import {
-  AuditWriter,
   Prisma,
   SerializableRetryError,
   hasPrismaCode,
   withSerializableRetry,
 } from '@medsphere/database';
+import { AuditWriter } from '../audit/audit-writer.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { assertActiveTenantActor } from './tenant-actor';
+import { assertTrustedProviderAccess } from './inventory-access';
 import type {
   AdjustBatchCommand,
   ConfigureInventoryCommand,
   InventoryConfigurationResult,
   ReceiveBatchCommand,
   StockMutationResult,
-} from './stock.types';
+  TrustedInventoryActor,
+} from './inventory-command.types';
 
 const RECEIVE_REFERENCE = 'inventory.batch.receive';
 const ADJUST_REFERENCE = 'inventory.stock.adjustment';
 
 @Injectable()
-export class StockService {
+export class InventoryCommandService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditWriter,
@@ -53,6 +54,7 @@ export class StockService {
 
     try {
       return await withSerializableRetry(this.prisma.client, async (transaction) => {
+        await assertTrustedProviderAccess(transaction, command.actor, command.providerId);
         const replay = await this.findConfigurationReplay(
           transaction,
           command.actor.tenantId,
@@ -61,7 +63,6 @@ export class StockService {
         );
         if (replay) return replay;
 
-        await assertActiveTenantActor(transaction, command.actor);
         const [provider, product] = await Promise.all([
           transaction.provider.findFirst({
             where: {
@@ -164,6 +165,7 @@ export class StockService {
       });
     } catch (error) {
       if (!hasPrismaCode(error, 'P2002')) throw error;
+      await assertTrustedProviderAccess(this.prisma.client, command.actor, command.providerId);
       const replay = await this.findConfigurationReplay(
         this.prisma.client,
         command.actor.tenantId,
@@ -177,26 +179,29 @@ export class StockService {
 
   async receiveBatch(command: ReceiveBatchCommand): Promise<StockMutationResult> {
     this.validateReceive(command);
+    const commandHash = this.receiveCommandHash(command);
     return this.executeIdempotent(
-      command.actor.tenantId,
+      command.actor,
+      command.providerId,
       command.idempotencyKey,
+      commandHash,
       'STOCK_IN',
       RECEIVE_REFERENCE,
       () =>
         withSerializableRetry(this.prisma.client, async (transaction) => {
+          await assertTrustedProviderAccess(transaction, command.actor, command.providerId);
           const replay = await this.findReplay(
             transaction,
             command.actor.tenantId,
             command.idempotencyKey,
+            commandHash,
             'STOCK_IN',
             RECEIVE_REFERENCE,
           );
           if (replay) return replay;
 
-          await assertActiveTenantActor(transaction, command.actor);
           const inventory = await transaction.inventory.findFirst({
             where: {
-              id: command.inventoryId,
               tenantId: command.actor.tenantId,
               providerId: command.providerId,
               productId: command.productId,
@@ -264,6 +269,7 @@ export class StockService {
               referenceId: batchId,
               reason: command.reason,
               idempotencyKey: command.idempotencyKey,
+              commandHash,
               actorType: 'TENANT_USER',
               actorMembershipId: command.actor.membershipId,
             },
@@ -295,23 +301,27 @@ export class StockService {
 
   async adjustBatch(command: AdjustBatchCommand): Promise<StockMutationResult> {
     this.validateAdjustment(command);
+    const commandHash = this.adjustCommandHash(command);
     return this.executeIdempotent(
-      command.actor.tenantId,
+      command.actor,
+      command.providerId,
       command.idempotencyKey,
+      commandHash,
       'ADJUSTMENT',
       ADJUST_REFERENCE,
       () =>
         withSerializableRetry(this.prisma.client, async (transaction) => {
+          await assertTrustedProviderAccess(transaction, command.actor, command.providerId);
           const replay = await this.findReplay(
             transaction,
             command.actor.tenantId,
             command.idempotencyKey,
+            commandHash,
             'ADJUSTMENT',
             ADJUST_REFERENCE,
           );
           if (replay) return replay;
 
-          await assertActiveTenantActor(transaction, command.actor);
           const batch = await transaction.batch.findFirst({
             where: {
               id: command.batchId,
@@ -386,6 +396,7 @@ export class StockService {
               referenceId: batch.id,
               reason: command.reason,
               idempotencyKey: command.idempotencyKey,
+              commandHash,
               actorType: 'TENANT_USER',
               actorMembershipId: command.actor.membershipId,
             },
@@ -421,8 +432,10 @@ export class StockService {
   }
 
   private async executeIdempotent(
-    tenantId: string,
+    actor: TrustedInventoryActor,
+    providerId: string,
     idempotencyKey: string,
+    commandHash: string,
     expectedType: 'STOCK_IN' | 'ADJUSTMENT',
     expectedReferenceType: string,
     operation: () => Promise<StockMutationResult>,
@@ -431,10 +444,12 @@ export class StockService {
       return await operation();
     } catch (error) {
       if (!hasPrismaCode(error, 'P2002')) throw error;
+      await assertTrustedProviderAccess(this.prisma.client, actor, providerId);
       const replay = await this.findReplay(
         this.prisma.client,
-        tenantId,
+        actor.tenantId,
         idempotencyKey,
+        commandHash,
         expectedType,
         expectedReferenceType,
       );
@@ -468,6 +483,7 @@ export class StockService {
     database: Pick<Prisma.TransactionClient, 'stockMovement'>,
     tenantId: string,
     idempotencyKey: string,
+    expectedCommandHash: string,
     expectedType: 'STOCK_IN' | 'ADJUSTMENT' | undefined,
     expectedReferenceType: string | undefined,
   ): Promise<StockMutationResult | null> {
@@ -483,6 +499,7 @@ export class StockService {
         onHandAfter: true,
         referenceType: true,
         referenceId: true,
+        commandHash: true,
         batch: { select: { version: true } },
       },
     });
@@ -490,7 +507,8 @@ export class StockService {
     if (
       (expectedType !== undefined && movement.type !== expectedType) ||
       (expectedReferenceType !== undefined && movement.referenceType !== expectedReferenceType) ||
-      movement.referenceId !== movement.batchId
+      movement.referenceId !== movement.batchId ||
+      movement.commandHash !== expectedCommandHash
     ) {
       throw new ConflictException('Idempotency key is already used by another command');
     }
@@ -519,15 +537,50 @@ export class StockService {
     if (
       command.manufacturingDate &&
       (Number.isNaN(command.manufacturingDate.getTime()) ||
+        command.manufacturingDate.getTime() > Date.now() ||
         command.manufacturingDate.getTime() >= command.expiryDate.getTime())
     ) {
-      throw new BadRequestException('Manufacturing date must be before expiry date');
+      throw new BadRequestException('Manufacturing date cannot be in the future or after expiry');
     }
     this.nonNegativeDecimal(command.purchasePrice, 'Purchase price');
     this.nonNegativeDecimal(command.sellingPrice, 'Selling price');
     if (command.reason !== undefined && command.reason.length > 500) {
       throw new BadRequestException('Reason cannot exceed 500 characters');
     }
+  }
+
+  private receiveCommandHash(command: ReceiveBatchCommand): string {
+    return createHash('sha256')
+      .update(
+        JSON.stringify({
+          tenantId: command.actor.tenantId,
+          providerId: command.providerId,
+          productId: command.productId,
+          batchNumber: command.batchNumber,
+          manufacturingDate: command.manufacturingDate?.toISOString() ?? null,
+          expiryDate: command.expiryDate.toISOString(),
+          quantity: command.quantity,
+          purchasePrice: command.purchasePrice,
+          sellingPrice: command.sellingPrice,
+          reason: command.reason ?? null,
+        }),
+      )
+      .digest('hex');
+  }
+
+  private adjustCommandHash(command: AdjustBatchCommand): string {
+    return createHash('sha256')
+      .update(
+        JSON.stringify({
+          tenantId: command.actor.tenantId,
+          providerId: command.providerId,
+          batchId: command.batchId,
+          expectedVersion: command.expectedVersion,
+          delta: command.delta,
+          reason: command.reason,
+        }),
+      )
+      .digest('hex');
   }
 
   private validateConfiguration(command: ConfigureInventoryCommand): {

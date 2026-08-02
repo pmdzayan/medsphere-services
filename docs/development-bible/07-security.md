@@ -1,8 +1,8 @@
 # Volume 07 — Security Bible: Identity, Authorization, and Audit
 
-**Decisions:** ADR-003, ADR-004, ADR-005, and ADR-006
+**Decisions:** ADR-003 through ADR-007
 
-**Status:** S0.3 and S0.4 accepted and merged; S0.5 security target active
+**Status:** S0.3–S0.5 and G3.1 accepted; G3.2 security target active
 
 ## Security invariants
 
@@ -153,3 +153,16 @@ requires a later Marketplace decision for global-user attribution, patient
 self-access, abuse controls, and tenant-scoped audit visibility. No header,
 zero UUID, system actor, or client-supplied tenant may be used as a temporary
 identity fallback.
+
+## G3.2 command boundary
+
+- Listing, receipt, and adjustment commands require both a dedicated
+  migration-owned permission and live `MembershipProviderAccess`.
+- Missing provider assignment uses the same not-found response as missing
+  provider inventory.
+- Idempotency receipt lookup occurs only after provider authorization and the
+  canonical command hash must match before replay.
+- Client tenant, provider, membership, user, actor, and inventory identifiers
+  never override verified identity and path scope.
+- Every protected write is serializable and atomic with its stock movement or
+  configuration receipt and typed tenant audit event.

@@ -595,6 +595,7 @@ model StockMovement {
   referenceId    String? @db.VarChar(120)
   reason         String? @db.VarChar(500)
   idempotencyKey String  @db.VarChar(120)
+  commandHash    String? @db.VarChar(64)
 
   actorType         AuditActorType
   actorMembershipId String?           @db.Uuid

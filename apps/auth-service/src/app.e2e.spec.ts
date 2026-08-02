@@ -18,6 +18,7 @@ import { AuditWriter } from './audit/audit-writer.service';
 import { AuthorizationService } from './authorization/authorization.service';
 import { RedisThrottlerStorage } from './security/redis-throttler.storage';
 import { UsersService } from './users/users.service';
+import { InventoryCommandService } from './inventory/inventory-command.service';
 import { InventoryService } from './inventory/inventory.service';
 
 interface ApiResponse {
@@ -27,7 +28,7 @@ interface ApiResponse {
 }
 
 interface RequestOptions {
-  readonly method?: 'GET' | 'POST' | 'PATCH';
+  readonly method?: 'GET' | 'POST' | 'PATCH' | 'PUT';
   readonly headers?: Readonly<Record<string, string>>;
   readonly body?: unknown;
 }
@@ -97,6 +98,14 @@ describe('S0.4 authentication and authorization HTTP security boundary', () => {
   } as unknown as AuditWriter;
   const listStock = jest.fn();
   const inventoryService = { listStock } as unknown as InventoryService;
+  const configureInventory = jest.fn();
+  const receiveBatch = jest.fn();
+  const adjustBatch = jest.fn();
+  const inventoryCommandService = {
+    configureInventory,
+    receiveBatch,
+    adjustBatch,
+  } as unknown as InventoryCommandService;
 
   let app: INestApplication;
   let module: TestingModule;
@@ -130,6 +139,8 @@ describe('S0.4 authentication and authorization HTTP security boundary', () => {
       .useValue(auditWriter)
       .overrideProvider(InventoryService)
       .useValue(inventoryService)
+      .overrideProvider(InventoryCommandService)
+      .useValue(inventoryCommandService)
       .compile();
 
     app = module.createNestApplication();
@@ -165,6 +176,9 @@ describe('S0.4 authentication and authorization HTTP security boundary', () => {
     listTenantEvents.mockReset();
     appendTenantUser.mockReset().mockResolvedValue(undefined);
     listStock.mockReset();
+    configureInventory.mockReset();
+    receiveBatch.mockReset();
+    adjustBatch.mockReset();
     getPrivacy.mockResolvedValue({
       sharePhone: false,
       shareEmail: false,
@@ -381,6 +395,15 @@ describe('S0.4 authentication and authorization HTTP security boundary', () => {
     },
   );
 
+  it.each([
+    ['PUT', `/inventory/providers/${randomUUID()}/products/${randomUUID()}`],
+    ['POST', `/inventory/providers/${randomUUID()}/products/${randomUUID()}/batches`],
+    ['POST', `/inventory/providers/${randomUUID()}/batches/${randomUUID()}/adjustments`],
+  ] as const)('keeps an inventory mutation authenticated: %s %s', async (method, path) => {
+    await expect(sendRequest(path, { method })).resolves.toMatchObject({ status: 401 });
+    expect(hasAllPermissions).not.toHaveBeenCalled();
+  });
+
   it('uses trusted identity for the provider-scoped inventory read boundary', async () => {
     const issued = issueAccessToken();
     const providerId = randomUUID();
@@ -416,6 +439,190 @@ describe('S0.4 authentication and authorization HTTP security boundary', () => {
       identity,
       providerId,
       expect.objectContaining({ limit: 25, query: 'medicine' }),
+    );
+  });
+
+  it('passes trusted identity and bounded request metadata to inventory configuration', async () => {
+    const issued = issueAccessToken();
+    const providerId = randomUUID();
+    const productId = randomUUID();
+    const identity: AuthenticatedIdentity = {
+      userId,
+      membershipId,
+      tenantId,
+      sessionId,
+      tokenId: issued.tokenId,
+    };
+    validateAccessIdentity.mockResolvedValue(identity);
+    hasAllPermissions.mockResolvedValue(true);
+    configureInventory.mockResolvedValue({
+      inventoryId: randomUUID(),
+      version: 1,
+      replayed: false,
+    });
+
+    const response = await sendRequest(`/inventory/providers/${providerId}/products/${productId}`, {
+      method: 'PUT',
+      headers: {
+        authorization: `Bearer ${issued.value}`,
+        'x-tenant-id': randomUUID(),
+        'x-provider-id': randomUUID(),
+        'x-request-id': 'inventory-configure-1',
+      },
+      body: {
+        sellingPrice: '120.00',
+        mrp: '135.00',
+        discountPercentage: '5.00',
+        taxPercentage: '5.00',
+        minimumStockLevel: 10,
+        isVisible: true,
+        idempotencyKey: 'configure-1',
+      },
+    });
+
+    expect(response.status).toBe(200);
+    expect(hasAllPermissions).toHaveBeenCalledWith(identity, ['inventory.listings.manage']);
+    expect(configureInventory).toHaveBeenCalledWith(
+      expect.objectContaining({
+        actor: identity,
+        providerId,
+        productId,
+        idempotencyKey: 'configure-1',
+        request: expect.objectContaining({ requestId: 'inventory-configure-1' }),
+      }),
+    );
+  });
+
+  it('validates and maps the batch receipt command without accepting client identity', async () => {
+    const issued = issueAccessToken();
+    const providerId = randomUUID();
+    const productId = randomUUID();
+    const identity: AuthenticatedIdentity = {
+      userId,
+      membershipId,
+      tenantId,
+      sessionId,
+      tokenId: issued.tokenId,
+    };
+    validateAccessIdentity.mockResolvedValue(identity);
+    hasAllPermissions.mockResolvedValue(true);
+    receiveBatch.mockResolvedValue({
+      inventoryId: randomUUID(),
+      batchId: randomUUID(),
+      movementId: randomUUID(),
+      onHandBefore: 0,
+      onHandAfter: 20,
+      batchVersion: 1,
+      replayed: false,
+    });
+
+    const response = await sendRequest(
+      `/inventory/providers/${providerId}/products/${productId}/batches`,
+      {
+        method: 'POST',
+        headers: { authorization: `Bearer ${issued.value}` },
+        body: {
+          batchNumber: 'BATCH-001',
+          manufacturingDate: '2026-01-01T00:00:00.000Z',
+          expiryDate: '2028-01-01T00:00:00.000Z',
+          quantity: 20,
+          purchasePrice: '100.00',
+          sellingPrice: '120.00',
+          idempotencyKey: 'receive-1',
+        },
+      },
+    );
+
+    expect(response.status).toBe(200);
+    expect(hasAllPermissions).toHaveBeenCalledWith(identity, ['inventory.stock.receive']);
+    expect(receiveBatch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        actor: identity,
+        providerId,
+        productId,
+        manufacturingDate: new Date('2026-01-01T00:00:00.000Z'),
+        expiryDate: new Date('2028-01-01T00:00:00.000Z'),
+      }),
+    );
+  });
+
+  it('rejects unknown inventory command fields before reaching the mutation service', async () => {
+    const issued = issueAccessToken();
+    validateAccessIdentity.mockResolvedValue({
+      userId,
+      membershipId,
+      tenantId,
+      sessionId,
+      tokenId: issued.tokenId,
+    });
+    hasAllPermissions.mockResolvedValue(true);
+
+    const response = await sendRequest(
+      `/inventory/providers/${randomUUID()}/batches/${randomUUID()}/adjustments`,
+      {
+        method: 'POST',
+        headers: { authorization: `Bearer ${issued.value}` },
+        body: {
+          expectedVersion: 1,
+          delta: -1,
+          reason: 'Verified cycle count',
+          idempotencyKey: 'adjust-1',
+          tenantId: randomUUID(),
+        },
+      },
+    );
+
+    expect(response.status).toBe(400);
+    expect(adjustBatch).not.toHaveBeenCalled();
+  });
+
+  it('maps a versioned adjustment from trusted identity with its dedicated permission', async () => {
+    const issued = issueAccessToken();
+    const providerId = randomUUID();
+    const batchId = randomUUID();
+    const identity: AuthenticatedIdentity = {
+      userId,
+      membershipId,
+      tenantId,
+      sessionId,
+      tokenId: issued.tokenId,
+    };
+    validateAccessIdentity.mockResolvedValue(identity);
+    hasAllPermissions.mockResolvedValue(true);
+    adjustBatch.mockResolvedValue({
+      inventoryId: randomUUID(),
+      batchId,
+      movementId: randomUUID(),
+      onHandBefore: 20,
+      onHandAfter: 19,
+      batchVersion: 2,
+      replayed: false,
+    });
+
+    const response = await sendRequest(
+      `/inventory/providers/${providerId}/batches/${batchId}/adjustments`,
+      {
+        method: 'POST',
+        headers: { authorization: `Bearer ${issued.value}` },
+        body: {
+          expectedVersion: 1,
+          delta: -1,
+          reason: 'Verified cycle count',
+          idempotencyKey: 'adjust-1',
+        },
+      },
+    );
+
+    expect(response.status).toBe(200);
+    expect(hasAllPermissions).toHaveBeenCalledWith(identity, ['inventory.stock.adjust']);
+    expect(adjustBatch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        actor: identity,
+        providerId,
+        batchId,
+        expectedVersion: 1,
+        delta: -1,
+      }),
     );
   });
 

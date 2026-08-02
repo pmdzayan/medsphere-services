@@ -2,9 +2,9 @@
 
 **Last updated:** 2026-08-02
 
-**Current sprint:** G3.1 — trusted provider access and read-only stock boundary
+**Current sprint:** G3.2 — trusted inventory stock commands
 
-**Next feature work:** Blocked until G3.1 exact-commit CI and merge acceptance
+**Next feature work:** Blocked until G3.2 exact-commit CI and merge acceptance
 
 ## Mandatory startup sequence
 
@@ -51,10 +51,11 @@ The migration must be incremental:
 - S0.4 tenant-safe authorization and durable audit passed PostgreSQL
   constraints, triggers, atomicity, concurrency, Redis, clean migration, drift,
   populated S0.3 upgrade verification, and the final documentation workflow.
-- Provider, product, reservation, and medical-record controllers remain
-  unmounted. G3.1 mounts only a provider-scoped stock read controller.
-- The accepted stabilization and frontend baseline is PR #10 squash commit
-  `410368cda73fc151b04996d547b62db22231a9e8`.
+- Provider, product, reservation, and medical-record prototype controllers
+  remain unmounted. G3.1 mounts the provider-scoped stock read controller;
+  G3.2 adds only reviewed listing, receipt, and adjustment commands.
+- G3.1 passed exact-commit CI in run `30743115664` and was squash-merged in PR
+  #11 as `77689b5ccfff21f2f580b87718bf6f7611d1c238`.
 - S0.5 now defines `Batch` as physical/held quantity authority, uses an
   append-only movement ledger, and stores typed reservation items and
   allocations. Its accepted production HTTP boundary and live frontend
@@ -84,7 +85,7 @@ See `docs/audits/2026-07-20-cto-baseline.md` for the accepted baseline.
 - The CTO owns schema, migration, transaction, concurrency, tenant, audit, and
   final acceptance decisions.
 
-## S0.5 and G3.1 checkpoint state
+## S0.5 and Gate 3 checkpoint state
 
 1. Acceptance synchronization — completed
 2. Architecture and sprint contract — completed and merged in PR #8
@@ -97,10 +98,13 @@ See `docs/audits/2026-07-20-cto-baseline.md` for the accepted baseline.
    `30741672770`
 9. PR #10 merge acceptance — completed as `410368c`
 10. G3.1 provider-scope ADR, schema, migration, permissions, routes, and tests —
-    implementation complete locally
-11. G3.1 exact-commit PostgreSQL/Redis CI and review — pending
-12. Later inventory mutations and live frontend integration — blocked pending
-    G3.1 acceptance
+    accepted and merged in PR #11 as `77689b5`
+11. G3.2 listing configuration, batch receipt, and stock adjustment boundary —
+    implementation and local non-infrastructure verification complete on
+    `cto/gate3-inventory-mutations`
+12. G3.2 exact-commit PostgreSQL/Redis CI and review — pending
+13. Reservation lifecycle, transfers/returns/damage, expiry operations, and
+    live frontend integration — blocked pending G3.2 acceptance
 
 If ownership transfers, resume at the first pending checkpoint. Do not use
 `cline/s0.4-rbac-audit` or
@@ -108,10 +112,11 @@ If ownership transfers, resume at the first pending checkpoint. Do not use
 
 ## Exact continuation point
 
-Continue from `cto/gate3-trusted-provider-scope` only. Finish G3.1 migration,
-provider-assignment, stock-read, integration, documentation, and full quality
-verification. Obtain exact-commit CI and merge acceptance before designing any
-inventory mutation or replacing frontend preview data. Keep Gates 2 and 4–9
+Continue from `cto/gate3-inventory-mutations` only. Publish the reviewed G3.2
+commit, run its exact-commit PostgreSQL migration, drift, populated-upgrade, and
+zero-skip infrastructure suites in CI, and address only evidence-backed defects.
+Obtain review and merge acceptance before mounting reservation or broader
+inventory mutations or replacing frontend preview data. Keep Gates 2 and 4–9
 blocked in the dependency order recorded by the Gates 1–9 audit.
 
 Cline may receive only a complete, bounded prompt for characterization tests or
