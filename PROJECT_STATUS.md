@@ -1,8 +1,8 @@
 # MedSphere Project Status
 
-**Status date:** 2026-08-01
+**Status date:** 2026-08-02
 
-**Audited source commit:** `553542245fe7b97bdff38234949f55a636987dd0`
+**Audited source commit:** `d9e680b2277f2b8b2c790c4d2f2d1ef656f6cfc9`
 
 **Accepted stabilization baseline:** `4ea55a17e188410ddee45fa3ea6c016e22d6617a`
 
@@ -17,10 +17,13 @@
 ### PR #10 — S0.5 Integrity and Frontend Foundation Integration
 
 **Status:** S0.5 implementation and frontend Tasks 7–12 are present on the
-integration branch. Exact Task 12 commit `5535422` passed the pull-request
-quality workflow in
-[run 30709965855](https://github.com/pmdzayan/medsphere-services/actions/runs/30709965855).
-Review, merge acceptance, and exact-commit CI for later remediation remain open.
+integration branch. Exact audit commit `d9e680b` passed the pull-request quality
+workflow in
+[run 30711234222](https://github.com/pmdzayan/medsphere-services/actions/runs/30711234222).
+Manual CTO review then found over-broad authorization BFF request/response
+boundaries and missing explicit private-response cache controls. The bounded
+remediation is locally verified; exact-commit CI and merge acceptance remain
+open.
 
 **Dependency:** S0.4 Tenant-Safe RBAC and Durable Audit accepted and merged
 
@@ -62,8 +65,8 @@ code is not an accepted production boundary until PR #10 passes CI and review.
 
 ## Critical blockers
 
-1. PR #10 exact Task 12 source-commit CI passed; review, merge acceptance, and
-   exact-commit CI for the audit remediation remain open.
+1. PR #10 exact audit-commit CI passed; the authorization BFF review remediation
+   still requires exact-commit CI and merge acceptance.
 2. The S0.5 inventory application is still runtime-gated as an unaccepted
    prototype and exposes no accepted production HTTP controllers.
 3. Pharmacy dashboard and inventory frontend data remain previews rather than

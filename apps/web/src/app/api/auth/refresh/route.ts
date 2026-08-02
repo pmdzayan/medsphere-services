@@ -3,6 +3,7 @@ import {
   authApiUrl,
   boundedUpstreamMessage,
   isSameOriginMutation,
+  noStoreJson,
   publicUpstreamStatus,
   upstreamHeaders,
 } from '@/lib/auth-api';
@@ -12,7 +13,7 @@ import { PROFILE_COOKIE, REFRESH_COOKIE, readSessionProfile } from '@/lib/sessio
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   if (!isSameOriginMutation(request)) {
-    return NextResponse.json({ message: 'Cross-origin request rejected.' }, { status: 403 });
+    return noStoreJson({ message: 'Cross-origin request rejected.' }, 403);
   }
 
   const refreshToken = request.cookies.get(REFRESH_COOKIE)?.value;
@@ -32,10 +33,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       cache: 'no-store',
     });
   } catch {
-    return NextResponse.json(
-      { message: 'Authentication service is unavailable.' },
-      { status: 503 },
-    );
+    return noStoreJson({ message: 'Authentication service is unavailable.' }, 503);
   }
 
   if (!upstream.ok) {
@@ -43,7 +41,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       return expiredResponse();
     }
     const message = await boundedUpstreamMessage(upstream, 'Unable to refresh the session.');
-    return NextResponse.json({ message }, { status: publicUpstreamStatus(upstream.status) });
+    return noStoreJson({ message }, publicUpstreamStatus(upstream.status));
   }
 
   try {
@@ -51,22 +49,16 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     if (!isTokenResponse(credentials)) {
       throw new Error('Invalid refresh response');
     }
-    const response = NextResponse.json({ expiresIn: credentials.expiresIn });
+    const response = noStoreJson({ expiresIn: credentials.expiresIn }, 200);
     setSessionCookies(response, credentials, { ...profile, expiresIn: credentials.expiresIn });
     return response;
   } catch {
-    return NextResponse.json(
-      { message: 'Authentication service returned an invalid response.' },
-      { status: 502 },
-    );
+    return noStoreJson({ message: 'Authentication service returned an invalid response.' }, 502);
   }
 }
 
 function expiredResponse(): NextResponse {
-  const response = NextResponse.json(
-    { message: 'Your session has expired. Sign in again.' },
-    { status: 401 },
-  );
+  const response = noStoreJson({ message: 'Your session has expired. Sign in again.' }, 401);
   clearSessionCookies(response);
   return response;
 }

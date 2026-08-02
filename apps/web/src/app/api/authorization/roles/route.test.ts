@@ -50,6 +50,36 @@ describe('custom role mutation boundary', () => {
     await expect(response.json()).resolves.toEqual(created);
     const init = fetchMock.mock.calls[0]?.[1] as RequestInit;
     expect(new Headers(init.headers).get('authorization')).toBe('Bearer access-secret');
+    expect(response.headers.get('cache-control')).toBe('no-store');
+  });
+
+  it('rejects client tenant context and over-broad upstream responses', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+
+    const rejected = await POST(
+      createRequest(
+        { ...validRole, tenantId: 'client-controlled' },
+        { cookie: 'medsphere_access=access-secret' },
+      ),
+    );
+    expect(rejected.status).toBe(400);
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    fetchMock.mockResolvedValue(
+      Response.json({
+        id: 'role-id',
+        ...validRole,
+        type: 'TENANT',
+        version: 1,
+        assignmentCount: 0,
+        tenantId: 'unexpected',
+      }),
+    );
+    const invalidResponse = await POST(
+      createRequest(validRole, { cookie: 'medsphere_access=access-secret' }),
+    );
+    expect(invalidResponse.status).toBe(502);
   });
 
   it('preserves a safe backend conflict message', async () => {

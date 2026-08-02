@@ -1,4 +1,4 @@
-import type { NextRequest } from 'next/server';
+import { NextResponse, type NextRequest } from 'next/server';
 
 export function authApiUrl(path: string): string {
   const baseUrl = process.env.AUTH_API_URL ?? 'http://localhost:3000';
@@ -49,4 +49,8 @@ export function publicUpstreamStatus(status: number): number {
     return 400;
   }
   return 502;
+}
+
+export function noStoreJson(body: unknown, status: number): NextResponse {
+  return NextResponse.json(body, { status, headers: { 'cache-control': 'no-store' } });
 }

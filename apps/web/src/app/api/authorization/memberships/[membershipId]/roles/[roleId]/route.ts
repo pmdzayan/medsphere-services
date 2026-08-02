@@ -3,9 +3,11 @@ import {
   authApiUrl,
   boundedUpstreamMessage,
   isSameOriginMutation,
+  noStoreJson,
   publicUpstreamStatus,
   upstreamHeaders,
 } from '@/lib/auth-api';
+import { isAssignmentResponse } from '@/lib/authorization-contract';
 import { ACCESS_COOKIE } from '@/lib/session-profile';
 
 type Context = { params: Promise<{ membershipId: string; roleId: string }> };
@@ -24,13 +26,12 @@ async function mutate(
   method: 'PUT' | 'DELETE',
 ): Promise<NextResponse> {
   if (!isSameOriginMutation(request))
-    return NextResponse.json({ message: 'Cross-origin request rejected.' }, { status: 403 });
+    return noStoreJson({ message: 'Cross-origin request rejected.' }, 403);
   const { membershipId, roleId } = await context.params;
   const accessToken = request.cookies.get(ACCESS_COOKIE)?.value;
-  if (!accessToken)
-    return NextResponse.json({ message: 'Your session has expired.' }, { status: 401 });
+  if (!accessToken) return noStoreJson({ message: 'Your session has expired.' }, 401);
   if (!uuid.test(membershipId) || !uuid.test(roleId))
-    return NextResponse.json({ message: 'Invalid assignment identifier.' }, { status: 400 });
+    return noStoreJson({ message: 'Invalid assignment identifier.' }, 400);
   try {
     const upstream = await fetch(
       authApiUrl(`/authorization/memberships/${membershipId}/roles/${roleId}`),
@@ -42,12 +43,24 @@ async function mutate(
     );
     if (!upstream.ok) {
       const message = await boundedUpstreamMessage(upstream, 'Unable to update role assignment.');
-      return NextResponse.json({ message }, { status: publicUpstreamStatus(upstream.status) });
+      return noStoreJson({ message }, publicUpstreamStatus(upstream.status));
     }
-    return method === 'DELETE'
-      ? new NextResponse(null, { status: 204 })
-      : NextResponse.json(await upstream.json());
+    if (method === 'DELETE') {
+      return new NextResponse(null, {
+        status: 204,
+        headers: { 'cache-control': 'no-store' },
+      });
+    }
+    const assignment: unknown = await upstream.json();
+    if (
+      !isAssignmentResponse(assignment) ||
+      assignment.membershipId !== membershipId ||
+      assignment.roleId !== roleId
+    ) {
+      return noStoreJson({ message: 'Authorization service returned an invalid response.' }, 502);
+    }
+    return noStoreJson(assignment, 200);
   } catch {
-    return NextResponse.json({ message: 'Authorization service is unavailable.' }, { status: 503 });
+    return noStoreJson({ message: 'Authorization service is unavailable.' }, 503);
   }
 }

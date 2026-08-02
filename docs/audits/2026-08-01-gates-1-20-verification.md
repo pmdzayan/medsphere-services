@@ -73,6 +73,13 @@ do not turn missing healthcare workflows into completed gates.
    live inventory integration remain open.
 4. **Documentation drift:** status and handoff documents lagged Tasks 11–12 and
    the successful exact-commit CI result. They are synchronized by this audit.
+5. **Authorization BFF strictness:** manual PR review found that role creation
+   could forward unexpected client fields, role and membership responses
+   accepted unknown fields, assignment success data was not validated against
+   the requested path, and some authenticated responses omitted explicit
+   `no-store` headers. The follow-up remediation now rejects those shapes,
+   validates assignment identity, centralizes non-cacheable JSON responses, and
+   adds negative regression tests.
 
 ## Audit-remediation validation
 
@@ -80,15 +87,15 @@ do not turn missing healthcare workflows into completed gates.
 | --------------------- | ------------------------------------------------------------------------------------------------ |
 | Formatting            | Passed                                                                                           |
 | Lint                  | Passed — 16/16 Turbo tasks                                                                       |
-| Web tests             | Passed — 21 files, 104/104 tests                                                                 |
+| Web tests             | Passed — 22 files, 112/112 tests                                                                 |
 | Inventory tests       | Passed — 5 suites, 27/27 tests                                                                   |
 | Authentication tests  | 17 suites and 109 tests passed; 3 PostgreSQL/Redis-dependent suites and 17 tests skipped locally |
 | Combined test command | Passed — 19/19 Turbo tasks, with the infrastructure skips disclosed above                        |
 | Build                 | Passed — 16/16 Turbo tasks                                                                       |
 
-The prior exact Task 12 source commit has green infrastructure CI. The current
-audit remediation still requires a new exact-commit workflow before it can be
-accepted.
+Exact audit source commit `d9e680b` passed the full pull-request workflow in run
+`30711234222`. The follow-up authorization BFF review remediation still requires
+a new exact-commit workflow before it can be accepted.
 
 ## Dependency-ordered next work
 

@@ -54,6 +54,12 @@ export interface UpdateRoleRequest {
   permissionKeys?: string[];
 }
 
+export interface AssignmentResponse {
+  membershipId: string;
+  roleId: string;
+  roleName: string;
+}
+
 export interface MembershipRole {
   id: string;
   name: string;
@@ -111,7 +117,7 @@ export function validateCreateRole(
 }
 
 export function isAuthorizationCatalogue(value: unknown): value is AuthorizationCatalogue {
-  if (!value || typeof value !== 'object') {
+  if (!hasExactKeys(value, ['roles', 'permissions', 'total', 'effectivePermissions'])) {
     return false;
   }
   const candidate = value as Partial<AuthorizationCatalogue>;
@@ -131,7 +137,7 @@ export function isAuthorizationCatalogue(value: unknown): value is Authorization
 export function isEffectivePermissionsResponse(
   value: unknown,
 ): value is EffectivePermissionsResponse {
-  if (!value || typeof value !== 'object') return false;
+  if (!hasExactKeys(value, ['permissionKeys'])) return false;
   const candidate = value as Partial<EffectivePermissionsResponse>;
   return (
     Array.isArray(candidate.permissionKeys) &&
@@ -148,7 +154,17 @@ export function hasAuthorizationPermission(
 }
 
 export function isRole(value: unknown): value is Role {
-  if (!value || typeof value !== 'object') {
+  if (
+    !hasExactKeys(value, [
+      'id',
+      'name',
+      'description',
+      'type',
+      'version',
+      'permissionKeys',
+      'assignmentCount',
+    ])
+  ) {
     return false;
   }
   const role = value as Partial<Role>;
@@ -160,14 +176,15 @@ export function isRole(value: unknown): value is Role {
     Number.isSafeInteger(role.version) &&
     Number(role.version) >= 1 &&
     Array.isArray(role.permissionKeys) &&
-    role.permissionKeys.every(isString) &&
+    role.permissionKeys.every(isAuthorizationPermission) &&
+    new Set(role.permissionKeys).size === role.permissionKeys.length &&
     Number.isSafeInteger(role.assignmentCount) &&
     Number(role.assignmentCount) >= 0
   );
 }
 
 export function isMembershipCatalogue(value: unknown): value is MembershipCatalogue {
-  if (!value || typeof value !== 'object') return false;
+  if (!hasExactKeys(value, ['data', 'total', 'limit', 'offset'])) return false;
   const candidate = value as Partial<MembershipCatalogue>;
   return (
     Array.isArray(candidate.data) &&
@@ -175,12 +192,16 @@ export function isMembershipCatalogue(value: unknown): value is MembershipCatalo
     Number.isSafeInteger(candidate.total) &&
     Number(candidate.total) >= candidate.data.length &&
     Number.isSafeInteger(candidate.limit) &&
-    Number.isSafeInteger(candidate.offset)
+    Number(candidate.limit) > 0 &&
+    Number(candidate.limit) <= 100 &&
+    Number.isSafeInteger(candidate.offset) &&
+    Number(candidate.offset) >= 0
   );
 }
 
 export function isMembership(value: unknown): value is Membership {
-  if (!value || typeof value !== 'object') return false;
+  if (!hasExactKeys(value, ['id', 'userId', 'email', 'firstName', 'lastName', 'status', 'roles']))
+    return false;
   const member = value as Partial<Membership>;
   return (
     isString(member.id) &&
@@ -190,14 +211,72 @@ export function isMembership(value: unknown): value is Membership {
     isString(member.lastName) &&
     ['PENDING', 'ACTIVE', 'SUSPENDED', 'REVOKED'].includes(String(member.status)) &&
     Array.isArray(member.roles) &&
-    member.roles.every((role) =>
-      Boolean(role && typeof role === 'object' && isString(role.id) && isString(role.name)),
+    member.roles.every(
+      (role) => hasExactKeys(role, ['id', 'name']) && isString(role.id) && isString(role.name),
     )
   );
 }
 
+export function isCreateRoleRequest(value: unknown): value is CreateRoleRequest {
+  if (!hasExactKeys(value, ['name', 'permissionKeys'], ['description'])) return false;
+  const request = value as Partial<CreateRoleRequest>;
+  return (
+    typeof request.name === 'string' &&
+    /^[A-Z][A-Z0-9_]{2,63}$/.test(request.name) &&
+    (request.description === undefined ||
+      (typeof request.description === 'string' &&
+        request.description.trim().length >= 1 &&
+        request.description.length <= 240)) &&
+    Array.isArray(request.permissionKeys) &&
+    request.permissionKeys.length <= authorizationPermissionKeys.size &&
+    request.permissionKeys.every(
+      (permission) =>
+        typeof permission === 'string' &&
+        permission.length > 0 &&
+        permission.length <= 120 &&
+        authorizationPermissionKeys.has(permission),
+    ) &&
+    new Set(request.permissionKeys).size === request.permissionKeys.length
+  );
+}
+
+export function isUpdateRoleRequest(value: unknown): value is UpdateRoleRequest {
+  if (!hasExactKeys(value, ['version'], ['name', 'description', 'permissionKeys'])) return false;
+  const request = value as Partial<UpdateRoleRequest>;
+  const updateKeys = ['name', 'description', 'permissionKeys'].filter((key) => key in value);
+  return (
+    Number.isSafeInteger(request.version) &&
+    Number(request.version) >= 1 &&
+    updateKeys.length > 0 &&
+    (request.name === undefined ||
+      (typeof request.name === 'string' && /^[A-Z][A-Z0-9_]{2,63}$/.test(request.name))) &&
+    (request.description === undefined ||
+      (typeof request.description === 'string' &&
+        request.description.trim().length >= 1 &&
+        request.description.length <= 240)) &&
+    (request.permissionKeys === undefined ||
+      (Array.isArray(request.permissionKeys) &&
+        request.permissionKeys.length <= authorizationPermissionKeys.size &&
+        request.permissionKeys.every(
+          (permission) =>
+            typeof permission === 'string' && authorizationPermissionKeys.has(permission),
+        ) &&
+        new Set(request.permissionKeys).size === request.permissionKeys.length))
+  );
+}
+
+export function isRoleVersionRequest(value: unknown): value is Pick<UpdateRoleRequest, 'version'> {
+  if (!hasExactKeys(value, ['version'])) return false;
+  return Number.isSafeInteger(value.version) && Number(value.version) >= 1;
+}
+
+export function isAssignmentResponse(value: unknown): value is AssignmentResponse {
+  if (!hasExactKeys(value, ['membershipId', 'roleId', 'roleName'])) return false;
+  return isString(value.membershipId) && isString(value.roleId) && isString(value.roleName);
+}
+
 function isPermission(value: unknown): value is Permission {
-  if (!value || typeof value !== 'object') {
+  if (!hasExactKeys(value, ['id', 'name', 'description'])) {
     return false;
   }
   const permission = value as Partial<Permission>;
@@ -210,4 +289,15 @@ function isAuthorizationPermission(value: unknown): value is AuthorizationPermis
 
 function isString(value: unknown): value is string {
   return typeof value === 'string' && value.length > 0;
+}
+
+function hasExactKeys(
+  value: unknown,
+  required: readonly string[],
+  optional: readonly string[] = [],
+): value is Record<string, unknown> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const keys = Object.keys(value);
+  const allowed = new Set([...required, ...optional]);
+  return required.every((key) => key in value) && keys.every((key) => allowed.has(key));
 }

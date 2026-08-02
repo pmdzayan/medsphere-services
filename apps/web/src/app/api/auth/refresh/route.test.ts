@@ -45,6 +45,7 @@ describe('refresh rotation boundary', () => {
     const response = await POST(createRequest());
 
     expect(response.status).toBe(200);
+    expect(response.headers.get('cache-control')).toBe('no-store');
     const cookies = response.headers.getSetCookie().join(';');
     expect(cookies).toContain('medsphere_access=new-access');
     expect(cookies).toContain('medsphere_refresh=new-refresh');

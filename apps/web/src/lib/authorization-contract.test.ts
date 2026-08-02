@@ -1,9 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
   hasAuthorizationPermission,
+  isAssignmentResponse,
   isAuthorizationCatalogue,
+  isCreateRoleRequest,
   isEffectivePermissionsResponse,
   isMembershipCatalogue,
+  isRoleVersionRequest,
+  isUpdateRoleRequest,
   normalizeRoleName,
   validateCreateRole,
 } from './authorization-contract';
@@ -110,5 +114,39 @@ describe('authorization contract', () => {
       }),
     ).toBe(true);
     expect(isMembershipCatalogue({ data: [], total: -1, limit: 100, offset: 0 })).toBe(false);
+  });
+
+  it('rejects unexpected fields at authorization mutation boundaries', () => {
+    expect(
+      isCreateRoleRequest({
+        name: 'PHARMACY_MANAGER',
+        permissionKeys: ['authorization.roles.read'],
+      }),
+    ).toBe(true);
+    expect(
+      isCreateRoleRequest({
+        name: 'PHARMACY_MANAGER',
+        permissionKeys: ['authorization.roles.read'],
+        tenantId: 'client-controlled',
+      }),
+    ).toBe(false);
+    expect(isUpdateRoleRequest({ version: 2, name: 'PHARMACY_MANAGER' })).toBe(true);
+    expect(isUpdateRoleRequest({ version: 2 })).toBe(false);
+    expect(isRoleVersionRequest({ version: 2 })).toBe(true);
+    expect(isRoleVersionRequest({ version: 2, roleId: 'client-controlled' })).toBe(false);
+  });
+
+  it('accepts only exact assignment responses', () => {
+    expect(
+      isAssignmentResponse({ membershipId: 'membership', roleId: 'role', roleName: 'MANAGER' }),
+    ).toBe(true);
+    expect(
+      isAssignmentResponse({
+        membershipId: 'membership',
+        roleId: 'role',
+        roleName: 'MANAGER',
+        tenantId: 'unexpected',
+      }),
+    ).toBe(false);
   });
 });

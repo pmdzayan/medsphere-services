@@ -37,6 +37,32 @@ describe('version-safe role mutation BFF', () => {
     expect(response.status).toBe(400);
     expect(fetchMock).not.toHaveBeenCalled();
   });
+
+  it('rejects unexpected mutation fields and over-broad role responses', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const unexpected = await PATCH(
+      request('PATCH', { version: 2, name: 'MANAGER', tenantId: 'client-controlled' }),
+      context,
+    );
+    expect(unexpected.status).toBe(400);
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    fetchMock.mockResolvedValue(
+      Response.json({
+        id: roleId,
+        name: 'MANAGER',
+        description: null,
+        type: 'TENANT',
+        version: 3,
+        permissionKeys: [],
+        assignmentCount: 0,
+        tenantId: 'unexpected',
+      }),
+    );
+    const invalidResponse = await PATCH(request('PATCH', { version: 2, name: 'MANAGER' }), context);
+    expect(invalidResponse.status).toBe(502);
+  });
 });
 
 function request(method: string, body: unknown) {

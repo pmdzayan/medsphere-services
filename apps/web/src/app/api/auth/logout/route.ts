@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { authApiUrl, isSameOriginMutation, upstreamHeaders } from '@/lib/auth-api';
+import { authApiUrl, isSameOriginMutation, noStoreJson, upstreamHeaders } from '@/lib/auth-api';
 import { clearSessionCookies } from '@/lib/session-cookies';
 import { ACCESS_COOKIE } from '@/lib/session-profile';
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   if (!isSameOriginMutation(request)) {
-    return NextResponse.json({ message: 'Cross-origin request rejected.' }, { status: 403 });
+    return noStoreJson({ message: 'Cross-origin request rejected.' }, 403);
   }
 
   const accessToken = request.cookies.get(ACCESS_COOKIE)?.value;
@@ -21,7 +21,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
   }
 
-  const response = NextResponse.json({ message: 'Signed out.' });
+  const response = noStoreJson({ message: 'Signed out.' }, 200);
   clearSessionCookies(response);
   return response;
 }

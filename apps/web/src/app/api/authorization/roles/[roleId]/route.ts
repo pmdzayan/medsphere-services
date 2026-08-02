@@ -3,10 +3,16 @@ import {
   authApiUrl,
   boundedUpstreamMessage,
   isSameOriginMutation,
+  noStoreJson,
   publicUpstreamStatus,
   upstreamHeaders,
 } from '@/lib/auth-api';
-import { isRole, type UpdateRoleRequest } from '@/lib/authorization-contract';
+import {
+  isRole,
+  isRoleVersionRequest,
+  isUpdateRoleRequest,
+  type UpdateRoleRequest,
+} from '@/lib/authorization-contract';
 import { ACCESS_COOKIE } from '@/lib/session-profile';
 
 type Context = { params: Promise<{ roleId: string }> };
@@ -26,28 +32,36 @@ async function mutateRole(
   method: 'PATCH' | 'DELETE',
 ): Promise<NextResponse> {
   if (!isSameOriginMutation(request)) {
-    return NextResponse.json({ message: 'Cross-origin request rejected.' }, { status: 403 });
+    return noStoreJson({ message: 'Cross-origin request rejected.' }, 403);
   }
   const { roleId } = await context.params;
   const accessToken = request.cookies.get(ACCESS_COOKIE)?.value;
   if (!uuid.test(roleId) || !accessToken) {
-    return NextResponse.json(
+    return noStoreJson(
       { message: accessToken ? 'Invalid role identifier.' : 'Your session has expired.' },
-      { status: accessToken ? 400 : 401 },
+      accessToken ? 400 : 401,
     );
   }
 
-  let payload: Partial<UpdateRoleRequest>;
+  let version: number;
+  let update: UpdateRoleRequest | undefined;
   try {
-    payload = (await request.json()) as Partial<UpdateRoleRequest>;
-    if (!Number.isSafeInteger(payload.version) || Number(payload.version) < 1) throw new Error();
+    const candidate: unknown = await request.json();
+    if (method === 'PATCH') {
+      if (!isUpdateRoleRequest(candidate)) throw new Error();
+      update = candidate;
+      version = candidate.version;
+    } else {
+      if (!isRoleVersionRequest(candidate)) throw new Error();
+      version = candidate.version;
+    }
   } catch {
-    return NextResponse.json({ message: 'A valid role version is required.' }, { status: 400 });
+    return noStoreJson({ message: 'A valid role mutation is required.' }, 400);
   }
 
   try {
     const headers = upstreamHeaders(request, accessToken);
-    headers.set('if-match', `"${payload.version}"`);
+    headers.set('if-match', `"${version}"`);
     if (method === 'PATCH') headers.set('content-type', 'application/json');
     const upstream = await fetch(authApiUrl(`/authorization/roles/${roleId}`), {
       method,
@@ -55,9 +69,9 @@ async function mutateRole(
       ...(method === 'PATCH'
         ? {
             body: JSON.stringify({
-              name: payload.name,
-              description: payload.description,
-              permissionKeys: payload.permissionKeys,
+              name: update?.name,
+              description: update?.description,
+              permissionKeys: update?.permissionKeys,
             }),
           }
         : {}),
@@ -68,17 +82,18 @@ async function mutateRole(
         upstream,
         `Unable to ${method === 'PATCH' ? 'update' : 'delete'} role.`,
       );
-      return NextResponse.json({ message }, { status: publicUpstreamStatus(upstream.status) });
+      return noStoreJson({ message }, publicUpstreamStatus(upstream.status));
     }
-    if (method === 'DELETE') return new NextResponse(null, { status: 204 });
+    if (method === 'DELETE')
+      return new NextResponse(null, {
+        status: 204,
+        headers: { 'cache-control': 'no-store' },
+      });
     const role: unknown = await upstream.json();
     return isRole(role)
-      ? NextResponse.json(role)
-      : NextResponse.json(
-          { message: 'Authorization service returned an invalid response.' },
-          { status: 502 },
-        );
+      ? noStoreJson(role, 200)
+      : noStoreJson({ message: 'Authorization service returned an invalid response.' }, 502);
   } catch {
-    return NextResponse.json({ message: 'Authorization service is unavailable.' }, { status: 503 });
+    return noStoreJson({ message: 'Authorization service is unavailable.' }, 503);
   }
 }

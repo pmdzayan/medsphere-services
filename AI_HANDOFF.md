@@ -96,8 +96,11 @@ See `docs/audits/2026-07-20-cto-baseline.md` for the accepted baseline.
 7. Medicine reservation hold lifecycle — implemented on PR #10
 8. Application boundary and accepted route inventory — route inventory proven;
    production inventory controllers remain intentionally unmounted
-9. Exact Task 12 source-commit CI — passed in workflow run `30709965855`
-10. CTO review, merge acceptance, and live inventory API/frontend integration — pending
+9. Exact audit source-commit CI — passed on `d9e680b` in workflow run
+   `30711234222`
+10. Authorization BFF strict-contract review remediation — locally verified;
+    exact-commit CI pending
+11. Merge acceptance and live inventory API/frontend integration — pending
 
 If ownership transfers, resume at the first pending checkpoint. Do not use
 `cline/s0.4-rbac-audit` or

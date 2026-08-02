@@ -3,22 +3,20 @@ import {
   authApiUrl,
   boundedUpstreamMessage,
   isSameOriginMutation,
+  noStoreJson,
   publicUpstreamStatus,
   upstreamHeaders,
 } from '@/lib/auth-api';
-import { isRole, type CreateRoleRequest } from '@/lib/authorization-contract';
+import { isCreateRoleRequest, isRole, type CreateRoleRequest } from '@/lib/authorization-contract';
 import { ACCESS_COOKIE } from '@/lib/session-profile';
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   if (!isSameOriginMutation(request)) {
-    return NextResponse.json({ message: 'Cross-origin request rejected.' }, { status: 403 });
+    return noStoreJson({ message: 'Cross-origin request rejected.' }, 403);
   }
   const accessToken = request.cookies.get(ACCESS_COOKIE)?.value;
   if (!accessToken) {
-    return NextResponse.json(
-      { message: 'Your session has expired. Sign in again.' },
-      { status: 401 },
-    );
+    return noStoreJson({ message: 'Your session has expired. Sign in again.' }, 401);
   }
 
   let body: CreateRoleRequest;
@@ -29,7 +27,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
     body = payload;
   } catch {
-    return NextResponse.json({ message: 'Invalid role request.' }, { status: 400 });
+    return noStoreJson({ message: 'Invalid role request.' }, 400);
   }
 
   let upstream: Response;
@@ -43,12 +41,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       cache: 'no-store',
     });
   } catch {
-    return NextResponse.json({ message: 'Authorization service is unavailable.' }, { status: 503 });
+    return noStoreJson({ message: 'Authorization service is unavailable.' }, 503);
   }
 
   if (!upstream.ok) {
     const message = await boundedUpstreamMessage(upstream, 'Unable to create role.');
-    return NextResponse.json({ message }, { status: publicUpstreamStatus(upstream.status) });
+    return noStoreJson({ message }, publicUpstreamStatus(upstream.status));
   }
 
   try {
@@ -56,30 +54,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     if (!isRole(role)) {
       throw new Error('Invalid role response');
     }
-    return NextResponse.json(role, { status: 201 });
+    return noStoreJson(role, 201);
   } catch {
-    return NextResponse.json(
-      { message: 'Authorization service returned an invalid response.' },
-      { status: 502 },
-    );
+    return noStoreJson({ message: 'Authorization service returned an invalid response.' }, 502);
   }
-}
-
-function isCreateRoleRequest(value: unknown): value is CreateRoleRequest {
-  if (!value || typeof value !== 'object') {
-    return false;
-  }
-  const candidate = value as Partial<CreateRoleRequest>;
-  return (
-    typeof candidate.name === 'string' &&
-    candidate.name.length >= 3 &&
-    candidate.name.length <= 64 &&
-    (candidate.description === undefined ||
-      (typeof candidate.description === 'string' && candidate.description.length <= 240)) &&
-    Array.isArray(candidate.permissionKeys) &&
-    candidate.permissionKeys.length <= 100 &&
-    candidate.permissionKeys.every(
-      (permission) => typeof permission === 'string' && permission.length <= 120,
-    )
-  );
 }

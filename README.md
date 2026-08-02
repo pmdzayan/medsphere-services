@@ -57,9 +57,10 @@ Gates 2 and 4–20 are not complete.
   assignment, effective-permission behavior, and tenant audit evidence.
 - Frontend Tasks 11–12 add personal privacy settings and policy-controlled
   onboarding without claiming that the wider compliance milestone is complete.
-- Exact Task 12 commit `5535422` passed the pull-request workflow in
-  [run 30709965855](https://github.com/pmdzayan/medsphere-services/actions/runs/30709965855).
-  PR review and merge acceptance remain open.
+- Exact audit commit `d9e680b` passed the pull-request workflow in
+  [run 30711234222](https://github.com/pmdzayan/medsphere-services/actions/runs/30711234222).
+  A follow-up authorization BFF review remediation is locally verified and
+  awaits exact-commit CI. PR merge acceptance remains open.
 
 ### Remaining work
 
