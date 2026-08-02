@@ -181,6 +181,9 @@ describeReservationInfrastructure('G3.3 PostgreSQL reservation lifecycle integri
     const reservationId = randomUUID();
     const itemId = randomUUID();
     const allocationId = randomUUID();
+    const createdAt = new Date(Date.now() - 3 * 60 * 1000);
+    const confirmedAt = status === 'READY' ? new Date(createdAt.getTime() + 60 * 1000) : undefined;
+    const readyAt = status === 'READY' ? new Date(createdAt.getTime() + 2 * 60 * 1000) : undefined;
     await prisma.client.product.create({
       data: {
         id: productId,
@@ -228,6 +231,9 @@ describeReservationInfrastructure('G3.3 PostgreSQL reservation lifecycle integri
         providerId,
         subjectUserId: userId,
         status,
+        createdAt,
+        confirmedAt,
+        readyAt,
         expiresAt: new Date('2030-01-01T00:00:00.000Z'),
         idempotencyKey: `fixture-${reservationId}`,
         creationHash: 'a'.repeat(64),
