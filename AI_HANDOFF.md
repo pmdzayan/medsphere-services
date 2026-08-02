@@ -1,11 +1,10 @@
 # MedSphere AI Handoff
 
-**Last updated:** 2026-08-01
+**Last updated:** 2026-08-02
 
-**Current sprint:** PR #10 — S0.5 acceptance, frontend foundation integration,
-and bounded security/documentation remediation
+**Current sprint:** G3.1 — trusted provider access and read-only stock boundary
 
-**Next feature work:** Blocked until PR #10 review and merge acceptance
+**Next feature work:** Blocked until G3.1 exact-commit CI and merge acceptance
 
 ## Mandatory startup sequence
 
@@ -52,10 +51,10 @@ The migration must be incremental:
 - S0.4 tenant-safe authorization and durable audit passed PostgreSQL
   constraints, triggers, atomicity, concurrency, Redis, clean migration, drift,
   populated S0.3 upgrade verification, and the final documentation workflow.
-- Provider, product, inventory, reservation, and medical-record controllers
-  remain unmounted from the accepted authenticated application boundary.
-- The accepted stabilization baseline is S0.4 squash commit
-  `4ea55a17e188410ddee45fa3ea6c016e22d6617a`.
+- Provider, product, reservation, and medical-record controllers remain
+  unmounted. G3.1 mounts only a provider-scoped stock read controller.
+- The accepted stabilization and frontend baseline is PR #10 squash commit
+  `410368cda73fc151b04996d547b62db22231a9e8`.
 - S0.5 now defines `Batch` as physical/held quantity authority, uses an
   append-only movement ledger, and stores typed reservation items and
   allocations. Its accepted production HTTP boundary and live frontend
@@ -85,7 +84,7 @@ See `docs/audits/2026-07-20-cto-baseline.md` for the accepted baseline.
 - The CTO owns schema, migration, transaction, concurrency, tenant, audit, and
   final acceptance decisions.
 
-## S0.5 checkpoint state
+## S0.5 and G3.1 checkpoint state
 
 1. Acceptance synchronization — completed
 2. Architecture and sprint contract — completed and merged in PR #8
@@ -94,13 +93,14 @@ See `docs/audits/2026-07-20-cto-baseline.md` for the accepted baseline.
 5. Shared transaction and audit primitives — implemented on PR #10
 6. Stock model, ledger, FEFO, and availability — implemented on PR #10
 7. Medicine reservation hold lifecycle — implemented on PR #10
-8. Application boundary and accepted route inventory — route inventory proven;
-   production inventory controllers remain intentionally unmounted
-9. Exact audit source-commit CI — passed on `d9e680b` in workflow run
-   `30711234222`
-10. Authorization BFF strict-contract review remediation — locally verified;
-    exact-commit CI pending
-11. Merge acceptance and live inventory API/frontend integration — pending
+8. PR #10 exact-commit quality workflow — passed on `3003625` in run
+   `30741672770`
+9. PR #10 merge acceptance — completed as `410368c`
+10. G3.1 provider-scope ADR, schema, migration, permissions, routes, and tests —
+    implementation complete locally
+11. G3.1 exact-commit PostgreSQL/Redis CI and review — pending
+12. Later inventory mutations and live frontend integration — blocked pending
+    G3.1 acceptance
 
 If ownership transfers, resume at the first pending checkpoint. Do not use
 `cline/s0.4-rbac-audit` or
@@ -108,12 +108,11 @@ If ownership transfers, resume at the first pending checkpoint. Do not use
 
 ## Exact continuation point
 
-Continue from `cto/frontend-foundation` only. First pass the full quality gate
-for the current audit remediation, then obtain PR #10 review and merge
-acceptance. After acceptance, define and review the inventory HTTP contracts,
-permissions, audit behavior, and integration tests before mounting controllers
-or replacing preview frontend data. Keep later roadmap modules blocked until
-their dependency-ordered sprint is approved.
+Continue from `cto/gate3-trusted-provider-scope` only. Finish G3.1 migration,
+provider-assignment, stock-read, integration, documentation, and full quality
+verification. Obtain exact-commit CI and merge acceptance before designing any
+inventory mutation or replacing frontend preview data. Keep Gates 2 and 4–9
+blocked in the dependency order recorded by the Gates 1–9 audit.
 
 Cline may receive only a complete, bounded prompt for characterization tests or
 mechanical work whose contract is already fixed by ADR-005. Cline must not

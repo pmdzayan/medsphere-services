@@ -1,0 +1,15 @@
+import { Module } from '@nestjs/common';
+import { AuthorizationModule } from '../authorization/authorization.module';
+import { AuditPersistenceModule } from '../audit/audit-persistence.module';
+import { PrismaModule } from '../prisma/prisma.module';
+import { InventoryController } from './inventory.controller';
+import { InventoryRepository } from './inventory.repository';
+import { InventoryService } from './inventory.service';
+
+@Module({
+  imports: [PrismaModule, AuthorizationModule, AuditPersistenceModule],
+  controllers: [InventoryController],
+  providers: [InventoryRepository, InventoryService],
+  exports: [InventoryService],
+})
+export class InventoryModule {}

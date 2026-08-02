@@ -42,6 +42,11 @@ describe('AuthorizationService', () => {
       findAssignment: jest.fn(),
       countActiveTenantAdministrators: jest.fn(),
       removeAssignment: jest.fn(),
+      findProvider: jest.fn(),
+      listProviderAccess: jest.fn(),
+      findProviderAccess: jest.fn(),
+      createProviderAccess: jest.fn(),
+      removeProviderAccess: jest.fn(),
     } as unknown as jest.Mocked<AuthorizationRepository>;
     auditWriter = {
       appendTenantUser: jest.fn().mockResolvedValue(undefined),
@@ -196,6 +201,65 @@ describe('AuthorizationService', () => {
         eventType: 'authorization.assignment.removed',
         request: { requestId: 'request-remove-1' },
       }),
+    );
+  });
+
+  it('idempotently assigns provider access and writes evidence in the same transaction', async () => {
+    const membershipId = randomUUID();
+    const providerId = randomUUID();
+    repository.findMembership.mockResolvedValue({ id: membershipId, status: 'ACTIVE' } as never);
+    repository.findProvider.mockResolvedValue({
+      id: providerId,
+      businessName: 'Trusted Pharmacy',
+      providerType: 'PHARMACY',
+      isActive: true,
+    });
+    repository.findProviderAccess.mockResolvedValue(null);
+    repository.createProviderAccess.mockResolvedValue({ count: 1 });
+
+    await expect(
+      service.addProviderAccess(identity, membershipId, providerId, { requestId: 'provider-1' }),
+    ).resolves.toMatchObject({ membershipId, providerId, businessName: 'Trusted Pharmacy' });
+    expect(repository.createProviderAccess).toHaveBeenCalledWith(
+      transaction,
+      identity.tenantId,
+      membershipId,
+      providerId,
+    );
+    expect(auditWriter.appendTenantUser).toHaveBeenCalledWith(
+      transaction,
+      expect.objectContaining({
+        eventType: 'authorization.provider-access.added',
+        resourceId: `${membershipId}:${providerId}`,
+      }),
+    );
+  });
+
+  it('removes provider access and its audit evidence atomically', async () => {
+    const membershipId = randomUUID();
+    const providerId = randomUUID();
+    repository.findMembership.mockResolvedValue({ id: membershipId, status: 'ACTIVE' } as never);
+    repository.findProvider.mockResolvedValue({
+      id: providerId,
+      businessName: 'Trusted Hospital',
+      providerType: 'HOSPITAL',
+      isActive: true,
+    });
+    repository.findProviderAccess.mockResolvedValue({ id: randomUUID() });
+    repository.removeProviderAccess.mockResolvedValue({ count: 1 });
+
+    await service.removeProviderAccess(identity, membershipId, providerId);
+
+    expect(repository.bumpTenantVersion).toHaveBeenCalledWith(transaction, identity.tenantId);
+    expect(repository.removeProviderAccess).toHaveBeenCalledWith(
+      transaction,
+      identity.tenantId,
+      membershipId,
+      providerId,
+    );
+    expect(auditWriter.appendTenantUser).toHaveBeenCalledWith(
+      transaction,
+      expect.objectContaining({ eventType: 'authorization.provider-access.removed' }),
     );
   });
 

@@ -152,6 +152,7 @@ model Tenant {
   deletedAt DateTime?
 
   memberships                    TenantMembership[]
+  membershipProviderAccess       MembershipProviderAccess[]
   roles                          Role[]
   auditEvents                    AuditEvent[]
   providerVerifications          ProviderVerification[]
@@ -219,6 +220,7 @@ model TenantMembership {
   roleAssignments MembershipRole[]
   auditEvents     AuditEvent[]
   stockMovements  StockMovement[]
+  providerAccess  MembershipProviderAccess[]
 
   @@unique([tenantId, userId])
   @@unique([id, tenantId])
@@ -295,6 +297,23 @@ model MembershipRole {
   @@unique([membershipId, roleId])
   @@index([tenantId, membershipId])
   @@index([tenantId, roleId])
+}
+
+model MembershipProviderAccess {
+  id           String @id @default(uuid()) @db.Uuid
+  tenantId     String @db.Uuid
+  membershipId String @db.Uuid
+  providerId   String @db.Uuid
+
+  tenant     Tenant           @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  membership TenantMembership @relation(fields: [membershipId, tenantId], references: [id, tenantId], onDelete: Cascade)
+  provider   Provider         @relation(fields: [providerId, tenantId], references: [id, tenantId], onDelete: Restrict)
+
+  createdAt DateTime @default(now())
+
+  @@unique([membershipId, providerId])
+  @@index([tenantId, membershipId])
+  @@index([tenantId, providerId])
 }
 
 model RolePermission {
@@ -407,6 +426,7 @@ model Provider {
   medicineReservations   MedicineReservation[]
   reservationItems       MedicineReservationItem[]
   reservationAllocations MedicineReservationAllocation[]
+  membershipAccesses     MembershipProviderAccess[]
 
   version Int @default(1)
 

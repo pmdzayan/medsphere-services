@@ -4,6 +4,7 @@ import { AppModule } from '../app.module';
 import { AuthController } from './auth.controller';
 import { HealthController } from '@medsphere/common';
 import { LocalizationController } from '../localization/localization.controller';
+import { InventoryController } from '../inventory/inventory.controller';
 
 describe('S0.4 route policy', () => {
   it.each([
@@ -33,7 +34,13 @@ describe('S0.4 route policy', () => {
     },
   );
 
-  it('mounts accepted authorization and audit modules without later-domain prototypes', () => {
+  it('keeps the accepted inventory stock handler protected', () => {
+    expect(
+      Reflect.getMetadata(PUBLIC_ENDPOINT_METADATA, InventoryController.prototype.listStock),
+    ).toBeUndefined();
+  });
+
+  it('mounts accepted authorization, audit, and inventory-read modules without prototypes', () => {
     const imports = Reflect.getMetadata(MODULE_METADATA.IMPORTS, AppModule) as Array<{
       name?: string;
       module?: { name?: string };
@@ -50,15 +57,11 @@ describe('S0.4 route policy', () => {
         'LocalizationModule',
         'AuthorizationModule',
         'AuditModule',
+        'InventoryModule',
       ]),
     );
     expect(mountedNames).not.toEqual(
-      expect.arrayContaining([
-        'ProviderVerificationModule',
-        'ProvidersModule',
-        'ProductsModule',
-        'InventoryModule',
-      ]),
+      expect.arrayContaining(['ProviderVerificationModule', 'ProvidersModule', 'ProductsModule']),
     );
   });
 });

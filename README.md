@@ -6,9 +6,12 @@ MedSphere is a planned multi-tenant healthcare ecosystem for patients, pharmacie
 
 ## Verified project progress
 
-**Status date:** 2026-08-01
+**Status date:** 2026-08-02
 
-**Audited evidence baseline:** `5535422` on `cto/frontend-foundation`
+**Accepted evidence baseline:** `410368c` (PR #10 squash merge)
+
+**Current sprint:** G3.1 trusted provider stock read on
+`cto/gate3-trusted-provider-scope`
 
 **Full-roadmap estimate:** **30% complete / 70% remaining**
 
@@ -29,17 +32,17 @@ rejects the claim that the full roadmap is complete: Gate 1 is an accepted
 foundation, Gate 3 is substantially implemented but not accepted/live, and
 Gates 2 and 4–20 are not complete.
 
-| Area                                                             | Verified state                                                                                                                                                                       | Estimated completion |
-| ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------: |
-| Architecture, governance, monorepo, and database baseline        | ADR process, PNPM/Turbo tooling, shared packages, forward migrations, drift checks, and CI gates exist                                                                               |                  85% |
-| Authentication, tenant context, RBAC, and durable audit          | S0.3 and S0.4 accepted; authenticated frontend, role administration, effective permissions, audit, policy-controlled onboarding, and personal privacy settings implemented           |                  85% |
-| Inventory ledger and medicine reservation integrity              | S0.5 schema, migration, stock ledger, FEFO, reservation aggregate, lifecycle services, and tests implemented; accepted production HTTP boundary and live frontend integration remain |                  65% |
-| Frontend                                                         | Landing, login, responsive shell, team/RBAC, and audit are connected; pharmacy dashboard and inventory remain previews; most healthcare modules are absent                           |                  32% |
-| Compliance beyond RBAC and audit                                 | Consent, privacy operations, verification, retention, legal hold, and policy enforcement remain incomplete                                                                           |                  10% |
-| Supplier, procurement, pharmacy, billing, and delivery workflows | Existing deployables are mostly health-only placeholders or unaccepted prototypes                                                                                                    |                   5% |
-| Hospital, doctor, laboratory, patient, and clinical journeys     | Some schema foundations exist, but accepted end-to-end application workflows are not implemented                                                                                     |                   2% |
-| Production operations and release readiness                      | Pull-request quality gates and a deployment freeze exist; deployment, observability, backup/restore, disaster recovery, performance evidence, and operational acceptance remain      |                  10% |
-| Gates 10–20 and AI/network expansion                             | Planned but not implemented as accepted product capabilities                                                                                                                         |                   0% |
+| Area                                                             | Verified state                                                                                                                                                                  | Estimated completion |
+| ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------: |
+| Architecture, governance, monorepo, and database baseline        | ADR process, PNPM/Turbo tooling, shared packages, forward migrations, drift checks, and CI gates exist                                                                          |                  85% |
+| Authentication, tenant context, RBAC, and durable audit          | S0.3 and S0.4 accepted; authenticated frontend, role administration, effective permissions, audit, policy-controlled onboarding, and personal privacy settings implemented      |                  85% |
+| Inventory ledger and medicine reservation integrity              | S0.5 integrity accepted in PR #10; G3.1 adds the first provider-scoped read boundary, while stock mutations and live frontend integration remain incomplete                     |                  68% |
+| Frontend                                                         | Landing, login, responsive shell, team/RBAC, and audit are connected; pharmacy dashboard and inventory remain previews; most healthcare modules are absent                      |                  32% |
+| Compliance beyond RBAC and audit                                 | Consent, privacy operations, verification, retention, legal hold, and policy enforcement remain incomplete                                                                      |                  10% |
+| Supplier, procurement, pharmacy, billing, and delivery workflows | Existing deployables are mostly health-only placeholders or unaccepted prototypes                                                                                               |                   5% |
+| Hospital, doctor, laboratory, patient, and clinical journeys     | Some schema foundations exist, but accepted end-to-end application workflows are not implemented                                                                                |                   2% |
+| Production operations and release readiness                      | Pull-request quality gates and a deployment freeze exist; deployment, observability, backup/restore, disaster recovery, performance evidence, and operational acceptance remain |                  10% |
+| Gates 10–20 and AI/network expansion                             | Planned but not implemented as accepted product capabilities                                                                                                                    |                   0% |
 
 ### Substantially completed and verified foundations
 
@@ -48,29 +51,30 @@ Gates 2 and 4–20 are not complete.
 - S0.3 authentication, trusted tenant context, refresh rotation, replay
   protection, and rate limiting.
 - S0.4 tenant-safe authorization and append-only durable audit.
-- S0.5 inventory-ledger and medicine-reservation integrity implementation on
-  the current feature history, including the forward migration and domain
-  tests. Final pull-request acceptance and live product exposure remain open.
+- S0.5 inventory-ledger and medicine-reservation integrity accepted through
+  PR #10, including its migration and domain tests. Operational HTTP exposure
+  remains a sequence of separately reviewed sprints.
 - Premium frontend foundation: public landing page, login, authenticated and
   responsive application shell, and pharmacy operations visual language.
 - Connected frontend administration: team membership, role lifecycle, role
   assignment, effective-permission behavior, and tenant audit evidence.
 - Frontend Tasks 11–12 add personal privacy settings and policy-controlled
   onboarding without claiming that the wider compliance milestone is complete.
-- Exact audit commit `d9e680b` passed the pull-request workflow in
-  [run 30711234222](https://github.com/pmdzayan/medsphere-services/actions/runs/30711234222).
-  A follow-up authorization BFF review remediation is locally verified and
-  awaits exact-commit CI. PR merge acceptance remains open.
+- PR #10 passed its final quality workflow at commit `3003625` in
+  [run 30741672770](https://github.com/pmdzayan/medsphere-services/actions/runs/30741672770)
+  and was squash-merged as `410368c`.
+- G3.1 implements migration-backed membership-to-provider assignments and the
+  first permission-protected, provider-scoped stock read contract. Exact-commit
+  CI and review acceptance remain required.
 
 ### Remaining work
 
-1. **Close stabilization acceptance:** review and merge the combined S0.5 and
-   frontend pull request after the current audit remediation passes exact-commit
-   CI; synchronize accepted branch references.
-2. **Expose accepted inventory operations:** add the reviewed HTTP controllers,
-   DTOs, Swagger contracts, permissions, tenant isolation, idempotency, and
-   integration tests; replace inventory and pharmacy preview data with live
-   read models and mutations.
+1. **Accept G3.1 provider-scoped stock reads:** pass clean PostgreSQL migration,
+   populated-upgrade, integration, formatting, lint, test, build, and review
+   gates on the exact branch commit.
+2. **Expose bounded inventory mutations:** define separate idempotent receipt,
+   adjustment, transfer, return, and reservation contracts with atomic audit;
+   connect frontend previews only after each backend contract is accepted.
 3. **Complete inventory operations:** expiry management, transfers, damaged
    stock, returns, recalls/quarantine, operational analytics, and production
    worker behavior where accepted by dedicated sprints.

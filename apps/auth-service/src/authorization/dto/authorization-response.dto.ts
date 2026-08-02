@@ -64,6 +64,23 @@ export class AssignmentResponseDto {
   roleName!: string;
 }
 
+export class ProviderAccessResponseDto {
+  @ApiProperty({ format: 'uuid' })
+  membershipId!: string;
+
+  @ApiProperty({ format: 'uuid' })
+  providerId!: string;
+
+  @ApiProperty()
+  businessName!: string;
+
+  @ApiProperty({ enum: ['PHARMACY', 'HOSPITAL'] })
+  providerType!: 'PHARMACY' | 'HOSPITAL';
+
+  @ApiProperty()
+  isActive!: boolean;
+}
+
 export class MembershipRoleSummaryDto {
   @ApiProperty({ format: 'uuid' })
   id!: string;

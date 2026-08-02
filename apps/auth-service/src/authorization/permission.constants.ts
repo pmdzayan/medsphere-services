@@ -6,7 +6,10 @@ export const PERMISSIONS = {
   permissionsRead: 'authorization.permissions.read',
   assignmentsRead: 'authorization.assignments.read',
   assignmentsManage: 'authorization.assignments.manage',
+  providerAccessRead: 'authorization.provider-access.read',
+  providerAccessManage: 'authorization.provider-access.manage',
   auditEventsRead: 'audit.events.read',
+  inventoryStockRead: 'inventory.stock.read',
 } as const;
 
 export const PERMISSION_KEYS = Object.values(PERMISSIONS);

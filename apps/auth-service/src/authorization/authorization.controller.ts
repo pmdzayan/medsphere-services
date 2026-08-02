@@ -37,6 +37,7 @@ import {
   PermissionResponseDto,
   RoleListResponseDto,
   RoleResponseDto,
+  ProviderAccessResponseDto,
 } from './dto/authorization-response.dto';
 import { CreateRoleDto } from './dto/create-role.dto';
 import { UpdateRoleDto } from './dto/update-role.dto';
@@ -197,6 +198,54 @@ export class AuthorizationController {
       identity,
       membershipId,
       roleId,
+      extractRequestMetadata(request),
+    );
+  }
+
+  @Get('memberships/:membershipId/provider-access')
+  @RequirePermissions(PERMISSIONS.providerAccessRead)
+  @ApiOperation({ summary: 'List provider assignments for one tenant membership' })
+  @ApiOkResponse({ type: [ProviderAccessResponseDto] })
+  listProviderAccess(
+    @CurrentIdentity() identity: AuthenticatedIdentity,
+    @Param('membershipId', uuid) membershipId: string,
+  ) {
+    return this.authorizationService.listProviderAccess(identity, membershipId);
+  }
+
+  @Put('memberships/:membershipId/provider-access/:providerId')
+  @RequirePermissions(PERMISSIONS.providerAccessManage)
+  @ApiOperation({ summary: 'Idempotently assign a provider to a tenant membership' })
+  @ApiOkResponse({ type: ProviderAccessResponseDto })
+  addProviderAccess(
+    @CurrentIdentity() identity: AuthenticatedIdentity,
+    @Param('membershipId', uuid) membershipId: string,
+    @Param('providerId', uuid) providerId: string,
+    @Req() request: MetadataHttpRequest,
+  ) {
+    return this.authorizationService.addProviderAccess(
+      identity,
+      membershipId,
+      providerId,
+      extractRequestMetadata(request),
+    );
+  }
+
+  @Delete('memberships/:membershipId/provider-access/:providerId')
+  @RequirePermissions(PERMISSIONS.providerAccessManage)
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Remove a provider assignment from a tenant membership' })
+  @ApiNoContentResponse()
+  async removeProviderAccess(
+    @CurrentIdentity() identity: AuthenticatedIdentity,
+    @Param('membershipId', uuid) membershipId: string,
+    @Param('providerId', uuid) providerId: string,
+    @Req() request: MetadataHttpRequest,
+  ): Promise<void> {
+    await this.authorizationService.removeProviderAccess(
+      identity,
+      membershipId,
+      providerId,
       extractRequestMetadata(request),
     );
   }

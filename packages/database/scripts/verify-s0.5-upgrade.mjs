@@ -20,13 +20,14 @@ const baselineMigrations = [
   '20260720120000_trusted_authentication_tenant_context',
   '20260725120000_tenant_safe_authorization_durable_audit',
 ];
-const s05Migrations = [
+const upgradeMigrations = [
   '20260731120000_inventory_ledger_medicine_reservation_integrity',
   '20260801000000_align_medicine_reservation_command_fk_name',
+  '20260802120000_trusted_provider_stock_read',
 ];
 const pnpmCommand = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm';
 
-for (const migrationName of [...baselineMigrations, ...s05Migrations]) {
+for (const migrationName of [...baselineMigrations, ...upgradeMigrations]) {
   if (!existsSync(join(sourceMigrations, migrationName, 'migration.sql'))) {
     throw new Error(`Required migration is missing: ${migrationName}`);
   }
@@ -131,7 +132,7 @@ function verifyScenario({ label, seedSql, assertionSql, expectedFailure }) {
     executeSql(project.schemaFile, databaseUrl.toString(), `CREATE DATABASE "${name}";`);
     runPrisma(['migrate', 'deploy', '--schema', project.schemaFile], scopedDatabaseUrl);
     executeSql(project.schemaFile, scopedDatabaseUrl, seedSql);
-    for (const migrationName of s05Migrations) {
+    for (const migrationName of upgradeMigrations) {
       cpSync(join(sourceMigrations, migrationName), join(project.migrationsRoot, migrationName), {
         recursive: true,
       });
@@ -160,6 +161,7 @@ const tenantOne = '10000000-0000-4000-8000-000000000001';
 const tenantTwo = '10000000-0000-4000-8000-000000000002';
 const userOne = '20000000-0000-4000-8000-000000000001';
 const membershipOne = '30000000-0000-4000-8000-000000000001';
+const administratorRoleOne = '35000000-0000-4000-8000-000000000001';
 const providerOne = '40000000-0000-4000-8000-000000000001';
 const productOne = '50000000-0000-4000-8000-000000000001';
 const inventoryOne = '60000000-0000-4000-8000-000000000001';
@@ -188,6 +190,17 @@ INSERT INTO "TenantMembership" (
 ) VALUES (
   '${membershipOne}', '${tenantOne}', '${userOne}', 'ACTIVE', true,
   CURRENT_TIMESTAMP, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+);
+INSERT INTO "Role" (
+  "id", "tenantId", "name", "description", "type", "version", "createdAt", "updatedAt"
+) VALUES (
+  '${administratorRoleOne}', '${tenantOne}', 'TENANT_ADMINISTRATOR',
+  'Fixture administrator', 'SYSTEM', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+);
+INSERT INTO "MembershipRole" (
+  "id", "tenantId", "membershipId", "roleId", "createdAt"
+) VALUES (
+  gen_random_uuid(), '${tenantOne}', '${membershipOne}', '${administratorRoleOne}', CURRENT_TIMESTAMP
 );
 INSERT INTO "Provider" (
   "id", "tenantId", "providerType", "businessName", "ownerName", "email", "phone",
@@ -293,6 +306,26 @@ BEGIN
   ) THEN
     RAISE EXCEPTION 'Medicine reservation command foreign-key name was not repaired';
   END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM "MembershipProviderAccess"
+    WHERE "tenantId" = '${tenantOne}'
+      AND "membershipId" = '${membershipOne}'
+      AND "providerId" = '${providerOne}'
+  ) THEN
+    RAISE EXCEPTION 'Tenant administrator provider access was not backfilled';
+  END IF;
+  IF (
+    SELECT count(*) FROM "RolePermission" rp
+    JOIN "Permission" p ON p."id" = rp."permissionId"
+    WHERE rp."roleId" = '${administratorRoleOne}'
+      AND p."name" IN (
+        'authorization.provider-access.read',
+        'authorization.provider-access.manage',
+        'inventory.stock.read'
+      )
+  ) <> 3 THEN
+    RAISE EXCEPTION 'Gate 3 permissions were not assigned to the tenant administrator';
+  END IF;
 END $$;
 INSERT INTO "AuditEvent" (
   "id", "scope", "actorType", "outcome", "tenantId", "eventType", "metadata", "occurredAt"
@@ -382,4 +415,4 @@ ${batchRow({ id: batchOne, batchNumber: 'BATCH-001', quantity: 0, initial: 0 })}
   expectedFailure: 'S0.5 migration blocked: invalid legacy batch values',
 });
 
-process.stdout.write('S0.5 populated upgrade verification passed.\n');
+process.stdout.write('S0.5 through G3.1 populated upgrade verification passed.\n');
