@@ -10,14 +10,30 @@ export type InventoryItem = {
   location: string;
   expiry: string;
   onHand: number;
-  reserved: number;
+  held: number;
   available: number;
   reorderAt: number;
   unitPrice: number;
   status: InventoryStatus;
 };
 
-export const inventoryItems: InventoryItem[] = [
+export type InventoryDataset = {
+  source: 'preview';
+  label: string;
+  disclosure: string;
+  items: readonly InventoryItem[];
+};
+
+export type InventorySummary = {
+  inventoryValue: number;
+  productCount: number;
+  availableUnits: number;
+  lowCount: number;
+  expiringCount: number;
+  outCount: number;
+};
+
+const previewItems: InventoryItem[] = [
   {
     id: 'inv-001',
     product: 'Metformin 500 mg',
@@ -28,7 +44,7 @@ export const inventoryItems: InventoryItem[] = [
     location: 'Rack A-04',
     expiry: '18 Aug 2026',
     onHand: 24,
-    reserved: 6,
+    held: 6,
     available: 18,
     reorderAt: 80,
     unitPrice: 1.82,
@@ -44,7 +60,7 @@ export const inventoryItems: InventoryItem[] = [
     location: 'Rack B-11',
     expiry: '03 Mar 2027',
     onHand: 48,
-    reserved: 6,
+    held: 6,
     available: 42,
     reorderAt: 60,
     unitPrice: 4.25,
@@ -60,7 +76,7 @@ export const inventoryItems: InventoryItem[] = [
     location: 'Cold C-02',
     expiry: '22 Sep 2026',
     onHand: 18,
-    reserved: 6,
+    held: 6,
     available: 12,
     reorderAt: 15,
     unitPrice: 642,
@@ -76,7 +92,7 @@ export const inventoryItems: InventoryItem[] = [
     location: 'Rack D-07',
     expiry: '11 Dec 2027',
     onHand: 74,
-    reserved: 13,
+    held: 13,
     available: 61,
     reorderAt: 50,
     unitPrice: 7.48,
@@ -92,7 +108,7 @@ export const inventoryItems: InventoryItem[] = [
     location: 'Rack A-01',
     expiry: '14 Feb 2028',
     onHand: 612,
-    reserved: 38,
+    held: 38,
     available: 574,
     reorderAt: 140,
     unitPrice: 2.1,
@@ -108,7 +124,7 @@ export const inventoryItems: InventoryItem[] = [
     location: 'Rack E-03',
     expiry: '09 Aug 2026',
     onHand: 9,
-    reserved: 2,
+    held: 2,
     available: 7,
     reorderAt: 20,
     unitPrice: 168,
@@ -124,7 +140,7 @@ export const inventoryItems: InventoryItem[] = [
     location: 'Rack B-08',
     expiry: '27 Nov 2027',
     onHand: 0,
-    reserved: 0,
+    held: 0,
     available: 0,
     reorderAt: 30,
     unitPrice: 22.3,
@@ -140,7 +156,7 @@ export const inventoryItems: InventoryItem[] = [
     location: 'Rack C-05',
     expiry: '19 Jun 2028',
     onHand: 226,
-    reserved: 14,
+    held: 14,
     available: 212,
     reorderAt: 60,
     unitPrice: 5.6,
@@ -148,13 +164,20 @@ export const inventoryItems: InventoryItem[] = [
   },
 ];
 
+export const previewInventoryDataset: InventoryDataset = createPreviewInventoryDataset({
+  label: 'Sanitised preview',
+  disclosure:
+    'Interface-validation data only. It is not tenant stock and cannot be used for operational decisions.',
+  items: previewItems,
+});
+
 export type InventoryFilters = {
   query: string;
   status: 'all' | InventoryStatus;
   category: string;
 };
 
-export function filterInventoryItems(items: InventoryItem[], filters: InventoryFilters) {
+export function filterInventoryItems(items: readonly InventoryItem[], filters: InventoryFilters) {
   const query = filters.query.trim().toLocaleLowerCase();
 
   return items.filter((item) => {
@@ -168,4 +191,66 @@ export function filterInventoryItems(items: InventoryItem[], filters: InventoryF
 
     return matchesQuery && matchesStatus && matchesCategory;
   });
+}
+
+export function summarizeInventory(items: readonly InventoryItem[]): InventorySummary {
+  const summary = items.reduce<Omit<InventorySummary, 'productCount'>>(
+    (summary, item) => ({
+      inventoryValue: summary.inventoryValue + item.available * item.unitPrice,
+      availableUnits: summary.availableUnits + item.available,
+      lowCount: summary.lowCount + Number(item.status === 'low'),
+      expiringCount: summary.expiringCount + Number(item.status === 'expiring'),
+      outCount: summary.outCount + Number(item.status === 'out'),
+    }),
+    {
+      inventoryValue: 0,
+      availableUnits: 0,
+      lowCount: 0,
+      expiringCount: 0,
+      outCount: 0,
+    },
+  );
+  return {
+    ...summary,
+    productCount: new Set(items.map((item) => item.sku)).size,
+  };
+}
+
+export function createPreviewInventoryDataset(
+  dataset: Omit<InventoryDataset, 'source'>,
+): InventoryDataset {
+  if (!dataset.label.trim() || !dataset.disclosure.trim()) {
+    throw new Error('Invalid inventory preview dataset.');
+  }
+  const ids = new Set<string>();
+  const batches = new Set<string>();
+  for (const item of dataset.items) {
+    if (
+      !item.id ||
+      !item.sku ||
+      !item.batch ||
+      !Number.isSafeInteger(item.onHand) ||
+      !Number.isSafeInteger(item.held) ||
+      !Number.isSafeInteger(item.available) ||
+      item.onHand < 0 ||
+      item.held < 0 ||
+      item.held > item.onHand ||
+      item.available !== item.onHand - item.held ||
+      !Number.isFinite(item.unitPrice) ||
+      item.unitPrice < 0 ||
+      ids.has(item.id) ||
+      batches.has(`${item.sku}:${item.batch}`)
+    ) {
+      throw new Error('Invalid inventory preview dataset.');
+    }
+    ids.add(item.id);
+    batches.add(`${item.sku}:${item.batch}`);
+  }
+
+  return {
+    source: 'preview',
+    label: dataset.label,
+    disclosure: dataset.disclosure,
+    items: dataset.items,
+  };
 }

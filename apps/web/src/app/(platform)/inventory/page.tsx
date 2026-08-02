@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 
 import { InventoryWorkspace } from '@/features/inventory/inventory-workspace';
+import { previewInventoryDataset } from '@/features/inventory/inventory-data';
 
 export const metadata: Metadata = {
   title: 'Inventory | MedSphere',
@@ -8,5 +9,5 @@ export const metadata: Metadata = {
 };
 
 export default function InventoryPage() {
-  return <InventoryWorkspace />;
+  return <InventoryWorkspace dataset={previewInventoryDataset} />;
 }

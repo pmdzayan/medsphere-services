@@ -5,7 +5,12 @@ import { useMemo, useState } from 'react';
 import { MetricCard, SectionCard, StatusBadge } from '@/components/platform/dashboard-primitives';
 import { Icon } from '@/components/platform/icon';
 
-import { filterInventoryItems, inventoryItems, type InventoryStatus } from './inventory-data';
+import {
+  filterInventoryItems,
+  summarizeInventory,
+  type InventoryDataset,
+  type InventoryStatus,
+} from './inventory-data';
 
 const statusPresentation: Record<
   InventoryStatus,
@@ -17,30 +22,6 @@ const statusPresentation: Record<
   out: { label: 'Out of stock', tone: 'rose' },
 };
 
-const statusTabs: Array<{ value: 'all' | InventoryStatus; label: string; count: number }> = [
-  { value: 'all', label: 'All stock', count: inventoryItems.length },
-  {
-    value: 'low',
-    label: 'Low stock',
-    count: inventoryItems.filter((item) => item.status === 'low').length,
-  },
-  {
-    value: 'expiring',
-    label: 'Expiring soon',
-    count: inventoryItems.filter((item) => item.status === 'expiring').length,
-  },
-  {
-    value: 'out',
-    label: 'Out of stock',
-    count: inventoryItems.filter((item) => item.status === 'out').length,
-  },
-];
-
-const categories = [
-  'all',
-  ...Array.from(new Set(inventoryItems.map((item) => item.category))).sort(),
-];
-
 function formatCurrency(value: number) {
   return new Intl.NumberFormat('en-IN', {
     style: 'currency',
@@ -50,14 +31,31 @@ function formatCurrency(value: number) {
   }).format(value);
 }
 
-export function InventoryWorkspace() {
+export function InventoryWorkspace({ dataset }: { dataset: InventoryDataset }) {
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState<'all' | InventoryStatus>('all');
   const [category, setCategory] = useState('all');
 
+  const summary = useMemo(() => summarizeInventory(dataset.items), [dataset.items]);
+  const statusTabs = useMemo<
+    Array<{ value: 'all' | InventoryStatus; label: string; count: number }>
+  >(
+    () => [
+      { value: 'all', label: 'All stock', count: dataset.items.length },
+      { value: 'low', label: 'Low stock', count: summary.lowCount },
+      { value: 'expiring', label: 'Expiring soon', count: summary.expiringCount },
+      { value: 'out', label: 'Out of stock', count: summary.outCount },
+    ],
+    [dataset.items.length, summary],
+  );
+  const categories = useMemo(
+    () => ['all', ...Array.from(new Set(dataset.items.map((item) => item.category))).sort()],
+    [dataset.items],
+  );
+
   const filteredItems = useMemo(
-    () => filterInventoryItems(inventoryItems, { query, status, category }),
-    [category, query, status],
+    () => filterInventoryItems(dataset.items, { query, status, category }),
+    [category, dataset.items, query, status],
   );
 
   const clearFilters = () => {
@@ -74,8 +72,8 @@ export function InventoryWorkspace() {
             <p className="text-xs font-extrabold uppercase tracking-[.18em] text-emerald-700">
               Inventory control
             </p>
-            <span className="rounded-full bg-[#e8f3ef] px-2.5 py-1 text-[10px] font-bold text-[#42645a]">
-              Preview data
+            <span className="rounded-full bg-amber-100 px-2.5 py-1 text-[10px] font-bold text-amber-800">
+              {dataset.label}
             </span>
           </div>
           <h1 className="mt-3 font-[var(--font-display)] text-3xl font-bold tracking-[-.045em] text-[#10271f] sm:text-[2.45rem]">
@@ -107,33 +105,44 @@ export function InventoryWorkspace() {
         </div>
       </div>
 
+      <div
+        role="status"
+        className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-950"
+      >
+        <Icon name="warning" className="mt-0.5 size-4 shrink-0 text-amber-700" />
+        <div>
+          <p className="text-xs font-extrabold uppercase tracking-[.12em]">Preview boundary</p>
+          <p className="mt-1 text-xs leading-5 text-amber-900/75">{dataset.disclosure}</p>
+        </div>
+      </div>
+
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard
-          label="Inventory value"
-          value="₹24.8L"
+          label="Sample inventory value"
+          value={formatCurrency(summary.inventoryValue)}
           icon="billing"
-          detail="Across active sellable batches"
+          detail="Available units in displayed samples"
         />
         <MetricCard
-          label="Active products"
-          value="1,254"
+          label="Sample products"
+          value={summary.productCount.toLocaleString('en-IN')}
           icon="inventory"
           accent="cyan"
-          detail="18,420 available units"
+          detail={`${summary.availableUnits.toLocaleString('en-IN')} available units shown`}
         />
         <MetricCard
           label="Low stock"
-          value="94"
+          value={summary.lowCount.toLocaleString('en-IN')}
           icon="warning"
           accent="amber"
-          detail="27 items below critical level"
+          detail="Displayed samples below reorder level"
         />
         <MetricCard
-          label="Expiring in 90 days"
-          value="21"
+          label="Expiring soon"
+          value={summary.expiringCount.toLocaleString('en-IN')}
           icon="calendar"
           accent="rose"
-          detail="₹38,420 value at risk"
+          detail="Displayed samples marked for attention"
         />
       </div>
 
@@ -290,7 +299,7 @@ export function InventoryWorkspace() {
                       <td className="w-44 px-4 py-4">
                         <div className="flex items-end justify-between gap-3">
                           <p className="text-sm font-bold text-[#28453b]">{item.available}</p>
-                          <p className="text-[10px] text-[#8d9a96]">{item.reserved} reserved</p>
+                          <p className="text-[10px] text-[#8d9a96]">{item.held} held</p>
                         </div>
                         <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#edf2f0]">
                           <div
@@ -349,7 +358,7 @@ export function InventoryWorkspace() {
       </SectionCard>
 
       <p className="pb-2 text-center text-[11px] text-[#93a09c]">
-        Sanitised sample inventory for interface validation · Live mutations remain disabled
+        {dataset.disclosure} · Live mutations remain disabled
       </p>
     </div>
   );

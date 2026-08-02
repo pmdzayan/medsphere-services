@@ -2,85 +2,77 @@
 
 **Status date:** 2026-08-02
 
-**Audited source commit:** `d9e680b2277f2b8b2c790c4d2f2d1ef656f6cfc9`
+**Audited source commit:** `410368cda73fc151b04996d547b62db22231a9e8`
 
-**Accepted stabilization baseline:** `4ea55a17e188410ddee45fa3ea6c016e22d6617a`
+**Accepted stabilization baseline:** `410368cda73fc151b04996d547b62db22231a9e8`
 
-**Current integration branch:** `cto/frontend-foundation`
+**Current integration branch:** `feature/database-architecture`
 
 **Release state:** Not approved for production or real healthcare data
 
-**Full-roadmap engineering estimate:** 30% complete / 70% remaining
+**Full-roadmap engineering estimate:** 31% complete / 69% remaining
 
 ## Current sprint
 
-### PR #10 — S0.5 Integrity and Frontend Foundation Integration
+### F0.13 — Inventory Integration Readiness
 
-**Status:** S0.5 implementation and frontend Tasks 7–12 are present on the
-integration branch. Exact audit commit `d9e680b` passed the pull-request quality
-workflow in
-[run 30711234222](https://github.com/pmdzayan/medsphere-services/actions/runs/30711234222).
-Manual CTO review then found over-broad authorization BFF request/response
-boundaries and missing explicit private-response cache controls. The bounded
-remediation is locally verified; exact-commit CI and merge acceptance remain
-open.
+**Status:** In progress on `cto/frontend-task13`. PR #10 passed exact-commit CI,
+was reviewed, and was squash-merged as `410368c`. This bounded frontend sprint
+makes the inventory preview contract explicit, derives every displayed value
+from the supplied dataset, and enforces ADR-005 quantity invariants while the
+accepted inventory HTTP boundary remains unmounted.
 
-**Dependency:** S0.4 Tenant-Safe RBAC and Durable Audit accepted and merged
+**Dependency:** PR #10 accepted and squash-merged
 
-**Implementation authority:** Accepted ADRs remain authoritative. Feature-branch
-code is not an accepted production boundary until PR #10 passes CI and review.
+**Implementation authority:** ADR-005 remains authoritative. F0.13 must not add
+or infer an inventory HTTP contract, enable mutations, or present preview data
+as tenant stock.
 
 **In scope**
 
-- S0.5 inventory ledger and medicine-reservation integrity acceptance
-- removal of rejected legacy inventory and reservation prototypes
-- clean and populated database upgrade verification through S0.5
-- premium authenticated web application foundation
-- connected team, role, assignment, effective-permission, and audit workspaces
-- personal privacy settings and policy-controlled public onboarding
-- honest separation of connected workflows from preview-only frontend data
-- exact-commit pull-request quality gates and merge review
+- explicit serialisable inventory preview dataset
+- ADR-005 `onHand`, `held`, and `available` quantity terminology and invariants
+- metrics, tab counts, categories, rows, and filters derived from one dataset
+- accessible preview disclosure and disabled unsupported mutations
+- unit and component coverage plus repository-wide quality gates
 
 **Out of scope**
 
-- new supplier, marketplace, delivery, payment, or controlled-medicine work
-- patient self-service reservation exposure
-- hospital, doctor, laboratory, clinical, billing, document, notification, and
-  workflow implementation
+- inventory BFF, backend endpoints, permissions, or actor contracts
+- stock receipt, adjustment, import, reservation, or dispensing mutations
+- supplier, marketplace, delivery, payment, or controlled-medicine work
 - production deployment or compliance approval
 
 ## CTO acceptance ledger
 
-| Area                        | Repository evidence                                                                                               | CTO status                                                  |
-| --------------------------- | ----------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
-| Planning and architecture   | ADR-001 and S0.1 governance merged in PR #1                                                                       | Accepted baseline                                           |
-| Monorepo/tooling foundation | PNPM, Turbo, TypeScript, NestJS, Prisma, shared packages, and quality gates exist                                 | Accepted stabilization foundation                           |
-| Database reproducibility    | S0.2–S0.4 accepted; forward S0.5 migration and upgrade verifier exist on PR #10                                   | S0.5 acceptance pending                                     |
-| Identity and tenant context | S0.3 authentication and trusted tenant context merged                                                             | Accepted                                                    |
-| Authorization and audit     | S0.4 tenant-safe RBAC and durable audit merged                                                                    | Accepted                                                    |
-| Inventory and reservation   | S0.5 ledger, FEFO, typed reservation aggregate, lifecycle services, and tests exist                               | Feature complete; acceptance pending                        |
-| Frontend foundation         | Landing, login, responsive shell, team/RBAC, effective permissions, audit, privacy settings, and onboarding exist | Feature complete for accepted contracts; acceptance pending |
-| Pharmacy and inventory UI   | Responsive workspaces exist with explicitly labelled preview data                                                 | Preview only                                                |
-| Remaining healthcare scope  | Most domain deployables are health-only scaffolds or absent                                                       | Not implemented                                             |
+| Area                        | Repository evidence                                                                                         | CTO status                                           |
+| --------------------------- | ----------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| Planning and architecture   | ADR-001 and S0.1 governance merged in PR #1                                                                 | Accepted baseline                                    |
+| Monorepo/tooling foundation | PNPM, Turbo, TypeScript, NestJS, Prisma, shared packages, and quality gates exist                           | Accepted stabilization foundation                    |
+| Database reproducibility    | S0.2–S0.5 clean deployment, drift, and populated upgrade evidence passed and merged                         | Accepted through S0.5                                |
+| Identity and tenant context | S0.3 authentication and trusted tenant context merged                                                       | Accepted                                             |
+| Authorization and audit     | S0.4 tenant-safe RBAC and durable audit merged                                                              | Accepted                                             |
+| Inventory and reservation   | S0.5 ledger, FEFO, typed reservation aggregate, lifecycle services, migration, and tests                    | Integrity foundation accepted; HTTP exposure pending |
+| Frontend foundation         | Landing, login, responsive shell, team/RBAC, effective permissions, audit, privacy settings, and onboarding | Accepted in PR #10                                   |
+| Pharmacy and inventory UI   | Responsive workspaces exist with explicitly labelled preview data                                           | Preview only                                         |
+| Remaining healthcare scope  | Most domain deployables are health-only scaffolds or absent                                                 | Not implemented                                      |
 
 ## Critical blockers
 
-1. PR #10 exact audit-commit CI passed; the authorization BFF review remediation
-   still requires exact-commit CI and merge acceptance.
-2. The S0.5 inventory application is still runtime-gated as an unaccepted
-   prototype and exposes no accepted production HTTP controllers.
-3. Pharmacy dashboard and inventory frontend data remain previews rather than
+1. The accepted S0.5 inventory integrity layer exposes no reviewed production
+   HTTP controllers.
+2. Pharmacy dashboard and inventory frontend data remain previews rather than
    connected operational read models and mutations.
-4. Consent, privacy operations, verification, retention, legal hold, and the
+3. Consent, privacy operations, verification, retention, legal hold, and the
    policy engine are incomplete.
-5. Billing and notification applications are health-only scaffolds; documents,
+4. Billing and notification applications are health-only scaffolds; documents,
    workflows, supplier procurement, and analytics are not complete services.
-6. Hospital, doctor, laboratory, patient, and clinical journeys do not have
+5. Hospital, doctor, laboratory, patient, and clinical journeys do not have
    accepted end-to-end implementations. Medical-record exposure remains blocked
    before consent and privacy controls.
-7. Browser E2E, performance/load, penetration, backup/restore, disaster recovery,
+6. Browser E2E, performance/load, penetration, backup/restore, disaster recovery,
    observability, and operational-runbook evidence remain incomplete.
-8. Production deployment is intentionally disabled.
+7. Production deployment is intentionally disabled.
 
 Supporting evidence is recorded in [the baseline audit](docs/audits/2026-07-20-cto-baseline.md)
 and [the Gates 1–20 verification](docs/audits/2026-08-01-gates-1-20-verification.md).
@@ -92,12 +84,11 @@ and [the Gates 1–20 verification](docs/audits/2026-08-01-gates-1-20-verificati
 3. **S0.3 Authentication and trusted tenant context** — accepted and squash-merged in PR #3
 4. **S0.4 Tenant-safe RBAC and durable audit** — accepted and squash-merged in
    PR #7
-5. **S0.5 Inventory ledger and reservation integrity** — implemented on the
-   PR #10 history; exact Task 12 source-commit CI passed; review and merge
-   acceptance pending
+5. **S0.5 Inventory ledger and reservation integrity** — accepted and
+   squash-merged in PR #10 as `410368c`
 6. **Frontend Tasks 7–12** — authenticated team access, role lifecycle,
    effective permissions, tenant audit, personal privacy settings, and
-   policy-controlled onboarding implemented on PR #10; acceptance pending
+   policy-controlled onboarding accepted in PR #10
 7. Mount only reviewed inventory HTTP contracts and replace preview frontend
    data with live tenant-safe integration
 8. Resume remaining Inventory and Compliance milestones in dependency order
@@ -107,7 +98,7 @@ Only one recovery sprint may be active at a time. Exact boundaries may be refine
 ## Progress reporting rule
 
 Progress is measured by accepted milestone criteria, not by the number of files
-or endpoints present. The README's 30% full-roadmap estimate and 32% frontend
+or endpoints present. The README's 31% full-roadmap estimate and 35% frontend
 estimate are planning indicators, not acceptance or release claims. They may
 change only when repository evidence and milestone acceptance change. Preview
 screens, placeholder services, unmounted routes, and schema-only foundations do
@@ -246,6 +237,27 @@ ADR-006 is implemented on `cto/s0.5-integrity-remediation` at commit
 Evidence: [PR #9](https://github.com/pmdzayan/medsphere-services/pull/9) and
 [workflow run 30147083613](https://github.com/pmdzayan/medsphere-services/actions/runs/30147083613).
 
-ADR-006 implementation and verification are CTO-accepted. S0.5 stock and
-reservation implementation remains blocked until PR #9 is squash-merged into
-`feature/database-architecture`.
+ADR-006 implementation and verification are CTO-accepted and present in the
+accepted `feature/database-architecture` history.
+
+## S0.5 and PR #10 verification evidence
+
+| Check                                      | Result                                                             |
+| ------------------------------------------ | ------------------------------------------------------------------ |
+| Production dependency audit                | Passed                                                             |
+| Clean PostgreSQL 16 migration and drift    | Passed                                                             |
+| Populated S0.3 through S0.5 upgrade safety | Passed                                                             |
+| Inventory and reservation tests            | Passed — 27/27                                                     |
+| Authentication and authorization tests     | Passed in CI                                                       |
+| Frontend tests                             | Passed                                                             |
+| Formatting, lint, and build                | Passed                                                             |
+| Exact authorization-remediation commit     | `3003625f94f991ed03da24a4627e26b84667c588`                         |
+| Exact-commit pull-request workflow         | Passed — run `30741672770`                                         |
+| Merge                                      | PR #10 squash-merged as `410368cda73fc151b04996d547b62db22231a9e8` |
+
+Evidence: [PR #10](https://github.com/pmdzayan/medsphere-services/pull/10) and
+[workflow run 30741672770](https://github.com/pmdzayan/medsphere-services/actions/runs/30741672770).
+
+S0.5's integrity foundation and Frontend Tasks 1–12 are accepted. This does not
+accept an inventory HTTP boundary, live inventory frontend integration,
+production deployment, or legal/regulatory compliance.

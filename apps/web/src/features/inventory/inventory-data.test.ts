@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
-import { filterInventoryItems, inventoryItems } from './inventory-data';
+import {
+  createPreviewInventoryDataset,
+  filterInventoryItems,
+  previewInventoryDataset,
+  summarizeInventory,
+} from './inventory-data';
+
+const inventoryItems = previewInventoryDataset.items;
 
 describe('filterInventoryItems', () => {
   it('returns every item when filters are empty', () => {
@@ -43,5 +50,41 @@ describe('filterInventoryItems', () => {
         category: 'all',
       }),
     ).toEqual([]);
+  });
+
+  it('derives every summary metric from the supplied batch rows', () => {
+    expect(summarizeInventory(inventoryItems)).toEqual({
+      inventoryValue: 11940.14,
+      productCount: 8,
+      availableUnits: 926,
+      lowCount: 2,
+      expiringCount: 2,
+      outCount: 1,
+    });
+  });
+
+  it('rejects preview data that violates batch quantity authority', () => {
+    const invalid = {
+      ...inventoryItems[0],
+      available: inventoryItems[0].onHand,
+    };
+
+    expect(() =>
+      createPreviewInventoryDataset({
+        label: 'Preview',
+        disclosure: 'Not operational data.',
+        items: [invalid],
+      }),
+    ).toThrow('Invalid inventory preview dataset.');
+  });
+
+  it('rejects duplicate row and batch identities', () => {
+    expect(() =>
+      createPreviewInventoryDataset({
+        label: 'Preview',
+        disclosure: 'Not operational data.',
+        items: [inventoryItems[0], inventoryItems[0]],
+      }),
+    ).toThrow('Invalid inventory preview dataset.');
   });
 });

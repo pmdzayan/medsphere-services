@@ -1,11 +1,11 @@
 # MedSphere AI Handoff
 
-**Last updated:** 2026-08-01
+**Last updated:** 2026-08-02
 
-**Current sprint:** PR #10 — S0.5 acceptance, frontend foundation integration,
-and bounded security/documentation remediation
+**Current sprint:** F0.13 — inventory integration readiness
 
-**Next feature work:** Blocked until PR #10 review and merge acceptance
+**Next feature work:** Define and accept the inventory HTTP contract before live
+frontend integration
 
 ## Mandatory startup sequence
 
@@ -54,8 +54,8 @@ The migration must be incremental:
   populated S0.3 upgrade verification, and the final documentation workflow.
 - Provider, product, inventory, reservation, and medical-record controllers
   remain unmounted from the accepted authenticated application boundary.
-- The accepted stabilization baseline is S0.4 squash commit
-  `4ea55a17e188410ddee45fa3ea6c016e22d6617a`.
+- The accepted stabilization baseline is PR #10 squash commit
+  `410368cda73fc151b04996d547b62db22231a9e8`.
 - S0.5 now defines `Batch` as physical/held quantity authority, uses an
   append-only movement ledger, and stores typed reservation items and
   allocations. Its accepted production HTTP boundary and live frontend
@@ -90,17 +90,16 @@ See `docs/audits/2026-07-20-cto-baseline.md` for the accepted baseline.
 1. Acceptance synchronization — completed
 2. Architecture and sprint contract — completed and merged in PR #8
 3. ADR-006 runtime/security prerequisite — accepted
-4. Database schema and populated migration verification — implemented on PR #10
-5. Shared transaction and audit primitives — implemented on PR #10
-6. Stock model, ledger, FEFO, and availability — implemented on PR #10
-7. Medicine reservation hold lifecycle — implemented on PR #10
+4. Database schema and populated migration verification — accepted in PR #10
+5. Shared transaction and audit primitives — accepted in PR #10
+6. Stock model, ledger, FEFO, and availability — accepted in PR #10
+7. Medicine reservation hold lifecycle — accepted in PR #10
 8. Application boundary and accepted route inventory — route inventory proven;
    production inventory controllers remain intentionally unmounted
-9. Exact audit source-commit CI — passed on `d9e680b` in workflow run
-   `30711234222`
-10. Authorization BFF strict-contract review remediation — locally verified;
-    exact-commit CI pending
-11. Merge acceptance and live inventory API/frontend integration — pending
+9. Authorization BFF strict-contract remediation — passed on `3003625` in
+   workflow run `30741672770`
+10. Merge acceptance — completed as `410368c` in PR #10
+11. Live inventory API/frontend integration — pending the reviewed HTTP contract
 
 If ownership transfers, resume at the first pending checkpoint. Do not use
 `cline/s0.4-rbac-audit` or
@@ -108,12 +107,12 @@ If ownership transfers, resume at the first pending checkpoint. Do not use
 
 ## Exact continuation point
 
-Continue from `cto/frontend-foundation` only. First pass the full quality gate
-for the current audit remediation, then obtain PR #10 review and merge
-acceptance. After acceptance, define and review the inventory HTTP contracts,
-permissions, audit behavior, and integration tests before mounting controllers
-or replacing preview frontend data. Keep later roadmap modules blocked until
-their dependency-ordered sprint is approved.
+Continue from `feature/database-architecture` or the current bounded branch
+`cto/frontend-task13`. Finish and review F0.13 without inventing backend routes.
+Then define and review the inventory HTTP contracts, permissions, audit
+behavior, and integration tests before mounting controllers or replacing
+preview frontend data. Keep later roadmap modules blocked until their
+dependency-ordered sprint is approved.
 
 Cline may receive only a complete, bounded prompt for characterization tests or
 mechanical work whose contract is already fixed by ADR-005. Cline must not
