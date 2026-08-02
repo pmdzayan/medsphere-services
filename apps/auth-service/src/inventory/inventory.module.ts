@@ -6,11 +6,21 @@ import { InventoryController } from './inventory.controller';
 import { InventoryCommandService } from './inventory-command.service';
 import { InventoryRepository } from './inventory.repository';
 import { InventoryService } from './inventory.service';
+import { ReservationLifecycleService } from './reservation-lifecycle.service';
+import { ReservationRepository } from './reservation.repository';
+import { ReservationService } from './reservation.service';
 
 @Module({
   imports: [PrismaModule, AuthorizationModule, AuditPersistenceModule],
   controllers: [InventoryController],
-  providers: [InventoryRepository, InventoryService, InventoryCommandService],
+  providers: [
+    InventoryRepository,
+    InventoryService,
+    InventoryCommandService,
+    ReservationRepository,
+    ReservationService,
+    ReservationLifecycleService,
+  ],
   exports: [InventoryService],
 })
 export class InventoryModule {}

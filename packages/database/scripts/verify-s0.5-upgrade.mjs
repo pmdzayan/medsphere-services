@@ -325,9 +325,11 @@ BEGIN
         'inventory.stock.read',
         'inventory.listings.manage',
         'inventory.stock.receive',
-        'inventory.stock.adjust'
+        'inventory.stock.adjust',
+        'inventory.reservations.read',
+        'inventory.reservations.manage'
       )
-  ) <> 6 THEN
+  ) <> 8 THEN
     RAISE EXCEPTION 'Gate 3 permissions were not assigned to the tenant administrator';
   END IF;
   IF NOT EXISTS (

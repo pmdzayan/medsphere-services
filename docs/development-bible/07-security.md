@@ -2,7 +2,7 @@
 
 **Decisions:** ADR-003 through ADR-007
 
-**Status:** S0.3–S0.5 and G3.1 accepted; G3.2 security target active
+**Status:** S0.3–S0.5 and G3.1–G3.2 accepted; G3.3 security target active
 
 ## Security invariants
 
@@ -166,3 +166,16 @@ identity fallback.
   never override verified identity and path scope.
 - Every protected write is serializable and atomic with its stock movement or
   configuration receipt and typed tenant audit event.
+
+## G3.3 reservation authorization boundary
+
+- Reads require `inventory.reservations.read`; transitions require
+  `inventory.reservations.manage`.
+- Every request also requires a live membership-to-provider assignment.
+- Provider access is checked before any idempotency receipt lookup, including
+  unique-conflict recovery, so revoked or unassigned staff cannot discover a
+  durable replay.
+- Operational reads omit subject identity and notes; patient access remains
+  blocked pending consent architecture.
+- `EXPIRE` is denied at DTO validation and has no staff route. A later worker
+  must use explicit tenant scope and a system audit actor.

@@ -41,6 +41,15 @@ import {
 } from './dto/inventory-command-response.dto';
 import { InventoryCommandService } from './inventory-command.service';
 import { InventoryService } from './inventory.service';
+import { ProviderReservationQueryDto } from './dto/reservation-query.dto';
+import {
+  ProviderReservationListResponseDto,
+  ProviderReservationResponseDto,
+  ProviderReservationTransitionResponseDto,
+} from './dto/reservation-response.dto';
+import { TransitionProviderReservationDto } from './dto/reservation-transition.dto';
+import { ReservationLifecycleService } from './reservation-lifecycle.service';
+import { ReservationService } from './reservation.service';
 
 @Controller('inventory')
 @ApiTags('Inventory')
@@ -51,7 +60,60 @@ export class InventoryController {
   constructor(
     private readonly inventoryService: InventoryService,
     private readonly inventoryCommands: InventoryCommandService,
+    private readonly reservations: ReservationService,
+    private readonly reservationLifecycle: ReservationLifecycleService,
   ) {}
+
+  @Get('providers/:providerId/reservations')
+  @Header('Cache-Control', 'private, no-store')
+  @RequirePermissions(PERMISSIONS.inventoryReservationsRead)
+  @ApiOperation({ summary: 'List operational reservations for an assigned provider' })
+  @ApiOkResponse({ type: ProviderReservationListResponseDto })
+  @ApiNotFoundResponse({ description: 'Provider reservations not found' })
+  listReservations(
+    @CurrentIdentity() identity: AuthenticatedIdentity,
+    @Param('providerId', new ParseUUIDPipe({ version: '4' })) providerId: string,
+    @Query() query: ProviderReservationQueryDto,
+  ) {
+    return this.reservations.list(identity, providerId, query);
+  }
+
+  @Get('providers/:providerId/reservations/:reservationId')
+  @Header('Cache-Control', 'private, no-store')
+  @RequirePermissions(PERMISSIONS.inventoryReservationsRead)
+  @ApiOperation({ summary: 'Get an operational reservation for an assigned provider' })
+  @ApiOkResponse({ type: ProviderReservationResponseDto })
+  @ApiNotFoundResponse({ description: 'Medicine reservation not found' })
+  getReservation(
+    @CurrentIdentity() identity: AuthenticatedIdentity,
+    @Param('providerId', new ParseUUIDPipe({ version: '4' })) providerId: string,
+    @Param('reservationId', new ParseUUIDPipe({ version: '4' })) reservationId: string,
+  ) {
+    return this.reservations.get(identity, providerId, reservationId);
+  }
+
+  @Post('providers/:providerId/reservations/:reservationId/transitions')
+  @HttpCode(HttpStatus.OK)
+  @RequirePermissions(PERMISSIONS.inventoryReservationsManage)
+  @ApiOperation({ summary: 'Transition an active reservation for an assigned provider' })
+  @ApiOkResponse({ type: ProviderReservationTransitionResponseDto })
+  @ApiNotFoundResponse({ description: 'Medicine reservation not found' })
+  @ApiConflictResponse({ description: 'State, version, stock, or idempotency conflict' })
+  transitionReservation(
+    @CurrentIdentity() identity: AuthenticatedIdentity,
+    @Param('providerId', new ParseUUIDPipe({ version: '4' })) providerId: string,
+    @Param('reservationId', new ParseUUIDPipe({ version: '4' })) reservationId: string,
+    @Body() dto: TransitionProviderReservationDto,
+    @Req() request: MetadataHttpRequest,
+  ) {
+    return this.reservationLifecycle.transition({
+      actor: identity,
+      providerId,
+      reservationId,
+      ...dto,
+      request: extractRequestMetadata(request),
+    });
+  }
 
   @Get('providers/:providerId/stock')
   @Header('Cache-Control', 'private, no-store')

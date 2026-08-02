@@ -2,7 +2,7 @@
 
 **Audit date:** 2026-08-02
 
-**Accepted source:** `77689b5ccfff21f2f580b87718bf6f7611d1c238`
+**Accepted source:** `3249f8ac46f043473630a473aea0e49ff72d4a5d`
 
 ## Decision
 
@@ -10,17 +10,17 @@ The claim that Gates 1–9 are complete is rejected. Green builds do not convert
 schema-only, health-only, preview-only, or unmounted code into accepted product
 capabilities.
 
-| Gate | Scope                | Accepted evidence                                                                      | State                                      | Next acceptance dependency                                                     |
-| ---: | -------------------- | -------------------------------------------------------------------------------------- | ------------------------------------------ | ------------------------------------------------------------------------------ |
-|    1 | Identity and RBAC    | Authentication, trusted tenant context, RBAC, durable audit, migration and CI evidence | Accepted foundation                        | All later provider commands must preserve Gate 1 guarantees                    |
-|    2 | Master Patient Index | Only a legacy `MedicalRecord` schema model                                             | Not complete                               | Consent/privacy architecture, patient identity model, deduplication contract   |
-|    3 | Inventory            | Ledger, batches, FEFO, reservation integrity, G3.1 provider scope and stock read       | Integrity/read accepted; mutations partial | Accept bounded commands, reservation lifecycle, and remaining stock operations |
-|    4 | Clinical/EMR         | Legacy medical-record schema only                                                      | Not complete                               | Gate 2 plus consent-aware encounter architecture                               |
-|    5 | Finance              | Health-only billing deployable                                                         | Not complete                               | Accepted clinical/pharmacy charge sources and double-entry finance ADR         |
-|    6 | Unified Event Bus    | No transactional outbox, dispatcher, inbox, or delivery worker                         | Not implemented                            | Event catalogue and outbox architecture after mounted domain commands          |
-|    7 | Notifications        | Health-only notification deployable                                                    | Not complete                               | Gate 6 delivery contract, templates, consent/preferences, provider adapters    |
-|    8 | Documents            | No accepted storage or signature boundary                                              | Not implemented                            | Consent, malware scanning, encryption, retention, access-policy ADR            |
-|    9 | Workflow Engine      | No accepted definition, approval, or runtime module                                    | Not implemented                            | Stable domain commands plus workflow/versioning ADR                            |
+| Gate | Scope                | Accepted evidence                                                                       | State                                      | Next acceptance dependency                                                   |
+| ---: | -------------------- | --------------------------------------------------------------------------------------- | ------------------------------------------ | ---------------------------------------------------------------------------- |
+|    1 | Identity and RBAC    | Authentication, trusted tenant context, RBAC, durable audit, migration and CI evidence  | Accepted foundation                        | All later provider commands must preserve Gate 1 guarantees                  |
+|    2 | Master Patient Index | Only a legacy `MedicalRecord` schema model                                              | Not complete                               | Consent/privacy architecture, patient identity model, deduplication contract |
+|    3 | Inventory            | Ledger, batches, FEFO, reservation integrity, G3.1 reads, and G3.2 first stock commands | Core commands accepted; operations partial | Accept reservation lifecycle and remaining stock operations                  |
+|    4 | Clinical/EMR         | Legacy medical-record schema only                                                       | Not complete                               | Gate 2 plus consent-aware encounter architecture                             |
+|    5 | Finance              | Health-only billing deployable                                                          | Not complete                               | Accepted clinical/pharmacy charge sources and double-entry finance ADR       |
+|    6 | Unified Event Bus    | No transactional outbox, dispatcher, inbox, or delivery worker                          | Not implemented                            | Event catalogue and outbox architecture after mounted domain commands        |
+|    7 | Notifications        | Health-only notification deployable                                                     | Not complete                               | Gate 6 delivery contract, templates, consent/preferences, provider adapters  |
+|    8 | Documents            | No accepted storage or signature boundary                                               | Not implemented                            | Consent, malware scanning, encryption, retention, access-policy ADR          |
+|    9 | Workflow Engine      | No accepted definition, approval, or runtime module                                     | Not implemented                            | Stable domain commands plus workflow/versioning ADR                          |
 
 ## Dependency order
 

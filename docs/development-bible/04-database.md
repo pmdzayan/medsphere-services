@@ -1,6 +1,6 @@
 # Volume 04 — Database Bible
 
-**Baseline:** S0.2 through S0.5 and G3.1 accepted and merged; G3.2 active
+**Baseline:** S0.2 through S0.5 and G3.1–G3.2 accepted and merged; G3.3 active
 
 **Engine:** PostgreSQL 16
 
@@ -12,12 +12,13 @@
 
 ## Acceptance boundary
 
-This volume documents the accepted database through G3.1 and the G3.2 command
+This volume documents the accepted database through G3.2 and the G3.3 reservation
 target. S0.5 established tenant-scoped batch quantity authority, an append-only
 stock ledger, typed medicine reservations, deterministic FEFO allocations, and
 idempotent command receipts. G3.1 added composite membership-provider access.
-G3.2 adds migration-owned permissions and constrained command hashes for the
-first candidate stock mutations. Consent, privacy, retention, and remaining
+G3.2 added migration-owned permissions and constrained command hashes for the
+first accepted stock mutations. G3.3 adds migration-owned reservation read and
+manage permissions without changing the aggregate schema. Consent, privacy, retention, and remaining
 product domains continue through dependency-ordered sprints.
 
 No production or real healthcare data is approved.
@@ -34,6 +35,7 @@ No production or real healthcare data is approved.
 |     6 | `20260801000000_align_medicine_reservation_command_fk_name`      | Repair reservation command foreign-key naming                          |
 |     7 | `20260802120000_trusted_provider_stock_read`                     | Trusted provider assignments and inventory-read permission             |
 |     8 | `20260802160000_inventory_stock_commands`                        | Stock command hashes and listing/receipt/adjust permissions            |
+|     9 | `20260802180000_provider_reservation_operations`                 | Provider reservation read/manage permissions                           |
 
 Migration history is append-only under ADR-002. Applied migrations are never edited or deleted. Shared databases use `prisma migrate deploy`; `prisma db push` is prohibited.
 
