@@ -16,6 +16,8 @@ import { CreateRoleDto } from './dto/create-role.dto';
 import { UpdateRoleDto } from './dto/update-role.dto';
 import {
   AssignmentResponseDto,
+  EffectivePermissionsResponseDto,
+  MembershipListResponseDto,
   RoleListResponseDto,
   RoleResponseDto,
 } from './dto/authorization-response.dto';
@@ -35,6 +37,13 @@ export class AuthorizationService {
     const permissions = await this.repository.findEffectivePermissions(identity);
     const effective = new Set<PermissionKey>(permissions);
     return requiredPermissions.every((permission) => effective.has(permission));
+  }
+
+  async listEffectivePermissions(
+    identity: AuthenticatedIdentity,
+  ): Promise<EffectivePermissionsResponseDto> {
+    const permissionKeys = await this.repository.findEffectivePermissions(identity);
+    return { permissionKeys: [...new Set(permissionKeys)].sort() };
   }
 
   listPermissions() {
@@ -256,6 +265,31 @@ export class AuthorizationService {
       roleId: assignment.roleId,
       roleName: assignment.role.name,
     }));
+  }
+
+  async listMemberships(
+    identity: AuthenticatedIdentity,
+    query: AuthorizationListQueryDto,
+  ): Promise<MembershipListResponseDto> {
+    const result = await this.repository.listMemberships(
+      identity.tenantId,
+      query.limit,
+      query.offset,
+    );
+    return {
+      data: result.data.map((membership) => ({
+        id: membership.id,
+        userId: membership.userId,
+        email: membership.user.email,
+        firstName: membership.user.firstName,
+        lastName: membership.user.lastName,
+        status: membership.status,
+        roles: membership.roleAssignments.map(({ role }) => role),
+      })),
+      total: result.total,
+      limit: query.limit,
+      offset: query.offset,
+    };
   }
 
   async addAssignment(

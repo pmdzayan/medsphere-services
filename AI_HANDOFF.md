@@ -1,12 +1,11 @@
 # MedSphere AI Handoff
 
-**Last updated:** 2026-07-25
+**Last updated:** 2026-08-01
 
-**Current sprint:** S0.5 — Inventory Ledger and Medicine Reservation Integrity
-(architecture accepted; ADR-006 runtime/security prerequisite CI-verified in
-PR #9 and awaiting merge)
+**Current sprint:** PR #10 — S0.5 acceptance, frontend foundation integration,
+and bounded security/documentation remediation
 
-**Next feature work:** Blocked by S0.5
+**Next feature work:** Blocked until PR #10 review and merge acceptance
 
 ## Mandatory startup sequence
 
@@ -57,13 +56,10 @@ The migration must be incremental:
   remain unmounted from the accepted authenticated application boundary.
 - The accepted stabilization baseline is S0.4 squash commit
   `4ea55a17e188410ddee45fa3ea6c016e22d6617a`.
-- `Inventory` and `Batch` are competing stock authorities.
-- Existing inventory transaction callbacks call repositories bound to the root
-  Prisma client, so their writes are not proven atomic.
-- Medicine reservation behavior is duplicated across inventory-service and
-  reservation-service; the latter uses a hard-coded all-zero user identifier.
-- Reservation product, quantity, and expiry are stored in JSON `notes` without
-  relational integrity.
+- S0.5 now defines `Batch` as physical/held quantity authority, uses an
+  append-only movement ledger, and stores typed reservation items and
+  allocations. Its accepted production HTTP boundary and live frontend
+  integration remain open.
 - Durable audit covers S0.4 authorization and accepted authentication session
   mutations. Future business modules must add atomic audit coverage when their
   own sprints are accepted.
@@ -93,14 +89,18 @@ See `docs/audits/2026-07-20-cto-baseline.md` for the accepted baseline.
 
 1. Acceptance synchronization — completed
 2. Architecture and sprint contract — completed and merged in PR #8
-3. ADR-006 runtime/security prerequisite — implementation and CI verification
-   complete; PR #9 merge pending
-4. Database schema and populated migration verification — pending
-5. Shared transaction and audit primitives — pending
-6. Stock model, ledger, FEFO, and availability — pending
-7. Medicine reservation hold lifecycle — pending
-8. Application boundary and accepted route inventory — pending
-9. Infrastructure evidence and CTO acceptance — pending
+3. ADR-006 runtime/security prerequisite — accepted
+4. Database schema and populated migration verification — implemented on PR #10
+5. Shared transaction and audit primitives — implemented on PR #10
+6. Stock model, ledger, FEFO, and availability — implemented on PR #10
+7. Medicine reservation hold lifecycle — implemented on PR #10
+8. Application boundary and accepted route inventory — route inventory proven;
+   production inventory controllers remain intentionally unmounted
+9. Exact audit source-commit CI — passed on `d9e680b` in workflow run
+   `30711234222`
+10. Authorization BFF strict-contract review remediation — locally verified;
+    exact-commit CI pending
+11. Merge acceptance and live inventory API/frontend integration — pending
 
 If ownership transfers, resume at the first pending checkpoint. Do not use
 `cline/s0.4-rbac-audit` or
@@ -108,17 +108,12 @@ If ownership transfers, resume at the first pending checkpoint. Do not use
 
 ## Exact continuation point
 
-Do not implement stock or reservation code until the CI-verified ADR-006
-prerequisite is squash-merged from PR #9. Then:
-
-1. continue from the resulting `feature/database-architecture` merge commit and
-   design the forward migration from the S0.4 schema state introduced by
-   `4ea55a1`;
-2. define populated upgrade and fail-closed corruption fixtures;
-3. extract focused transaction and audit primitives without copying S0.4 code;
-4. implement stock before medicine reservation;
-5. run real PostgreSQL rollback and concurrency gates before mounting routes;
-6. keep every later roadmap module blocked until S0.5 CTO acceptance.
+Continue from `cto/frontend-foundation` only. First pass the full quality gate
+for the current audit remediation, then obtain PR #10 review and merge
+acceptance. After acceptance, define and review the inventory HTTP contracts,
+permissions, audit behavior, and integration tests before mounting controllers
+or replacing preview frontend data. Keep later roadmap modules blocked until
+their dependency-ordered sprint is approved.
 
 Cline may receive only a complete, bounded prompt for characterization tests or
 mechanical work whose contract is already fixed by ADR-005. Cline must not

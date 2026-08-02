@@ -18,8 +18,8 @@ Ordered sprints:
 2. S0.2 Reproducible database baseline — accepted and merged
 3. S0.3 Authentication and trusted tenant context — accepted and merged
 4. S0.4 Tenant-safe RBAC and durable audit — accepted and merged
-5. S0.5 Inventory ledger and reservation integrity — current; architecture
-   accepted, checkpoint publication and CI pending
+5. S0.5 Inventory ledger and reservation integrity — implemented on PR #10;
+   exact Task 12 source-commit CI passed, review and merge acceptance pending
 
 **Completion gate:** Accepted ADRs; protected review flow; clean migrations; deny-by-default authentication; tenant-isolation tests; integrated audit trail; atomic stock/reservation behavior; mandatory lint/test/build passing.
 

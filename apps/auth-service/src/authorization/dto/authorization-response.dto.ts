@@ -11,6 +11,11 @@ export class PermissionResponseDto {
   description!: string;
 }
 
+export class EffectivePermissionsResponseDto {
+  @ApiProperty({ type: [String] })
+  permissionKeys!: string[];
+}
+
 export class RoleResponseDto {
   @ApiProperty({ format: 'uuid' })
   id!: string;
@@ -57,4 +62,49 @@ export class AssignmentResponseDto {
 
   @ApiProperty()
   roleName!: string;
+}
+
+export class MembershipRoleSummaryDto {
+  @ApiProperty({ format: 'uuid' })
+  id!: string;
+
+  @ApiProperty()
+  name!: string;
+}
+
+export class MembershipResponseDto {
+  @ApiProperty({ format: 'uuid' })
+  id!: string;
+
+  @ApiProperty({ format: 'uuid' })
+  userId!: string;
+
+  @ApiProperty({ format: 'email' })
+  email!: string;
+
+  @ApiProperty()
+  firstName!: string;
+
+  @ApiProperty()
+  lastName!: string;
+
+  @ApiProperty({ enum: ['PENDING', 'ACTIVE', 'SUSPENDED', 'REVOKED'] })
+  status!: 'PENDING' | 'ACTIVE' | 'SUSPENDED' | 'REVOKED';
+
+  @ApiProperty({ type: [MembershipRoleSummaryDto] })
+  roles!: MembershipRoleSummaryDto[];
+}
+
+export class MembershipListResponseDto {
+  @ApiProperty({ type: [MembershipResponseDto] })
+  data!: MembershipResponseDto[];
+
+  @ApiProperty()
+  total!: number;
+
+  @ApiProperty()
+  limit!: number;
+
+  @ApiProperty()
+  offset!: number;
 }

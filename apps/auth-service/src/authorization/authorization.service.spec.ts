@@ -38,6 +38,7 @@ describe('AuthorizationService', () => {
       replaceRolePermissions: jest.fn(),
       bumpTenantVersion: jest.fn(),
       findMembership: jest.fn(),
+      listMemberships: jest.fn(),
       findAssignment: jest.fn(),
       countActiveTenantAdministrators: jest.fn(),
       removeAssignment: jest.fn(),
@@ -60,6 +61,19 @@ describe('AuthorizationService', () => {
     await expect(
       service.hasAllPermissions(identity, [PERMISSIONS.rolesRead, PERMISSIONS.rolesDelete]),
     ).resolves.toBe(false);
+    expect(repository.findEffectivePermissions).toHaveBeenCalledWith(identity);
+  });
+
+  it('returns a stable effective-permission snapshot for only the active membership', async () => {
+    repository.findEffectivePermissions.mockResolvedValue([
+      PERMISSIONS.rolesUpdate,
+      PERMISSIONS.rolesRead,
+      PERMISSIONS.rolesUpdate,
+    ]);
+
+    await expect(service.listEffectivePermissions(identity)).resolves.toEqual({
+      permissionKeys: [PERMISSIONS.rolesRead, PERMISSIONS.rolesUpdate],
+    });
     expect(repository.findEffectivePermissions).toHaveBeenCalledWith(identity);
   });
 
@@ -122,6 +136,36 @@ describe('AuthorizationService', () => {
     expect(repository.bumpTenantVersion).toHaveBeenCalledWith(transaction, identity.tenantId);
     expect(repository.removeAssignment).not.toHaveBeenCalled();
     expect(auditWriter.appendTenantUser).not.toHaveBeenCalled();
+  });
+
+  it('maps only the repository tenant membership directory shape', async () => {
+    repository.listMemberships.mockResolvedValue({
+      data: [
+        {
+          id: identity.membershipId,
+          userId: identity.userId,
+          status: 'ACTIVE',
+          user: { email: 'admin@example.com', firstName: 'Aisha', lastName: 'Zahra' },
+          roleAssignments: [{ role: { id: randomUUID(), name: 'PHARMACY_MANAGER' } }],
+        },
+      ],
+      total: 1,
+    } as never);
+
+    await expect(service.listMemberships(identity, { limit: 50, offset: 0 })).resolves.toEqual({
+      data: [
+        expect.objectContaining({
+          id: identity.membershipId,
+          userId: identity.userId,
+          email: 'admin@example.com',
+          roles: [expect.objectContaining({ name: 'PHARMACY_MANAGER' })],
+        }),
+      ],
+      total: 1,
+      limit: 50,
+      offset: 0,
+    });
+    expect(repository.listMemberships).toHaveBeenCalledWith(identity.tenantId, 50, 0);
   });
 
   it('writes assignment removal evidence in the same transaction', async () => {

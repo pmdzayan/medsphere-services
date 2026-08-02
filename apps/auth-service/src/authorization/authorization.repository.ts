@@ -202,6 +202,31 @@ export class AuthorizationRepository {
     });
   }
 
+  async listMemberships(tenantId: string, limit: number, offset: number) {
+    const where = { tenantId, deletedAt: null };
+    const [data, total] = await Promise.all([
+      this.prisma.client.tenantMembership.findMany({
+        where,
+        select: {
+          id: true,
+          userId: true,
+          status: true,
+          user: { select: { email: true, firstName: true, lastName: true } },
+          roleAssignments: {
+            where: { role: { deletedAt: null } },
+            select: { role: { select: { id: true, name: true } } },
+            orderBy: { role: { name: 'asc' } },
+          },
+        },
+        orderBy: [{ user: { firstName: 'asc' } }, { user: { lastName: 'asc' } }, { id: 'asc' }],
+        take: limit,
+        skip: offset,
+      }),
+      this.prisma.client.tenantMembership.count({ where }),
+    ]);
+    return { data, total };
+  }
+
   async listMembershipRoles(tenantId: string, membershipId: string) {
     return this.prisma.client.membershipRole.findMany({
       where: {
