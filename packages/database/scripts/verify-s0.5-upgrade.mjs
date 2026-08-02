@@ -25,6 +25,7 @@ const upgradeMigrations = [
   '20260801000000_align_medicine_reservation_command_fk_name',
   '20260802120000_trusted_provider_stock_read',
   '20260802160000_inventory_stock_commands',
+  '20260802180000_provider_reservation_operations',
 ];
 const pnpmCommand = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm';
 
@@ -429,4 +430,4 @@ ${batchRow({ id: batchOne, batchNumber: 'BATCH-001', quantity: 0, initial: 0 })}
   expectedFailure: 'S0.5 migration blocked: invalid legacy batch values',
 });
 
-process.stdout.write('S0.5 through G3.1 populated upgrade verification passed.\n');
+process.stdout.write('S0.5 through G3.3 populated upgrade verification passed.\n');
