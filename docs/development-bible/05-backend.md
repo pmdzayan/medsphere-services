@@ -1,10 +1,10 @@
-# Volume 05 — Backend Bible: Identity, Authorization, and Audit
+# Volume 05 — Backend Bible: Identity, Authorization, Audit, and Inventory
 
-**Sprints:** S0.3 and S0.4 accepted and merged; S0.5 architecture active
+**Sprints:** S0.3–S0.5 and G3.1 accepted; G3.2 active
 
-**Decisions:** ADR-003, ADR-004, ADR-005, and ADR-006
+**Decisions:** ADR-003 through ADR-007
 
-**Status:** S0.4 accepted; S0.5 target not yet implemented; not production-approved
+**Status:** G3.1 accepted; G3.2 commands under verification; not production-approved
 
 ## Purpose and boundary
 
@@ -14,37 +14,48 @@ that exact active membership on every request. The audit module records bounded,
 attributable, append-only evidence for accepted authorization and session
 events.
 
-The active auth-service application mounts health, authentication, self-user
-privacy/language, language metadata, S0.4 authorization administration, and
-tenant audit reads. Provider, verification, product, inventory, reservation,
+The active authentication application is the temporary modular-monolith
+composition root. It mounts health, authentication, self-user settings,
+authorization administration, tenant audit reads, provider-access management,
+and accepted inventory routes. Prototype provider/product CRUD, reservation,
 medical-record, marketplace, delivery, payment, and controlled-medicine APIs
 remain unmounted.
 
-## Accepted route contract
+## Mounted route contract
 
-| Method | Route                                                    | Access                  | Authoritative context                        |
-| ------ | -------------------------------------------------------- | ----------------------- | -------------------------------------------- |
-| POST   | `/auth/register`                                         | Public/limited          | Normalized tenant slug plus tenant policy    |
-| POST   | `/auth/login`                                            | Public/limited          | Active user-membership-tenant database chain |
-| POST   | `/auth/refresh`                                          | Public/limited          | Stored session membership                    |
-| POST   | `/auth/logout`                                           | Authenticated           | Verified request identity                    |
-| POST   | `/auth/logout-all`                                       | Authenticated           | Verified global user                         |
-| GET    | `/users/me/privacy`                                      | Authenticated           | Verified request identity user               |
-| PATCH  | `/users/me/privacy`                                      | Authenticated           | Verified request identity user               |
-| PATCH  | `/users/me/language`                                     | Authenticated           | Verified request identity user               |
-| GET    | `/authorization/permissions`                             | Permission guarded      | Global migration-owned catalogue             |
-| GET    | `/authorization/roles`                                   | Permission guarded      | Verified request tenant                      |
-| POST   | `/authorization/roles`                                   | Permission guarded      | Verified request tenant                      |
-| GET    | `/authorization/roles/:roleId`                           | Permission guarded      | Verified request tenant                      |
-| PATCH  | `/authorization/roles/:roleId`                           | Permission + `If-Match` | Verified request tenant                      |
-| DELETE | `/authorization/roles/:roleId`                           | Permission + `If-Match` | Verified request tenant                      |
-| GET    | `/authorization/memberships/:membershipId/roles`         | Permission guarded      | Verified request tenant                      |
-| PUT    | `/authorization/memberships/:membershipId/roles/:roleId` | Permission guarded      | Verified request tenant                      |
-| DELETE | `/authorization/memberships/:membershipId/roles/:roleId` | Permission guarded      | Verified request tenant                      |
-| GET    | `/audit/events`                                          | `audit.events.read`     | Verified request tenant only                 |
-| GET    | `/audit/events/:eventId`                                 | `audit.events.read`     | Verified request tenant only                 |
+| Method | Route                                                                  | Access                          | Authoritative context                        |
+| ------ | ---------------------------------------------------------------------- | ------------------------------- | -------------------------------------------- |
+| POST   | `/auth/register`                                                       | Public/limited                  | Normalized tenant slug plus tenant policy    |
+| POST   | `/auth/login`                                                          | Public/limited                  | Active user-membership-tenant database chain |
+| POST   | `/auth/refresh`                                                        | Public/limited                  | Stored session membership                    |
+| POST   | `/auth/logout`                                                         | Authenticated                   | Verified request identity                    |
+| POST   | `/auth/logout-all`                                                     | Authenticated                   | Verified global user                         |
+| GET    | `/users/me/privacy`                                                    | Authenticated                   | Verified request identity user               |
+| PATCH  | `/users/me/privacy`                                                    | Authenticated                   | Verified request identity user               |
+| PATCH  | `/users/me/language`                                                   | Authenticated                   | Verified request identity user               |
+| GET    | `/authorization/permissions`                                           | Permission guarded              | Global migration-owned catalogue             |
+| GET    | `/authorization/roles`                                                 | Permission guarded              | Verified request tenant                      |
+| POST   | `/authorization/roles`                                                 | Permission guarded              | Verified request tenant                      |
+| GET    | `/authorization/roles/:roleId`                                         | Permission guarded              | Verified request tenant                      |
+| PATCH  | `/authorization/roles/:roleId`                                         | Permission + `If-Match`         | Verified request tenant                      |
+| DELETE | `/authorization/roles/:roleId`                                         | Permission + `If-Match`         | Verified request tenant                      |
+| GET    | `/authorization/memberships/:membershipId/roles`                       | Permission guarded              | Verified request tenant                      |
+| PUT    | `/authorization/memberships/:membershipId/roles/:roleId`               | Permission guarded              | Verified request tenant                      |
+| DELETE | `/authorization/memberships/:membershipId/roles/:roleId`               | Permission guarded              | Verified request tenant                      |
+| GET    | `/audit/events`                                                        | `audit.events.read`             | Verified request tenant only                 |
+| GET    | `/audit/events/:eventId`                                               | `audit.events.read`             | Verified request tenant only                 |
+| GET    | `/authorization/memberships/:membershipId/provider-access`             | Permission guarded              | Verified request tenant                      |
+| PUT    | `/authorization/memberships/:membershipId/provider-access/:providerId` | Permission guarded              | Verified request tenant                      |
+| DELETE | `/authorization/memberships/:membershipId/provider-access/:providerId` | Permission guarded              | Verified request tenant                      |
+| GET    | `/inventory/providers/:providerId/stock`                               | Read permission + assignment    | Verified membership/provider relation        |
+| PUT    | `/inventory/providers/:providerId/products/:productId`                 | Manage permission + assignment  | Verified membership/provider relation        |
+| POST   | `/inventory/providers/:providerId/products/:productId/batches`         | Receipt permission + assignment | Verified membership/provider relation        |
+| POST   | `/inventory/providers/:providerId/batches/:batchId/adjustments`        | Adjust permission + assignment  | Verified membership/provider relation        |
 
 No accepted endpoint takes an authoritative user, membership, tenant, or session ID from the request body, path, query, or custom header.
+
+The three G3.2 write routes are mounted candidates; they do not become accepted
+production boundaries until exact-commit PostgreSQL CI and review pass.
 
 ## Components
 
@@ -68,6 +79,9 @@ No accepted endpoint takes an authoritative user, membership, tenant, or session
   request correlation, and tenant/platform actor scoping.
 - `AuditRepository` and `AuditService`: field-minimized, cursor-based tenant
   reads that cannot return platform evidence.
+- `InventoryService`: assigned-provider batch-derived stock reads.
+- `InventoryCommandService`: serializable, idempotent, version-aware listing,
+  receipt, and adjustment orchestration with atomic ledger and audit writes.
 
 Repositories own persistence queries; controllers do not access Prisma. Services own orchestration and security state transitions. DTOs own transport validation and normalization. The access identity is readonly and contains `userId`, `membershipId`, `tenantId`, `sessionId`, and the verified token ID.
 
@@ -80,8 +94,8 @@ so its audit row is written before the guard returns forbidden.
 
 - The client never submits an authoritative tenant identifier.
 - Roles belong to one tenant; assignments belong to `TenantMembership`.
-- The eight S0.4 permissions are compile-time constants and migration-owned
-  rows. Wildcards and arbitrary tenant capabilities are rejected.
+- Permission keys are compile-time constants backed by migration-owned rows.
+  Wildcards and arbitrary tenant capabilities are rejected.
 - `TENANT_ADMINISTRATOR` is the only built-in role. Tenant APIs cannot rename,
   delete, or replace its permissions.
 - Custom role update/delete requires a strong positive numeric `If-Match`

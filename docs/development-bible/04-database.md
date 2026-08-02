@@ -1,6 +1,6 @@
 # Volume 04 — Database Bible
 
-**Baseline:** S0.2 through S0.4 accepted and merged
+**Baseline:** S0.2 through S0.5 and G3.1 accepted and merged; G3.2 active
 
 **Engine:** PostgreSQL 16
 
@@ -12,23 +12,28 @@
 
 ## Acceptance boundary
 
-This volume documents the accepted database through S0.4 and the ADR-005 target
-for S0.5. PostgreSQL 16 clean deploy, populated S0.3 upgrade, drift, constraint,
-trigger, atomicity, and concurrency tests passed in PR #7. Existing inventory
-and reservation tables remain rejected prototypes until the S0.5 migration and
-integrity gates pass. Consent, privacy, retention, and the remaining product
-domains continue through their dependency-ordered sprints.
+This volume documents the accepted database through G3.1 and the G3.2 command
+target. S0.5 established tenant-scoped batch quantity authority, an append-only
+stock ledger, typed medicine reservations, deterministic FEFO allocations, and
+idempotent command receipts. G3.1 added composite membership-provider access.
+G3.2 adds migration-owned permissions and constrained command hashes for the
+first candidate stock mutations. Consent, privacy, retention, and remaining
+product domains continue through dependency-ordered sprints.
 
 No production or real healthcare data is approved.
 
 ## Migration chain
 
-| Order | Migration                                                | Purpose                                                                |
-| ----: | -------------------------------------------------------- | ---------------------------------------------------------------------- |
-|     1 | `20260715163416_init_auth_schema`                        | Tenant, user, session, role, permission, and assignment foundation     |
-|     2 | `20260720020000_complete_reproducible_baseline`          | Additive migration from the auth state to the complete declared schema |
-|     3 | `20260720120000_trusted_authentication_tenant_context`   | Global identity, tenant memberships, and secure rotated sessions       |
-|     4 | `20260725120000_tenant_safe_authorization_durable_audit` | Membership RBAC, global permissions, and append-only audit events      |
+| Order | Migration                                                        | Purpose                                                                |
+| ----: | ---------------------------------------------------------------- | ---------------------------------------------------------------------- |
+|     1 | `20260715163416_init_auth_schema`                                | Tenant, user, session, role, permission, and assignment foundation     |
+|     2 | `20260720020000_complete_reproducible_baseline`                  | Additive migration from the auth state to the complete declared schema |
+|     3 | `20260720120000_trusted_authentication_tenant_context`           | Global identity, tenant memberships, and secure rotated sessions       |
+|     4 | `20260725120000_tenant_safe_authorization_durable_audit`         | Membership RBAC, global permissions, and append-only audit events      |
+|     5 | `20260731120000_inventory_ledger_medicine_reservation_integrity` | Tenant-safe batches, ledger, reservations, and command receipts        |
+|     6 | `20260801000000_align_medicine_reservation_command_fk_name`      | Repair reservation command foreign-key naming                          |
+|     7 | `20260802120000_trusted_provider_stock_read`                     | Trusted provider assignments and inventory-read permission             |
+|     8 | `20260802160000_inventory_stock_commands`                        | Stock command hashes and listing/receipt/adjust permissions            |
 
 Migration history is append-only under ADR-002. Applied migrations are never edited or deleted. Shared databases use `prisma migrate deploy`; `prisma db push` is prohibited.
 
@@ -298,17 +303,17 @@ Types below describe the PostgreSQL representation. Columns are required unless 
 
 The following are deliberately documented rather than silently accepted:
 
-- S0.4 PostgreSQL 16 migration, trigger, atomicity, and concurrency evidence
-  remains mandatory before its candidate schema is accepted.
-- Several identifier columns have no foreign keys.
-- Inventory and batch quantities lack database check constraints.
-- `Inventory` and `Batch` are competing stock sources of truth.
-- `StockMovement` and `InventoryHistory` are competing ledger/history sources.
+- G3.2 real PostgreSQL migration, upgrade, command atomicity, replay, and
+  concurrency evidence remains mandatory before acceptance.
+- Reservation HTTP exposure and automated expiry processing remain unaccepted.
+- Transfer, return, damage, quarantine, recall, and location modeling are not
+  implemented.
 - Audit retention, legal hold, archival, export, partitioning, correction
   events, and cryptographic signing remain future compliance work.
 - Consent, purpose, retention, legal hold, archival, and deletion rules are not modeled.
 - Country and data-residency partitioning are not designed.
-- Seed data is intentionally absent; permission and taxonomy seeds require reviewed, idempotent specifications.
+- Permission catalogue extensions are migration-owned; broader taxonomy and
+  bootstrap data still require reviewed, idempotent specifications.
 
 These gaps must be resolved through forward migrations in their assigned sprint. Reproducibility is not permission to skip their dependencies.
 

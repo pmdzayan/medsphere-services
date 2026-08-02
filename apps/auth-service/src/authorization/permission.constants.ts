@@ -10,6 +10,9 @@ export const PERMISSIONS = {
   providerAccessManage: 'authorization.provider-access.manage',
   auditEventsRead: 'audit.events.read',
   inventoryStockRead: 'inventory.stock.read',
+  inventoryListingsManage: 'inventory.listings.manage',
+  inventoryStockReceive: 'inventory.stock.receive',
+  inventoryStockAdjust: 'inventory.stock.adjust',
 } as const;
 
 export const PERMISSION_KEYS = Object.values(PERMISSIONS);

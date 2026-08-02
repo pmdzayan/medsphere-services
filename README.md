@@ -8,10 +8,11 @@ MedSphere is a planned multi-tenant healthcare ecosystem for patients, pharmacie
 
 **Status date:** 2026-08-02
 
-**Accepted evidence baseline:** `410368c` (PR #10 squash merge)
+**Accepted evidence baseline:** `77689b5` (PR #11 squash merge)
 
-**Current sprint:** G3.1 trusted provider stock read on
-`cto/gate3-trusted-provider-scope`
+**Current sprint:** G3.2 trusted inventory stock commands on
+`cto/gate3-inventory-mutations`; local non-infrastructure validation is complete,
+while exact-commit PostgreSQL CI and review remain pending
 
 **Full-roadmap estimate:** **30% complete / 70% remaining**
 
@@ -36,7 +37,7 @@ Gates 2 and 4–20 are not complete.
 | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------: |
 | Architecture, governance, monorepo, and database baseline        | ADR process, PNPM/Turbo tooling, shared packages, forward migrations, drift checks, and CI gates exist                                                                          |                  85% |
 | Authentication, tenant context, RBAC, and durable audit          | S0.3 and S0.4 accepted; authenticated frontend, role administration, effective permissions, audit, policy-controlled onboarding, and personal privacy settings implemented      |                  85% |
-| Inventory ledger and medicine reservation integrity              | S0.5 integrity accepted in PR #10; G3.1 adds the first provider-scoped read boundary, while stock mutations and live frontend integration remain incomplete                     |                  68% |
+| Inventory ledger and medicine reservation integrity              | S0.5 integrity and G3.1 provider-scoped reads are accepted; G3.2 listing, receipt, and adjustment commands are under verification; broader operations remain incomplete         |                  68% |
 | Frontend                                                         | Landing, login, responsive shell, team/RBAC, and audit are connected; pharmacy dashboard and inventory remain previews; most healthcare modules are absent                      |                  32% |
 | Compliance beyond RBAC and audit                                 | Consent, privacy operations, verification, retention, legal hold, and policy enforcement remain incomplete                                                                      |                  10% |
 | Supplier, procurement, pharmacy, billing, and delivery workflows | Existing deployables are mostly health-only placeholders or unaccepted prototypes                                                                                               |                   5% |
@@ -63,18 +64,18 @@ Gates 2 and 4–20 are not complete.
 - PR #10 passed its final quality workflow at commit `3003625` in
   [run 30741672770](https://github.com/pmdzayan/medsphere-services/actions/runs/30741672770)
   and was squash-merged as `410368c`.
-- G3.1 implements migration-backed membership-to-provider assignments and the
-  first permission-protected, provider-scoped stock read contract. Exact-commit
-  CI and review acceptance remain required.
+- G3.1 passed run `30743115664` and was squash-merged in PR #11 as `77689b5`,
+  accepting migration-backed provider assignments and the first
+  permission-protected stock read contract.
 
 ### Remaining work
 
-1. **Accept G3.1 provider-scoped stock reads:** pass clean PostgreSQL migration,
-   populated-upgrade, integration, formatting, lint, test, build, and review
-   gates on the exact branch commit.
-2. **Expose bounded inventory mutations:** define separate idempotent receipt,
-   adjustment, transfer, return, and reservation contracts with atomic audit;
-   connect frontend previews only after each backend contract is accepted.
+1. **Accept G3.2 stock commands:** pass clean PostgreSQL migration,
+   populated-upgrade, zero-skip integration, formatting, lint, test, build, and
+   review gates for listing configuration, batch receipt, and adjustment.
+2. **Expose remaining bounded inventory mutations:** define separate transfer,
+   return, damage, expiry, and reservation contracts with atomic audit; connect
+   frontend previews only after each backend contract is accepted.
 3. **Complete inventory operations:** expiry management, transfers, damaged
    stock, returns, recalls/quarantine, operational analytics, and production
    worker behavior where accepted by dedicated sprints.

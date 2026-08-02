@@ -24,6 +24,7 @@ const upgradeMigrations = [
   '20260731120000_inventory_ledger_medicine_reservation_integrity',
   '20260801000000_align_medicine_reservation_command_fk_name',
   '20260802120000_trusted_provider_stock_read',
+  '20260802160000_inventory_stock_commands',
 ];
 const pnpmCommand = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm';
 
@@ -321,10 +322,21 @@ BEGIN
       AND p."name" IN (
         'authorization.provider-access.read',
         'authorization.provider-access.manage',
-        'inventory.stock.read'
+        'inventory.stock.read',
+        'inventory.listings.manage',
+        'inventory.stock.receive',
+        'inventory.stock.adjust'
       )
-  ) <> 3 THEN
+  ) <> 6 THEN
     RAISE EXCEPTION 'Gate 3 permissions were not assigned to the tenant administrator';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conrelid = '"StockMovement"'::regclass
+      AND conname = 'StockMovement_command_hash_check'
+      AND contype = 'c'
+  ) THEN
+    RAISE EXCEPTION 'Stock movement command-hash constraint is missing';
   END IF;
 END $$;
 INSERT INTO "AuditEvent" (

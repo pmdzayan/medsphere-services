@@ -20,7 +20,9 @@ Ordered sprints:
 4. S0.4 Tenant-safe RBAC and durable audit — accepted and merged
 5. S0.5 Inventory ledger and reservation integrity — accepted and merged in
    PR #10 as `410368c`
-6. G3.1 Trusted provider stock read — implementation and acceptance in progress
+6. G3.1 Trusted provider stock read — accepted and merged in PR #11 as `77689b5`
+7. G3.2 Trusted listing configuration, batch receipt, and stock adjustment —
+   locally verified; exact-commit infrastructure CI and review pending
 
 **Completion gate:** Accepted ADRs; protected review flow; clean migrations; deny-by-default authentication; tenant-isolation tests; integrated audit trail; atomic stock/reservation behavior; mandatory lint/test/build passing.
 
