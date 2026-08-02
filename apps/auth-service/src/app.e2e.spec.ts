@@ -18,6 +18,7 @@ import { AuditWriter } from './audit/audit-writer.service';
 import { AuthorizationService } from './authorization/authorization.service';
 import { RedisThrottlerStorage } from './security/redis-throttler.storage';
 import { UsersService } from './users/users.service';
+import { InventoryService } from './inventory/inventory.service';
 
 interface ApiResponse {
   readonly status: number;
@@ -94,6 +95,8 @@ describe('S0.4 authentication and authorization HTTP security boundary', () => {
   const auditWriter = {
     appendTenantUser,
   } as unknown as AuditWriter;
+  const listStock = jest.fn();
+  const inventoryService = { listStock } as unknown as InventoryService;
 
   let app: INestApplication;
   let module: TestingModule;
@@ -125,6 +128,8 @@ describe('S0.4 authentication and authorization HTTP security boundary', () => {
       .useValue(auditService)
       .overrideProvider(AuditWriter)
       .useValue(auditWriter)
+      .overrideProvider(InventoryService)
+      .useValue(inventoryService)
       .compile();
 
     app = module.createNestApplication();
@@ -159,6 +164,7 @@ describe('S0.4 authentication and authorization HTTP security boundary', () => {
     updateRole.mockReset();
     listTenantEvents.mockReset();
     appendTenantUser.mockReset().mockResolvedValue(undefined);
+    listStock.mockReset();
     getPrivacy.mockResolvedValue({
       sharePhone: false,
       shareEmail: false,
@@ -367,13 +373,51 @@ describe('S0.4 authentication and authorization HTTP security boundary', () => {
     ).resolves.toMatchObject({ status: 401 });
   });
 
-  it.each(['/authorization/roles', '/audit/events'])(
+  it.each(['/authorization/roles', '/audit/events', `/inventory/providers/${randomUUID()}/stock`])(
     'keeps an accepted S0.4 route authenticated: %s',
     async (path) => {
       await expect(sendRequest(path)).resolves.toMatchObject({ status: 401 });
       expect(hasAllPermissions).not.toHaveBeenCalled();
     },
   );
+
+  it('uses trusted identity for the provider-scoped inventory read boundary', async () => {
+    const issued = issueAccessToken();
+    const providerId = randomUUID();
+    const identity: AuthenticatedIdentity = {
+      userId,
+      membershipId,
+      tenantId,
+      sessionId,
+      tokenId: issued.tokenId,
+    };
+    validateAccessIdentity.mockResolvedValue(identity);
+    hasAllPermissions.mockResolvedValue(true);
+    listStock.mockResolvedValue({ data: [], total: 0, limit: 25, offset: 0 });
+
+    const response = await sendRequest(
+      `/inventory/providers/${providerId}/stock?limit=25&query=medicine`,
+      {
+        headers: {
+          authorization: `Bearer ${issued.value}`,
+          'x-tenant-id': randomUUID(),
+          'x-provider-id': randomUUID(),
+        },
+      },
+    );
+
+    expect(response).toMatchObject({
+      status: 200,
+      body: { data: [], total: 0, limit: 25, offset: 0 },
+      headers: { 'cache-control': 'private, no-store' },
+    });
+    expect(hasAllPermissions).toHaveBeenCalledWith(identity, ['inventory.stock.read']);
+    expect(listStock).toHaveBeenCalledWith(
+      identity,
+      providerId,
+      expect.objectContaining({ limit: 25, query: 'medicine' }),
+    );
+  });
 
   it('derives authorization tenant context from trusted identity and ignores forged headers', async () => {
     const issued = issueAccessToken();

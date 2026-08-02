@@ -18,6 +18,7 @@ import {
   AssignmentResponseDto,
   EffectivePermissionsResponseDto,
   MembershipListResponseDto,
+  ProviderAccessResponseDto,
   RoleListResponseDto,
   RoleResponseDto,
 } from './dto/authorization-response.dto';
@@ -389,6 +390,122 @@ export class AuthorizationService {
           targetMembershipId: membershipId,
           roleName: role.name,
         },
+        request,
+      });
+    });
+  }
+
+  async listProviderAccess(
+    identity: AuthenticatedIdentity,
+    membershipId: string,
+  ): Promise<ProviderAccessResponseDto[]> {
+    const membership = await this.repository.findMembership(
+      this.repository.transactionClient,
+      identity.tenantId,
+      membershipId,
+      false,
+    );
+    if (!membership) {
+      throw new NotFoundException('Membership not found');
+    }
+    const assignments = await this.repository.listProviderAccess(identity.tenantId, membershipId);
+    return assignments.map((assignment) => ({
+      membershipId: assignment.membershipId,
+      providerId: assignment.providerId,
+      businessName: assignment.provider.businessName,
+      providerType: assignment.provider.providerType,
+      isActive: assignment.provider.isActive,
+    }));
+  }
+
+  async addProviderAccess(
+    identity: AuthenticatedIdentity,
+    membershipId: string,
+    providerId: string,
+    request: RequestMetadata = {},
+  ): Promise<ProviderAccessResponseDto> {
+    return withSerializableRetry(this.repository.transactionClient, async (transaction) => {
+      const [membership, provider] = await Promise.all([
+        this.repository.findMembership(transaction, identity.tenantId, membershipId, true),
+        this.repository.findProvider(transaction, identity.tenantId, providerId, true),
+      ]);
+      if (!membership || !provider) {
+        throw new NotFoundException('Active membership or provider not found');
+      }
+      const existing = await this.repository.findProviderAccess(
+        transaction,
+        identity.tenantId,
+        membershipId,
+        providerId,
+      );
+      if (!existing) {
+        const created = await this.repository.createProviderAccess(
+          transaction,
+          identity.tenantId,
+          membershipId,
+          providerId,
+        );
+        if (created.count === 1) {
+          await this.auditWriter.appendTenantUser(transaction, {
+            tenantId: identity.tenantId,
+            actorMembershipId: identity.membershipId,
+            eventType: 'authorization.provider-access.added',
+            outcome: 'SUCCEEDED',
+            resourceType: 'membership-provider-access',
+            resourceId: `${membershipId}:${providerId}`,
+            metadata: { targetMembershipId: membershipId, providerId },
+            request,
+          });
+        }
+      }
+      return {
+        membershipId,
+        providerId,
+        businessName: provider.businessName,
+        providerType: provider.providerType,
+        isActive: provider.isActive,
+      };
+    });
+  }
+
+  async removeProviderAccess(
+    identity: AuthenticatedIdentity,
+    membershipId: string,
+    providerId: string,
+    request: RequestMetadata = {},
+  ): Promise<void> {
+    await withSerializableRetry(this.repository.transactionClient, async (transaction) => {
+      await this.repository.bumpTenantVersion(transaction, identity.tenantId);
+      const [membership, provider, access] = await Promise.all([
+        this.repository.findMembership(transaction, identity.tenantId, membershipId, false),
+        this.repository.findProvider(transaction, identity.tenantId, providerId, false),
+        this.repository.findProviderAccess(
+          transaction,
+          identity.tenantId,
+          membershipId,
+          providerId,
+        ),
+      ]);
+      if (!membership || !provider || !access) {
+        throw new NotFoundException('Provider assignment not found');
+      }
+      const removed = await this.repository.removeProviderAccess(
+        transaction,
+        identity.tenantId,
+        membershipId,
+        providerId,
+      );
+      if (removed.count !== 1) {
+        throw new NotFoundException('Provider assignment not found');
+      }
+      await this.auditWriter.appendTenantUser(transaction, {
+        tenantId: identity.tenantId,
+        actorMembershipId: identity.membershipId,
+        eventType: 'authorization.provider-access.removed',
+        outcome: 'SUCCEEDED',
+        resourceType: 'membership-provider-access',
+        resourceId: `${membershipId}:${providerId}`,
+        metadata: { targetMembershipId: membershipId, providerId },
         request,
       });
     });

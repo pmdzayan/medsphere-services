@@ -33,6 +33,8 @@ describeAuthorizationInfra('S0.4 PostgreSQL authorization and durable-audit inte
   const administratorAId = randomUUID();
   const administratorBId = randomUUID();
   const tenantBReaderRoleId = randomUUID();
+  const providerAId = randomUUID();
+  const providerBId = randomUUID();
 
   const identityA: AuthenticatedIdentity = {
     userId: sharedUserId,
@@ -177,6 +179,12 @@ describeAuthorizationInfra('S0.4 PostgreSQL authorization and durable-audit inte
         },
       ],
     });
+    await prisma.client.provider.createMany({
+      data: [
+        providerFixture(providerAId, tenantAId, 'Tenant A Pharmacy', 'a'),
+        providerFixture(providerBId, tenantBId, 'Tenant B Hospital', 'b', 'HOSPITAL'),
+      ],
+    });
   });
 
   afterAll(async () => {
@@ -220,6 +228,31 @@ describeAuthorizationInfra('S0.4 PostgreSQL authorization and durable-audit inte
         },
       }),
     ).rejects.toBeDefined();
+  });
+
+  it('rejects cross-tenant provider access and persists tenant-safe assignment evidence', async () => {
+    await expect(
+      prisma.client.membershipProviderAccess.create({
+        data: {
+          tenantId: tenantAId,
+          membershipId: membershipAId,
+          providerId: providerBId,
+        },
+      }),
+    ).rejects.toBeDefined();
+
+    await expect(
+      authorizationService.addProviderAccess(identityA, membershipAId, providerAId),
+    ).resolves.toMatchObject({ membershipId: membershipAId, providerId: providerAId });
+    await expect(
+      prisma.client.auditEvent.count({
+        where: {
+          tenantId: tenantAId,
+          eventType: 'authorization.provider-access.added',
+          resourceId: `${membershipAId}:${providerAId}`,
+        },
+      }),
+    ).resolves.toBe(1);
   });
 
   it('keeps the permission catalogue migration-owned and built-in role shape constrained', async () => {
@@ -522,5 +555,32 @@ describeAuthorizationInfra('S0.4 PostgreSQL authorization and durable-audit inte
       throw new Error('Accepted permission catalogue is incomplete');
     }
     return permission.id;
+  }
+
+  function providerFixture(
+    id: string,
+    tenantId: string,
+    businessName: string,
+    suffix: string,
+    providerType: 'PHARMACY' | 'HOSPITAL' = 'PHARMACY',
+  ) {
+    return {
+      id,
+      tenantId,
+      providerType,
+      businessName,
+      ownerName: 'Integration Owner',
+      email: `provider-${suffix}-${id}@medsphere.test`,
+      phone: '0000000000',
+      address: 'Integration address',
+      city: 'Chennai',
+      state: 'Tamil Nadu',
+      country: 'India',
+      postalCode: '600001',
+      latitude: 13.0827,
+      longitude: 80.2707,
+      isVerified: true,
+      isActive: true,
+    } as const;
   }
 });

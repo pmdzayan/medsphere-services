@@ -10,6 +10,7 @@ import { JwtAuthGuard } from './auth/jwt-auth.guard';
 import { AuthRateLimitModule } from './security/auth-rate-limit.module';
 import { AuthorizationModule } from './authorization/authorization.module';
 import { AuditModule } from './audit/audit.module';
+import { InventoryModule } from './inventory/inventory.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { AuditModule } from './audit/audit.module';
     LocalizationModule,
     AuthorizationModule,
     AuditModule,
+    InventoryModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },

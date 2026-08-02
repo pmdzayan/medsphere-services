@@ -2,11 +2,11 @@
 
 **Status date:** 2026-08-02
 
-**Audited source commit:** `d9e680b2277f2b8b2c790c4d2f2d1ef656f6cfc9`
+**Accepted source commit:** `410368cda73fc151b04996d547b62db22231a9e8`
 
 **Accepted stabilization baseline:** `4ea55a17e188410ddee45fa3ea6c016e22d6617a`
 
-**Current integration branch:** `cto/frontend-foundation`
+**Current sprint branch:** `cto/gate3-trusted-provider-scope`
 
 **Release state:** Not approved for production or real healthcare data
 
@@ -14,32 +14,30 @@
 
 ## Current sprint
 
-### PR #10 — S0.5 Integrity and Frontend Foundation Integration
+### G3.1 — Trusted Provider Stock Read
 
-**Status:** S0.5 implementation and frontend Tasks 7–12 are present on the
-integration branch. Exact audit commit `d9e680b` passed the pull-request quality
-workflow in
-[run 30711234222](https://github.com/pmdzayan/medsphere-services/actions/runs/30711234222).
-Manual CTO review then found over-broad authorization BFF request/response
-boundaries and missing explicit private-response cache controls. The bounded
-remediation is locally verified; exact-commit CI and merge acceptance remain
-open.
+**Status:** PR #10 passed exact-commit quality run
+[30741672770](https://github.com/pmdzayan/medsphere-services/actions/runs/30741672770)
+and was squash-merged as `410368c`. G3.1 is the active bounded sprint. It adds
+server-side membership-to-provider authority, administration routes, and the
+first read-only inventory stock HTTP contract. Exact-commit CI and review
+acceptance remain open.
 
-**Dependency:** S0.4 Tenant-Safe RBAC and Durable Audit accepted and merged
+**Dependency:** S0.5 inventory integrity and frontend foundation accepted and
+merged in PR #10
 
-**Implementation authority:** Accepted ADRs remain authoritative. Feature-branch
-code is not an accepted production boundary until PR #10 passes CI and review.
+**Implementation authority:** Accepted ADRs and merged PR #10 remain
+authoritative. G3.1 feature-branch code is not an accepted production boundary
+until its own exact-commit CI and review pass.
 
 **In scope**
 
-- S0.5 inventory ledger and medicine-reservation integrity acceptance
-- removal of rejected legacy inventory and reservation prototypes
-- clean and populated database upgrade verification through S0.5
-- premium authenticated web application foundation
-- connected team, role, assignment, effective-permission, and audit workspaces
-- personal privacy settings and policy-controlled public onboarding
-- honest separation of connected workflows from preview-only frontend data
-- exact-commit pull-request quality gates and merge review
+- trusted membership-to-provider assignment with composite tenant constraints
+- migration-owned provider-access and inventory-read permissions
+- audited provider-assignment administration routes
+- permission-protected, provider-assigned, read-only stock contract
+- clean and populated database upgrade verification through G3.1
+- exact-commit pull-request quality gates and review
 
 **Out of scope**
 
@@ -51,24 +49,24 @@ code is not an accepted production boundary until PR #10 passes CI and review.
 
 ## CTO acceptance ledger
 
-| Area                        | Repository evidence                                                                                               | CTO status                                                  |
-| --------------------------- | ----------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
-| Planning and architecture   | ADR-001 and S0.1 governance merged in PR #1                                                                       | Accepted baseline                                           |
-| Monorepo/tooling foundation | PNPM, Turbo, TypeScript, NestJS, Prisma, shared packages, and quality gates exist                                 | Accepted stabilization foundation                           |
-| Database reproducibility    | S0.2–S0.4 accepted; forward S0.5 migration and upgrade verifier exist on PR #10                                   | S0.5 acceptance pending                                     |
-| Identity and tenant context | S0.3 authentication and trusted tenant context merged                                                             | Accepted                                                    |
-| Authorization and audit     | S0.4 tenant-safe RBAC and durable audit merged                                                                    | Accepted                                                    |
-| Inventory and reservation   | S0.5 ledger, FEFO, typed reservation aggregate, lifecycle services, and tests exist                               | Feature complete; acceptance pending                        |
-| Frontend foundation         | Landing, login, responsive shell, team/RBAC, effective permissions, audit, privacy settings, and onboarding exist | Feature complete for accepted contracts; acceptance pending |
-| Pharmacy and inventory UI   | Responsive workspaces exist with explicitly labelled preview data                                                 | Preview only                                                |
-| Remaining healthcare scope  | Most domain deployables are health-only scaffolds or absent                                                       | Not implemented                                             |
+| Area                        | Repository evidence                                                                                               | CTO status                                     |
+| --------------------------- | ----------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| Planning and architecture   | ADR-001 and S0.1 governance merged in PR #1                                                                       | Accepted baseline                              |
+| Monorepo/tooling foundation | PNPM, Turbo, TypeScript, NestJS, Prisma, shared packages, and quality gates exist                                 | Accepted stabilization foundation              |
+| Database reproducibility    | S0.2–S0.5 accepted; G3.1 forward migration and upgraded populated verifier implemented                            | G3.1 acceptance pending                        |
+| Identity and tenant context | S0.3 authentication and trusted tenant context merged                                                             | Accepted                                       |
+| Authorization and audit     | S0.4 tenant-safe RBAC and durable audit merged                                                                    | Accepted                                       |
+| Inventory and reservation   | S0.5 integrity accepted; G3.1 provider-scoped stock read implemented                                              | Mutations and live frontend integration remain |
+| Frontend foundation         | Landing, login, responsive shell, team/RBAC, effective permissions, audit, privacy settings, and onboarding exist | Accepted in PR #10 for implemented contracts   |
+| Pharmacy and inventory UI   | Responsive workspaces exist with explicitly labelled preview data                                                 | Preview only                                   |
+| Remaining healthcare scope  | Most domain deployables are health-only scaffolds or absent                                                       | Not implemented                                |
 
 ## Critical blockers
 
-1. PR #10 exact audit-commit CI passed; the authorization BFF review remediation
-   still requires exact-commit CI and merge acceptance.
-2. The S0.5 inventory application is still runtime-gated as an unaccepted
-   prototype and exposes no accepted production HTTP controllers.
+1. G3.1 still requires clean PostgreSQL migration/upgrade execution,
+   exact-commit CI, review, and merge acceptance.
+2. Only the read-only stock contract is in G3.1; inventory mutations and
+   medicine reservation routes remain intentionally unmounted.
 3. Pharmacy dashboard and inventory frontend data remain previews rather than
    connected operational read models and mutations.
 4. Consent, privacy operations, verification, retention, legal hold, and the
@@ -92,15 +90,14 @@ and [the Gates 1–20 verification](docs/audits/2026-08-01-gates-1-20-verificati
 3. **S0.3 Authentication and trusted tenant context** — accepted and squash-merged in PR #3
 4. **S0.4 Tenant-safe RBAC and durable audit** — accepted and squash-merged in
    PR #7
-5. **S0.5 Inventory ledger and reservation integrity** — implemented on the
-   PR #10 history; exact Task 12 source-commit CI passed; review and merge
-   acceptance pending
-6. **Frontend Tasks 7–12** — authenticated team access, role lifecycle,
-   effective permissions, tenant audit, personal privacy settings, and
-   policy-controlled onboarding implemented on PR #10; acceptance pending
-7. Mount only reviewed inventory HTTP contracts and replace preview frontend
-   data with live tenant-safe integration
-8. Resume remaining Inventory and Compliance milestones in dependency order
+5. **S0.5 Inventory ledger and reservation integrity** — accepted and merged in
+   PR #10 as `410368c`
+6. **Frontend Tasks 7–12** — accepted in PR #10 for their implemented contracts
+7. **G3.1 trusted provider stock read** — implementation and local verification
+   in progress; exact-commit CI and review pending
+8. Mount later inventory mutations only through separate accepted contracts,
+   then replace preview frontend data with live tenant-safe integration
+9. Resume remaining Inventory and Compliance milestones in dependency order
 
 Only one recovery sprint may be active at a time. Exact boundaries may be refined through an ADR, but dependencies must not be skipped.
 

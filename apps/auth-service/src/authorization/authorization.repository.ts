@@ -6,7 +6,14 @@ import { PermissionKey, TENANT_ADMINISTRATOR_ROLE } from './permission.constants
 
 type AuthorizationDatabase = Pick<
   Prisma.TransactionClient,
-  'membershipRole' | 'permission' | 'role' | 'rolePermission' | 'tenant' | 'tenantMembership'
+  | 'membershipProviderAccess'
+  | 'membershipRole'
+  | 'permission'
+  | 'provider'
+  | 'role'
+  | 'rolePermission'
+  | 'tenant'
+  | 'tenantMembership'
 >;
 
 const roleInclude = {
@@ -275,6 +282,76 @@ export class AuthorizationRepository {
   ) {
     return database.membershipRole.deleteMany({
       where: { tenantId, membershipId, roleId },
+    });
+  }
+
+  async findProvider(
+    database: AuthorizationDatabase,
+    tenantId: string,
+    providerId: string,
+    requireActive: boolean,
+  ) {
+    return database.provider.findFirst({
+      where: {
+        id: providerId,
+        tenantId,
+        deletedAt: null,
+        ...(requireActive ? { isActive: true } : {}),
+      },
+      select: { id: true, businessName: true, providerType: true, isActive: true },
+    });
+  }
+
+  async listProviderAccess(tenantId: string, membershipId: string) {
+    return this.prisma.client.membershipProviderAccess.findMany({
+      where: {
+        tenantId,
+        membershipId,
+        provider: { deletedAt: null },
+      },
+      select: {
+        membershipId: true,
+        providerId: true,
+        provider: {
+          select: { businessName: true, providerType: true, isActive: true },
+        },
+      },
+      orderBy: [{ provider: { businessName: 'asc' } }, { providerId: 'asc' }],
+    });
+  }
+
+  async findProviderAccess(
+    database: AuthorizationDatabase,
+    tenantId: string,
+    membershipId: string,
+    providerId: string,
+  ) {
+    return database.membershipProviderAccess.findFirst({
+      where: { tenantId, membershipId, providerId },
+      select: { id: true },
+    });
+  }
+
+  async createProviderAccess(
+    database: AuthorizationDatabase,
+    tenantId: string,
+    membershipId: string,
+    providerId: string,
+  ) {
+    return database.membershipProviderAccess.createMany({
+      data: [{ tenantId, membershipId, providerId }],
+      skipDuplicates: true,
+    });
+  }
+
+  async removeProviderAccess(
+    database: AuthorizationDatabase,
+    tenantId: string,
+    membershipId: string,
+    providerId: string,
+  ) {
+    return database.membershipProviderAccess.deleteMany({
+      where: { tenantId, membershipId, providerId },
     });
   }
 
