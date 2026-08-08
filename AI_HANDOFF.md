@@ -1,10 +1,10 @@
 # MedSphere AI Handoff
 
-**Last updated:** 2026-08-02
+**Last updated:** 2026-08-08
 
-**Current sprint:** G3.3 — provider reservation operations
+**Current sprint:** G3.4 contract — live assigned-provider stock workspace
 
-**Next feature work:** Blocked until G3.3 exact-commit CI and merge acceptance
+**Next feature work:** Implement only after the G3.4 sprint contract is reviewed
 
 ## Mandatory startup sequence
 
@@ -57,6 +57,11 @@ The migration must be incremental:
   assigned-provider reservation reads and safe staff transitions.
 - G3.1 passed exact-commit CI in run `30743115664` and was squash-merged in PR
   #11 as `77689b5ccfff21f2f580b87718bf6f7611d1c238`.
+- G3.3 passed exact-commit PostgreSQL/Redis CI in run `30753450235` and was
+  squash-merged in PR #13 as `d84dee0`.
+- AG-01 boundary enforcement passed run `31275757316` and merged in PR #15 as
+  `ba172f1`. Corrected AG-02A session credential integrity passed run
+  `31276741918` and merged in PR #16 as `9c38792`.
 - S0.5 now defines `Batch` as physical/held quantity authority, uses an
   append-only movement ledger, and stores typed reservation items and
   allocations. Its accepted production HTTP boundary and live frontend
@@ -102,12 +107,14 @@ See `docs/audits/2026-07-20-cto-baseline.md` for the accepted baseline.
     accepted and merged in PR #11 as `77689b5`
 11. G3.2 listing configuration, batch receipt, and stock adjustment boundary —
     accepted and squash-merged in PR #12 as `3249f8a`
-12. G3.3 provider reservation reads and staff transitions — implementation and
-    local non-infrastructure verification complete on
-    `cto/gate3-reservation-lifecycle`
-13. G3.3 exact-commit PostgreSQL/Redis CI and review — pending
-14. Transfers/returns/damage, worker expiry, safe creation, and live frontend
-    integration — blocked pending G3.3 acceptance
+12. G3.3 provider reservation reads and staff transitions — accepted and merged
+    in PR #13 as `d84dee0`
+13. AG-01 application boundaries — accepted and merged in PR #15 as `ba172f1`
+14. AG-02A session credential integrity — accepted and merged in PR #16 as
+    `9c38792`
+15. G3.4 live assigned-provider stock workspace — contract definition active
+16. Transfers/returns/damage, worker expiry, safe creation, and later live
+    mutations — blocked pending their own accepted contracts
 
 If ownership transfers, resume at the first pending checkpoint. Do not use
 `cline/s0.4-rbac-audit` or
@@ -115,12 +122,14 @@ If ownership transfers, resume at the first pending checkpoint. Do not use
 
 ## Exact continuation point
 
-Continue from `cto/gate3-reservation-lifecycle` only. Publish the reviewed G3.3
-commit, run its exact-commit PostgreSQL migration, drift, populated-upgrade, and
-zero-skip infrastructure suites in CI, and address only evidence-backed defects.
-Obtain review and merge acceptance before mounting broader inventory mutations
-or replacing frontend preview data. Keep Gates 2 and 4–9
-blocked in the dependency order recorded by the Gates 1–9 audit.
+Continue from accepted commit `9c38792` and review
+`docs/sprints/G3.4-live-assigned-provider-stock-workspace.md` before
+implementation. Resolve the authenticated membership's assigned provider,
+expose the accepted
+read-only stock contract through a strict same-origin BFF, validate exact
+upstream shapes, and replace only the inventory workspace's preview reads.
+Mutations, patient exposure, and Gates 2 and 4–9 remain blocked by their recorded
+dependencies.
 
 Cline may receive only a complete, bounded prompt for characterization tests or
 mechanical work whose contract is already fixed by ADR-005. Cline must not
