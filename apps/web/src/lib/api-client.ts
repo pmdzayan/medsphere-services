@@ -25,6 +25,11 @@ import type {
   PrivacyPreferenceUpdate,
   SupportedLanguage,
 } from './settings-contract';
+import {
+  toReservationSearchParams,
+  type ProviderReservationPage,
+  type ReservationFilters,
+} from './reservation-contract';
 
 export class ApiError extends Error {
   constructor(
@@ -105,6 +110,13 @@ export async function getProviderStock(
 ): Promise<InventoryStockPage> {
   const search = toInventoryStockSearchParams(filters);
   return requestJson<InventoryStockPage>(`/api/inventory/stock?${search.toString()}`);
+}
+
+export async function getProviderReservations(
+  filters: ReservationFilters,
+): Promise<ProviderReservationPage> {
+  const search = toReservationSearchParams(filters);
+  return requestJson<ProviderReservationPage>(`/api/inventory/reservations?${search.toString()}`);
 }
 
 export async function getPrivacyPreferences(): Promise<PrivacyPreferences> {

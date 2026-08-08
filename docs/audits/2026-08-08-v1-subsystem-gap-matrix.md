@@ -2,7 +2,7 @@
 
 **Audit date:** 2026-08-08
 
-**Accepted source commit:** `7b2eb7821b27d212a6aebdb96610d81dd08832f1`
+**Accepted source commit:** `84409007d398a264d26d068e55b0e98d08fc8462`
 
 **Decision:** Version 1 is not release-ready. The evidence-weighted full-roadmap
 estimate remains approximately **30% complete**.
@@ -26,7 +26,7 @@ The readiness score is a planning aid, not a completion or compliance claim.
 | Architecture, repository, CI              | ADR governance, reproducible migrations, dependency audit, boundary checker, lint/test/build gates                       | Modular-monolith consolidation, ownership completion, release operations                                   |    8.5/10 |
 | Identity, sessions, RBAC, audit           | Trusted login/refresh, tenant context, session replay protection, RBAC administration, durable audit                     | Operational retention, key rotation/runbooks, broader compliance controls                                  |    8.8/10 |
 | Inventory and reservations backend        | Ledger/FEFO integrity, provider stock reads, listing/receipt/adjustment commands, provider reservation reads/transitions | Safe creation, worker expiry, transfers, returns, damage, quarantine/recall, analytics                     |    7.5/10 |
-| Connected frontend                        | Login, shell, team/RBAC, audit, onboarding, privacy settings, assigned-provider stock                                    | Pharmacy preview and most role journeys remain unconnected                                                 |    4.8/10 |
+| Connected frontend                        | Login, shell, team/RBAC, audit, onboarding, settings, assigned-provider stock and reservation reads                      | Pharmacy overview preview and most role journeys remain unconnected                                        |    5.5/10 |
 | API gateway/application composition       | Health scaffold and shared HTTP controls                                                                                 | Accepted product routing/composition, contract tests, rate/timeout policy, observability                   |    1.5/10 |
 | Master patient index and clinical records | Schema-only medical-record foundation                                                                                    | Patient identity resolution, consent-aware access, encounters, notes, prescriptions, UI                    |    1.0/10 |
 | Compliance foundation                     | RBAC, audit, limited personal preference/privacy settings                                                                | Consent, verification, retention, deletion, legal hold, purpose/policy enforcement                         |    2.0/10 |

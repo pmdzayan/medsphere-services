@@ -10,7 +10,7 @@ import { Icon, type IconName } from './icon';
 const primaryNavigation: NavigationItem[] = [
   { label: 'Overview', href: '/dashboard', icon: 'dashboard' },
   { label: 'Inventory', href: '/inventory', icon: 'inventory' },
-  { label: 'Reservations', href: '/reservations', icon: 'reservations', available: false },
+  { label: 'Reservations', href: '/reservations', icon: 'reservations' },
   { label: 'Billing', href: '/billing', icon: 'billing', available: false },
   { label: 'Documents', href: '/documents', icon: 'documents', available: false },
 ];

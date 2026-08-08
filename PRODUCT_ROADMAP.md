@@ -31,7 +31,8 @@ Ordered sprints:
     as `9c38792`
 11. G3.4 Live assigned-provider stock workspace — accepted and merged in PR #18
     as `7b2eb78`
-12. G3.5 Live assigned-provider reservation workspace — next contract unit
+12. G3.5 Live assigned-provider reservation workspace — implemented;
+    exact-commit acceptance required
 
 **Completion gate:** Accepted ADRs; protected review flow; clean migrations; deny-by-default authentication; tenant-isolation tests; integrated audit trail; atomic stock/reservation behavior; mandatory lint/test/build passing.
 

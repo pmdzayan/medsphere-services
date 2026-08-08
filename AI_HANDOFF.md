@@ -2,9 +2,9 @@
 
 **Last updated:** 2026-08-08
 
-**Current sprint:** G3.5 contract — live assigned-provider reservation workspace
+**Current sprint:** G3.5 implementation acceptance — live assigned-provider reservation workspace
 
-**Next feature work:** Implement only after the G3.5 sprint contract is reviewed
+**Next feature work:** Define the next bounded inventory/frontend closure contract after G3.5 acceptance
 
 ## Mandatory startup sequence
 
@@ -64,6 +64,8 @@ The migration must be incremental:
   `31276741918` and merged in PR #16 as `9c38792`.
 - G3.4 live assigned-provider stock passed run `31278555022` and merged in PR
   #18 as `7b2eb78`.
+- The G3.5 read-only reservation contract passed run `31278969284` and merged
+  in PR #19 as `8440900` before implementation began.
 - S0.5 now defines `Batch` as physical/held quantity authority, uses an
   append-only movement ledger, and stores typed reservation items and
   allocations. Its accepted production HTTP boundary and live frontend
@@ -117,8 +119,8 @@ See `docs/audits/2026-07-20-cto-baseline.md` for the accepted baseline.
     `9c38792`
 15. G3.4 live assigned-provider stock workspace — accepted and merged in PR #18
     as `7b2eb78`
-16. G3.5 live assigned-provider reservation workspace — contract definition
-    active
+16. G3.5 live assigned-provider reservation workspace — implemented;
+    exact-commit acceptance required
 17. Transfers/returns/damage, worker expiry, safe creation, and later live
     mutations — blocked pending their own accepted contracts
 
@@ -128,11 +130,10 @@ If ownership transfers, resume at the first pending checkpoint. Do not use
 
 ## Exact continuation point
 
-Continue from accepted commit `7b2eb78` and review
-`docs/sprints/G3.5-live-assigned-provider-reservation-workspace.md` before
-implementation. Connect only the accepted reservation list fields through a
-strict BFF and dedicated read-only workspace. Mutations, patient exposure, and
-Gates 2 and 4–9 remain blocked by their recorded dependencies.
+Accept the exact G3.5 implementation commit, then define the next bounded unit
+before changing behavior. G3.5 connects only accepted reservation list fields
+through a strict BFF and dedicated read-only workspace. Mutations, patient
+exposure, and Gates 2 and 4–9 remain blocked by their recorded dependencies.
 
 Cline may receive only a complete, bounded prompt for characterization tests or
 mechanical work whose contract is already fixed by ADR-005. Cline must not

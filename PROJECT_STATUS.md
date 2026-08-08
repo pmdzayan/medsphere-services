@@ -2,11 +2,11 @@
 
 **Status date:** 2026-08-08
 
-**Accepted source commit:** `7b2eb7821b27d212a6aebdb96610d81dd08832f1`
+**Accepted source commit:** `84409007d398a264d26d068e55b0e98d08fc8462`
 
 **Accepted stabilization baseline:** `4ea55a17e188410ddee45fa3ea6c016e22d6617a`
 
-**Current sprint:** G3.5 contract — live assigned-provider reservation workspace
+**Current sprint:** G3.5 implementation acceptance — live assigned-provider reservation workspace
 
 **Release state:** Not approved for production or real healthcare data
 
@@ -16,19 +16,21 @@
 
 ### G3.5 — Live Assigned-Provider Reservation Workspace
 
-**Status:** Contract proposed in
+**Status:** Implemented against
 `docs/sprints/G3.5-live-assigned-provider-reservation-workspace.md`;
-implementation has not started. G3.4 passed exact-commit workflow `31278555022`
-and merged in PR #18 as `7b2eb78`.
+exact-commit pull-request acceptance is required. The implementation adds a
+strict reservation BFF, exact response validation, provider/status selection,
+pagination, read-only details, explicit access/error states, and the mounted
+`/reservations` navigation route.
 
 **Dependency:** G3.3 provider reservation reads and G3.4 assigned-provider BFF
 patterns are accepted. The reservation API has no patient identity fields and
 will remain read-only in G3.5.
 
 **Implementation authority:** ADR-001, ADR-003 through ADR-008, merged PRs
-#10–18, the
-`docs/audits/2026-08-08-v1-subsystem-gap-matrix.md` audit, and the proposed G3.5
-sprint contract. The contract must be accepted before implementation begins.
+#10–19, the
+`docs/audits/2026-08-08-v1-subsystem-gap-matrix.md` audit, and the accepted G3.5
+sprint contract.
 
 **In scope**
 
@@ -47,17 +49,17 @@ sprint contract. The contract must be accepted before implementation begins.
 
 ## CTO acceptance ledger
 
-| Area                        | Repository evidence                                                                                               | CTO status                                   |
-| --------------------------- | ----------------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
-| Planning and architecture   | ADR-001 and S0.1 governance merged in PR #1                                                                       | Accepted baseline                            |
-| Monorepo/tooling foundation | PNPM, Turbo, TypeScript, NestJS, Prisma, shared packages, and quality gates exist                                 | Accepted stabilization foundation            |
-| Database reproducibility    | S0.2–S0.5, G3.1–G3.3, and corrected AG-02A accepted with clean and populated upgrade evidence                     | Accepted through `9c38792`                   |
-| Identity and tenant context | S0.3 authentication and trusted tenant context merged                                                             | Accepted                                     |
-| Authorization and audit     | S0.4 tenant-safe RBAC and durable audit merged                                                                    | Accepted                                     |
-| Inventory and reservation   | S0.5 integrity, G3.1–G3.3 reads/commands, and G3.4 live stock workspace                                           | Broader operations remain incomplete         |
-| Frontend foundation         | Landing, login, responsive shell, team/RBAC, effective permissions, audit, privacy settings, and onboarding exist | Accepted in PR #10 for implemented contracts |
-| Pharmacy and inventory UI   | Inventory uses assigned-provider live reads; pharmacy dashboard remains explicitly labelled preview data          | Partially connected                          |
-| Remaining healthcare scope  | Most domain deployables are health-only scaffolds or absent                                                       | Not implemented                              |
+| Area                        | Repository evidence                                                                                      | CTO status                           |
+| --------------------------- | -------------------------------------------------------------------------------------------------------- | ------------------------------------ |
+| Planning and architecture   | ADR-001 and S0.1 governance merged in PR #1                                                              | Accepted baseline                    |
+| Monorepo/tooling foundation | PNPM, Turbo, TypeScript, NestJS, Prisma, shared packages, and quality gates exist                        | Accepted stabilization foundation    |
+| Database reproducibility    | S0.2–S0.5, G3.1–G3.3, and corrected AG-02A accepted with clean and populated upgrade evidence            | Accepted through `9c38792`           |
+| Identity and tenant context | S0.3 authentication and trusted tenant context merged                                                    | Accepted                             |
+| Authorization and audit     | S0.4 tenant-safe RBAC and durable audit merged                                                           | Accepted                             |
+| Inventory and reservation   | S0.5 integrity, G3.1–G3.3 backend, G3.4 stock UI, and G3.5 reservation-read UI                           | Broader operations remain incomplete |
+| Frontend foundation         | Landing, login, shell, team/RBAC, audit, settings, onboarding, stock, and reservation reads              | Connected for accepted contracts     |
+| Pharmacy and inventory UI   | Inventory uses assigned-provider live reads; pharmacy dashboard remains explicitly labelled preview data | Partially connected                  |
+| Remaining healthcare scope  | Most domain deployables are health-only scaffolds or absent                                              | Not implemented                      |
 
 ## Critical blockers
 
