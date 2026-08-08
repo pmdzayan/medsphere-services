@@ -1,47 +1,25 @@
 import { describe, expect, it } from 'vitest';
+import type { InventoryStockItem } from '@/lib/inventory-contract';
+import { formatInventoryCurrency, loadedInventoryMetrics } from './inventory-data';
 
-import { filterInventoryItems, inventoryItems } from './inventory-data';
-
-describe('filterInventoryItems', () => {
-  it('returns every item when filters are empty', () => {
-    expect(
-      filterInventoryItems(inventoryItems, { query: '', status: 'all', category: 'all' }),
-    ).toHaveLength(inventoryItems.length);
+describe('live inventory presentation', () => {
+  it('derives only current-page totals from accepted stock fields', () => {
+    const item = {
+      totalOnHandQuantity: 20,
+      totalHeldQuantity: 3,
+      totalAvailableQuantity: 17,
+      batches: [{}, {}],
+    } as InventoryStockItem;
+    expect(loadedInventoryMetrics([item])).toEqual({
+      products: 1,
+      batches: 2,
+      onHand: 20,
+      held: 3,
+      available: 17,
+    });
   });
 
-  it('searches product, generic name, SKU, and batch without case sensitivity', () => {
-    const byProduct = filterInventoryItems(inventoryItems, {
-      query: 'METFORMIN',
-      status: 'all',
-      category: 'all',
-    });
-    const byBatch = filterInventoryItems(inventoryItems, {
-      query: 'azm-25022',
-      status: 'all',
-      category: 'all',
-    });
-
-    expect(byProduct.map((item) => item.id)).toEqual(['inv-001']);
-    expect(byBatch.map((item) => item.id)).toEqual(['inv-007']);
-  });
-
-  it('combines status and category filters', () => {
-    const results = filterInventoryItems(inventoryItems, {
-      query: '',
-      status: 'low',
-      category: 'Antibiotics',
-    });
-
-    expect(results.map((item) => item.id)).toEqual(['inv-002']);
-  });
-
-  it('returns an empty list when nothing matches', () => {
-    expect(
-      filterInventoryItems(inventoryItems, {
-        query: 'not-a-real-medicine',
-        status: 'all',
-        category: 'all',
-      }),
-    ).toEqual([]);
+  it('formats accepted decimal strings without changing their value', () => {
+    expect(formatInventoryCurrency('12.50')).toContain('12.50');
   });
 });

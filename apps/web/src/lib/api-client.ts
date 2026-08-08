@@ -12,6 +12,12 @@ import type {
   Role,
   UpdateRoleRequest,
 } from './authorization-contract';
+import {
+  toInventoryStockSearchParams,
+  type InventoryStockFilters,
+  type InventoryStockPage,
+  type ProviderAccess,
+} from './inventory-contract';
 import type {
   LanguageUpdateRequest,
   LanguageUpdateResponse,
@@ -88,6 +94,17 @@ export async function getAuditEvents(filters: AuditEventFilters = {}): Promise<A
   const search = toAuditSearchParams(filters);
   const query = search.toString();
   return requestJson<AuditEventPage>(`/api/audit/events${query ? `?${query}` : ''}`);
+}
+
+export async function getAssignedProviders(): Promise<ProviderAccess[]> {
+  return requestJson<ProviderAccess[]>('/api/inventory/providers');
+}
+
+export async function getProviderStock(
+  filters: InventoryStockFilters,
+): Promise<InventoryStockPage> {
+  const search = toInventoryStockSearchParams(filters);
+  return requestJson<InventoryStockPage>(`/api/inventory/stock?${search.toString()}`);
 }
 
 export async function getPrivacyPreferences(): Promise<PrivacyPreferences> {

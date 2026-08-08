@@ -1,7 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   getAuditEvents,
+  getAssignedProviders,
   getAuthorizationCatalogue,
+  getProviderStock,
   getPrivacyPreferences,
   getSupportedLanguages,
   register,
@@ -57,6 +59,28 @@ describe('authenticated API client', () => {
     expect(fetchMock).toHaveBeenCalledWith('/api/audit/events?outcome=FAILED&limit=25', {
       cache: 'no-store',
     });
+  });
+
+  it('loads assigned providers and selected provider stock through same-origin routes', async () => {
+    const providers = [{ providerId: 'provider-id' }];
+    const page = { data: [], total: 0, limit: 25, offset: 0 };
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(Response.json(providers))
+      .mockResolvedValueOnce(Response.json(page));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(getAssignedProviders()).resolves.toEqual(providers);
+    await expect(
+      getProviderStock({ providerId: 'provider-id', query: 'metformin', limit: 25, offset: 0 }),
+    ).resolves.toEqual(page);
+    expect(fetchMock.mock.calls).toEqual([
+      ['/api/inventory/providers', { cache: 'no-store' }],
+      [
+        '/api/inventory/stock?providerId=provider-id&query=metformin&limit=25&offset=0',
+        { cache: 'no-store' },
+      ],
+    ]);
   });
 
   it('loads and updates account settings through same-origin endpoints', async () => {
