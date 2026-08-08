@@ -26,6 +26,7 @@ const upgradeMigrations = [
   '20260802120000_trusted_provider_stock_read',
   '20260802160000_inventory_stock_commands',
   '20260802180000_provider_reservation_operations',
+  '20260808210000_session_credential_integrity',
 ];
 const pnpmCommand = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm';
 
@@ -172,6 +173,10 @@ const batchOne = '70000000-0000-4000-8000-000000000001';
 const batchTwo = '70000000-0000-4000-8000-000000000002';
 const movementOne = '80000000-0000-4000-8000-000000000001';
 const historyOne = '90000000-0000-4000-8000-000000000001';
+const activeSession = 'a0000000-0000-4000-8000-000000000001';
+const rotatedSession = 'a0000000-0000-4000-8000-000000000002';
+const revokedSession = 'a0000000-0000-4000-8000-000000000003';
+const rotatedFamily = 'b0000000-0000-4000-8000-000000000001';
 const fixedTime = '2026-07-30T12:00:00.000Z';
 
 const identityAndCatalogue = `
@@ -269,6 +274,30 @@ INSERT INTO "InventoryHistory" (
 );
 `;
 
+const legacySessionHistory = `
+INSERT INTO "UserSession" (
+  "id", "membershipId", "familyId", "refreshTokenHash", "expiresAt",
+  "absoluteExpiresAt", "lastUsedAt", "status", "replacedById", "revokedAt",
+  "revocationReason", "createdAt", "updatedAt"
+) VALUES
+  (
+    '${activeSession}', '${membershipOne}', '${rotatedFamily}', repeat('a', 64),
+    '2030-01-01', '2030-02-01', '${fixedTime}', 'ACTIVE', NULL, NULL, NULL,
+    '${fixedTime}'::timestamptz + INTERVAL '1 minute',
+    '${fixedTime}'::timestamptz + INTERVAL '1 minute'
+  ),
+  (
+    '${rotatedSession}', '${membershipOne}', '${rotatedFamily}', repeat('b', 64),
+    '2030-01-01', '2030-02-01', '${fixedTime}', 'ROTATED', '${activeSession}', NULL,
+    NULL, '${fixedTime}', '${fixedTime}'
+  ),
+  (
+    '${revokedSession}', '${membershipOne}', gen_random_uuid(), repeat('c', 64),
+    '2030-01-01', '2030-02-01', '${fixedTime}', 'REVOKED', NULL, '${fixedTime}',
+    'fixture-revocation', '${fixedTime}', '${fixedTime}'
+  );
+`;
+
 verifyScenario({
   label: 'valid_populated',
   seedSql: `
@@ -278,6 +307,7 @@ ${inventoryRow({ id: inventoryTwo, batchNumber: 'BATCH-002', quantity: 15 })}
 ${batchRow({ id: batchOne, batchNumber: 'BATCH-001', quantity: 10 })}
 ${batchRow({ id: batchTwo, batchNumber: 'BATCH-002', quantity: 15 })}
 ${matchingMovementAndHistory}
+${legacySessionHistory}
 `,
   assertionSql: `
 DO $$
@@ -340,6 +370,36 @@ BEGIN
       AND contype = 'c'
   ) THEN
     RAISE EXCEPTION 'Stock movement command-hash constraint is missing';
+  END IF;
+  IF (
+    SELECT count(*) FROM "UserSession"
+    WHERE "userId" = '${userOne}' AND "tenantId" = '${tenantOne}' AND "version" = 1
+  ) <> 3 THEN
+    RAISE EXCEPTION 'Session identity tuple was not backfilled';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM "UserSessionRefreshCredential"
+    WHERE "sessionId" = '${activeSession}' AND "status" = 'ACTIVE'
+      AND "usedAt" IS NULL AND "revokedAt" IS NULL AND "rotationSequence" = 2
+  ) THEN
+    RAISE EXCEPTION 'Active session credential was not preserved as active';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1
+    FROM "UserSessionRefreshCredential" AS used
+    JOIN "UserSessionRefreshCredential" AS successor ON successor."id" = used."replacedById"
+    WHERE used."sessionId" = '${rotatedSession}' AND used."status" = 'USED'
+      AND used."usedAt" IS NOT NULL AND used."revokedAt" IS NULL
+      AND used."rotationSequence" = 1 AND successor."sessionId" = '${activeSession}'
+  ) THEN
+    RAISE EXCEPTION 'Rotated session credential was not preserved as used';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM "UserSessionRefreshCredential"
+    WHERE "sessionId" = '${revokedSession}' AND "status" = 'REVOKED'
+      AND "usedAt" IS NULL AND "revokedAt" IS NOT NULL
+  ) THEN
+    RAISE EXCEPTION 'Revoked session credential was not preserved as revoked';
   END IF;
 END $$;
 INSERT INTO "AuditEvent" (
@@ -430,4 +490,4 @@ ${batchRow({ id: batchOne, batchNumber: 'BATCH-001', quantity: 0, initial: 0 })}
   expectedFailure: 'S0.5 migration blocked: invalid legacy batch values',
 });
 
-process.stdout.write('S0.5 through G3.3 populated upgrade verification passed.\n');
+process.stdout.write('S0.5 through AG-02A populated upgrade verification passed.\n');
