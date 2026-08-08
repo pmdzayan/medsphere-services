@@ -24,8 +24,12 @@ Ordered sprints:
 7. G3.2 Trusted listing configuration, batch receipt, and stock adjustment —
    accepted and merged in PR #12 as `3249f8a`
 8. G3.3 Assigned-provider reservation reads and staff lifecycle transitions —
-   local non-infrastructure verification complete; exact-commit PostgreSQL CI
-   and review pending
+   accepted and merged in PR #13 as `d84dee0`
+9. AG-01 application boundaries and domain-event contracts — accepted and
+   merged in PR #15 as `ba172f1`
+10. AG-02A durable session credential integrity — accepted and merged in PR #16
+    as `9c38792`
+11. G3.4 Live assigned-provider stock workspace — contract definition active
 
 **Completion gate:** Accepted ADRs; protected review flow; clean migrations; deny-by-default authentication; tenant-isolation tests; integrated audit trail; atomic stock/reservation behavior; mandatory lint/test/build passing.
 

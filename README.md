@@ -6,13 +6,12 @@ MedSphere is a planned multi-tenant healthcare ecosystem for patients, pharmacie
 
 ## Verified project progress
 
-**Status date:** 2026-08-02
+**Status date:** 2026-08-08
 
-**Accepted evidence baseline:** `3249f8a` (PR #12 squash merge)
+**Accepted evidence baseline:** `9c38792` (PR #16 squash merge)
 
-**Current sprint:** G3.3 provider reservation operations on
-`cto/gate3-reservation-lifecycle`; local non-infrastructure validation is
-complete, while exact-commit PostgreSQL CI and review remain pending
+**Current sprint:** G3.4 contract definition for a live, read-only
+assigned-provider stock workspace
 
 **Full-roadmap estimate:** **30% complete / 70% remaining**
 
@@ -30,14 +29,14 @@ finished.
 
 The evidence-based [Gates 1–20 verification](docs/audits/2026-08-01-gates-1-20-verification.md)
 rejects the claim that the full roadmap is complete: Gate 1 is an accepted
-foundation, Gate 3 is substantially implemented but not accepted/live, and
-Gates 2 and 4–20 are not complete.
+foundation, Gate 3 has accepted backend foundations but is not complete/live,
+and Gates 2 and 4–20 are not complete.
 
 | Area                                                             | Verified state                                                                                                                                                                  | Estimated completion |
 | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------: |
 | Architecture, governance, monorepo, and database baseline        | ADR process, PNPM/Turbo tooling, shared packages, forward migrations, drift checks, and CI gates exist                                                                          |                  85% |
 | Authentication, tenant context, RBAC, and durable audit          | S0.3 and S0.4 accepted; authenticated frontend, role administration, effective permissions, audit, policy-controlled onboarding, and personal privacy settings implemented      |                  85% |
-| Inventory ledger and medicine reservation integrity              | S0.5, G3.1 reads, and G3.2 listing/receipt/adjustment commands are accepted; G3.3 reservation operations are under verification; broader operations remain incomplete           |                  72% |
+| Inventory ledger and medicine reservation integrity              | S0.5 and G3.1–G3.3 reads/commands are accepted; live frontend integration and broader operations remain incomplete                                                              |                  75% |
 | Frontend                                                         | Landing, login, responsive shell, team/RBAC, and audit are connected; pharmacy dashboard and inventory remain previews; most healthcare modules are absent                      |                  32% |
 | Compliance beyond RBAC and audit                                 | Consent, privacy operations, verification, retention, legal hold, and policy enforcement remain incomplete                                                                      |                  10% |
 | Supplier, procurement, pharmacy, billing, and delivery workflows | Existing deployables are mostly health-only placeholders or unaccepted prototypes                                                                                               |                   5% |
@@ -69,12 +68,16 @@ Gates 2 and 4–20 are not complete.
   permission-protected stock read contract.
 - G3.2 listing configuration, batch receipt, and stock adjustment commands were
   accepted and squash-merged in PR #12 as `3249f8a`.
+- G3.3 provider reservation reads and transitions were accepted and
+  squash-merged in PR #13 as `d84dee0`.
+- AG-01 application boundaries and corrected AG-02A session credential
+  integrity were accepted in PRs #15 and #16 as `ba172f1` and `9c38792`.
 
 ### Remaining work
 
-1. **Accept G3.3 reservation operations:** pass clean PostgreSQL migration,
-   populated-upgrade, zero-skip integration, formatting, lint, test, build, and
-   review gates for assigned-provider reads and safe staff transitions.
+1. **Complete G3.4 live stock reads:** resolve assigned-provider context and
+   replace inventory preview rows with the accepted read-only stock contract
+   through a strict same-origin BFF.
 2. **Expose remaining bounded inventory mutations:** define separate transfer,
    return, damage, expiry, and reservation contracts with atomic audit; connect
    frontend previews only after each backend contract is accepted.
