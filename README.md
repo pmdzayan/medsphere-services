@@ -11,7 +11,7 @@ MedSphere is a planned multi-tenant healthcare ecosystem for patients, pharmacie
 **Accepted evidence baseline:** `9c38792` (PR #16 squash merge)
 
 **Current sprint:** G3.4 contract definition for a live, read-only
-assigned-provider stock workspace
+[assigned-provider stock workspace](docs/sprints/G3.4-live-assigned-provider-stock-workspace.md)
 
 **Full-roadmap estimate:** **30% complete / 70% remaining**
 

@@ -56,9 +56,10 @@ The readiness score is a planning aid, not a completion or compliance claim.
 
 ## Next bounded implementation unit
 
-**G3.4 — Live assigned-provider stock workspace** is next. It is read-only and
-depends only on already accepted provider-access and stock-read contracts. Its
-contract must include:
+**G3.4 — Live assigned-provider stock workspace** is next. Its proposed
+[sprint contract](../sprints/G3.4-live-assigned-provider-stock-workspace.md) is
+read-only and depends only on accepted provider-access and stock-read contracts.
+It requires:
 
 - an exact-shape provider-context response for the authenticated membership;
 - a strict same-origin BFF that never accepts client-supplied identity/tenant;

@@ -16,7 +16,9 @@
 
 ### G3.4 — Live Assigned-Provider Stock Workspace
 
-**Status:** Contract definition is the next bounded implementation unit. G3.3
+**Status:** Contract proposed in
+`docs/sprints/G3.4-live-assigned-provider-stock-workspace.md`; implementation has
+not started. G3.3
 passed exact-commit PostgreSQL/Redis quality run `30753450235` and merged in PR
 #13 as `d84dee0`. AG-01 boundary enforcement and corrected AG-02A session
 credential integrity subsequently merged through fully green PRs #15 and #16.
@@ -26,9 +28,9 @@ accepted. The existing provider-access list can resolve the active membership's
 assigned provider without trusting client-supplied identity or tenant context.
 
 **Implementation authority:** ADR-001, ADR-003 through ADR-008, merged PRs
-#10–16, and
-`docs/audits/2026-08-08-v1-subsystem-gap-matrix.md`. A dedicated G3.4 sprint
-contract must be accepted before implementation is claimed complete.
+#10–16, the
+`docs/audits/2026-08-08-v1-subsystem-gap-matrix.md` audit, and the proposed G3.4
+sprint contract. The contract must be accepted before implementation begins.
 
 **In scope**
 

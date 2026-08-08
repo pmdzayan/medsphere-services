@@ -122,8 +122,10 @@ If ownership transfers, resume at the first pending checkpoint. Do not use
 
 ## Exact continuation point
 
-Continue from accepted commit `9c38792`. Define G3.4 before implementation:
-resolve the authenticated membership's assigned provider, expose the accepted
+Continue from accepted commit `9c38792` and review
+`docs/sprints/G3.4-live-assigned-provider-stock-workspace.md` before
+implementation. Resolve the authenticated membership's assigned provider,
+expose the accepted
 read-only stock contract through a strict same-origin BFF, validate exact
 upstream shapes, and replace only the inventory workspace's preview reads.
 Mutations, patient exposure, and Gates 2 and 4–9 remain blocked by their recorded
