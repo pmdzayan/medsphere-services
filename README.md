@@ -8,10 +8,10 @@ MedSphere is a planned multi-tenant healthcare ecosystem for patients, pharmacie
 
 **Status date:** 2026-08-08
 
-**Accepted evidence baseline:** `9c38792` (PR #16 squash merge)
+**Accepted evidence baseline:** `7b2eb78` (PR #18 squash merge)
 
-**Current sprint:** G3.4 implementation acceptance for a live, read-only
-[assigned-provider stock workspace](docs/sprints/G3.4-live-assigned-provider-stock-workspace.md)
+**Current sprint:** G3.5 contract definition for a live, read-only
+[assigned-provider reservation workspace](docs/sprints/G3.5-live-assigned-provider-reservation-workspace.md)
 
 **Full-roadmap estimate:** **30% complete / 70% remaining**
 
@@ -72,9 +72,10 @@ and Gates 2 and 4–20 are not complete.
   squash-merged in PR #13 as `d84dee0`.
 - AG-01 application boundaries and corrected AG-02A session credential
   integrity were accepted in PRs #15 and #16 as `ba172f1` and `9c38792`.
-- G3.4 replaces fabricated inventory rows with strict same-origin
+- G3.4 replaced fabricated inventory rows with strict same-origin
   assigned-provider and stock reads, exact response validation, and live
-  read-only workspace states; exact-commit acceptance is required.
+  read-only workspace states; PR #18 merged as `7b2eb78` after run
+  `31278555022` passed.
 
 ### Remaining work
 

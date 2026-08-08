@@ -2,7 +2,7 @@
 
 **Audit date:** 2026-08-08
 
-**Accepted source commit:** `9c387920cdea06798169175877b13a1394b183ec`
+**Accepted source commit:** `7b2eb7821b27d212a6aebdb96610d81dd08832f1`
 
 **Decision:** Version 1 is not release-ready. The evidence-weighted full-roadmap
 estimate remains approximately **30% complete**.
@@ -40,9 +40,9 @@ The readiness score is a planning aid, not a completion or compliance claim.
 
 ## Dependency-ordered closure path
 
-1. Synchronize status and handoff documents to accepted commit `9c38792`.
-2. Accept G3.4 exact-commit evidence for the live assigned-provider stock
-   workspace.
+1. Synchronize status and handoff documents to accepted commit `7b2eb78`.
+2. G3.4 exact-commit evidence for the live assigned-provider stock workspace —
+   accepted in PR #18.
 3. Define and accept G3.5: connect assigned-provider reservation reads before
    exposing lifecycle mutations in the browser.
 4. Add remaining inventory operations as separate contracts: safe reservation
