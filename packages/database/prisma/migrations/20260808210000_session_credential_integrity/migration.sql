@@ -123,6 +123,9 @@ FROM "UserSession" AS session;
 CREATE UNIQUE INDEX "UserSessionRefreshCredential_hash_key"
 ON "UserSessionRefreshCredential"("hash");
 
+CREATE UNIQUE INDEX "UserSessionRefreshCredential_replacedById_key"
+ON "UserSessionRefreshCredential"("replacedById");
+
 CREATE INDEX "UserSessionRefreshCredential_sessionId_status_idx"
 ON "UserSessionRefreshCredential"("sessionId", "status");
 
