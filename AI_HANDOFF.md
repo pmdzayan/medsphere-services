@@ -2,9 +2,9 @@
 
 **Last updated:** 2026-08-08
 
-**Current sprint:** G3.4 implementation acceptance — live assigned-provider stock workspace
+**Current sprint:** G3.5 contract — live assigned-provider reservation workspace
 
-**Next feature work:** Define G3.5 assigned-provider reservation workspace after G3.4 acceptance
+**Next feature work:** Implement only after the G3.5 sprint contract is reviewed
 
 ## Mandatory startup sequence
 
@@ -62,6 +62,8 @@ The migration must be incremental:
 - AG-01 boundary enforcement passed run `31275757316` and merged in PR #15 as
   `ba172f1`. Corrected AG-02A session credential integrity passed run
   `31276741918` and merged in PR #16 as `9c38792`.
+- G3.4 live assigned-provider stock passed run `31278555022` and merged in PR
+  #18 as `7b2eb78`.
 - S0.5 now defines `Batch` as physical/held quantity authority, uses an
   append-only movement ledger, and stores typed reservation items and
   allocations. Its accepted production HTTP boundary and live frontend
@@ -113,9 +115,11 @@ See `docs/audits/2026-07-20-cto-baseline.md` for the accepted baseline.
 13. AG-01 application boundaries — accepted and merged in PR #15 as `ba172f1`
 14. AG-02A session credential integrity — accepted and merged in PR #16 as
     `9c38792`
-15. G3.4 live assigned-provider stock workspace — implemented; exact-commit
-    acceptance required
-16. Transfers/returns/damage, worker expiry, safe creation, and later live
+15. G3.4 live assigned-provider stock workspace — accepted and merged in PR #18
+    as `7b2eb78`
+16. G3.5 live assigned-provider reservation workspace — contract definition
+    active
+17. Transfers/returns/damage, worker expiry, safe creation, and later live
     mutations — blocked pending their own accepted contracts
 
 If ownership transfers, resume at the first pending checkpoint. Do not use
@@ -124,11 +128,11 @@ If ownership transfers, resume at the first pending checkpoint. Do not use
 
 ## Exact continuation point
 
-Accept the exact G3.4 implementation commit, then define G3.5 before connecting
-the already accepted assigned-provider reservation read contract. G3.4 derives
-membership from the sealed server profile, validates exact provider/stock
-responses, and renders only live read-only stock fields. Mutations, patient
-exposure, and Gates 2 and 4–9 remain blocked by their recorded dependencies.
+Continue from accepted commit `7b2eb78` and review
+`docs/sprints/G3.5-live-assigned-provider-reservation-workspace.md` before
+implementation. Connect only the accepted reservation list fields through a
+strict BFF and dedicated read-only workspace. Mutations, patient exposure, and
+Gates 2 and 4–9 remain blocked by their recorded dependencies.
 
 Cline may receive only a complete, bounded prompt for characterization tests or
 mechanical work whose contract is already fixed by ADR-005. Cline must not

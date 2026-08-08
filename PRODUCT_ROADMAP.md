@@ -29,8 +29,8 @@ Ordered sprints:
    merged in PR #15 as `ba172f1`
 10. AG-02A durable session credential integrity — accepted and merged in PR #16
     as `9c38792`
-11. G3.4 Live assigned-provider stock workspace — implemented; exact-commit
-    acceptance required
+11. G3.4 Live assigned-provider stock workspace — accepted and merged in PR #18
+    as `7b2eb78`
 12. G3.5 Live assigned-provider reservation workspace — next contract unit
 
 **Completion gate:** Accepted ADRs; protected review flow; clean migrations; deny-by-default authentication; tenant-isolation tests; integrated audit trail; atomic stock/reservation behavior; mandatory lint/test/build passing.
