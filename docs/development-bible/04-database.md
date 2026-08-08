@@ -205,12 +205,21 @@ Types below describe the PostgreSQL representation. Columns are required unless 
 
 ### `UserSession`
 
-- Columns: `id UUID PK`; `membershipId UUID`; `familyId UUID`; `refreshTokenHash varchar(64) unique`; `ipAddress inet?`; `userAgent varchar(512)?`; `deviceName varchar(120)?`; `expiresAt timestamp`; `absoluteExpiresAt timestamp`; `lastUsedAt timestamp=now`; `status SessionStatus=ACTIVE`; `replacedById UUID? unique`; `revokedAt timestamp?`; `revocationReason varchar(120)?`; `createdAt timestamp=now`; `updatedAt timestamp`.
-- Relationships: belongs to `TenantMembership`; optional self-reference to the rotation successor.
-- Constraints: `membershipId → TenantMembership.id` cascade delete; `replacedById → UserSession.id` set null; unique digest and successor reference.
-- Indexes: `(membershipId, status)`; `(familyId, status)`; `(status, expiresAt)`; `(status, absoluteExpiresAt)`; unique digest and successor.
-- Migration behavior: all raw prototype refresh sessions are deliberately deleted and users must authenticate again. Raw credentials cannot be safely transformed into opaque single-use values.
+- Columns: `id UUID PK`; `userId UUID`; `tenantId UUID`; `membershipId UUID`; `familyId UUID`; `refreshTokenHash varchar(64) unique`; `ipAddress inet?`; `userAgent varchar(512)?`; `deviceName varchar(120)?`; `expiresAt timestamp`; `absoluteExpiresAt timestamp`; `lastUsedAt timestamp=now`; `status SessionStatus=ACTIVE`; `replacedById UUID? unique`; `version integer=1`; `revokedAt timestamp?`; `revocationReason varchar(120)?`; `createdAt timestamp=now`; `updatedAt timestamp`.
+- Relationships: belongs to `User`, `Tenant`, and `TenantMembership`; optional self-reference to the rotation successor; parent of credential history.
+- Constraints: composite `(membershipId, userId, tenantId) → TenantMembership(id, userId, tenantId)` cascade delete; direct user and tenant foreign keys; `replacedById → UserSession.id` set null; unique digest and successor reference; `version >= 1`.
+- Indexes: `(userId, status)`; `(tenantId, status)`; `(membershipId, status)`; `(familyId, status)`; `(familyId, createdAt)`; `(status, expiresAt)`; `(status, absoluteExpiresAt)`; unique digest and successor.
+- Migration behavior: AG-02A backfills the direct identity tuple from the authoritative membership and fails closed if a session cannot be resolved.
 - Sensitive/audit notes: only a peppered HMAC digest is stored. Device and network metadata remain sensitive and require an accepted retention policy.
+
+### `UserSessionRefreshCredential`
+
+- Columns: `id UUID PK`; `sessionId UUID`; `hash varchar(64) unique`; `status RefreshCredentialStatus=ACTIVE`; `issuedAt timestamp=now`; `usedAt timestamp?`; `revokedAt timestamp?`; `replacedById UUID? unique`; `rotationSequence integer=1`; `createdAt timestamp=now`.
+- Relationships: belongs to `UserSession`; optional self-reference to the successor credential.
+- Constraints: session cascade delete; successor set null; `rotationSequence >= 1`; exact state/timestamp shape; partial unique index allowing at most one active credential per session.
+- Indexes: unique hash; `(sessionId, status)`; `(sessionId, issuedAt)`; `(status, issuedAt)`; partial unique active-per-session.
+- Migration behavior: existing `ACTIVE` sessions become active credentials, `ROTATED` sessions become used credentials with `usedAt`, and terminal sessions become revoked credentials with `revokedAt`.
+- Security note: only HMAC-SHA-256 digests are persisted. Unknown hashes are invalid, while reuse of a known used hash is confirmed replay and compromises the session family.
 
 ### `ProviderVerification`
 

@@ -74,6 +74,7 @@ export class AuthService {
 
     await this.sessionRepository.createSession({
       id: refreshCredential.sessionId,
+      userId: loginIdentity.user.id,
       membershipId: loginIdentity.membershipId,
       tenantId: loginIdentity.tenantId,
       familyId,
@@ -138,7 +139,12 @@ export class AuthService {
       throw new UnauthorizedException(INVALID_REFRESH_MESSAGE);
     }
 
-    if (rotation.status === 'REJECTED') {
+    if (
+      rotation.status === 'INVALID' ||
+      rotation.status === 'EXPIRED' ||
+      rotation.status === 'REVOKED' ||
+      rotation.status === 'IDENTITY_DISABLED'
+    ) {
       this.securityEvents.record('refresh', {
         outcome: 'denied',
         sessionId: refreshParts.sessionId,

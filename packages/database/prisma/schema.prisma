@@ -22,6 +22,12 @@ enum SessionStatus {
   COMPROMISED
 }
 
+enum RefreshCredentialStatus {
+  ACTIVE
+  USED
+  REVOKED
+}
+
 enum MembershipStatus {
   PENDING
   ACTIVE
@@ -152,6 +158,7 @@ model Tenant {
   deletedAt DateTime?
 
   memberships                    TenantMembership[]
+  sessions                       UserSession[]
   membershipProviderAccess       MembershipProviderAccess[]
   roles                          Role[]
   auditEvents                    AuditEvent[]
@@ -191,6 +198,7 @@ model User {
   deletedAt DateTime?
 
   memberships          TenantMembership[]
+  sessions             UserSession[]
   platformAuditEvents  AuditEvent[]
   privacy              UserPrivacy?
   medicineReservations MedicineReservation[]
@@ -224,6 +232,7 @@ model TenantMembership {
 
   @@unique([tenantId, userId])
   @@unique([id, tenantId])
+  @@unique([id, userId, tenantId])
   @@index([userId, status])
   @@index([tenantId, status])
 }
@@ -335,8 +344,14 @@ model RolePermission {
 model UserSession {
   id String @id @default(uuid()) @db.Uuid
 
+  userId String @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  tenantId String @db.Uuid
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+
   membershipId String           @db.Uuid
-  membership   TenantMembership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  membership   TenantMembership @relation(fields: [membershipId, userId, tenantId], references: [id, userId, tenantId], onDelete: Cascade)
 
   familyId         String @db.Uuid
   refreshTokenHash String @unique @db.VarChar(64)
@@ -355,16 +370,48 @@ model UserSession {
   replacedBy   UserSession? @relation("SessionRotation", fields: [replacedById], references: [id], onDelete: SetNull)
   replaces     UserSession? @relation("SessionRotation")
 
+  version Int @default(1)
+
   revokedAt        DateTime?
   revocationReason String?   @db.VarChar(120)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  refreshCredentials UserSessionRefreshCredential[]
+
   @@index([membershipId, status])
   @@index([familyId, status])
   @@index([status, expiresAt])
   @@index([status, absoluteExpiresAt])
+  @@index([userId, status])
+  @@index([tenantId, status])
+  @@index([familyId, createdAt])
+}
+
+model UserSessionRefreshCredential {
+  id        String      @id @default(uuid()) @db.Uuid
+  sessionId String      @db.Uuid
+  session   UserSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  hash   String                  @unique @db.VarChar(64)
+  status RefreshCredentialStatus @default(ACTIVE)
+
+  issuedAt  DateTime  @default(now())
+  usedAt    DateTime?
+  revokedAt DateTime?
+
+  replacedById String?                       @unique @db.Uuid
+  replacedBy   UserSessionRefreshCredential? @relation("CredentialRotation", fields: [replacedById], references: [id], onDelete: SetNull)
+  replaces     UserSessionRefreshCredential? @relation("CredentialRotation")
+
+  rotationSequence Int @default(1)
+
+  createdAt DateTime @default(now())
+
+  @@index([sessionId, status])
+  @@index([sessionId, issuedAt])
+  @@index([status, issuedAt])
 }
 
 model ProviderVerification {
