@@ -19,7 +19,8 @@
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev",
-    "test": "turbo run test --concurrency=1",
+    "test": "pnpm test:architecture && turbo run test --concurrency=1",
+    "test:architecture": "node --test scripts/architecture-boundary-check.spec.js && node scripts/architecture-boundary-check.js",
     "test:cov": "turbo run test:cov --concurrency=1",
     "lint": "turbo run lint",
     "audit:prod": "pnpm audit --prod --audit-level moderate",

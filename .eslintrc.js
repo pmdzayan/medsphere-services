@@ -17,5 +17,28 @@ module.exports = {
   rules: {
     '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
     '@typescript-eslint/explicit-function-return-type': 'off',
+    'no-restricted-imports': [
+      'error',
+      {
+        patterns: [
+          {
+            group: [
+              '**/apps/*/**',
+              '../apps/*/**',
+              '../../apps/*/**',
+              '../../../apps/*/**',
+              '../../../../apps/*/**',
+            ],
+            message:
+              'Applications cannot import another application. Move reusable contracts or infrastructure into an owning @medsphere package.',
+          },
+          {
+            group: ['@medsphere/*/src', '@medsphere/*/src/**'],
+            message:
+              'Import an @medsphere package through its public entry point, not its internal source tree.',
+          },
+        ],
+      },
+    ],
   },
 };

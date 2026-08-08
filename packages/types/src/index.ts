@@ -23,3 +23,41 @@ export interface ErrorEnvelope {
     requestId?: string;
   };
 }
+
+export type EventActorContext =
+  | {
+      readonly actorType: 'TENANT_USER';
+      readonly tenantId: string;
+      readonly membershipId: string;
+      readonly userId: string;
+    }
+  | {
+      readonly actorType: 'PLATFORM_USER';
+      readonly userId: string;
+      readonly tenantId?: never;
+      readonly membershipId?: never;
+    }
+  | {
+      readonly actorType: 'SYSTEM';
+      readonly tenantId: string;
+      readonly service: string;
+      readonly userId?: never;
+      readonly membershipId?: never;
+    };
+
+/**
+ * Transport-neutral domain-event contract. Persistence, dispatch, retry, and
+ * logging belong to infrastructure packages; this package exports no publisher.
+ */
+export interface DomainEventEnvelope<TPayload> {
+  readonly eventId: string;
+  readonly eventType: string;
+  readonly eventVersion: number;
+  readonly aggregateType: string;
+  readonly aggregateId: string;
+  readonly occurredAt: string;
+  readonly actor: EventActorContext;
+  readonly correlationId?: string;
+  readonly causationId?: string;
+  readonly payload: TPayload;
+}
