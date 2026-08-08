@@ -26,7 +26,7 @@ The readiness score is a planning aid, not a completion or compliance claim.
 | Architecture, repository, CI              | ADR governance, reproducible migrations, dependency audit, boundary checker, lint/test/build gates                       | Modular-monolith consolidation, ownership completion, release operations                                   |    8.5/10 |
 | Identity, sessions, RBAC, audit           | Trusted login/refresh, tenant context, session replay protection, RBAC administration, durable audit                     | Operational retention, key rotation/runbooks, broader compliance controls                                  |    8.8/10 |
 | Inventory and reservations backend        | Ledger/FEFO integrity, provider stock reads, listing/receipt/adjustment commands, provider reservation reads/transitions | Safe creation, worker expiry, transfers, returns, damage, quarantine/recall, analytics                     |    7.5/10 |
-| Connected frontend                        | Login, shell, team/RBAC, audit, onboarding, personal privacy settings                                                    | Inventory/pharmacy previews must use accepted live contracts; most role journeys absent                    |    4.0/10 |
+| Connected frontend                        | Login, shell, team/RBAC, audit, onboarding, privacy settings, assigned-provider stock                                    | Pharmacy preview and most role journeys remain unconnected                                                 |    4.8/10 |
 | API gateway/application composition       | Health scaffold and shared HTTP controls                                                                                 | Accepted product routing/composition, contract tests, rate/timeout policy, observability                   |    1.5/10 |
 | Master patient index and clinical records | Schema-only medical-record foundation                                                                                    | Patient identity resolution, consent-aware access, encounters, notes, prescriptions, UI                    |    1.0/10 |
 | Compliance foundation                     | RBAC, audit, limited personal preference/privacy settings                                                                | Consent, verification, retention, deletion, legal hold, purpose/policy enforcement                         |    2.0/10 |
@@ -41,9 +41,8 @@ The readiness score is a planning aid, not a completion or compliance claim.
 ## Dependency-ordered closure path
 
 1. Synchronize status and handoff documents to accepted commit `9c38792`.
-2. Define and accept G3.4: resolve the current membership's assigned provider
-   context and connect the inventory workspace to the accepted read-only stock
-   contract through a strict same-origin BFF.
+2. Accept G3.4 exact-commit evidence for the live assigned-provider stock
+   workspace.
 3. Define and accept G3.5: connect assigned-provider reservation reads before
    exposing lifecycle mutations in the browser.
 4. Add remaining inventory operations as separate contracts: safe reservation
@@ -56,18 +55,20 @@ The readiness score is a planning aid, not a completion or compliance claim.
 
 ## Next bounded implementation unit
 
-**G3.4 — Live assigned-provider stock workspace** is next. Its proposed
-[sprint contract](../sprints/G3.4-live-assigned-provider-stock-workspace.md) is
-read-only and depends only on accepted provider-access and stock-read contracts.
-It requires:
+**G3.5 — Live assigned-provider reservation workspace** is next after G3.4
+acceptance. Its contract must remain read-only and depend only on accepted
+provider-access and reservation-read contracts. G3.4 provides the reusable
+assigned-provider BFF pattern. G3.5 must require:
 
 - an exact-shape provider-context response for the authenticated membership;
 - a strict same-origin BFF that never accepts client-supplied identity/tenant;
-- bounded stock query and response validation with `private, no-store` behavior;
+- bounded reservation query and response validation with `private, no-store`
+  behavior;
 - explicit empty, unauthenticated, forbidden, malformed-upstream, and upstream
   unavailable states;
-- frontend replacement of preview rows and metrics only after contract tests;
-- no stock mutation, reservation mutation, import, barcode, or analytics scope.
+- frontend rendering only from accepted reservation fields after contract tests;
+- no stock mutation, reservation mutation, patient exposure, payment, delivery,
+  or analytics scope.
 
 ## Release decision
 

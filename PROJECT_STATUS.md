@@ -6,7 +6,7 @@
 
 **Accepted stabilization baseline:** `4ea55a17e188410ddee45fa3ea6c016e22d6617a`
 
-**Current sprint:** G3.4 contract — live assigned-provider stock workspace
+**Current sprint:** G3.4 implementation acceptance — live assigned-provider stock workspace
 
 **Release state:** Not approved for production or real healthcare data
 
@@ -16,12 +16,11 @@
 
 ### G3.4 — Live Assigned-Provider Stock Workspace
 
-**Status:** Contract proposed in
-`docs/sprints/G3.4-live-assigned-provider-stock-workspace.md`; implementation has
-not started. G3.3
-passed exact-commit PostgreSQL/Redis quality run `30753450235` and merged in PR
-#13 as `d84dee0`. AG-01 boundary enforcement and corrected AG-02A session
-credential integrity subsequently merged through fully green PRs #15 and #16.
+**Status:** Implemented against
+`docs/sprints/G3.4-live-assigned-provider-stock-workspace.md`; exact-commit pull
+request acceptance is required. The implementation replaces fabricated
+inventory data with strict assigned-provider and stock BFF boundaries, live
+read-only rows, current-page metrics, and explicit loading/error/access states.
 
 **Dependency:** S0.5 inventory integrity and G3.1 provider stock reads are
 accepted. The existing provider-access list can resolve the active membership's
@@ -29,8 +28,8 @@ assigned provider without trusting client-supplied identity or tenant context.
 
 **Implementation authority:** ADR-001, ADR-003 through ADR-008, merged PRs
 #10–16, the
-`docs/audits/2026-08-08-v1-subsystem-gap-matrix.md` audit, and the proposed G3.4
-sprint contract. The contract must be accepted before implementation begins.
+`docs/audits/2026-08-08-v1-subsystem-gap-matrix.md` audit, and the G3.4 sprint
+contract.
 
 **In scope**
 
@@ -56,19 +55,19 @@ sprint contract. The contract must be accepted before implementation begins.
 | Database reproducibility    | S0.2–S0.5, G3.1–G3.3, and corrected AG-02A accepted with clean and populated upgrade evidence                     | Accepted through `9c38792`                   |
 | Identity and tenant context | S0.3 authentication and trusted tenant context merged                                                             | Accepted                                     |
 | Authorization and audit     | S0.4 tenant-safe RBAC and durable audit merged                                                                    | Accepted                                     |
-| Inventory and reservation   | S0.5 integrity and G3.1–G3.3 reads/commands accepted                                                              | Broader operations and live frontend remain  |
+| Inventory and reservation   | S0.5 integrity, G3.1–G3.3 reads/commands, and G3.4 live stock workspace                                           | Broader operations remain incomplete         |
 | Frontend foundation         | Landing, login, responsive shell, team/RBAC, effective permissions, audit, privacy settings, and onboarding exist | Accepted in PR #10 for implemented contracts |
-| Pharmacy and inventory UI   | Responsive workspaces exist with explicitly labelled preview data                                                 | Preview only                                 |
+| Pharmacy and inventory UI   | Inventory uses assigned-provider live reads; pharmacy dashboard remains explicitly labelled preview data          | Partially connected                          |
 | Remaining healthcare scope  | Most domain deployables are health-only scaffolds or absent                                                       | Not implemented                              |
 
 ## Critical blockers
 
-1. The inventory and pharmacy frontend still uses preview data; G3.4 must add a
-   tenant-safe assigned-provider context and live read-only integration.
+1. The pharmacy dashboard still uses preview data; later bounded contracts must
+   replace it without inventing unsupported operational fields.
 2. Patient-safe reservation creation, transfer, return, damage, quarantine,
    recall, and system-worker expiry remain intentionally unmounted.
-3. Pharmacy dashboard and inventory frontend data remain previews rather than
-   connected operational read models and mutations.
+3. Inventory mutations and the pharmacy dashboard remain unconnected; G3.4 is
+   deliberately read-only.
 4. Consent, privacy operations, verification, retention, legal hold, and the
    policy engine are incomplete.
 5. Billing and notification applications are health-only scaffolds; documents,

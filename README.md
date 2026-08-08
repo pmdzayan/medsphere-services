@@ -10,7 +10,7 @@ MedSphere is a planned multi-tenant healthcare ecosystem for patients, pharmacie
 
 **Accepted evidence baseline:** `9c38792` (PR #16 squash merge)
 
-**Current sprint:** G3.4 contract definition for a live, read-only
+**Current sprint:** G3.4 implementation acceptance for a live, read-only
 [assigned-provider stock workspace](docs/sprints/G3.4-live-assigned-provider-stock-workspace.md)
 
 **Full-roadmap estimate:** **30% complete / 70% remaining**
@@ -37,7 +37,7 @@ and Gates 2 and 4–20 are not complete.
 | Architecture, governance, monorepo, and database baseline        | ADR process, PNPM/Turbo tooling, shared packages, forward migrations, drift checks, and CI gates exist                                                                          |                  85% |
 | Authentication, tenant context, RBAC, and durable audit          | S0.3 and S0.4 accepted; authenticated frontend, role administration, effective permissions, audit, policy-controlled onboarding, and personal privacy settings implemented      |                  85% |
 | Inventory ledger and medicine reservation integrity              | S0.5 and G3.1–G3.3 reads/commands are accepted; live frontend integration and broader operations remain incomplete                                                              |                  75% |
-| Frontend                                                         | Landing, login, responsive shell, team/RBAC, and audit are connected; pharmacy dashboard and inventory remain previews; most healthcare modules are absent                      |                  32% |
+| Frontend                                                         | Landing, login, shell, team/RBAC, audit, and assigned-provider inventory reads are connected; pharmacy dashboard and most healthcare modules remain previews or absent          |                  35% |
 | Compliance beyond RBAC and audit                                 | Consent, privacy operations, verification, retention, legal hold, and policy enforcement remain incomplete                                                                      |                  10% |
 | Supplier, procurement, pharmacy, billing, and delivery workflows | Existing deployables are mostly health-only placeholders or unaccepted prototypes                                                                                               |                   5% |
 | Hospital, doctor, laboratory, patient, and clinical journeys     | Some schema foundations exist, but accepted end-to-end application workflows are not implemented                                                                                |                   2% |
@@ -72,12 +72,14 @@ and Gates 2 and 4–20 are not complete.
   squash-merged in PR #13 as `d84dee0`.
 - AG-01 application boundaries and corrected AG-02A session credential
   integrity were accepted in PRs #15 and #16 as `ba172f1` and `9c38792`.
+- G3.4 replaces fabricated inventory rows with strict same-origin
+  assigned-provider and stock reads, exact response validation, and live
+  read-only workspace states; exact-commit acceptance is required.
 
 ### Remaining work
 
-1. **Complete G3.4 live stock reads:** resolve assigned-provider context and
-   replace inventory preview rows with the accepted read-only stock contract
-   through a strict same-origin BFF.
+1. **Complete G3.5 reservation reads:** define and connect the accepted
+   assigned-provider reservation read contract without exposing mutations.
 2. **Expose remaining bounded inventory mutations:** define separate transfer,
    return, damage, expiry, and reservation contracts with atomic audit; connect
    frontend previews only after each backend contract is accepted.
