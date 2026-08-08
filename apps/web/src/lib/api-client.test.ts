@@ -4,6 +4,7 @@ import {
   getAssignedProviders,
   getAuthorizationCatalogue,
   getProviderStock,
+  getProviderReservations,
   getPrivacyPreferences,
   getSupportedLanguages,
   register,
@@ -81,6 +82,20 @@ describe('authenticated API client', () => {
         { cache: 'no-store' },
       ],
     ]);
+  });
+
+  it('loads selected provider reservations with accepted filters', async () => {
+    const page = { data: [], total: 0, limit: 25, offset: 0 };
+    const fetchMock = vi.fn().mockResolvedValue(Response.json(page));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(
+      getProviderReservations({ providerId: 'provider-id', status: 'READY', limit: 25, offset: 0 }),
+    ).resolves.toEqual(page);
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/inventory/reservations?providerId=provider-id&status=READY&limit=25&offset=0',
+      { cache: 'no-store' },
+    );
   });
 
   it('loads and updates account settings through same-origin endpoints', async () => {
