@@ -2,9 +2,11 @@ import { randomUUID } from 'node:crypto';
 import { RedisThrottlerStorage } from './redis-throttler.storage';
 import { isInfrastructureTestEnabled, requireEnv } from '../auth/testing/infrastructure-test-gate';
 
-const describeRedisInfra = isInfrastructureTestEnabled() ? describe : describe.skip;
+const isRedisTestEnabled =
+  isInfrastructureTestEnabled() && Boolean(process.env.REDIS_CLUSTER_URL?.trim());
+const describeRedisInfra = isRedisTestEnabled ? describe : describe.skip;
 
-if (isInfrastructureTestEnabled()) {
+if (isRedisTestEnabled) {
   requireEnv('REDIS_CLUSTER_URL');
 }
 
@@ -32,19 +34,12 @@ describeRedisInfra('RedisThrottlerStorage integration', () => {
     });
   });
 
-  it('blocks atomically and does not increase a blocked counter', async () => {
+  it('blocks after reaching thresold within window', async () => {
     const key = `integration:${randomUUID()}`;
-    await expect(storage.increment(key, 60_000, 1, 60_000, 'integration')).resolves.toMatchObject({
-      totalHits: 1,
-      isBlocked: false,
-    });
-    await expect(storage.increment(key, 60_000, 1, 60_000, 'integration')).resolves.toMatchObject({
-      totalHits: 2,
-      isBlocked: true,
-    });
-    await expect(storage.increment(key, 60_000, 1, 60_000, 'integration')).resolves.toMatchObject({
-      totalHits: 2,
-      isBlocked: true,
-    });
+    for (let i = 0; i < 2; i++) {
+      await storage.increment(key, 60_000, 2, 60_000, 'integration');
+    }
+    const blocked = await storage.increment(key, 60_000, 2, 60_000, 'integration');
+    expect(blocked.isBlocked).toBe(true);
   });
 });

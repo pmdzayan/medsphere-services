@@ -5,6 +5,8 @@
   "scripts": {
     "build": "nest build",
     "dev": "nest start --watch",
+    "test": "jest",
+    "test:cov": "jest --coverage",
     "lint": "eslint \"src/**/*.ts\"",
     "clean": "rimraf dist tsconfig.tsbuildinfo"
   },
@@ -24,6 +26,10 @@
   },
   "devDependencies": {
     "@nestjs/cli": "^11.0.24",
+    "@nestjs/testing": "^11.1.28",
+    "@types/jest": "^30.0.0",
+    "jest": "^30.4.2",
+    "ts-jest": "^29.4.11",
     "typescript": "^5.3.3"
   }
 }

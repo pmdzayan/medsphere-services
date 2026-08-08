@@ -29,6 +29,7 @@ No production or real healthcare data is approved.
 |     2 | `20260720020000_complete_reproducible_baseline`          | Additive migration from the auth state to the complete declared schema |
 |     3 | `20260720120000_trusted_authentication_tenant_context`   | Global identity, tenant memberships, and secure rotated sessions       |
 |     4 | `20260725120000_tenant_safe_authorization_durable_audit` | Membership RBAC, global permissions, and append-only audit events      |
+|     5 | `20260803120000_persistent_session_credential_rotation`  | Direct user/tenant session relations, credential history, constraints  |
 
 Migration history is append-only under ADR-002. Applied migrations are never edited or deleted. Shared databases use `prisma migrate deploy`; `prisma db push` is prohibited.
 
@@ -198,12 +199,22 @@ Types below describe the PostgreSQL representation. Columns are required unless 
 
 ### `UserSession`
 
-- Columns: `id UUID PK`; `membershipId UUID`; `familyId UUID`; `refreshTokenHash varchar(64) unique`; `ipAddress inet?`; `userAgent varchar(512)?`; `deviceName varchar(120)?`; `expiresAt timestamp`; `absoluteExpiresAt timestamp`; `lastUsedAt timestamp=now`; `status SessionStatus=ACTIVE`; `replacedById UUID? unique`; `revokedAt timestamp?`; `revocationReason varchar(120)?`; `createdAt timestamp=now`; `updatedAt timestamp`.
-- Relationships: belongs to `TenantMembership`; optional self-reference to the rotation successor.
-- Constraints: `membershipId → TenantMembership.id` cascade delete; `replacedById → UserSession.id` set null; unique digest and successor reference.
-- Indexes: `(membershipId, status)`; `(familyId, status)`; `(status, expiresAt)`; `(status, absoluteExpiresAt)`; unique digest and successor.
-- Migration behavior: all raw prototype refresh sessions are deliberately deleted and users must authenticate again. Raw credentials cannot be safely transformed into opaque single-use values.
+- Columns: `id UUID PK`; `userId UUID`; `tenantId UUID`; `membershipId UUID`; `familyId UUID`; `refreshTokenHash varchar(64) unique`; `ipAddress inet?`; `userAgent varchar(512)?`; `deviceName varchar(120)?`; `expiresAt timestamp`; `absoluteExpiresAt timestamp`; `lastUsedAt timestamp=now`; `status SessionStatus=ACTIVE`; `replacedById UUID? unique`; `version integer=1`; `revokedAt timestamp?`; `revocationReason varchar(120)?`; `createdAt timestamp=now`; `updatedAt timestamp`.
+- Relationships: belongs to `User`, `Tenant`, and `TenantMembership`; optional self-reference to the rotation successor; parent of `UserSessionRefreshCredential` history.
+- Constraints: `userId → User.id` cascade delete; `tenantId → Tenant.id` delete restrict; `membershipId → TenantMembership.id` cascade delete; `replacedById → UserSession.id` set null; unique digest and successor reference; `version >= 0`.
+- Indexes: `(userId, status)`; `(tenantId, status)`; `(membershipId, status)`; `(familyId, status)`; `(familyId, createdAt)`; `(status, expiresAt)`; `(status, absoluteExpiresAt)`; unique digest and successor.
+- Migration behavior: all raw prototype refresh sessions are deliberately deleted and users must authenticate again. AG-02A backfills `userId`/`tenantId` from the authoritative `TenantMembership` and stops if any orphaned session cannot be resolved.
 - Sensitive/audit notes: only a peppered HMAC digest is stored. Device and network metadata remain sensitive and require an accepted retention policy.
+
+### `UserSessionRefreshCredential`
+
+- Columns: `id UUID PK`; `sessionId UUID`; `hash varchar(64) unique`; `status RefreshCredentialStatus=ACTIVE`; `issuedAt timestamp=now`; `usedAt timestamp?`; `revokedAt timestamp?`; `replacedById UUID? unique`; `rotationSequence integer=1`; `createdAt timestamp=now`.
+- Relationships: belongs to `UserSession`; optional self-reference to the rotation successor credential.
+- Constraints: `sessionId → UserSession.id` cascade delete; `replacedById → UserSessionRefreshCredential.id` set null; unique hash and successor reference; `rotationSequence >= 0`; status/timestamp shape checks (USED implies `usedAt`; REVOKED implies `revokedAt`; ACTIVE implies neither); partial unique index enforcing one `ACTIVE` credential per session.
+- Indexes: unique hash; `(sessionId, status)`; `(sessionId, issuedAt)`; `(status, issuedAt)`; partial unique active-per-session.
+- Migration behavior: AG-02A backfills one credential record per existing session from the denormalized `refreshTokenHash`.
+- Sensitive/audit notes: only HMAC-SHA-256 digests are stored — never raw refresh credentials or opaque values. The history enables strong replay detection while keeping the database disclosure-safe.
+- Security note: an `UNKNOWN` hash for an existing session is classified `INVALID`, not `REPLAY_DETECTED`, preventing an attacker with a random secret from revoking a legitimate session.
 
 ### `ProviderVerification`
 

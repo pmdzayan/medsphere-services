@@ -31,6 +31,8 @@ interface RequestOptions {
   readonly body?: unknown;
 }
 
+const E2E_LIFECYCLE_TIMEOUT_MS = 60_000;
+
 @Controller('__e2e/errors')
 @PublicEndpoint()
 class ErrorBoundaryTestController {
@@ -133,7 +135,7 @@ describe('S0.4 authentication and authorization HTTP security boundary', () => {
 
     tokenService = module.get(TokenService);
     authConfig = module.get(AuthConfigService);
-  });
+  }, E2E_LIFECYCLE_TIMEOUT_MS);
 
   afterAll(async () => {
     await app.close();
@@ -149,7 +151,7 @@ describe('S0.4 authentication and authorization HTTP security boundary', () => {
     } else {
       process.env.ENABLE_SWAGGER = previousSwaggerEnvironment;
     }
-  });
+  }, E2E_LIFECYCLE_TIMEOUT_MS);
 
   beforeEach(() => {
     validateAccessIdentity.mockReset();

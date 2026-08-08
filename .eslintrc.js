@@ -17,5 +17,17 @@ module.exports = {
   rules: {
     '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
     '@typescript-eslint/explicit-function-return-type': 'off',
+    'no-restricted-imports': [
+      'error',
+      {
+        patterns: [
+          {
+            group: ['**/apps/*/**', '../../../apps/*/**', '../../apps/*/**', '../apps/*/**'],
+            message:
+              'Cross-application imports are strictly prohibited. Import shared functionality from @medsphere/* packages.',
+          },
+        ],
+      },
+    ],
   },
 };

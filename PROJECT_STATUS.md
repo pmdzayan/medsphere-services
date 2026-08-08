@@ -1,226 +1,56 @@
 # MedSphere Project Status
 
-**Status date:** 2026-07-25
-
-**Baseline commit:** `75e4d45855d5e99eab355c41a5e424bbda602a9b`
-
-**Accepted stabilization baseline:** `5ffc36bf45b5fb2aea541b0920f650cc32fd1405`
-
-**Current remediation branch:** `cto/s0.5-integrity-remediation`
+**Status date:** 2026-08-03
 
 **Release state:** Not approved for production or real healthcare data
 
-## Current sprint
+## Active Antigravity Sprints & Tasks
 
-### Stabilization Sprint S0.5 — Inventory Ledger and Reservation Integrity
+### Task AG-00 — Repository Preservation and Stabilization Baseline
 
-**Status:** Architecture accepted and merged; ADR-006 runtime/security
-prerequisite CI-verified in PR #9 and awaiting merge
+**Status:** `COMPLETED`  
+**Verdict:** `SAFE`  
+**Audit Report:** `docs/audits/2026-08-03-antigravity-repository-stabilization.md`
 
-**Dependency:** S0.4 Tenant-Safe RBAC and Durable Audit accepted and merged
+### Task AG-01 — Shared Audit Infrastructure and Domain Contract Boundaries
 
-**Implementation authority:** ADR-005 and the S0.5 sprint contract are accepted.
+**Status:** `IMPLEMENTATION COMPLETE` (Awaiting CTO Review)  
+**ADR:** `docs/adr/0008-shared-audit-infrastructure-and-domain-contract-boundaries.md`
 
-**In scope**
+**In Scope & Completed:**
 
-- One inventory bounded-context owner
-- Batch as the sole physical and held quantity state
-- Append-only stock movement ledger
-- Deterministic, transactional FEFO
-- Typed medicine reservation header, items, and exact batch allocations
-- Serializable, idempotent, tenant-safe stock and reservation mutations
-- Atomic durable audit integration
-- Clean and populated migration verification
+- Relocated reusable audit types, metadata validation, constants, and `AuditWriter` to `@medsphere/common`.
+- Relocated authentication identity types, RBAC decorators, permission constants, `JwtAuthGuard`, and `PermissionsGuard` to `@medsphere/common`.
+- Extended `@medsphere/types` with versionable `DomainEventEnvelope<TPayload>` and `EventActorContext`.
+- Added ESLint `no-restricted-imports` rule in `.eslintrc.js` to strictly enforce that applications (`apps/*`) cannot directly import internal source code from other applications.
+- Eliminated 100% of cross-application source imports (`apps/inventory-service` -> `apps/auth-service/src/*`).
 
-**Out of scope**
+### Task AG-02A — Persistent Session Schema, Credential Rotation and Repository
 
-- S0.4 authorization and audit — accepted and merged
-- Hospital, laboratory, and vaccination scheduling
-- Supplier procurement and goods receipt
-- Marketplace, delivery, payment, frontend, and controlled-medicine work
-- Patient self-service reservation exposure
+**Status:** `PROVISIONALLY COMPLETE` (Awaiting CTO Review)  
+**Branch:** `cto/ag02a-session-persistence`  
+**Plan:** `docs/audits/2026-08-03-ag02a-session-persistence-plan.md`  
+**Completion Report:** `docs/audits/2026-08-03-ag02a-session-persistence-completion.md`
 
-## CTO acceptance ledger
+**In Scope & Completed:**
 
-| Area                        | Repository evidence                                             | CTO status         |
-| --------------------------- | --------------------------------------------------------------- | ------------------ |
-| Planning and architecture   | ADR-001 and S0.1 governance merged in PR #1                     | Accepted baseline  |
-| Monorepo/tooling foundation | PNPM, Turbo, TypeScript, NestJS, Prisma, shared packages exist  | Partially accepted |
-| Database reproducibility    | PR #2 migration and clean-database gates CI-verified and merged | Accepted base      |
-| Inventory foundation        | Batch, stock, availability, FEFO, and search scaffolding exists | Prototype only     |
-| Reservation                 | Competing implementations and unsafe transaction boundaries     | Rejected           |
-| Task 11 — Identity/RBAC     | S0.3 identity and S0.4 tenant-safe authorization merged         | Accepted           |
-| Task 12 — Audit Logging     | S0.4 durable, integrated, append-only audit merged              | Accepted           |
-| Task 13 onward              | Dependencies are not complete                                   | Blocked            |
+- `UserSession` extended with direct `userId`/`tenantId` relationships and a `version` column for optimistic concurrency.
+- New `UserSessionRefreshCredential` history model with `RefreshCredentialStatus` (`ACTIVE`, `USED`, `REVOKED`) for strong replay detection.
+- Append-only migration `20260803120000_persistent_session_credential_rotation` with backfill, check constraints, composite indexes, and a partial unique index enforcing one active credential per session.
+- Real persistent `SessionRepository` with atomic creation, durable validation, atomic rotation, replay distinction, family/user revocation, and bounded cleanup.
+- Explicit rotation outcomes: `ROTATED`, `REPLAY_DETECTED`, `INVALID`, `EXPIRED`, `REVOKED`, `IDENTITY_DISABLED`.
+- Pure decision-logic module (`session-policy.ts`) with 15 unit tests (all passing).
+- PostgreSQL integration and concurrency tests written and gated behind `RUN_AUTH_INFRASTRUCTURE_TESTS=true` (not executed locally — environmental limitation).
 
-## Critical blockers
+## Verification Ledger
 
-1. Inventory and batch are competing quantity authorities.
-2. Existing transaction callbacks use repositories bound to the root Prisma
-   client and therefore do not prove atomic writes.
-3. Reservation structure is stored in JSON and duplicated across two
-   applications.
-4. Stock and reservation rows lack database-enforced tenant scope,
-   idempotency, and concurrency safety.
-5. Durable audit currently covers accepted S0.4 authorization and
-   authentication session events only; later business modules must integrate
-   it in their own dependency-ordered sprints.
-6. Medical-record functionality remains blocked before consent/privacy controls.
-7. Repository-wide integration, security, and tenant-isolation coverage remains
-   insufficient beyond the accepted S0.4 boundary.
-
-The supporting evidence is recorded in [the baseline audit](docs/audits/2026-07-20-cto-baseline.md).
-
-## Dependency-ordered recovery
-
-1. **S0.1 Architecture and governance** — accepted and merged in PR #1
-2. **S0.2 Reproducible database baseline** — accepted and squash-merged in PR #2
-3. **S0.3 Authentication and trusted tenant context** — accepted and squash-merged in PR #3
-4. **S0.4 Tenant-safe RBAC and durable audit** — accepted and squash-merged in
-   PR #7
-5. **S0.5 Inventory ledger and reservation integrity** — current; architecture
-   accepted in PR #8; ADR-006 prerequisite under review
-6. Reassess remaining Inventory and Compliance roadmap work
-
-Only one recovery sprint may be active at a time. Exact boundaries may be refined through an ADR, but dependencies must not be skipped.
-
-## Progress reporting rule
-
-Progress is measured by accepted milestone criteria, not by the number of files or endpoints present. Percentages are suspended until the stabilization milestone establishes reproducible builds, tests, migrations, security boundaries, and review evidence.
-
-## S0.1 validation evidence
-
-| Check                          | Result                                                          |
-| ------------------------------ | --------------------------------------------------------------- |
-| Locked dependency installation | Passed with PNPM 9.15.0 after registry retries                  |
-| `pnpm format:check`            | Passed                                                          |
-| `pnpm lint`                    | Passed — 15/15 tasks                                            |
-| `pnpm test`                    | Passed — 17/17 Turbo tasks                                      |
-| `pnpm build`                   | Passed — 15/15 tasks with 0 cached                              |
-| Markdown links                 | Passed — all repository-local links resolve                     |
-| Workflow syntax                | Passed — quality and deployment-freeze YAML parsed successfully |
-
-PR #1 was accepted and squash-merged as `d8958c4c1573b181e1f23874386b86ee837dd305`.
-
-## S0.2 verification evidence
-
-| Check                                          | Result                                                                                                                         |
-| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| Schema audit                                   | 18 models and 13 enums declared; the original migration contains 7 models and 4 enums                                          |
-| Prisma schema validation and client generation | Passed                                                                                                                         |
-| Additive schema diff                           | Tracked migration body exactly matches Prisma's generated diff from original auth state to declared schema                     |
-| Clean PNPM locked installation                 | Passed in GitHub Actions ([workflow run 29732542356](https://github.com/pmdzayan/medsphere-services/actions/runs/29732542356)) |
-| Clean PostgreSQL 16 migration deploy           | Passed                                                                                                                         |
-| `prisma migrate status`                        | Passed — no unapplied migrations reported                                                                                      |
-| Live-database-to-schema drift verification     | Passed — no drift detected                                                                                                     |
-| Formatting                                     | Passed                                                                                                                         |
-| Lint                                           | Passed                                                                                                                         |
-| Tests                                          | Passed                                                                                                                         |
-| Build                                          | Passed                                                                                                                         |
-| PostgreSQL container cleanup                   | Passed                                                                                                                         |
-
-The initial implementation commit `ed03abee671d075967499bfca742afbd61eb02d4`, the documentation evidence commit `c880d3d4e759ba369023dd319c5213885e06af4b`, and the final squash-merge commit `4480642b76dff0027c9ac63c598daa7cde8d53c3` all passed every gate. Reference: [PR #2](https://github.com/pmdzayan/medsphere-services/pull/2), workflow runs [29732542356](https://github.com/pmdzayan/medsphere-services/actions/runs/29732542356), [29736345081](https://github.com/pmdzayan/medsphere-services/actions/runs/29736345081), and [29736842625](https://github.com/pmdzayan/medsphere-services/actions/runs/29736842625).
-
-PR #2 was accepted and squash-merged into `feature/database-architecture`.
-
-## S0.3 verification evidence
-
-| Check                                      | Result                                                                                                       |
-| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------ |
-| Locked dependency installation             | Passed in GitHub Actions                                                                                     |
-| Clean PostgreSQL 16 migration deploy       | Passed                                                                                                       |
-| `prisma migrate status`                    | Passed — no unapplied migrations reported                                                                    |
-| Live-database-to-schema drift verification | Passed — no drift detected                                                                                   |
-| Formatting                                 | Passed                                                                                                       |
-| Lint                                       | Passed                                                                                                       |
-| Real PostgreSQL auth/session tests         | Passed ([workflow run 29746017664](https://github.com/pmdzayan/medsphere-services/actions/runs/29746017664)) |
-| Real Redis rate-limit tests                | Passed                                                                                                       |
-| Explicit infrastructure-test execution     | Passed                                                                                                       |
-| HTTP security-boundary tests               | Passed                                                                                                       |
-| Build                                      | Passed                                                                                                       |
-| PostgreSQL container cleanup               | Passed                                                                                                       |
-
-Reference: [PR #3](https://github.com/pmdzayan/medsphere-services/pull/3) (squash-merge `7872e57982f0ba2f0681ece9fc445fa63ed320c4`), [PR #4](https://github.com/pmdzayan/medsphere-services/pull/4) (integration gate, merge `edc74d6eddee303b87f1ed09b4c2178d6fb3ee0e`), workflow runs [29746017664](https://github.com/pmdzayan/medsphere-services/actions/runs/29746017664) and [29747026515](https://github.com/pmdzayan/medsphere-services/actions/runs/29747026515).
-
-PR #3 was accepted and squash-merged into `feature/database-architecture`.
-
-## S0.4 verification evidence
-
-S0.4 is implemented on `cto/s0.4-tenant-safe-rbac-durable-audit` in commits
-`9603f5b`, `a8b2128`, `993324b`, `067ce63`, and `4f10eef`. The implementation
-and strengthened verification gates have been published, reviewed, and proven
-by the pull-request workflow.
-
-| Check                                 | Result                                                                  |
-| ------------------------------------- | ----------------------------------------------------------------------- |
-| Locked dependency installation        | Passed with PNPM 9.15.0                                                 |
-| Prisma schema validation              | Passed                                                                  |
-| Prisma client generation              | Passed                                                                  |
-| Static Prisma schema comparison       | Passed for modeled objects; not a live migration/trigger result         |
-| Formatting                            | Passed                                                                  |
-| Lint                                  | Passed locally — 15/15 Turbo tasks                                      |
-| Tests                                 | Passed locally — 17/17 Turbo tasks; infrastructure suites skipped       |
-| Auth strict test type-check and Jest  | Passed after final review — 104 passed, 16 infrastructure tests skipped |
-| Build                                 | Passed locally — 15/15 Turbo tasks                                      |
-| PostgreSQL 16 and Redis 7 integration | Passed in initial PR #7 workflow — 120/120 auth tests, zero skipped     |
-| Clean deploy, status, and drift       | Passed in initial PR #7 workflow                                        |
-| Populated S0.3 upgrade verification   | Passed all six isolated scenarios in strengthened PR #7 workflow        |
-| Pull-request workflow                 | Strengthened run passed on exact commit `4f10eef`                       |
-| Final documentation workflow          | Passed on exact commit `f2cd0df` in run `30132631443`                   |
-| Merge                                 | PR #7 squash-merged as `4ea55a1`                                        |
-
-The initial [PR #7 workflow run](https://github.com/pmdzayan/medsphere-services/actions/runs/30130479231)
-proved the clean four-migration deployment, no drift, PostgreSQL and Redis
-integration, 20/20 auth suites with 120/120 tests and zero skips, 15/15 lint
-tasks, 17/17 test tasks, and 15/15 build tasks on commit `067ce63`.
-
-Final contract review found that a clean migration chain did not prove a
-populated S0.3 upgrade. The strengthened
-[workflow run 30131410814](https://github.com/pmdzayan/medsphere-services/actions/runs/30131410814)
-closed that gap on commit `4f10eef`: valid legacy membership-role and
-role-permission data survived; legacy audit rows, unknown permissions, invalid
-built-in roles, cross-tenant role-permission mappings, and ambiguous role
-assignments each failed closed in isolated databases. The same run reported no
-schema drift, 20/20 auth suites with 120/120 tests and zero skips, 15/15 lint
-tasks, 17/17 test tasks, and 15/15 build tasks.
-
-## S0.4 CTO acceptance decision
-
-S0.4 satisfies ADR-004 and its sprint completion criteria. Architecture,
-database integrity, tenant isolation, authorization failure behavior, audit
-atomicity and immutability, concurrency, migration safety, validation,
-duplication, security, and documentation have no unresolved acceptance
-findings.
-
-The final documentation-only commit passed
-[workflow run 30132631443](https://github.com/pmdzayan/medsphere-services/actions/runs/30132631443).
-PR #7 was squash-merged into `feature/database-architecture` as
-`4ea55a17e188410ddee45fa3ea6c016e22d6617a`.
-
-S0.4 is accepted and closed. S0.5 may proceed under ADR-005 and its sprint
-contract. This is not production or legal-compliance approval.
-
-## ADR-006 runtime and security verification evidence
-
-ADR-006 is implemented on `cto/s0.5-integrity-remediation` at commit
-`a409f052f00224130da796db951d6afdbcaa0726`.
-
-| Check                                     | Result                                  |
-| ----------------------------------------- | --------------------------------------- |
-| Locked PNPM 9.15.0 installation           | Passed                                  |
-| Production dependency audit               | Passed — zero known vulnerabilities     |
-| Clean PostgreSQL 16 migration and drift   | Passed                                  |
-| Populated S0.3 to S0.4 upgrade safety     | Passed                                  |
-| Formatting                                | Passed                                  |
-| Lint                                      | Passed — 15/15 Turbo tasks              |
-| PostgreSQL and Redis infrastructure tests | Passed without local-only substitutions |
-| Tests                                     | Passed — 17/17 Turbo tasks              |
-| Build                                     | Passed — 15/15 Turbo tasks              |
-| Exact-commit pull-request workflow        | Passed                                  |
-
-Evidence: [PR #9](https://github.com/pmdzayan/medsphere-services/pull/9) and
-[workflow run 30147083613](https://github.com/pmdzayan/medsphere-services/actions/runs/30147083613).
-
-ADR-006 implementation and verification are CTO-accepted. S0.5 stock and
-reservation implementation remains blocked until PR #9 is squash-merged into
-`feature/database-architecture`.
+| Check                                                | Result                     |
+| ---------------------------------------------------- | -------------------------- |
+| Cross-Application Import Audit (`search_imports.js`) | 0 violations found         |
+| ESLint `no-restricted-imports` rule                  | Enforced and passing       |
+| `pnpm format:check`                                  | Passed                     |
+| `pnpm lint`                                          | Passed (16/16 Turbo tasks) |
+| `@medsphere/types` build                             | Passed                     |
+| `@medsphere/common` build                            | Passed                     |
+| `@medsphere/auth-service` test & build               | Passed                     |
+| `@medsphere/inventory-service` test & build          | Passed                     |

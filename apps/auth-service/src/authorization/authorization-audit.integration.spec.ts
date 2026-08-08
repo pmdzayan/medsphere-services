@@ -444,8 +444,9 @@ describeAuthorizationInfra('S0.4 PostgreSQL authorization and durable-audit inte
     });
 
     const occurredAt = new Date('2099-01-01T00:00:00.000Z');
-    const highestId = 'ffffffff-ffff-4fff-8fff-ffffffffffff';
-    const lowestId = '00000000-0000-4000-8000-000000000001';
+    const prefix = randomUUID().replace(/-/g, '').slice(0, 7);
+    const highestId = `f${prefix}-ffff-4fff-8fff-ffffffffffff`;
+    const lowestId = `0${prefix}-0000-4000-8000-000000000001`;
     const resourceId = randomUUID();
     await prisma.client.auditEvent.createMany({
       data: [highestId, lowestId].map((id) => ({
