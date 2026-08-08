@@ -2,9 +2,9 @@
 
 **Last updated:** 2026-08-08
 
-**Current sprint:** G3.5 implementation acceptance — live assigned-provider reservation workspace
+**Current sprint:** G3.6 contract — live operations overview
 
-**Next feature work:** Define the next bounded inventory/frontend closure contract after G3.5 acceptance
+**Next feature work:** Implement only after the G3.6 sprint contract is reviewed
 
 ## Mandatory startup sequence
 
@@ -66,6 +66,8 @@ The migration must be incremental:
   #18 as `7b2eb78`.
 - The G3.5 read-only reservation contract passed run `31278969284` and merged
   in PR #19 as `8440900` before implementation began.
+- G3.5 implementation passed run `31279765403` and merged in PR #20 as
+  `6c68ee3`.
 - S0.5 now defines `Batch` as physical/held quantity authority, uses an
   append-only movement ledger, and stores typed reservation items and
   allocations. Its accepted production HTTP boundary and live frontend
@@ -119,9 +121,10 @@ See `docs/audits/2026-07-20-cto-baseline.md` for the accepted baseline.
     `9c38792`
 15. G3.4 live assigned-provider stock workspace — accepted and merged in PR #18
     as `7b2eb78`
-16. G3.5 live assigned-provider reservation workspace — implemented;
-    exact-commit acceptance required
-17. Transfers/returns/damage, worker expiry, safe creation, and later live
+16. G3.5 live assigned-provider reservation workspace — accepted and merged in
+    PR #20 as `6c68ee3`
+17. G3.6 live operations overview — contract definition active
+18. Transfers/returns/damage, worker expiry, safe creation, and later live
     mutations — blocked pending their own accepted contracts
 
 If ownership transfers, resume at the first pending checkpoint. Do not use
@@ -130,10 +133,11 @@ If ownership transfers, resume at the first pending checkpoint. Do not use
 
 ## Exact continuation point
 
-Accept the exact G3.5 implementation commit, then define the next bounded unit
-before changing behavior. G3.5 connects only accepted reservation list fields
-through a strict BFF and dedicated read-only workspace. Mutations, patient
-exposure, and Gates 2 and 4–9 remain blocked by their recorded dependencies.
+Continue from accepted commit `6c68ee3` and review
+`docs/sprints/G3.6-live-operations-overview.md` before implementation. Remove
+fabricated dashboard content using only accepted stock and reservation BFFs.
+Mutations, analytics policy, patient exposure, and Gates 2 and 4–9 remain
+blocked by their recorded dependencies.
 
 Cline may receive only a complete, bounded prompt for characterization tests or
 mechanical work whose contract is already fixed by ADR-005. Cline must not

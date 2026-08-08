@@ -2,11 +2,11 @@
 
 **Status date:** 2026-08-08
 
-**Accepted source commit:** `84409007d398a264d26d068e55b0e98d08fc8462`
+**Accepted source commit:** `6c68ee324f6bf6f003413ef390b5710ea7029b1a`
 
 **Accepted stabilization baseline:** `4ea55a17e188410ddee45fa3ea6c016e22d6617a`
 
-**Current sprint:** G3.5 implementation acceptance — live assigned-provider reservation workspace
+**Current sprint:** G3.6 contract — live operations overview
 
 **Release state:** Not approved for production or real healthcare data
 
@@ -14,35 +14,32 @@
 
 ## Current sprint
 
-### G3.5 — Live Assigned-Provider Reservation Workspace
+### G3.6 — Live Operations Overview
 
-**Status:** Implemented against
-`docs/sprints/G3.5-live-assigned-provider-reservation-workspace.md`;
-exact-commit pull-request acceptance is required. The implementation adds a
-strict reservation BFF, exact response validation, provider/status selection,
-pagination, read-only details, explicit access/error states, and the mounted
-`/reservations` navigation route.
+**Status:** Contract proposed in
+`docs/sprints/G3.6-live-operations-overview.md`; implementation has not started.
+G3.5 passed exact-commit workflow `31279765403` and merged in PR #20 as
+`6c68ee3`.
 
-**Dependency:** G3.3 provider reservation reads and G3.4 assigned-provider BFF
-patterns are accepted. The reservation API has no patient identity fields and
-will remain read-only in G3.5.
+**Dependency:** G3.4 live stock and G3.5 live reservation workspaces are
+accepted. G3.6 may compose only their existing read BFFs and exact fields.
 
 **Implementation authority:** ADR-001, ADR-003 through ADR-008, merged PRs
-#10–19, the
-`docs/audits/2026-08-08-v1-subsystem-gap-matrix.md` audit, and the accepted G3.5
-sprint contract.
+#10–20, the
+`docs/audits/2026-08-08-v1-subsystem-gap-matrix.md` audit, and the proposed G3.6
+sprint contract. The contract must be accepted before implementation begins.
 
 **In scope**
 
-- reuse exact-shape assigned-provider context for the authenticated membership
-- strict same-origin BFF for the accepted reservation-read contract
-- bounded query and response validation with private, no-store responses
-- live read-only reservation rows, details, metrics, loading, empty, and error states
-- contract, authorization-negative, malformed-upstream, and UI tests
+- reuse accepted assigned-provider, stock, and reservation browser APIs
+- remove all fabricated dashboard data and unsupported operational claims
+- show only bounded current-page counts and accepted live fields
+- independent loading, partial-error, empty, restricted, and retry states
+- responsive composition and UI tests
 
 **Out of scope**
 
-- stock or reservation mutations, patient identity, payment, or delivery
+- stock or reservation mutations, analytics policy, patient identity, payment, or delivery
 - supplier, marketplace, delivery, payment, or controlled-medicine work
 - patient, clinical, billing, document, notification, or workflow implementation
 - production deployment or compliance approval
@@ -105,9 +102,11 @@ and [the Gates 1–20 verification](docs/audits/2026-08-01-gates-1-20-verificati
     #16 as `9c38792`
 12. **G3.4 live assigned-provider stock workspace** — accepted and merged in PR
     #18 as `7b2eb78`
-13. Define and accept the G3.5 read-only reservation workspace, then mount later
-    mutations only through separate accepted contracts
-14. Resume remaining Inventory and Compliance milestones in dependency order
+13. **G3.5 live assigned-provider reservation workspace** — accepted and merged
+    in PR #20 as `6c68ee3`
+14. Define and accept G3.6 dashboard truthfulness, then mount later mutations
+    only through separate accepted contracts
+15. Resume remaining Inventory and Compliance milestones in dependency order
 
 Only one recovery sprint may be active at a time. Exact boundaries may be refined through an ADR, but dependencies must not be skipped.
 

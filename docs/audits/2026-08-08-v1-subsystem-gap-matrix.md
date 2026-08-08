@@ -2,7 +2,7 @@
 
 **Audit date:** 2026-08-08
 
-**Accepted source commit:** `84409007d398a264d26d068e55b0e98d08fc8462`
+**Accepted source commit:** `6c68ee324f6bf6f003413ef390b5710ea7029b1a`
 
 **Decision:** Version 1 is not release-ready. The evidence-weighted full-roadmap
 estimate remains approximately **30% complete**.
@@ -40,35 +40,32 @@ The readiness score is a planning aid, not a completion or compliance claim.
 
 ## Dependency-ordered closure path
 
-1. Synchronize status and handoff documents to accepted commit `7b2eb78`.
+1. Synchronize status and handoff documents to accepted commit `6c68ee3`.
 2. G3.4 exact-commit evidence for the live assigned-provider stock workspace —
    accepted in PR #18.
-3. Define and accept G3.5: connect assigned-provider reservation reads before
-   exposing lifecycle mutations in the browser.
-4. Add remaining inventory operations as separate contracts: safe reservation
+3. G3.5 assigned-provider reservation reads — accepted in PR #20.
+4. Define and accept G3.6: remove fabricated dashboard claims using only the
+   accepted stock and reservation BFFs.
+5. Add remaining inventory operations as separate contracts: safe reservation
    creation and worker expiry, transfers, returns, damage, quarantine/recall.
-5. Complete the compliance foundation before exposing patient or clinical data.
-6. Build event delivery before notification, workflow, analytics, or other
+6. Complete the compliance foundation before exposing patient or clinical data.
+7. Build event delivery before notification, workflow, analytics, or other
    asynchronous platform behavior claims completion.
-7. Implement the remaining healthcare and platform milestones, then execute the
+8. Implement the remaining healthcare and platform milestones, then execute the
    production verification milestone.
 
 ## Next bounded implementation unit
 
-**G3.5 — Live assigned-provider reservation workspace** is next after G3.4
-acceptance. Its contract must remain read-only and depend only on accepted
-provider-access and reservation-read contracts. G3.4 provides the reusable
-assigned-provider BFF pattern. G3.5 must require:
+**G3.6 — Live operations overview** is next. Its proposed
+[sprint contract](../sprints/G3.6-live-operations-overview.md) is a truthfulness
+checkpoint that may compose only accepted G3.4 and G3.5 browser reads. It must:
 
-- an exact-shape provider-context response for the authenticated membership;
-- a strict same-origin BFF that never accepts client-supplied identity/tenant;
-- bounded reservation query and response validation with `private, no-store`
-  behavior;
-- explicit empty, unauthenticated, forbidden, malformed-upstream, and upstream
-  unavailable states;
-- frontend rendering only from accepted reservation fields after contract tests;
-- no stock mutation, reservation mutation, patient exposure, payment, delivery,
-  or analytics scope.
+- remove fabricated value, risk, trend, priority, patient, and activity claims;
+- calculate only clearly labelled current-page values from validated data;
+- preserve independent stock and reservation loading/error states;
+- link to the complete live read workspaces;
+- add no mutation, analytics policy, backend, database, permission, or gateway
+  behavior.
 
 ## Release decision
 
