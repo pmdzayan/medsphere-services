@@ -8,10 +8,10 @@ MedSphere is a planned multi-tenant healthcare ecosystem for patients, pharmacie
 
 **Status date:** 2026-08-08
 
-**Accepted evidence baseline:** `8440900` (PR #19 squash merge)
+**Accepted evidence baseline:** `6c68ee3` (PR #20 squash merge)
 
-**Current sprint:** G3.5 implementation acceptance for a live, read-only
-[assigned-provider reservation workspace](docs/sprints/G3.5-live-assigned-provider-reservation-workspace.md)
+**Current sprint:** G3.6 contract definition for a
+[live operations overview](docs/sprints/G3.6-live-operations-overview.md)
 
 **Full-roadmap estimate:** **30% complete / 70% remaining**
 
@@ -79,8 +79,8 @@ and Gates 2 and 4–20 are not complete.
 
 ### Remaining work
 
-1. **Accept G3.5 reservation reads:** verify the strict read-only reservation
-   BFF and mounted workspace on the exact implementation commit.
+1. **Complete G3.6 dashboard truthfulness:** replace fabricated operational
+   claims with bounded composition of accepted stock and reservation reads.
 2. **Expose remaining bounded inventory mutations:** define separate transfer,
    return, damage, expiry, and reservation contracts with atomic audit; connect
    frontend previews only after each backend contract is accepted.
