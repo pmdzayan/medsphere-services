@@ -103,7 +103,6 @@ describe('ReservationExpiryService', () => {
           previousStatus: 'CONFIRMED',
           version: 4,
           totalQuantity: 4,
-          expiresAt: '2026-08-08T23:00:00.000Z',
         },
       }),
     );

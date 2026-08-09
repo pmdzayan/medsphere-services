@@ -199,7 +199,6 @@ export class ReservationExpiryService {
           previousStatus: reservation.status,
           version: resultingVersion,
           totalQuantity: allocatedQuantity,
-          expiresAt: reservation.expiresAt.toISOString(),
         },
       });
       return 'EXPIRED';
