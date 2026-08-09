@@ -5,6 +5,7 @@
   "scripts": {
     "build": "nest build",
     "dev": "nest start --watch",
+    "worker:reservation-expiry": "node dist/reservation-expiry.worker.js",
     "test": "tsc -p tsconfig.spec.json --noEmit && jest",
     "test:cov": "tsc -p tsconfig.spec.json --noEmit && jest --coverage",
     "lint": "eslint \"src/**/*.ts\"",
