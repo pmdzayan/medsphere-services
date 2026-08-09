@@ -2,22 +2,22 @@
 
 **Status date:** 2026-08-09
 
-**Accepted source commit:** `63707b8e8f375a7c8140e11a725f4773a59151c3`
+**Accepted source commit:** `b7bba10dc95571ad0ce60f4fa5e68886a6fbf9ae`
 
 **Accepted stabilization baseline:** `4ea55a17e188410ddee45fa3ea6c016e22d6617a`
 
-**Current sprint:** G3.7 reservation expiry worker
+**Current sprint:** G3.7 accepted — next sprint not selected
 
 **Release state:** Not approved for production or real healthcare data
 
-**Full-roadmap engineering estimate:** 31% complete / 69% remaining
+**Full-roadmap engineering estimate:** 32% complete / 68% remaining
 
 ## Current sprint
 
 ### G3.7 — Reservation Expiry Worker
 
-**Status:** Implemented; exact-commit CI and CTO acceptance required. Overall
-V1 progress remains 31% until that acceptance is recorded.
+**Status:** Accepted. G3.7 passed exact-head workflow `31310996464` and was
+squash-merged in PR #26 as `b7bba10` after CTO authorization.
 
 **Dependency:** ADR-005, S0.5, and G3.3 already provide the reservation state,
 allocation, command, tenant-system audit, and serializable transaction
@@ -51,29 +51,27 @@ accepted G3.7 sprint contract.
 | Database reproducibility    | S0.2–S0.5, G3.1–G3.3, and corrected AG-02A accepted with clean and populated upgrade evidence | Accepted through `9c38792`            |
 | Identity and tenant context | S0.3 authentication and trusted tenant context merged                                         | Accepted                              |
 | Authorization and audit     | S0.4 tenant-safe RBAC and durable audit merged                                                | Accepted                              |
-| Inventory and reservation   | S0.5 integrity, G3.1–G3.3 backend, G3.4 stock UI, G3.5 reservation UI, and G3.6 overview      | Broader operations remain incomplete  |
+| Inventory and reservation   | S0.5 integrity, G3.1–G3.3 backend, G3.4–G3.6 reads/UI, and G3.7 automatic hold expiry         | Broader operations remain incomplete  |
 | Frontend foundation         | Landing, login, shell, team/RBAC, audit, settings, onboarding, stock, and reservation reads   | Connected for accepted contracts      |
 | Pharmacy and inventory UI   | Assigned-provider stock, reservations, and bounded live overview use accepted reads           | Connected for accepted read contracts |
 | Remaining healthcare scope  | Most domain deployables are health-only scaffolds or absent                                   | Not implemented                       |
 
 ## Critical blockers
 
-1. Automatic reservation expiry is implemented as a bounded one-shot worker,
-   but exact-commit CI and CTO acceptance remain required before it is accepted.
-2. Patient-safe reservation creation, transfer, return, damage, quarantine, and
+1. Patient-safe reservation creation, transfer, return, damage, quarantine, and
    recall remain intentionally unmounted.
-3. Inventory mutation UIs remain unconnected; the accepted stock, reservation,
+2. Inventory mutation UIs remain unconnected; the accepted stock, reservation,
    and overview workspaces are deliberately read-only.
-4. Consent, privacy operations, verification, retention, legal hold, and the
+3. Consent, privacy operations, verification, retention, legal hold, and the
    policy engine are incomplete.
-5. Billing and notification applications are health-only scaffolds; documents,
+4. Billing and notification applications are health-only scaffolds; documents,
    workflows, supplier procurement, and analytics are not complete services.
-6. Hospital, doctor, laboratory, patient, and clinical journeys do not have
+5. Hospital, doctor, laboratory, patient, and clinical journeys do not have
    accepted end-to-end implementations. Medical-record exposure remains blocked
    before consent and privacy controls.
-7. Browser E2E, performance/load, penetration, backup/restore, disaster recovery,
+6. Browser E2E, performance/load, penetration, backup/restore, disaster recovery,
    observability, and operational-runbook evidence remain incomplete.
-8. Production deployment is intentionally disabled.
+7. Production deployment is intentionally disabled.
 
 Supporting evidence is recorded in [the baseline audit](docs/audits/2026-07-20-cto-baseline.md)
 and [the Gates 1–20 verification](docs/audits/2026-08-01-gates-1-20-verification.md).
@@ -104,8 +102,8 @@ and [the Gates 1–20 verification](docs/audits/2026-08-01-gates-1-20-verificati
     in PR #20 as `6c68ee3`
 14. **G3.6 live operations overview** — accepted and squash-merged in PR #23 as
     `63707b8`
-15. **G3.7 reservation expiry worker** — implemented; exact-commit CI and CTO
-    acceptance required
+15. **G3.7 reservation expiry worker** — accepted and squash-merged in PR #26
+    as `b7bba10`
 16. Resume remaining Inventory and Compliance milestones in dependency order
 
 Only one recovery sprint may be active at a time. Exact boundaries may be refined through an ADR, but dependencies must not be skipped.
@@ -113,7 +111,7 @@ Only one recovery sprint may be active at a time. Exact boundaries may be refine
 ## Progress reporting rule
 
 Progress is measured by accepted milestone criteria, not by the number of files
-or endpoints present. The README's 31% full-roadmap estimate and 32% frontend
+or endpoints present. The README's 32% full-roadmap estimate and 32% frontend
 estimate are planning indicators, not acceptance or release claims. They may
 change only when repository evidence and milestone acceptance change. Preview
 screens, placeholder services, unmounted routes, and schema-only foundations do
