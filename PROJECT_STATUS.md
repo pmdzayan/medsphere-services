@@ -2,24 +2,22 @@
 
 **Status date:** 2026-08-09
 
-**Accepted source commit:** `6c68ee324f6bf6f003413ef390b5710ea7029b1a`
+**Accepted source commit:** `63707b8e8f375a7c8140e11a725f4773a59151c3`
 
 **Accepted stabilization baseline:** `4ea55a17e188410ddee45fa3ea6c016e22d6617a`
 
-**Current sprint:** G3.6 implementation — live operations overview
+**Current sprint:** G3.6 accepted — next sprint not selected
 
 **Release state:** Not approved for production or real healthcare data
 
-**Full-roadmap engineering estimate:** 30% complete / 70% remaining
+**Full-roadmap engineering estimate:** 31% complete / 69% remaining
 
 ## Current sprint
 
 ### G3.6 — Live Operations Overview
 
-**Status:** Implemented; exact-commit CI and CTO acceptance required.
-G3.5 passed exact-commit workflow `31279765403` and merged in PR #20 as
-`6c68ee3`. G3.6 remains unaccepted and unmerged until its exact implementation
-commit passes the recorded acceptance process.
+**Status:** Accepted. G3.6 passed exact-head workflow `31305222063` and was
+squash-merged in PR #23 as `63707b8` after CTO review.
 
 **Dependency:** G3.4 live stock and G3.5 live reservation workspaces are
 accepted. G3.6 may compose only their existing read BFFs and exact fields.
@@ -104,8 +102,8 @@ and [the Gates 1–20 verification](docs/audits/2026-08-01-gates-1-20-verificati
     #18 as `7b2eb78`
 13. **G3.5 live assigned-provider reservation workspace** — accepted and merged
     in PR #20 as `6c68ee3`
-14. Define and accept G3.6 dashboard truthfulness, then mount later mutations
-    only through separate accepted contracts
+14. **G3.6 live operations overview** — accepted and squash-merged in PR #23 as
+    `63707b8`
 15. Resume remaining Inventory and Compliance milestones in dependency order
 
 Only one recovery sprint may be active at a time. Exact boundaries may be refined through an ADR, but dependencies must not be skipped.
@@ -113,7 +111,7 @@ Only one recovery sprint may be active at a time. Exact boundaries may be refine
 ## Progress reporting rule
 
 Progress is measured by accepted milestone criteria, not by the number of files
-or endpoints present. The README's 30% full-roadmap estimate and 32% frontend
+or endpoints present. The README's 31% full-roadmap estimate and 32% frontend
 estimate are planning indicators, not acceptance or release claims. They may
 change only when repository evidence and milestone acceptance change. Preview
 screens, placeholder services, unmounted routes, and schema-only foundations do

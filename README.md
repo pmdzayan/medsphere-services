@@ -6,14 +6,13 @@ MedSphere is a planned multi-tenant healthcare ecosystem for patients, pharmacie
 
 ## Verified project progress
 
-**Status date:** 2026-08-08
+**Status date:** 2026-08-09
 
-**Accepted evidence baseline:** `6c68ee3` (PR #20 squash merge)
+**Accepted evidence baseline:** `63707b8` (PR #23 squash merge)
 
-**Current sprint:** G3.6 contract definition for a
-[live operations overview](docs/sprints/G3.6-live-operations-overview.md)
+**Current sprint:** G3.6 accepted; next bounded sprint not selected
 
-**Full-roadmap estimate:** **30% complete / 70% remaining**
+**Full-roadmap estimate:** **31% complete / 69% remaining**
 
 This is an engineering progress estimate against the complete MedSphere roadmap,
 including stabilization, healthcare-domain workflows, frontend applications,
@@ -76,44 +75,45 @@ and Gates 2 and 4–20 are not complete.
   assigned-provider and stock reads, exact response validation, and live
   read-only workspace states; PR #18 merged as `7b2eb78` after run
   `31278555022` passed.
+- G3.6 replaced fabricated dashboard claims with bounded read-only composition
+  of accepted stock and reservation reads; PR #23 merged as `63707b8` after run
+  `31305222063` passed.
 
 ### Remaining work
 
-1. **Complete G3.6 dashboard truthfulness:** replace fabricated operational
-   claims with bounded composition of accepted stock and reservation reads.
-2. **Expose remaining bounded inventory mutations:** define separate transfer,
+1. **Expose remaining bounded inventory mutations:** define separate transfer,
    return, damage, expiry, and reservation contracts with atomic audit; connect
    frontend previews only after each backend contract is accepted.
-3. **Complete inventory operations:** expiry management, transfers, damaged
+2. **Complete inventory operations:** expiry management, transfers, damaged
    stock, returns, recalls/quarantine, operational analytics, and production
    worker behavior where accepted by dedicated sprints.
-4. **Complete reservation operations:** staff reservation creation, lifecycle,
+3. **Complete reservation operations:** staff reservation creation, lifecycle,
    expiry processing, fulfilment UI, and later patient-safe exposure. Delivery
    and payment must remain separate bounded sprints.
-5. **Finish the compliance foundation:** consent management, provider
+4. **Finish the compliance foundation:** consent management, provider
    verification, privacy center, retention, legal hold, and policy engine.
-6. **Build supplier and procurement:** supplier profiles, verification,
+5. **Build supplier and procurement:** supplier profiles, verification,
    purchase orders, approval, goods receipt, batch capture, and procurement
    dashboards.
-7. **Build complete pharmacy workflows:** catalog operations, dispensing,
+6. **Build complete pharmacy workflows:** catalog operations, dispensing,
    sales, invoices, reports, staff operations, and analytics.
-8. **Build hospital, doctor, laboratory, and patient journeys:** departments,
+7. **Build hospital, doctor, laboratory, and patient journeys:** departments,
    beds, schedules, appointments, encounters, SOAP notes, prescriptions,
    orders, samples, reports, consent-aware records, and role-specific
    dashboards.
-9. **Build platform services:** billing and insurance, notifications,
+8. **Build platform services:** billing and insurance, notifications,
    documents and signatures, workflow approvals, reporting, exports, feature
    flags, settings, and analytics. The current billing and notification apps
    are health-only scaffolds, not finished services.
-10. **Finish cross-cutting frontend quality:** live API integration for every
-    accepted module, accessibility verification, dark mode, PWA/offline rules,
-    responsive device testing, and browser end-to-end coverage.
-11. **Implement planned Gates 10–20:** universal inventory migration, medicine
+9. **Finish cross-cutting frontend quality:** live API integration for every
+   accepted module, accessibility verification, dark mode, PWA/offline rules,
+   responsive device testing, and browser end-to-end coverage.
+10. **Implement planned Gates 10–20:** universal inventory migration, medicine
     marketplace, hospital discovery, live healthcare availability,
     appointments and queues, laboratory information system, radiology/PACS,
     governed clinical decision support, patient mobile app, analytics, and the
     national healthcare network.
-12. **Earn production release approval:** secure deployment environments,
+11. **Earn production release approval:** secure deployment environments,
     secrets management, observability, alerting, backups, restore tests,
     disaster recovery, performance/load testing, penetration testing,
     operational runbooks, and compliance-control review.

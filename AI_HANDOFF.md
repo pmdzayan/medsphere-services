@@ -2,9 +2,9 @@
 
 **Last updated:** 2026-08-09
 
-**Current sprint:** G3.6 implementation — live operations overview
+**Current sprint:** G3.6 accepted — next sprint not selected
 
-**Next feature work:** G3.6 exact-commit CI and CTO acceptance only
+**Next feature work:** Select one dependency-ready bounded sprint through CTO prioritization
 
 ## Mandatory startup sequence
 
@@ -68,6 +68,8 @@ The migration must be incremental:
   in PR #19 as `8440900` before implementation began.
 - G3.5 implementation passed run `31279765403` and merged in PR #20 as
   `6c68ee3`.
+- G3.6 live operations overview passed exact-head run `31305222063` and was
+  squash-merged in PR #23 as `63707b8`.
 - S0.5 now defines `Batch` as physical/held quantity authority, uses an
   append-only movement ledger, and stores typed reservation items and
   allocations. Its accepted production HTTP boundary and live frontend
@@ -123,7 +125,8 @@ See `docs/audits/2026-07-20-cto-baseline.md` for the accepted baseline.
     as `7b2eb78`
 16. G3.5 live assigned-provider reservation workspace — accepted and merged in
     PR #20 as `6c68ee3`
-17. G3.6 live operations overview — Implemented; exact-commit CI and CTO acceptance required.
+17. G3.6 live operations overview — accepted and squash-merged in PR #23 as
+    `63707b8`
 18. Transfers/returns/damage, worker expiry, safe creation, and later live
     mutations — blocked pending their own accepted contracts
 
@@ -133,11 +136,9 @@ If ownership transfers, resume at the first pending checkpoint. Do not use
 
 ## Exact continuation point
 
-Review the focused G3.6 implementation against
-`docs/sprints/G3.6-live-operations-overview.md`, run exact-commit CI, and obtain
-CTO acceptance before merge. The accepted source remains `6c68ee3` until that
-process finishes. Mutations, analytics policy, patient exposure, and Gates 2
-and 4–9 remain blocked by their recorded dependencies.
+Continue from accepted commit `63707b8`. Select exactly one dependency-ready
+bounded sprint before changing code. Mutations, analytics policy, patient
+exposure, and Gates 2 and 4–9 remain blocked by their recorded dependencies.
 
 Cline may receive only a complete, bounded prompt for characterization tests or
 mechanical work whose contract is already fixed by ADR-005. Cline must not
