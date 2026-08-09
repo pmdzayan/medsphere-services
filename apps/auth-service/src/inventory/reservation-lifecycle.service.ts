@@ -21,6 +21,7 @@ import type {
   ProviderReservationTransitionResult,
   TransitionProviderReservationCommand,
 } from './reservation.types';
+import { releaseHeldAllocations } from './reservation-allocation-release';
 
 type ActiveReservationStatus = 'PENDING' | 'CONFIRMED' | 'READY';
 
@@ -127,7 +128,12 @@ export class ReservationLifecycleService {
             now,
           );
         } else if (command.transition === 'CANCEL') {
-          await this.releaseAllocations(transaction, command, reservation.allocations, now);
+          await releaseHeldAllocations(
+            transaction,
+            { tenantId: command.actor.tenantId, providerId: command.providerId },
+            reservation.allocations,
+            now,
+          );
         }
 
         const resultingVersion = reservation.version + 1;
@@ -244,27 +250,6 @@ export class ReservationLifecycleService {
         },
         select: { id: true },
       });
-    }
-  }
-
-  private async releaseAllocations(
-    transaction: Prisma.TransactionClient,
-    command: TransitionProviderReservationCommand,
-    allocations: readonly AllocationRecord[],
-    now: Date,
-  ): Promise<void> {
-    for (const allocation of allocations) {
-      if (allocation.batch.heldQuantity < allocation.quantity) {
-        throw new ConflictException('Reservation allocation exceeds current batch hold');
-      }
-      const batchUpdate = await transaction.batch.updateMany({
-        where: this.batchMatch(command, allocation),
-        data: { heldQuantity: { decrement: allocation.quantity }, version: { increment: 1 } },
-      });
-      if (batchUpdate.count !== 1) {
-        throw new SerializableRetryError('Concurrent reserved stock release detected');
-      }
-      await this.updateAllocation(transaction, allocation.id, 'RELEASED', now);
     }
   }
 

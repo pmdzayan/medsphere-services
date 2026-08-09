@@ -6,7 +6,7 @@
 
 **Accepted stabilization baseline:** `4ea55a17e188410ddee45fa3ea6c016e22d6617a`
 
-**Current sprint:** G3.7 contract — reservation expiry worker
+**Current sprint:** G3.7 reservation expiry worker
 
 **Release state:** Not approved for production or real healthcare data
 
@@ -16,18 +16,16 @@
 
 ### G3.7 — Reservation Expiry Worker
 
-**Status:** Contract proposed in
-`docs/sprints/G3.7-reservation-expiry-worker.md`; implementation has not
-started. Overall V1 progress remains 31%.
+**Status:** Implemented; exact-commit CI and CTO acceptance required. Overall
+V1 progress remains 31% until that acceptance is recorded.
 
 **Dependency:** ADR-005, S0.5, and G3.3 already provide the reservation state,
 allocation, command, tenant-system audit, and serializable transaction
 foundation. Patient-safe creation remains blocked by its authorization policy.
 
 **Implementation authority:** ADR-001, ADR-003 through ADR-008, merged PRs
-#10–24, the `docs/audits/2026-08-08-v1-subsystem-gap-matrix.md` audit, and the
-proposed G3.7 sprint contract. The contract must be accepted before
-implementation begins.
+#10–25, the `docs/audits/2026-08-08-v1-subsystem-gap-matrix.md` audit, and the
+accepted G3.7 sprint contract.
 
 **In scope**
 
@@ -60,8 +58,8 @@ implementation begins.
 
 ## Critical blockers
 
-1. Automatic reservation expiry is not mounted, so due reservations can retain
-   held stock until a safe worker boundary is accepted.
+1. Automatic reservation expiry is implemented as a bounded one-shot worker,
+   but exact-commit CI and CTO acceptance remain required before it is accepted.
 2. Patient-safe reservation creation, transfer, return, damage, quarantine, and
    recall remain intentionally unmounted.
 3. Inventory mutation UIs remain unconnected; the accepted stock, reservation,
@@ -106,7 +104,9 @@ and [the Gates 1–20 verification](docs/audits/2026-08-01-gates-1-20-verificati
     in PR #20 as `6c68ee3`
 14. **G3.6 live operations overview** — accepted and squash-merged in PR #23 as
     `63707b8`
-15. Resume remaining Inventory and Compliance milestones in dependency order
+15. **G3.7 reservation expiry worker** — implemented; exact-commit CI and CTO
+    acceptance required
+16. Resume remaining Inventory and Compliance milestones in dependency order
 
 Only one recovery sprint may be active at a time. Exact boundaries may be refined through an ADR, but dependencies must not be skipped.
 

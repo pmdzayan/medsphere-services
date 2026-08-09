@@ -2,9 +2,9 @@
 
 **Last updated:** 2026-08-09
 
-**Current sprint:** G3.7 contract — reservation expiry worker
+**Current sprint:** G3.7 reservation expiry worker
 
-**Next feature work:** Accept the G3.7 contract before implementing the expiry worker
+**Next feature work:** Complete exact-commit CI and CTO acceptance for G3.7; do not start a later sprint
 
 ## Mandatory startup sequence
 
@@ -70,6 +70,9 @@ The migration must be incremental:
   `6c68ee3`.
 - G3.6 live operations overview passed exact-head run `31305222063` and was
   squash-merged in PR #23 as `63707b8`.
+- The G3.7 contract passed exact-head run `31308659628` and merged in PR #25 as
+  `682f7c61`. The worker is implemented; exact-commit CI and CTO acceptance are
+  required before its status or the V1 estimate changes.
 - S0.5 now defines `Batch` as physical/held quantity authority, uses an
   append-only movement ledger, and stores typed reservation items and
   allocations. Its accepted production HTTP boundary and live frontend
@@ -127,7 +130,7 @@ See `docs/audits/2026-07-20-cto-baseline.md` for the accepted baseline.
     PR #20 as `6c68ee3`
 17. G3.6 live operations overview — accepted and squash-merged in PR #23 as
     `63707b8`
-18. G3.7 reservation expiry worker — contract definition active
+18. G3.7 reservation expiry worker — implemented; exact-commit CI and CTO acceptance required
 19. Transfers/returns/damage, safe creation, and later live
     mutations — blocked pending their own accepted contracts
 
@@ -137,9 +140,9 @@ If ownership transfers, resume at the first pending checkpoint. Do not use
 
 ## Exact continuation point
 
-Continue from accepted commit `3327d01` and review
-`docs/sprints/G3.7-reservation-expiry-worker.md`. Do not implement until the
-contract is accepted. Reservation creation, transfers, returns, damage,
+Continue from implementation base `682f7c61` and review
+`docs/sprints/G3.7-reservation-expiry-worker.md`. Do not mark G3.7 accepted or
+start a later sprint before exact-commit CI and CTO acceptance. Reservation creation, transfers, returns, damage,
 analytics policy, patient exposure, and Gates 2 and 4–9 remain blocked by their
 recorded dependencies.
 
