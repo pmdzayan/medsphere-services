@@ -1,10 +1,10 @@
 # MedSphere AI Handoff
 
-**Last updated:** 2026-08-08
+**Last updated:** 2026-08-09
 
-**Current sprint:** G3.6 contract — live operations overview
+**Current sprint:** G3.6 implementation — live operations overview
 
-**Next feature work:** Implement only after the G3.6 sprint contract is reviewed
+**Next feature work:** G3.6 exact-commit CI and CTO acceptance only
 
 ## Mandatory startup sequence
 
@@ -123,7 +123,7 @@ See `docs/audits/2026-07-20-cto-baseline.md` for the accepted baseline.
     as `7b2eb78`
 16. G3.5 live assigned-provider reservation workspace — accepted and merged in
     PR #20 as `6c68ee3`
-17. G3.6 live operations overview — contract definition active
+17. G3.6 live operations overview — Implemented; exact-commit CI and CTO acceptance required.
 18. Transfers/returns/damage, worker expiry, safe creation, and later live
     mutations — blocked pending their own accepted contracts
 
@@ -133,11 +133,11 @@ If ownership transfers, resume at the first pending checkpoint. Do not use
 
 ## Exact continuation point
 
-Continue from accepted commit `6c68ee3` and review
-`docs/sprints/G3.6-live-operations-overview.md` before implementation. Remove
-fabricated dashboard content using only accepted stock and reservation BFFs.
-Mutations, analytics policy, patient exposure, and Gates 2 and 4–9 remain
-blocked by their recorded dependencies.
+Review the focused G3.6 implementation against
+`docs/sprints/G3.6-live-operations-overview.md`, run exact-commit CI, and obtain
+CTO acceptance before merge. The accepted source remains `6c68ee3` until that
+process finishes. Mutations, analytics policy, patient exposure, and Gates 2
+and 4–9 remain blocked by their recorded dependencies.
 
 Cline may receive only a complete, bounded prompt for characterization tests or
 mechanical work whose contract is already fixed by ADR-005. Cline must not
