@@ -25,3 +25,4 @@ Every ADR includes decision, reason/context, alternatives, consequences, impleme
 | [ADR-006](0006-supported-runtime-and-secure-http-baseline.md)        | Supported runtime and secure HTTP baseline  | Accepted | 2026-07-25 |
 | [ADR-007](0007-trusted-provider-access-scope.md)                     | Trusted provider access scope               | Accepted | 2026-08-02 |
 | [ADR-008](0008-application-boundaries-and-domain-event-contracts.md) | Application boundaries and event contracts  | Accepted | 2026-08-08 |
+| [ADR-009](0009-atomic-completed-inventory-transfer.md)               | Atomic completed inventory transfer         | Proposed | 2026-08-09 |
