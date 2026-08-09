@@ -2,9 +2,9 @@
 
 **Last updated:** 2026-08-09
 
-**Current sprint:** G3.6 accepted — next sprint not selected
+**Current sprint:** G3.7 contract — reservation expiry worker
 
-**Next feature work:** Select one dependency-ready bounded sprint through CTO prioritization
+**Next feature work:** Accept the G3.7 contract before implementing the expiry worker
 
 ## Mandatory startup sequence
 
@@ -127,7 +127,8 @@ See `docs/audits/2026-07-20-cto-baseline.md` for the accepted baseline.
     PR #20 as `6c68ee3`
 17. G3.6 live operations overview — accepted and squash-merged in PR #23 as
     `63707b8`
-18. Transfers/returns/damage, worker expiry, safe creation, and later live
+18. G3.7 reservation expiry worker — contract definition active
+19. Transfers/returns/damage, safe creation, and later live
     mutations — blocked pending their own accepted contracts
 
 If ownership transfers, resume at the first pending checkpoint. Do not use
@@ -136,9 +137,11 @@ If ownership transfers, resume at the first pending checkpoint. Do not use
 
 ## Exact continuation point
 
-Continue from accepted commit `63707b8`. Select exactly one dependency-ready
-bounded sprint before changing code. Mutations, analytics policy, patient
-exposure, and Gates 2 and 4–9 remain blocked by their recorded dependencies.
+Continue from accepted commit `3327d01` and review
+`docs/sprints/G3.7-reservation-expiry-worker.md`. Do not implement until the
+contract is accepted. Reservation creation, transfers, returns, damage,
+analytics policy, patient exposure, and Gates 2 and 4–9 remain blocked by their
+recorded dependencies.
 
 Cline may receive only a complete, bounded prompt for characterization tests or
 mechanical work whose contract is already fixed by ADR-005. Cline must not
