@@ -6,7 +6,7 @@
 
 **Accepted stabilization baseline:** `4ea55a17e188410ddee45fa3ea6c016e22d6617a`
 
-**Current sprint:** G3.7 accepted — next sprint not selected
+**Current sprint:** G3.8 contract — completed inventory transfer
 
 **Release state:** Not approved for production or real healthcare data
 
@@ -14,33 +14,34 @@
 
 ## Current sprint
 
-### G3.7 — Reservation Expiry Worker
+### G3.8 — Completed Inventory Transfer
 
-**Status:** Accepted. G3.7 passed exact-head workflow `31310996464` and was
-squash-merged in PR #26 as `b7bba10` after CTO authorization.
+**Status:** ADR-009 and the G3.8 sprint contract are proposed for CTO review.
+Implementation has not started. Overall V1 progress remains 32%.
 
-**Dependency:** ADR-005, S0.5, and G3.3 already provide the reservation state,
-allocation, command, tenant-system audit, and serializable transaction
-foundation. Patient-safe creation remains blocked by its authorization policy.
+**Dependency:** ADR-005, G3.2, ADR-007, and G3.7 provide batch authority,
+immutable movements, serializable commands, provider assignment, and safe held
+stock behavior. Destination inventory configuration must already exist.
 
-**Implementation authority:** ADR-001, ADR-003 through ADR-008, merged PRs
-#10–25, the `docs/audits/2026-08-08-v1-subsystem-gap-matrix.md` audit, and the
-accepted G3.7 sprint contract.
+**Proposed implementation authority:** ADR-001 through ADR-009, merged PRs
+#10–27, the `docs/audits/2026-08-08-v1-subsystem-gap-matrix.md` audit, and
+`docs/sprints/G3.8-completed-inventory-transfer.md`. ADR-009 and the sprint
+contract must be accepted before implementation begins.
 
 **In scope**
 
-- bounded due-reservation selection
-- atomic release of exact held allocations
-- tenant-scoped system audit and deterministic expiry commands
-- idempotent and concurrency-safe one-shot worker execution
-- real PostgreSQL rollback, race, and tenant-boundary tests
+- one-batch, same-tenant, cross-provider completed-transfer recording
+- dual live provider assignment and dedicated permission
+- atomic source decrement, destination create/merge, and conserved on-hand stock
+- paired immutable transfer movements, receipt, and tenant-user audit
+- real PostgreSQL rollback, idempotency, race, and tenant-boundary tests
 
 **Out of scope**
 
-- reservation creation, patient self-service, Marketplace policy, or mutation UI
-- HTTP, BFF, API-gateway, permission, schema, or dependency changes
-- transfers, returns, damage, quarantine, recall, analytics, or notifications
-- production scheduling, deployment, or compliance approval
+- dispatch, in-transit, receipt, cancellation, discrepancy, or approval workflow
+- multi-line, multi-batch, cross-tenant, supplier, patient, or controlled transfer
+- returns, damage, quarantine, recall, analytics, notifications, or frontend UI
+- production deployment or compliance approval
 
 ## CTO acceptance ledger
 
@@ -58,8 +59,9 @@ accepted G3.7 sprint contract.
 
 ## Critical blockers
 
-1. Patient-safe reservation creation, transfer, return, damage, quarantine, and
-   recall remain intentionally unmounted.
+1. Patient-safe reservation creation, return, damage, quarantine, and recall
+   remain intentionally unmounted. G3.8 transfer implementation is blocked
+   until its proposed architecture and sprint contract are accepted.
 2. Inventory mutation UIs remain unconnected; the accepted stock, reservation,
    and overview workspaces are deliberately read-only.
 3. Consent, privacy operations, verification, retention, legal hold, and the
@@ -104,7 +106,9 @@ and [the Gates 1–20 verification](docs/audits/2026-08-01-gates-1-20-verificati
     `63707b8`
 15. **G3.7 reservation expiry worker** — accepted and squash-merged in PR #26
     as `b7bba10`
-16. Resume remaining Inventory and Compliance milestones in dependency order
+16. **G3.8 completed inventory transfer** — ADR and sprint contract proposed;
+    implementation blocked pending CTO acceptance
+17. Resume remaining Inventory and Compliance milestones in dependency order
 
 Only one recovery sprint may be active at a time. Exact boundaries may be refined through an ADR, but dependencies must not be skipped.
 
