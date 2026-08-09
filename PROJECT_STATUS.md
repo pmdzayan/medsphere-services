@@ -6,7 +6,7 @@
 
 **Accepted stabilization baseline:** `4ea55a17e188410ddee45fa3ea6c016e22d6617a`
 
-**Current sprint:** G3.6 accepted — next sprint not selected
+**Current sprint:** G3.7 contract — reservation expiry worker
 
 **Release state:** Not approved for production or real healthcare data
 
@@ -14,56 +14,58 @@
 
 ## Current sprint
 
-### G3.6 — Live Operations Overview
+### G3.7 — Reservation Expiry Worker
 
-**Status:** Accepted. G3.6 passed exact-head workflow `31305222063` and was
-squash-merged in PR #23 as `63707b8` after CTO review.
+**Status:** Contract proposed in
+`docs/sprints/G3.7-reservation-expiry-worker.md`; implementation has not
+started. Overall V1 progress remains 31%.
 
-**Dependency:** G3.4 live stock and G3.5 live reservation workspaces are
-accepted. G3.6 may compose only their existing read BFFs and exact fields.
+**Dependency:** ADR-005, S0.5, and G3.3 already provide the reservation state,
+allocation, command, tenant-system audit, and serializable transaction
+foundation. Patient-safe creation remains blocked by its authorization policy.
 
 **Implementation authority:** ADR-001, ADR-003 through ADR-008, merged PRs
-#10–21, the
-`docs/audits/2026-08-08-v1-subsystem-gap-matrix.md` audit, and the accepted G3.6
-sprint contract.
+#10–24, the `docs/audits/2026-08-08-v1-subsystem-gap-matrix.md` audit, and the
+proposed G3.7 sprint contract. The contract must be accepted before
+implementation begins.
 
 **In scope**
 
-- reuse accepted assigned-provider, stock, and reservation browser APIs
-- remove all fabricated dashboard data and unsupported operational claims
-- show only bounded current-page counts and accepted live fields
-- independent loading, partial-error, empty, restricted, and retry states
-- responsive composition and UI tests
+- bounded due-reservation selection
+- atomic release of exact held allocations
+- tenant-scoped system audit and deterministic expiry commands
+- idempotent and concurrency-safe one-shot worker execution
+- real PostgreSQL rollback, race, and tenant-boundary tests
 
 **Out of scope**
 
-- stock or reservation mutations, analytics policy, patient identity, payment, or delivery
-- supplier, marketplace, delivery, payment, or controlled-medicine work
-- patient, clinical, billing, document, notification, or workflow implementation
-- production deployment or compliance approval
+- reservation creation, patient self-service, Marketplace policy, or mutation UI
+- HTTP, BFF, API-gateway, permission, schema, or dependency changes
+- transfers, returns, damage, quarantine, recall, analytics, or notifications
+- production scheduling, deployment, or compliance approval
 
 ## CTO acceptance ledger
 
-| Area                        | Repository evidence                                                                                      | CTO status                           |
-| --------------------------- | -------------------------------------------------------------------------------------------------------- | ------------------------------------ |
-| Planning and architecture   | ADR-001 and S0.1 governance merged in PR #1                                                              | Accepted baseline                    |
-| Monorepo/tooling foundation | PNPM, Turbo, TypeScript, NestJS, Prisma, shared packages, and quality gates exist                        | Accepted stabilization foundation    |
-| Database reproducibility    | S0.2–S0.5, G3.1–G3.3, and corrected AG-02A accepted with clean and populated upgrade evidence            | Accepted through `9c38792`           |
-| Identity and tenant context | S0.3 authentication and trusted tenant context merged                                                    | Accepted                             |
-| Authorization and audit     | S0.4 tenant-safe RBAC and durable audit merged                                                           | Accepted                             |
-| Inventory and reservation   | S0.5 integrity, G3.1–G3.3 backend, G3.4 stock UI, and G3.5 reservation-read UI                           | Broader operations remain incomplete |
-| Frontend foundation         | Landing, login, shell, team/RBAC, audit, settings, onboarding, stock, and reservation reads              | Connected for accepted contracts     |
-| Pharmacy and inventory UI   | Inventory uses assigned-provider live reads; pharmacy dashboard remains explicitly labelled preview data | Partially connected                  |
-| Remaining healthcare scope  | Most domain deployables are health-only scaffolds or absent                                              | Not implemented                      |
+| Area                        | Repository evidence                                                                           | CTO status                            |
+| --------------------------- | --------------------------------------------------------------------------------------------- | ------------------------------------- |
+| Planning and architecture   | ADR-001 and S0.1 governance merged in PR #1                                                   | Accepted baseline                     |
+| Monorepo/tooling foundation | PNPM, Turbo, TypeScript, NestJS, Prisma, shared packages, and quality gates exist             | Accepted stabilization foundation     |
+| Database reproducibility    | S0.2–S0.5, G3.1–G3.3, and corrected AG-02A accepted with clean and populated upgrade evidence | Accepted through `9c38792`            |
+| Identity and tenant context | S0.3 authentication and trusted tenant context merged                                         | Accepted                              |
+| Authorization and audit     | S0.4 tenant-safe RBAC and durable audit merged                                                | Accepted                              |
+| Inventory and reservation   | S0.5 integrity, G3.1–G3.3 backend, G3.4 stock UI, G3.5 reservation UI, and G3.6 overview      | Broader operations remain incomplete  |
+| Frontend foundation         | Landing, login, shell, team/RBAC, audit, settings, onboarding, stock, and reservation reads   | Connected for accepted contracts      |
+| Pharmacy and inventory UI   | Assigned-provider stock, reservations, and bounded live overview use accepted reads           | Connected for accepted read contracts |
+| Remaining healthcare scope  | Most domain deployables are health-only scaffolds or absent                                   | Not implemented                       |
 
 ## Critical blockers
 
-1. The pharmacy dashboard still uses preview data; later bounded contracts must
-   replace it without inventing unsupported operational fields.
-2. Patient-safe reservation creation, transfer, return, damage, quarantine,
-   recall, and system-worker expiry remain intentionally unmounted.
-3. Inventory mutations and the pharmacy dashboard remain unconnected; G3.4 is
-   deliberately read-only.
+1. Automatic reservation expiry is not mounted, so due reservations can retain
+   held stock until a safe worker boundary is accepted.
+2. Patient-safe reservation creation, transfer, return, damage, quarantine, and
+   recall remain intentionally unmounted.
+3. Inventory mutation UIs remain unconnected; the accepted stock, reservation,
+   and overview workspaces are deliberately read-only.
 4. Consent, privacy operations, verification, retention, legal hold, and the
    policy engine are incomplete.
 5. Billing and notification applications are health-only scaffolds; documents,

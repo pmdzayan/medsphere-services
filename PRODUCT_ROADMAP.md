@@ -34,6 +34,8 @@ Ordered sprints:
 12. G3.5 Live assigned-provider reservation workspace — accepted and merged in
     PR #20 as `6c68ee3`
 13. G3.6 Live operations overview — accepted and merged in PR #23 as `63707b8`
+14. G3.7 Reservation expiry worker — contract proposed; implementation blocked
+    pending CTO acceptance
 
 **Completion gate:** Accepted ADRs; protected review flow; clean migrations; deny-by-default authentication; tenant-isolation tests; integrated audit trail; atomic stock/reservation behavior; mandatory lint/test/build passing.
 
