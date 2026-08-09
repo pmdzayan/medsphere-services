@@ -1,12 +1,12 @@
 # MedSphere Project Status
 
-**Status date:** 2026-08-08
+**Status date:** 2026-08-09
 
 **Accepted source commit:** `6c68ee324f6bf6f003413ef390b5710ea7029b1a`
 
 **Accepted stabilization baseline:** `4ea55a17e188410ddee45fa3ea6c016e22d6617a`
 
-**Current sprint:** G3.6 contract — live operations overview
+**Current sprint:** G3.6 implementation — live operations overview
 
 **Release state:** Not approved for production or real healthcare data
 
@@ -16,18 +16,18 @@
 
 ### G3.6 — Live Operations Overview
 
-**Status:** Contract proposed in
-`docs/sprints/G3.6-live-operations-overview.md`; implementation has not started.
+**Status:** Implemented; exact-commit CI and CTO acceptance required.
 G3.5 passed exact-commit workflow `31279765403` and merged in PR #20 as
-`6c68ee3`.
+`6c68ee3`. G3.6 remains unaccepted and unmerged until its exact implementation
+commit passes the recorded acceptance process.
 
 **Dependency:** G3.4 live stock and G3.5 live reservation workspaces are
 accepted. G3.6 may compose only their existing read BFFs and exact fields.
 
 **Implementation authority:** ADR-001, ADR-003 through ADR-008, merged PRs
-#10–20, the
-`docs/audits/2026-08-08-v1-subsystem-gap-matrix.md` audit, and the proposed G3.6
-sprint contract. The contract must be accepted before implementation begins.
+#10–21, the
+`docs/audits/2026-08-08-v1-subsystem-gap-matrix.md` audit, and the accepted G3.6
+sprint contract.
 
 **In scope**
 
