@@ -36,8 +36,8 @@ Ordered sprints:
 13. G3.6 Live operations overview — accepted and merged in PR #23 as `63707b8`
 14. G3.7 Reservation expiry worker — accepted and squash-merged in PR #26 as
     `b7bba10`
-15. G3.8 Completed inventory transfer — ADR and sprint contract proposed;
-    implementation blocked pending CTO acceptance
+15. G3.8 Completed inventory transfer — contract accepted in PR #28 as
+    `79d81ae`; implementation awaits exact-commit CI and CTO acceptance
 
 **Completion gate:** Accepted ADRs; protected review flow; clean migrations; deny-by-default authentication; tenant-isolation tests; integrated audit trail; atomic stock/reservation behavior; mandatory lint/test/build passing.
 

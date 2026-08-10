@@ -172,6 +172,7 @@ model Tenant {
   reservationItems               MedicineReservationItem[]
   reservationAllocations         MedicineReservationAllocation[]
   reservationCommands            MedicineReservationCommand[]
+  inventoryTransfers             InventoryTransfer[]
 
   @@index([slug])
 }
@@ -467,13 +468,15 @@ model Provider {
   isVerified Boolean @default(false)
   isActive   Boolean @default(true)
 
-  inventory              Inventory[]
-  batches                Batch[]
-  stockMovements         StockMovement[]
-  medicineReservations   MedicineReservation[]
-  reservationItems       MedicineReservationItem[]
-  reservationAllocations MedicineReservationAllocation[]
-  membershipAccesses     MembershipProviderAccess[]
+  inventory                     Inventory[]
+  batches                       Batch[]
+  stockMovements                StockMovement[]
+  medicineReservations          MedicineReservation[]
+  reservationItems              MedicineReservationItem[]
+  reservationAllocations        MedicineReservationAllocation[]
+  membershipAccesses            MembershipProviderAccess[]
+  sourceInventoryTransfers      InventoryTransfer[]             @relation("InventoryTransferSourceProvider")
+  destinationInventoryTransfers InventoryTransfer[]             @relation("InventoryTransferDestinationProvider")
 
   version Int @default(1)
 
@@ -508,6 +511,7 @@ model Product {
   stockMovements         StockMovement[]
   reservationItems       MedicineReservationItem[]
   reservationAllocations MedicineReservationAllocation[]
+  inventoryTransfers     InventoryTransfer[]
 
   version Int @default(1)
 
@@ -549,6 +553,8 @@ model Inventory {
   stockMovements         StockMovement[]
   configurationCommands  InventoryConfigurationCommand[]
   reservationAllocations MedicineReservationAllocation[]
+  sourceTransfers        InventoryTransfer[]             @relation("InventoryTransferSourceInventory")
+  destinationTransfers   InventoryTransfer[]             @relation("InventoryTransferDestinationInventory")
 
   @@unique([id, tenantId])
   @@unique([id, tenantId, providerId, productId])
@@ -608,6 +614,8 @@ model Batch {
 
   stockMovements         StockMovement[]
   reservationAllocations MedicineReservationAllocation[]
+  sourceTransfers        InventoryTransfer[]             @relation("InventoryTransferSourceBatch")
+  destinationTransfers   InventoryTransfer[]             @relation("InventoryTransferDestinationBatch")
 
   @@unique([tenantId, providerId, productId, batchNumber])
   @@unique([id, tenantId, inventoryId, providerId, productId])
@@ -651,11 +659,54 @@ model StockMovement {
   occurredAt DateTime @default(now())
   createdAt  DateTime @default(now())
 
+  sourceTransfers      InventoryTransfer[] @relation("InventoryTransferSourceMovement")
+  destinationTransfers InventoryTransfer[] @relation("InventoryTransferDestinationMovement")
+
   @@unique([tenantId, idempotencyKey])
+  @@unique([id, tenantId, inventoryId, batchId, providerId, productId])
   @@index([tenantId, inventoryId, occurredAt(sort: Desc), id(sort: Desc)])
   @@index([tenantId, batchId, occurredAt(sort: Desc), id(sort: Desc)])
   @@index([tenantId, providerId, productId, occurredAt(sort: Desc)])
   @@index([actorMembershipId, occurredAt(sort: Desc)])
+}
+
+model InventoryTransfer {
+  id                      String        @id @default(uuid()) @db.Uuid
+  tenantId                String        @db.Uuid
+  tenant                  Tenant        @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  sourceProviderId        String        @db.Uuid
+  sourceProvider          Provider      @relation("InventoryTransferSourceProvider", fields: [sourceProviderId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  destinationProviderId   String        @db.Uuid
+  destinationProvider     Provider      @relation("InventoryTransferDestinationProvider", fields: [destinationProviderId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  productId               String        @db.Uuid
+  product                 Product       @relation(fields: [productId], references: [id], onDelete: Restrict)
+  sourceInventoryId       String        @db.Uuid
+  sourceInventory         Inventory     @relation("InventoryTransferSourceInventory", fields: [sourceInventoryId, tenantId, sourceProviderId, productId], references: [id, tenantId, providerId, productId], onDelete: Restrict)
+  destinationInventoryId  String        @db.Uuid
+  destinationInventory    Inventory     @relation("InventoryTransferDestinationInventory", fields: [destinationInventoryId, tenantId, destinationProviderId, productId], references: [id, tenantId, providerId, productId], onDelete: Restrict)
+  sourceBatchId           String        @db.Uuid
+  sourceBatch             Batch         @relation("InventoryTransferSourceBatch", fields: [sourceBatchId, tenantId, sourceInventoryId, sourceProviderId, productId], references: [id, tenantId, inventoryId, providerId, productId], onDelete: Restrict)
+  destinationBatchId      String        @db.Uuid
+  destinationBatch        Batch         @relation("InventoryTransferDestinationBatch", fields: [destinationBatchId, tenantId, destinationInventoryId, destinationProviderId, productId], references: [id, tenantId, inventoryId, providerId, productId], onDelete: Restrict)
+  quantity                Int
+  idempotencyKey          String        @db.VarChar(120)
+  commandHash             String        @db.VarChar(64)
+  sourceOnHandAfter       Int
+  destinationOnHandAfter  Int
+  sourceBatchVersion      Int
+  destinationBatchVersion Int
+  sourceMovementId        String        @db.Uuid
+  sourceMovement          StockMovement @relation("InventoryTransferSourceMovement", fields: [sourceMovementId, tenantId, sourceInventoryId, sourceBatchId, sourceProviderId, productId], references: [id, tenantId, inventoryId, batchId, providerId, productId], onDelete: Restrict)
+  destinationMovementId   String        @db.Uuid
+  destinationMovement     StockMovement @relation("InventoryTransferDestinationMovement", fields: [destinationMovementId, tenantId, destinationInventoryId, destinationBatchId, destinationProviderId, productId], references: [id, tenantId, inventoryId, batchId, providerId, productId], onDelete: Restrict)
+  completedAt             DateTime      @default(now())
+  createdAt               DateTime      @default(now())
+
+  @@unique([tenantId, idempotencyKey])
+  @@unique([sourceMovementId])
+  @@unique([destinationMovementId])
+  @@index([tenantId, sourceProviderId, completedAt(sort: Desc), id(sort: Desc)])
+  @@index([tenantId, destinationProviderId, completedAt(sort: Desc), id(sort: Desc)])
 }
 
 model AuditEvent {

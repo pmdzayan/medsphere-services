@@ -2,9 +2,9 @@
 
 **Last updated:** 2026-08-09
 
-**Current sprint:** G3.8 contract — completed inventory transfer
+**Current sprint:** G3.8 implementation — completed inventory transfer
 
-**Next feature work:** Review and accept ADR-009 and the G3.8 contract before implementation
+**Next feature work:** Run exact-commit G3.8 CI and obtain CTO acceptance
 
 ## Mandatory startup sequence
 
@@ -73,7 +73,7 @@ The migration must be incremental:
 - The G3.7 contract passed exact-head run `31308659628` and merged in PR #25 as
   `682f7c61`. The implementation passed exact-head run `31310996464` and was
   squash-merged in PR #26 as `b7bba10` after CTO authorization.
-- G3.8 proposes only atomic recording of an already completed same-tenant
+- G3.8 implements only atomic recording of an already completed same-tenant
   cross-provider transfer. It deliberately does not claim dispatch, in-transit,
   delivery, partial receipt, discrepancy, reversal, or frontend behavior.
 - S0.5 now defines `Batch` as physical/held quantity authority, uses an
@@ -135,8 +135,8 @@ See `docs/audits/2026-07-20-cto-baseline.md` for the accepted baseline.
     `63707b8`
 18. G3.7 reservation expiry worker — accepted and squash-merged in PR #26 as
     `b7bba10`
-19. G3.8 completed inventory transfer — ADR and sprint contract proposed;
-    implementation blocked pending CTO acceptance
+19. G3.8 completed inventory transfer — contract accepted in PR #28 as
+    `79d81ae`; implementation awaits exact-commit CI and CTO acceptance
 20. Returns/damage, safe creation, and later live
     mutations — blocked pending their own accepted contracts
 
@@ -146,11 +146,10 @@ If ownership transfers, resume at the first pending checkpoint. Do not use
 
 ## Exact continuation point
 
-Continue from accepted commit `59ab5cb` and review ADR-009 plus
-`docs/sprints/G3.8-completed-inventory-transfer.md`. Do not implement G3.8
-until both are accepted. Reservation creation, returns, damage, analytics
-policy, patient exposure, and Gates 2 and 4–9 remain blocked by their recorded
-dependencies.
+Continue from accepted commit `79d81ae`. Review the focused G3.8 implementation
+against ADR-009 and its sprint contract, run all exact-commit gates, and obtain
+CTO acceptance before changing the V1 estimate. Reservation creation, returns,
+damage, analytics policy, patient exposure, and Gates 2 and 4–9 remain blocked.
 
 Cline may receive only a complete, bounded prompt for characterization tests or
 mechanical work whose contract is already fixed by ADR-005. Cline must not

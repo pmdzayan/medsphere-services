@@ -50,6 +50,9 @@ import {
 import { TransitionProviderReservationDto } from './dto/reservation-transition.dto';
 import { ReservationLifecycleService } from './reservation-lifecycle.service';
 import { ReservationService } from './reservation.service';
+import { RecordCompletedTransferDto } from './dto/inventory-transfer.dto';
+import { CompletedTransferResponseDto } from './dto/inventory-transfer-response.dto';
+import { InventoryTransferService } from './inventory-transfer.service';
 
 @Controller('inventory')
 @ApiTags('Inventory')
@@ -62,7 +65,30 @@ export class InventoryController {
     private readonly inventoryCommands: InventoryCommandService,
     private readonly reservations: ReservationService,
     private readonly reservationLifecycle: ReservationLifecycleService,
+    private readonly inventoryTransfers: InventoryTransferService,
   ) {}
+
+  @Post('providers/:providerId/transfers')
+  @HttpCode(HttpStatus.OK)
+  @Header('Cache-Control', 'private, no-store')
+  @RequirePermissions(PERMISSIONS.inventoryStockTransfer)
+  @ApiOperation({ summary: 'Record an atomic completed transfer between assigned providers' })
+  @ApiOkResponse({ type: CompletedTransferResponseDto })
+  @ApiNotFoundResponse({ description: 'Assigned provider inventory or batch not found' })
+  @ApiConflictResponse({ description: 'Stock, provenance, version, or idempotency conflict' })
+  recordCompletedTransfer(
+    @CurrentIdentity() identity: AuthenticatedIdentity,
+    @Param('providerId', new ParseUUIDPipe({ version: '4' })) sourceProviderId: string,
+    @Body() dto: RecordCompletedTransferDto,
+    @Req() request: MetadataHttpRequest,
+  ) {
+    return this.inventoryTransfers.recordCompleted({
+      actor: identity,
+      sourceProviderId,
+      ...dto,
+      request: extractRequestMetadata(request),
+    });
+  }
 
   @Get('providers/:providerId/reservations')
   @Header('Cache-Control', 'private, no-store')
