@@ -27,6 +27,8 @@ const upgradeMigrations = [
   '20260802160000_inventory_stock_commands',
   '20260802180000_provider_reservation_operations',
   '20260808210000_session_credential_integrity',
+  '20260809160000_completed_inventory_transfer',
+  '20260810140000_completed_damaged_stock_write_off',
 ];
 const pnpmCommand = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm';
 
@@ -357,11 +359,13 @@ BEGIN
         'inventory.listings.manage',
         'inventory.stock.receive',
         'inventory.stock.adjust',
+        'inventory.stock.transfer',
+        'inventory.stock.damage',
         'inventory.reservations.read',
         'inventory.reservations.manage'
       )
-  ) <> 8 THEN
-    RAISE EXCEPTION 'Gate 3 permissions were not assigned to the tenant administrator';
+  ) <> 10 THEN
+    RAISE EXCEPTION 'Gate 3 through G3.9 permissions were not assigned to the tenant administrator';
   END IF;
   IF NOT EXISTS (
     SELECT 1 FROM pg_constraint
@@ -370,6 +374,14 @@ BEGIN
       AND contype = 'c'
   ) THEN
     RAISE EXCEPTION 'Stock movement command-hash constraint is missing';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conrelid = '"StockMovement"'::regclass
+      AND conname = 'StockMovement_damage_contract_check'
+      AND contype = 'c'
+  ) THEN
+    RAISE EXCEPTION 'Damaged-stock movement contract constraint is missing';
   END IF;
   IF (
     SELECT count(*) FROM "UserSession"
@@ -490,4 +502,4 @@ ${batchRow({ id: batchOne, batchNumber: 'BATCH-001', quantity: 0, initial: 0 })}
   expectedFailure: 'S0.5 migration blocked: invalid legacy batch values',
 });
 
-process.stdout.write('S0.5 through AG-02A populated upgrade verification passed.\n');
+process.stdout.write('S0.5 through G3.9 populated upgrade verification passed.\n');

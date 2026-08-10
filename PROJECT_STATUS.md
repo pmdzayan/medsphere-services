@@ -6,7 +6,7 @@
 
 **Accepted stabilization baseline:** `4ea55a17e188410ddee45fa3ea6c016e22d6617a`
 
-**Current sprint:** G3.9 contract — completed damaged-stock write-off
+**Current sprint:** G3.9 implementation — completed damaged-stock write-off
 
 **Release state:** Not approved for production or real healthcare data
 
@@ -16,17 +16,17 @@
 
 ### G3.9 — Completed Damaged-Stock Write-off
 
-**Status:** ADR-010 and the G3.9 sprint contract are proposed for CTO review.
-Implementation has not started. Overall V1 progress remains 33%.
+**Status:** Implemented; exact-commit CI and CTO acceptance required. Overall V1
+progress remains 33% until acceptance.
 
 **Dependency:** ADR-005, G3.2, ADR-007, G3.7, and G3.8 provide batch authority,
 immutable movements, serializable commands, provider assignment, held-stock
 protection, and exact replay lessons.
 
-**Proposed implementation authority:** ADR-001 through ADR-010, merged PRs
-#10–30, the V1 gap matrix, and
+**Implementation authority:** ADR-001 through ADR-010, merged PRs #10–31, the
+V1 gap matrix, and
 `docs/sprints/G3.9-completed-damaged-stock-write-off.md`. ADR-010 and the sprint
-contract must be accepted before implementation.
+contract were accepted in PR #31 as `11c1692`.
 
 **In scope**
 
@@ -59,9 +59,8 @@ contract must be accepted before implementation.
 
 ## Critical blockers
 
-1. G3.9 implementation is blocked until ADR-010 and its sprint contract are
-   accepted. Patient-safe creation, returns, quarantine, and recall remain
-   unmounted pending their own contracts.
+1. G3.9 requires exact-commit CI and CTO acceptance. Patient-safe creation,
+   returns, quarantine, and recall remain unmounted pending their own contracts.
 2. Inventory mutation UIs remain unconnected; the accepted stock, reservation,
    and overview workspaces are deliberately read-only.
 3. Consent, privacy operations, verification, retention, legal hold, and the
@@ -108,8 +107,8 @@ and [the Gates 1–20 verification](docs/audits/2026-08-01-gates-1-20-verificati
     as `b7bba10`
 16. **G3.8 completed inventory transfer** — accepted and squash-merged in PR
     #29 as `5521ad5` after exact-head CI run `31357016150`
-17. **G3.9 completed damaged-stock write-off** — ADR and sprint contract
-    proposed; implementation blocked pending CTO acceptance
+17. **G3.9 completed damaged-stock write-off** — implemented; exact-commit CI
+    and CTO acceptance required
 18. Resume remaining Inventory and Compliance milestones in dependency order
 
 Only one recovery sprint may be active at a time. Exact boundaries may be refined through an ADR, but dependencies must not be skipped.
