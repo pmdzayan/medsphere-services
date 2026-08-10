@@ -46,3 +46,21 @@ ALTER TABLE "Permission" ENABLE TRIGGER "Permission_reject_insert_update_delete"
 INSERT INTO "RolePermission" ("id", "tenantId", "roleId", "permissionId", "createdAt")
 SELECT md5(r."id"::text || ':' || p."id"::text)::uuid, r."tenantId", r."id", p."id", CURRENT_TIMESTAMP
 FROM "Role" r CROSS JOIN "Permission" p WHERE r."name" = 'TENANT_ADMINISTRATOR' AND r."type" = 'SYSTEM' AND r."deletedAt" IS NULL AND p."name" = 'inventory.stock.transfer';
+
+ALTER TABLE "AuditEvent" DROP CONSTRAINT "AuditEvent_event_type_check";
+ALTER TABLE "AuditEvent" ADD CONSTRAINT "AuditEvent_event_type_check" CHECK (
+  "eventType" IN (
+    'authorization.role.created', 'authorization.role.updated',
+    'authorization.role.deleted', 'authorization.assignment.added',
+    'authorization.assignment.removed', 'authorization.provider-access.added',
+    'authorization.provider-access.removed', 'authorization.permission.denied',
+    'authentication.session.created', 'authentication.session.refresh.succeeded',
+    'authentication.session.refresh.failed', 'authentication.session.refresh.replayed',
+    'authentication.session.logout.succeeded', 'authentication.sessions.logout.succeeded',
+    'inventory.listing.configured', 'inventory.batch.received',
+    'inventory.stock.adjusted', 'inventory.stock.transferred',
+    'inventory.reservation.created', 'inventory.reservation.confirmed',
+    'inventory.reservation.ready', 'inventory.reservation.completed',
+    'inventory.reservation.cancelled', 'inventory.reservation.expired'
+  )
+);
