@@ -11,7 +11,7 @@ export interface FefoCandidate {
   readonly onHandQuantity: number;
   readonly heldQuantity: number;
   readonly version?: number;
-  readonly status: 'ACTIVE' | 'EXPIRED' | 'EXHAUSTED';
+  readonly status: 'ACTIVE' | 'EXPIRED' | 'EXHAUSTED' | 'QUARANTINED';
   readonly createdAt: Date;
   readonly deletedAt: Date | null;
 }

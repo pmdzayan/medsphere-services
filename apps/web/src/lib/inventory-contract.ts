@@ -11,7 +11,7 @@ export interface InventoryBatchStock {
   batchNumber: string;
   expiryDate: string;
   manufacturingDate: string | null;
-  status: 'ACTIVE' | 'EXPIRED' | 'EXHAUSTED';
+  status: 'ACTIVE' | 'EXPIRED' | 'EXHAUSTED' | 'QUARANTINED';
   onHandQuantity: number;
   heldQuantity: number;
   availableQuantity: number;
@@ -166,12 +166,16 @@ function isInventoryBatchStock(value: unknown): value is InventoryBatchStock {
     isBoundedString(batch.batchNumber, 120) &&
     isIsoDateTime(batch.expiryDate) &&
     (batch.manufacturingDate === null || isIsoDateTime(batch.manufacturingDate)) &&
-    (batch.status === 'ACTIVE' || batch.status === 'EXPIRED' || batch.status === 'EXHAUSTED') &&
+    (batch.status === 'ACTIVE' ||
+      batch.status === 'EXPIRED' ||
+      batch.status === 'EXHAUSTED' ||
+      batch.status === 'QUARANTINED') &&
     isQuantity(batch.onHandQuantity) &&
     isQuantity(batch.heldQuantity) &&
     isQuantity(batch.availableQuantity) &&
     Number(batch.heldQuantity) <= Number(batch.onHandQuantity) &&
-    Number(batch.availableQuantity) <= Number(batch.onHandQuantity) - Number(batch.heldQuantity)
+    Number(batch.availableQuantity) <= Number(batch.onHandQuantity) - Number(batch.heldQuantity) &&
+    (batch.status === 'ACTIVE' || batch.availableQuantity === 0)
   );
 }
 

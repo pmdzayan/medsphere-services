@@ -154,6 +154,12 @@ Logs contain aggregate counts and allowlisted failure categories only; batch and
 reservation audits contain no subject identity, notes, clinical data, contact
 data, credentials, prices, or free text.
 
+G3.11 requires both live provider assignment and the migration-owned
+`inventory.batch.quarantine` permission before replay lookup. The command takes
+no tenant, actor, patient, or free-text evidence from the client. Its user audit
+contains only bounded quarantine facts; derived cancellation audits identify
+only the `BATCH_QUARANTINE` system cause.
+
 S0.5 does not authorize public patient reservation creation. That boundary
 requires a later Marketplace decision for global-user attribution, patient
 self-access, abuse controls, and tenant-scoped audit visibility. No header,

@@ -22,6 +22,7 @@ export const AUDIT_EVENT_TYPES = [
   'inventory.stock.transferred',
   'inventory.stock.damaged',
   'inventory.batch.expired',
+  'inventory.batch.quarantined',
   'inventory.reservation.created',
   'inventory.reservation.confirmed',
   'inventory.reservation.ready',
@@ -68,11 +69,19 @@ export const AUDIT_METADATA_KEYS = {
     'releasedUnits',
     'resultingVersion',
   ],
+  'inventory.batch.quarantined': [
+    'productId',
+    'reasonCode',
+    'onHandQuantity',
+    'affectedReservations',
+    'releasedUnits',
+    'resultingVersion',
+  ],
   'inventory.reservation.created': ['itemCount', 'totalQuantity', 'expiresAt'],
   'inventory.reservation.confirmed': ['previousStatus', 'version'],
   'inventory.reservation.ready': ['previousStatus', 'version'],
   'inventory.reservation.completed': ['previousStatus', 'version', 'totalQuantity'],
-  'inventory.reservation.cancelled': ['previousStatus', 'version', 'totalQuantity'],
+  'inventory.reservation.cancelled': ['previousStatus', 'version', 'totalQuantity', 'cause'],
   'inventory.reservation.expired': ['previousStatus', 'version', 'totalQuantity', 'cause'],
 } as const satisfies Record<AuditEventType, readonly string[]>;
 

@@ -103,6 +103,14 @@ enum BatchStatus {
   ACTIVE
   EXPIRED
   EXHAUSTED
+  QUARANTINED
+}
+
+enum BatchQuarantineReason {
+  QUALITY_SUSPECT
+  TEMPERATURE_EXCURSION
+  PACKAGING_COMPROMISED
+  STORAGE_DEVIATION
 }
 
 enum StockMovementType {
@@ -174,6 +182,7 @@ model Tenant {
   reservationCommands            MedicineReservationCommand[]
   inventoryTransfers             InventoryTransfer[]
   batchExpiryRecords             BatchExpiryRecord[]
+  batchQuarantineRecords         BatchQuarantineRecord[]
 
   @@index([slug])
 }
@@ -226,11 +235,12 @@ model TenantMembership {
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
-  sessions        UserSession[]
-  roleAssignments MembershipRole[]
-  auditEvents     AuditEvent[]
-  stockMovements  StockMovement[]
-  providerAccess  MembershipProviderAccess[]
+  sessions               UserSession[]
+  roleAssignments        MembershipRole[]
+  auditEvents            AuditEvent[]
+  stockMovements         StockMovement[]
+  providerAccess         MembershipProviderAccess[]
+  batchQuarantineRecords BatchQuarantineRecord[]
 
   @@unique([tenantId, userId])
   @@unique([id, tenantId])
@@ -479,6 +489,7 @@ model Provider {
   sourceInventoryTransfers      InventoryTransfer[]             @relation("InventoryTransferSourceProvider")
   destinationInventoryTransfers InventoryTransfer[]             @relation("InventoryTransferDestinationProvider")
   batchExpiryRecords            BatchExpiryRecord[]
+  batchQuarantineRecords        BatchQuarantineRecord[]
 
   version Int @default(1)
 
@@ -515,6 +526,7 @@ model Product {
   reservationAllocations MedicineReservationAllocation[]
   inventoryTransfers     InventoryTransfer[]
   batchExpiryRecords     BatchExpiryRecord[]
+  batchQuarantineRecords BatchQuarantineRecord[]
 
   version Int @default(1)
 
@@ -559,6 +571,7 @@ model Inventory {
   sourceTransfers        InventoryTransfer[]             @relation("InventoryTransferSourceInventory")
   destinationTransfers   InventoryTransfer[]             @relation("InventoryTransferDestinationInventory")
   batchExpiryRecords     BatchExpiryRecord[]
+  batchQuarantineRecords BatchQuarantineRecord[]
 
   @@unique([id, tenantId])
   @@unique([id, tenantId, providerId, productId])
@@ -621,6 +634,7 @@ model Batch {
   sourceTransfers        InventoryTransfer[]             @relation("InventoryTransferSourceBatch")
   destinationTransfers   InventoryTransfer[]             @relation("InventoryTransferDestinationBatch")
   expiryRecord           BatchExpiryRecord?
+  quarantineRecord       BatchQuarantineRecord?
 
   @@unique([tenantId, providerId, productId, batchNumber])
   @@unique([id, tenantId, inventoryId, providerId, productId])
@@ -656,6 +670,43 @@ model BatchExpiryRecord {
   @@unique([batchId, tenantId, inventoryId, providerId, productId, expiryDate], map: "BatchExpiryRecord_batchId_tenantId_inventoryId_provider_key")
   @@index([tenantId, reconciledAt(sort: Desc), id(sort: Desc)], map: "BatchExpiryRecord_tenantId_reconciledAt_id_idx")
   @@index([tenantId, providerId, productId, reconciledAt(sort: Desc)], map: "BatchExpiryRecord_tenantId_providerId_productId_reconcil_idx")
+}
+
+model BatchQuarantineRecord {
+  id String @id @default(uuid()) @db.Uuid
+
+  tenantId String @db.Uuid
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict, map: "BatchQuarantineRecord_tenantId_fkey")
+
+  inventoryId String    @db.Uuid
+  inventory   Inventory @relation(fields: [inventoryId, tenantId, providerId, productId], references: [id, tenantId, providerId, productId], onDelete: Restrict, map: "BatchQuarantineRecord_inventory_scope_fkey")
+
+  providerId String   @db.Uuid
+  provider   Provider @relation(fields: [providerId, tenantId], references: [id, tenantId], onDelete: Restrict, map: "BatchQuarantineRecord_provider_scope_fkey")
+
+  productId String  @db.Uuid
+  product   Product @relation(fields: [productId], references: [id], onDelete: Restrict, map: "BatchQuarantineRecord_productId_fkey")
+
+  batchId String @unique(map: "BatchQuarantineRecord_batchId_key") @db.Uuid
+  batch   Batch  @relation(fields: [batchId, tenantId, inventoryId, providerId, productId], references: [id, tenantId, inventoryId, providerId, productId], onDelete: Restrict, map: "BatchQuarantineRecord_batch_scope_fkey")
+
+  actorMembershipId String           @db.Uuid
+  actorMembership   TenantMembership @relation(fields: [actorMembershipId, tenantId], references: [id, tenantId], onDelete: Restrict, map: "BatchQuarantineRecord_actor_scope_fkey")
+
+  reasonCode               BatchQuarantineReason
+  onHandQuantity           Int
+  affectedReservationCount Int
+  releasedUnitCount        Int
+  idempotencyKey           String                @db.VarChar(120)
+  commandHash              String                @db.VarChar(64)
+  resultingBatchVersion    Int
+  occurredAt               DateTime
+  createdAt                DateTime              @default(now())
+
+  @@unique([tenantId, idempotencyKey], map: "BatchQuarantineRecord_tenantId_idempotencyKey_key")
+  @@unique([batchId, tenantId, inventoryId, providerId, productId], map: "BatchQuarantineRecord_batch_scope_key")
+  @@index([tenantId, providerId, occurredAt(sort: Desc), id(sort: Desc)], map: "BatchQuarantineRecord_tenant_provider_occurred_idx")
+  @@index([actorMembershipId, occurredAt(sort: Desc), id(sort: Desc)], map: "BatchQuarantineRecord_actor_occurred_idx")
 }
 
 model StockMovement {

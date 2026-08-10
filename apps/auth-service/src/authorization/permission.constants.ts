@@ -15,6 +15,7 @@ export const PERMISSIONS = {
   inventoryStockAdjust: 'inventory.stock.adjust',
   inventoryStockTransfer: 'inventory.stock.transfer',
   inventoryStockDamage: 'inventory.stock.damage',
+  inventoryBatchQuarantine: 'inventory.batch.quarantine',
   inventoryReservationsRead: 'inventory.reservations.read',
   inventoryReservationsManage: 'inventory.reservations.manage',
 } as const;

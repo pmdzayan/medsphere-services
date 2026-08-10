@@ -13,8 +13,8 @@ export class InventoryBatchStockResponseDto {
   @ApiPropertyOptional({ format: 'date-time' })
   manufacturingDate!: Date | null;
 
-  @ApiProperty({ enum: ['ACTIVE', 'EXPIRED', 'EXHAUSTED'] })
-  status!: 'ACTIVE' | 'EXPIRED' | 'EXHAUSTED';
+  @ApiProperty({ enum: ['ACTIVE', 'EXPIRED', 'EXHAUSTED', 'QUARANTINED'] })
+  status!: 'ACTIVE' | 'EXPIRED' | 'EXHAUSTED' | 'QUARANTINED';
 
   @ApiProperty()
   onHandQuantity!: number;

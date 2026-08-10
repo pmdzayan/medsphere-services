@@ -56,6 +56,9 @@ import { InventoryTransferService } from './inventory-transfer.service';
 import { RecordDamagedStockDto } from './dto/inventory-damage.dto';
 import { DamagedStockResponseDto } from './dto/inventory-damage-response.dto';
 import { InventoryDamageService } from './inventory-damage.service';
+import { QuarantineBatchDto } from './dto/inventory-quarantine.dto';
+import { BatchQuarantineResponseDto } from './dto/inventory-quarantine-response.dto';
+import { InventoryQuarantineService } from './inventory-quarantine.service';
 
 @Controller('inventory')
 @ApiTags('Inventory')
@@ -70,7 +73,32 @@ export class InventoryController {
     private readonly reservationLifecycle: ReservationLifecycleService,
     private readonly inventoryTransfers: InventoryTransferService,
     private readonly inventoryDamage: InventoryDamageService,
+    private readonly inventoryQuarantine: InventoryQuarantineService,
   ) {}
+
+  @Post('providers/:providerId/batches/:batchId/quarantine')
+  @HttpCode(HttpStatus.OK)
+  @Header('Cache-Control', 'private, no-store')
+  @RequirePermissions(PERMISSIONS.inventoryBatchQuarantine)
+  @ApiOperation({ summary: 'Quarantine an active assigned-provider batch' })
+  @ApiOkResponse({ type: BatchQuarantineResponseDto })
+  @ApiNotFoundResponse({ description: 'Assigned provider batch not found' })
+  @ApiConflictResponse({ description: 'State, expiry, version, or idempotency conflict' })
+  quarantineBatch(
+    @CurrentIdentity() identity: AuthenticatedIdentity,
+    @Param('providerId', new ParseUUIDPipe({ version: '4' })) providerId: string,
+    @Param('batchId', new ParseUUIDPipe({ version: '4' })) batchId: string,
+    @Body() dto: QuarantineBatchDto,
+    @Req() request: MetadataHttpRequest,
+  ) {
+    return this.inventoryQuarantine.quarantine({
+      actor: identity,
+      providerId,
+      batchId,
+      ...dto,
+      request: extractRequestMetadata(request),
+    });
+  }
 
   @Post('providers/:providerId/batches/:batchId/damage')
   @HttpCode(HttpStatus.OK)

@@ -4,7 +4,11 @@ import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { MetricCard, SectionCard, StatusBadge } from '@/components/platform/dashboard-primitives';
 import { Icon } from '@/components/platform/icon';
 import { ApiError, getAssignedProviders, getProviderStock } from '@/lib/api-client';
-import type { InventoryStockPage, ProviderAccess } from '@/lib/inventory-contract';
+import type {
+  InventoryBatchStock,
+  InventoryStockPage,
+  ProviderAccess,
+} from '@/lib/inventory-contract';
 import {
   formatInventoryCurrency,
   formatInventoryDate,
@@ -324,9 +328,11 @@ function InventoryTable({ page }: { page: InventoryStockPage }) {
                   {item.batches.length ? (
                     item.batches.map((batch) => (
                       <div key={batch.id} className="text-xs text-[#536a62]">
-                        <p>
-                          <span className="font-mono font-semibold">{batch.batchNumber}</span> ·{' '}
-                          {batch.status}
+                        <p className="flex flex-wrap items-center gap-2">
+                          <span className="font-mono font-semibold">{batch.batchNumber}</span>
+                          <StatusBadge tone={batchStatusTone(batch.status)}>
+                            {batch.status === 'QUARANTINED' ? 'Quarantined' : batch.status}
+                          </StatusBadge>
                         </p>
                         <p className="mt-0.5 text-[#899792]">
                           Expires {formatInventoryDate(batch.expiryDate)} ·{' '}
@@ -350,6 +356,15 @@ function InventoryTable({ page }: { page: InventoryStockPage }) {
       </table>
     </div>
   );
+}
+
+function batchStatusTone(
+  status: InventoryBatchStock['status'],
+): 'emerald' | 'amber' | 'rose' | 'slate' {
+  if (status === 'ACTIVE') return 'emerald';
+  if (status === 'QUARANTINED') return 'amber';
+  if (status === 'EXPIRED') return 'rose';
+  return 'slate';
 }
 
 function InventoryLoading({ label }: { label: string }) {
