@@ -1,6 +1,6 @@
 # ADR-009: Atomic Completed Inventory Transfer
 
-**Status:** Proposed
+**Status:** Accepted in PR #28; implemented and accepted in PR #29
 
 **Date:** 2026-08-09
 
