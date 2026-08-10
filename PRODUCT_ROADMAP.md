@@ -40,8 +40,8 @@ Ordered sprints:
     as `5521ad5`
 16. G3.9 Completed damaged-stock write-off — accepted and squash-merged in PR
     #32 as `72fc92a` after exact-head CI run `31371305767`
-17. G3.10 Physical batch expiry reconciliation — ADR-011 and the sprint contract
-    accepted; implementation pending exact-commit CI and CTO acceptance
+17. G3.10 Physical batch expiry reconciliation — implemented; exact-commit CI
+    and CTO acceptance required
 
 **Completion gate:** Accepted ADRs; protected review flow; clean migrations; deny-by-default authentication; tenant-isolation tests; integrated audit trail; atomic stock/reservation behavior; mandatory lint/test/build passing.
 

@@ -173,6 +173,7 @@ model Tenant {
   reservationAllocations         MedicineReservationAllocation[]
   reservationCommands            MedicineReservationCommand[]
   inventoryTransfers             InventoryTransfer[]
+  batchExpiryRecords             BatchExpiryRecord[]
 
   @@index([slug])
 }
@@ -477,6 +478,7 @@ model Provider {
   membershipAccesses            MembershipProviderAccess[]
   sourceInventoryTransfers      InventoryTransfer[]             @relation("InventoryTransferSourceProvider")
   destinationInventoryTransfers InventoryTransfer[]             @relation("InventoryTransferDestinationProvider")
+  batchExpiryRecords            BatchExpiryRecord[]
 
   version Int @default(1)
 
@@ -512,6 +514,7 @@ model Product {
   reservationItems       MedicineReservationItem[]
   reservationAllocations MedicineReservationAllocation[]
   inventoryTransfers     InventoryTransfer[]
+  batchExpiryRecords     BatchExpiryRecord[]
 
   version Int @default(1)
 
@@ -555,6 +558,7 @@ model Inventory {
   reservationAllocations MedicineReservationAllocation[]
   sourceTransfers        InventoryTransfer[]             @relation("InventoryTransferSourceInventory")
   destinationTransfers   InventoryTransfer[]             @relation("InventoryTransferDestinationInventory")
+  batchExpiryRecords     BatchExpiryRecord[]
 
   @@unique([id, tenantId])
   @@unique([id, tenantId, providerId, productId])
@@ -616,11 +620,42 @@ model Batch {
   reservationAllocations MedicineReservationAllocation[]
   sourceTransfers        InventoryTransfer[]             @relation("InventoryTransferSourceBatch")
   destinationTransfers   InventoryTransfer[]             @relation("InventoryTransferDestinationBatch")
+  expiryRecord           BatchExpiryRecord?
 
   @@unique([tenantId, providerId, productId, batchNumber])
   @@unique([id, tenantId, inventoryId, providerId, productId])
+  @@unique([id, tenantId, inventoryId, providerId, productId, expiryDate], map: "Batch_id_tenantId_inventoryId_providerId_product_expiry_key")
   @@index([tenantId, providerId, productId, status, expiryDate, manufacturingDate, createdAt, id])
   @@index([inventoryId, status, expiryDate])
+}
+
+model BatchExpiryRecord {
+  id String @id @default(uuid()) @db.Uuid
+
+  tenantId String @db.Uuid
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict, map: "BatchExpiryRecord_tenantId_fkey")
+
+  inventoryId String    @db.Uuid
+  inventory   Inventory @relation(fields: [inventoryId, tenantId, providerId, productId], references: [id, tenantId, providerId, productId], onDelete: Restrict, map: "BatchExpiryRecord_inventory_scope_fkey")
+
+  providerId String   @db.Uuid
+  provider   Provider @relation(fields: [providerId, tenantId], references: [id, tenantId], onDelete: Restrict, map: "BatchExpiryRecord_provider_scope_fkey")
+
+  productId String  @db.Uuid
+  product   Product @relation(fields: [productId], references: [id], onDelete: Restrict, map: "BatchExpiryRecord_productId_fkey")
+
+  batchId String @unique(map: "BatchExpiryRecord_batchId_key") @db.Uuid
+  batch   Batch  @relation(fields: [batchId, tenantId, inventoryId, providerId, productId, expiryDate], references: [id, tenantId, inventoryId, providerId, productId, expiryDate], onDelete: Restrict, map: "BatchExpiryRecord_batch_scope_fkey")
+
+  expiryDate            DateTime
+  onHandQuantity        Int
+  resultingBatchVersion Int
+  reconciledAt          DateTime
+  createdAt             DateTime @default(now())
+
+  @@unique([batchId, tenantId, inventoryId, providerId, productId, expiryDate], map: "BatchExpiryRecord_batchId_tenantId_inventoryId_provider_key")
+  @@index([tenantId, reconciledAt(sort: Desc), id(sort: Desc)], map: "BatchExpiryRecord_tenantId_reconciledAt_id_idx")
+  @@index([tenantId, providerId, productId, reconciledAt(sort: Desc)], map: "BatchExpiryRecord_tenantId_providerId_productId_reconcil_idx")
 }
 
 model StockMovement {

@@ -90,6 +90,9 @@ PostgreSQL CI and review pass.
   identity and free-text notes.
 - `ReservationLifecycleService`: serializable, versioned staff transitions with
   authorization-before-replay, exact hold/stock updates, and atomic audit.
+- `BatchExpiryService`: bounded non-HTTP reconciliation using database time,
+  stable due-batch selection, full reservation-release reuse, per-candidate
+  serializable transactions, immutable expiry evidence, and tenant-system audit.
 
 Repositories own persistence queries; controllers do not access Prisma. Services own orchestration and security state transitions. DTOs own transport validation and normalization. The access identity is readonly and contains `userId`, `membershipId`, `tenantId`, `sessionId`, and the verified token ID.
 

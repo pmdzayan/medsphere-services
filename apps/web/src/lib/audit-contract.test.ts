@@ -18,6 +18,29 @@ describe('audit frontend contract', () => {
     expect(isAuditEventPage({ data: [event], nextCursor: null })).toBe(true);
   });
 
+  it('accepts only the bounded G3.10 batch-expiry metadata contract', () => {
+    const batchExpiry = {
+      ...event,
+      eventType: 'inventory.batch.expired',
+      actorMembershipId: null,
+      resourceType: 'Batch',
+      metadata: {
+        productId: '7c8423f1-f7ab-4a74-b925-23c1188e109c',
+        onHandQuantity: 20,
+        affectedReservations: 1,
+        releasedUnits: 4,
+        resultingVersion: 5,
+      },
+    };
+    expect(isAuditEventPage({ data: [batchExpiry], nextCursor: null })).toBe(true);
+    expect(
+      isAuditEventPage({
+        data: [{ ...batchExpiry, metadata: { ...batchExpiry.metadata, subjectUserId: 'private' } }],
+        nextCursor: null,
+      }),
+    ).toBe(false);
+  });
+
   it('rejects unknown event types and outcomes', () => {
     expect(
       isAuditEventPage({ data: [{ ...event, eventType: 'patient.exported' }], nextCursor: null }),

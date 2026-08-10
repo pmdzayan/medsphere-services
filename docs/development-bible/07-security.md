@@ -148,6 +148,12 @@ where state transitions occur, and atomic with their durable audit event.
 Automatic expiry may use a tenant-scoped `SYSTEM` audit actor only when tenant
 scope is explicit and user actor fields are absent.
 
+G3.10 derives every tenant/provider scope from the selected database batch. Its
+worker accepts no HTTP identity, token, header, membership, role, or permission.
+Logs contain aggregate counts and allowlisted failure categories only; batch and
+reservation audits contain no subject identity, notes, clinical data, contact
+data, credentials, prices, or free text.
+
 S0.5 does not authorize public patient reservation creation. That boundary
 requires a later Marketplace decision for global-user attribution, patient
 self-access, abuse controls, and tenant-scoped audit visibility. No header,

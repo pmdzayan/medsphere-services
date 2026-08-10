@@ -13,6 +13,7 @@ export const AUDIT_EVENT_TYPES = [
   'authentication.sessions.logout.succeeded',
   'inventory.listing.configured',
   'inventory.batch.received',
+  'inventory.batch.expired',
   'inventory.stock.adjusted',
   'inventory.reservation.created',
   'inventory.reservation.confirmed',
@@ -43,13 +44,20 @@ const AUDIT_METADATA_KEYS: Readonly<Record<AuditEventType, readonly string[]>> =
   'authentication.sessions.logout.succeeded': ['revokedCount'],
   'inventory.listing.configured': ['productId', 'version'],
   'inventory.batch.received': ['productId', 'quantity'],
+  'inventory.batch.expired': [
+    'productId',
+    'onHandQuantity',
+    'affectedReservations',
+    'releasedUnits',
+    'resultingVersion',
+  ],
   'inventory.stock.adjusted': ['productId', 'delta', 'onHandBefore', 'onHandAfter'],
   'inventory.reservation.created': ['itemCount', 'totalQuantity', 'expiresAt'],
   'inventory.reservation.confirmed': ['previousStatus', 'version'],
   'inventory.reservation.ready': ['previousStatus', 'version'],
   'inventory.reservation.completed': ['previousStatus', 'version', 'totalQuantity'],
   'inventory.reservation.cancelled': ['previousStatus', 'version', 'totalQuantity'],
-  'inventory.reservation.expired': ['previousStatus', 'version', 'totalQuantity'],
+  'inventory.reservation.expired': ['previousStatus', 'version', 'totalQuantity', 'cause'],
 };
 
 export interface AuditEvent {

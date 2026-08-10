@@ -149,8 +149,8 @@ See `docs/audits/2026-07-20-cto-baseline.md` for the accepted baseline.
     as `5521ad5` after exact-head CI run `31357016150`
 20. G3.9 completed damaged-stock write-off — accepted and squash-merged in PR
     #32 as `72fc92a` after exact-head CI run `31371305767`
-21. G3.10 physical batch expiry reconciliation — contract accepted;
-    implementation pending
+21. G3.10 physical batch expiry reconciliation — implemented; exact-commit CI
+    and CTO acceptance required
 22. Returns, safe creation, and later live mutations — blocked pending their
     own accepted contracts
 
@@ -160,12 +160,11 @@ If ownership transfers, resume at the first pending checkpoint. Do not use
 
 ## Exact continuation point
 
-Implement ADR-011 and
-`docs/sprints/G3.10-physical-batch-expiry-reconciliation.md` from accepted base
-`e1898cd`. Do not advance progress until exact-commit implementation CI and CTO
-acceptance. Reservation creation, returns, quarantine/recall, analytics policy,
-patient exposure, and Gates 2 and 4–9 remain blocked by their recorded
-dependencies.
+Verify the G3.10 implementation against ADR-011 and
+`docs/sprints/G3.10-physical-batch-expiry-reconciliation.md`. Do not advance
+progress until exact-commit implementation CI and CTO acceptance. Reservation
+creation, returns, quarantine/recall, analytics policy, patient exposure, and
+Gates 2 and 4–9 remain blocked by their recorded dependencies.
 
 Cline may receive only a complete, bounded prompt for characterization tests or
 mechanical work whose contract is already fixed by ADR-005. Cline must not
