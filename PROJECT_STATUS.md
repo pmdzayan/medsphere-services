@@ -2,11 +2,11 @@
 
 **Status date:** 2026-08-10
 
-**Accepted source commit:** `5521ad5c7bbf7002dab68ba82b9a59a0c39f9e5f`
+**Accepted source commit:** `093060809df31378298672e2288c9be0a68d63f7`
 
 **Accepted stabilization baseline:** `4ea55a17e188410ddee45fa3ea6c016e22d6617a`
 
-**Current sprint:** G3.8 accepted — completed inventory transfer
+**Current sprint:** G3.9 contract — completed damaged-stock write-off
 
 **Release state:** Not approved for production or real healthcare data
 
@@ -14,33 +14,33 @@
 
 ## Current sprint
 
-### G3.8 — Completed Inventory Transfer
+### G3.9 — Completed Damaged-Stock Write-off
 
-**Status:** Accepted and squash-merged in PR #29 as `5521ad5` after exact-head
-CI run `31357016150` passed. Overall V1 progress is now 33%.
+**Status:** ADR-010 and the G3.9 sprint contract are proposed for CTO review.
+Implementation has not started. Overall V1 progress remains 33%.
 
-**Dependency:** ADR-005, G3.2, ADR-007, and G3.7 provide batch authority,
-immutable movements, serializable commands, provider assignment, and safe held
-stock behavior. Destination inventory configuration must already exist.
+**Dependency:** ADR-005, G3.2, ADR-007, G3.7, and G3.8 provide batch authority,
+immutable movements, serializable commands, provider assignment, held-stock
+protection, and exact replay lessons.
 
-**Implementation authority:** ADR-001 through ADR-009, merged PRs #10–28, the
-`docs/audits/2026-08-08-v1-subsystem-gap-matrix.md` audit, and
-`docs/sprints/G3.8-completed-inventory-transfer.md`. The contract was accepted
-in PR #28 as `79d81ae`.
+**Proposed implementation authority:** ADR-001 through ADR-010, merged PRs
+#10–30, the V1 gap matrix, and
+`docs/sprints/G3.9-completed-damaged-stock-write-off.md`. ADR-010 and the sprint
+contract must be accepted before implementation.
 
 **In scope**
 
-- one-batch, same-tenant, cross-provider completed-transfer recording
-- dual live provider assignment and dedicated permission
-- atomic source decrement, destination create/merge, and conserved on-hand stock
-- paired immutable transfer movements, receipt, and tenant-user audit
-- real PostgreSQL rollback, idempotency, race, and tenant-boundary tests
+- one-batch completed damaged-stock write-off
+- live provider assignment and dedicated permission
+- available-only decrement preserving held and received quantities
+- immutable `DAMAGED` movement, exact replay snapshot, and tenant-user audit
+- real PostgreSQL rollback, idempotency, and concurrency evidence
 
 **Out of scope**
 
-- dispatch, in-transit, receipt, cancellation, discrepancy, or approval workflow
-- multi-line, multi-batch, cross-tenant, supplier, patient, or controlled transfer
-- returns, damage, quarantine, recall, analytics, notifications, or frontend UI
+- inspection, evidence files, approval, reversal, quarantine, recall, or disposal
+- multi-batch, supplier return/refund, patient, or controlled-medicine workflow
+- returns, analytics, notifications, gateway, or frontend UI
 - production deployment or compliance approval
 
 ## CTO acceptance ledger
@@ -59,8 +59,9 @@ in PR #28 as `79d81ae`.
 
 ## Critical blockers
 
-1. Patient-safe reservation creation, return, damage, quarantine, and recall
-   remain intentionally unmounted pending their own accepted contracts.
+1. G3.9 implementation is blocked until ADR-010 and its sprint contract are
+   accepted. Patient-safe creation, returns, quarantine, and recall remain
+   unmounted pending their own contracts.
 2. Inventory mutation UIs remain unconnected; the accepted stock, reservation,
    and overview workspaces are deliberately read-only.
 3. Consent, privacy operations, verification, retention, legal hold, and the
@@ -107,7 +108,9 @@ and [the Gates 1–20 verification](docs/audits/2026-08-01-gates-1-20-verificati
     as `b7bba10`
 16. **G3.8 completed inventory transfer** — accepted and squash-merged in PR
     #29 as `5521ad5` after exact-head CI run `31357016150`
-17. Resume remaining Inventory and Compliance milestones in dependency order
+17. **G3.9 completed damaged-stock write-off** — ADR and sprint contract
+    proposed; implementation blocked pending CTO acceptance
+18. Resume remaining Inventory and Compliance milestones in dependency order
 
 Only one recovery sprint may be active at a time. Exact boundaries may be refined through an ADR, but dependencies must not be skipped.
 

@@ -2,9 +2,9 @@
 
 **Last updated:** 2026-08-10
 
-**Current sprint:** G3.8 accepted — completed inventory transfer
+**Current sprint:** G3.9 contract — completed damaged-stock write-off
 
-**Next feature work:** Await CTO selection of the next bounded V1 sprint
+**Next feature work:** Review and accept ADR-010 and the G3.9 contract
 
 ## Mandatory startup sequence
 
@@ -78,6 +78,8 @@ The migration must be incremental:
   delivery, partial receipt, discrepancy, reversal, or frontend behavior.
 - G3.8 passed exact-head CI run `31357016150` and was squash-merged in PR #29
   as `5521ad5` after CTO authorization.
+- G3.9 proposes only an already confirmed damaged-stock write-off. It does not
+  claim quarantine, disposal, recall, return, approval, or frontend behavior.
 - S0.5 now defines `Batch` as physical/held quantity authority, uses an
   append-only movement ledger, and stores typed reservation items and
   allocations. Its accepted production HTTP boundary and live frontend
@@ -148,10 +150,10 @@ If ownership transfers, resume at the first pending checkpoint. Do not use
 
 ## Exact continuation point
 
-Continue from accepted commit `5521ad5`. Do not begin another feature until the
-CTO selects one bounded, dependency-ready V1 sprint. Reservation creation,
-returns, damage, analytics policy, patient exposure, and Gates 2 and 4–9 remain
-blocked by their recorded dependencies.
+Continue from accepted commit `0930608`. Review ADR-010 and the G3.9 sprint
+contract. Do not implement until both are accepted. Reservation creation,
+returns, quarantine/recall, analytics policy, patient exposure, and Gates 2 and
+4–9 remain blocked by their recorded dependencies.
 
 Cline may receive only a complete, bounded prompt for characterization tests or
 mechanical work whose contract is already fixed by ADR-005. Cline must not
