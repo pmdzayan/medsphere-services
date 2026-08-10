@@ -1,10 +1,10 @@
 # MedSphere AI Handoff
 
-**Last updated:** 2026-08-09
+**Last updated:** 2026-08-10
 
-**Current sprint:** G3.8 implementation — completed inventory transfer
+**Current sprint:** G3.8 accepted — completed inventory transfer
 
-**Next feature work:** Run exact-commit G3.8 CI and obtain CTO acceptance
+**Next feature work:** Await CTO selection of the next bounded V1 sprint
 
 ## Mandatory startup sequence
 
@@ -76,6 +76,8 @@ The migration must be incremental:
 - G3.8 implements only atomic recording of an already completed same-tenant
   cross-provider transfer. It deliberately does not claim dispatch, in-transit,
   delivery, partial receipt, discrepancy, reversal, or frontend behavior.
+- G3.8 passed exact-head CI run `31357016150` and was squash-merged in PR #29
+  as `5521ad5` after CTO authorization.
 - S0.5 now defines `Batch` as physical/held quantity authority, uses an
   append-only movement ledger, and stores typed reservation items and
   allocations. Its accepted production HTTP boundary and live frontend
@@ -135,8 +137,8 @@ See `docs/audits/2026-07-20-cto-baseline.md` for the accepted baseline.
     `63707b8`
 18. G3.7 reservation expiry worker — accepted and squash-merged in PR #26 as
     `b7bba10`
-19. G3.8 completed inventory transfer — contract accepted in PR #28 as
-    `79d81ae`; implementation awaits exact-commit CI and CTO acceptance
+19. G3.8 completed inventory transfer — accepted and squash-merged in PR #29
+    as `5521ad5` after exact-head CI run `31357016150`
 20. Returns/damage, safe creation, and later live
     mutations — blocked pending their own accepted contracts
 
@@ -146,10 +148,10 @@ If ownership transfers, resume at the first pending checkpoint. Do not use
 
 ## Exact continuation point
 
-Continue from accepted commit `79d81ae`. Review the focused G3.8 implementation
-against ADR-009 and its sprint contract, run all exact-commit gates, and obtain
-CTO acceptance before changing the V1 estimate. Reservation creation, returns,
-damage, analytics policy, patient exposure, and Gates 2 and 4–9 remain blocked.
+Continue from accepted commit `5521ad5`. Do not begin another feature until the
+CTO selects one bounded, dependency-ready V1 sprint. Reservation creation,
+returns, damage, analytics policy, patient exposure, and Gates 2 and 4–9 remain
+blocked by their recorded dependencies.
 
 Cline may receive only a complete, bounded prompt for characterization tests or
 mechanical work whose contract is already fixed by ADR-005. Cline must not

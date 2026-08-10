@@ -1,23 +1,23 @@
 # MedSphere Project Status
 
-**Status date:** 2026-08-09
+**Status date:** 2026-08-10
 
-**Accepted source commit:** `79d81aef47146d3eaad1bd398f0891ca1e0a2d9d`
+**Accepted source commit:** `5521ad5c7bbf7002dab68ba82b9a59a0c39f9e5f`
 
 **Accepted stabilization baseline:** `4ea55a17e188410ddee45fa3ea6c016e22d6617a`
 
-**Current sprint:** G3.8 implementation — completed inventory transfer
+**Current sprint:** G3.8 accepted — completed inventory transfer
 
 **Release state:** Not approved for production or real healthcare data
 
-**Full-roadmap engineering estimate:** 32% complete / 68% remaining
+**Full-roadmap engineering estimate:** 33% complete / 67% remaining
 
 ## Current sprint
 
 ### G3.8 — Completed Inventory Transfer
 
-**Status:** Implemented; exact-commit CI and CTO acceptance required. Overall
-V1 progress remains 32% until acceptance.
+**Status:** Accepted and squash-merged in PR #29 as `5521ad5` after exact-head
+CI run `31357016150` passed. Overall V1 progress is now 33%.
 
 **Dependency:** ADR-005, G3.2, ADR-007, and G3.7 provide batch authority,
 immutable movements, serializable commands, provider assignment, and safe held
@@ -52,7 +52,7 @@ in PR #28 as `79d81ae`.
 | Database reproducibility    | S0.2–S0.5, G3.1–G3.3, and corrected AG-02A accepted with clean and populated upgrade evidence | Accepted through `9c38792`            |
 | Identity and tenant context | S0.3 authentication and trusted tenant context merged                                         | Accepted                              |
 | Authorization and audit     | S0.4 tenant-safe RBAC and durable audit merged                                                | Accepted                              |
-| Inventory and reservation   | S0.5 integrity, G3.1–G3.3 backend, G3.4–G3.6 reads/UI, and G3.7 automatic hold expiry         | Broader operations remain incomplete  |
+| Inventory and reservation   | S0.5, G3.1–G3.3, G3.4–G3.6 reads/UI, G3.7 expiry, and G3.8 completed transfers                | Broader operations remain incomplete  |
 | Frontend foundation         | Landing, login, shell, team/RBAC, audit, settings, onboarding, stock, and reservation reads   | Connected for accepted contracts      |
 | Pharmacy and inventory UI   | Assigned-provider stock, reservations, and bounded live overview use accepted reads           | Connected for accepted read contracts |
 | Remaining healthcare scope  | Most domain deployables are health-only scaffolds or absent                                   | Not implemented                       |
@@ -60,8 +60,7 @@ in PR #28 as `79d81ae`.
 ## Critical blockers
 
 1. Patient-safe reservation creation, return, damage, quarantine, and recall
-   remain intentionally unmounted. G3.8 acceptance remains gated on exact-head
-   CI and CTO review.
+   remain intentionally unmounted pending their own accepted contracts.
 2. Inventory mutation UIs remain unconnected; the accepted stock, reservation,
    and overview workspaces are deliberately read-only.
 3. Consent, privacy operations, verification, retention, legal hold, and the
@@ -106,8 +105,8 @@ and [the Gates 1–20 verification](docs/audits/2026-08-01-gates-1-20-verificati
     `63707b8`
 15. **G3.7 reservation expiry worker** — accepted and squash-merged in PR #26
     as `b7bba10`
-16. **G3.8 completed inventory transfer** — contract accepted in PR #28 as
-    `79d81ae`; implementation awaits exact-commit CI and CTO acceptance
+16. **G3.8 completed inventory transfer** — accepted and squash-merged in PR
+    #29 as `5521ad5` after exact-head CI run `31357016150`
 17. Resume remaining Inventory and Compliance milestones in dependency order
 
 Only one recovery sprint may be active at a time. Exact boundaries may be refined through an ADR, but dependencies must not be skipped.
@@ -115,7 +114,7 @@ Only one recovery sprint may be active at a time. Exact boundaries may be refine
 ## Progress reporting rule
 
 Progress is measured by accepted milestone criteria, not by the number of files
-or endpoints present. The README's 32% full-roadmap estimate and 32% frontend
+or endpoints present. The README's 33% full-roadmap estimate and 32% frontend
 estimate are planning indicators, not acceptance or release claims. They may
 change only when repository evidence and milestone acceptance change. Preview
 screens, placeholder services, unmounted routes, and schema-only foundations do
