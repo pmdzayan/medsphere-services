@@ -52,7 +52,7 @@ The readiness score is a planning aid, not a completion or compliance claim.
    accepted.
 2. G3.7 reservation expiry, G3.8 completed transfers, and G3.9 damaged-stock
    write-off — accepted.
-3. Define and accept G3.10 physical batch expiry reconciliation without
+3. Implement accepted G3.10 physical batch expiry reconciliation without
    fabricating disposal.
 4. Add remaining inventory operations as separate contracts: safe reservation
    creation, returns, quarantine/recall, expiry visibility, and analytics.
@@ -64,7 +64,7 @@ The readiness score is a planning aid, not a completion or compliance claim.
 
 ## Next bounded implementation unit
 
-**G3.10 — Physical batch expiry reconciliation** is next. Its proposed
+**G3.10 — Physical batch expiry reconciliation** is next. Its accepted
 [sprint contract](../sprints/G3.10-physical-batch-expiry-reconciliation.md) is a
 medicine-safety checkpoint that must:
 

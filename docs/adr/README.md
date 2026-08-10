@@ -27,4 +27,4 @@ Every ADR includes decision, reason/context, alternatives, consequences, impleme
 | [ADR-008](0008-application-boundaries-and-domain-event-contracts.md) | Application boundaries and event contracts  | Accepted | 2026-08-08 |
 | [ADR-009](0009-atomic-completed-inventory-transfer.md)               | Atomic completed inventory transfer         | Accepted | 2026-08-09 |
 | [ADR-010](0010-atomic-completed-damaged-stock-write-off.md)          | Atomic completed damaged-stock write-off    | Accepted | 2026-08-10 |
-| [ADR-011](0011-physical-batch-expiry-reconciliation.md)              | Physical batch expiry reconciliation        | Proposed | 2026-08-10 |
+| [ADR-011](0011-physical-batch-expiry-reconciliation.md)              | Physical batch expiry reconciliation        | Accepted | 2026-08-10 |
