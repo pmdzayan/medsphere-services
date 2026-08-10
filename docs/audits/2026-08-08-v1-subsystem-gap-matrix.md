@@ -2,10 +2,10 @@
 
 **Audit date:** 2026-08-08
 
-**Accepted source commit:** `6c68ee324f6bf6f003413ef390b5710ea7029b1a`
+**Accepted source commit:** `72fc92a552e0cd44b074aef310d1199513bdf2e0`
 
 **Decision:** Version 1 is not release-ready. The evidence-weighted full-roadmap
-estimate remains approximately **30% complete**.
+estimate is approximately **34% complete**.
 
 ## Accepted since the prior gate audit
 
@@ -16,56 +16,64 @@ estimate remains approximately **30% complete**.
 - Corrected AG-02A durable refresh-credential integrity passed quality run
   `31276741918` and merged in PR #16 as `9c38792`.
 - Unsafe recovery PR #14 was closed. It is not an accepted source boundary.
+- G3.4–G3.6 replaced fabricated inventory, reservation, and dashboard previews
+  with accepted assigned-provider reads and responsive workspaces.
+- G3.7 reservation expiry passed exact-head CI and merged in PR #26 as
+  `b7bba10`.
+- G3.8 completed transfers passed exact-head CI and merged in PR #29 as
+  `5521ad5`.
+- G3.9 damaged-stock write-off passed exact-head CI and merged in PR #32 as
+  `72fc92a`.
 
 ## Evidence-weighted matrix
 
 The readiness score is a planning aid, not a completion or compliance claim.
 
-| Subsystem                                 | Accepted evidence                                                                                                        | Missing before V1 acceptance                                                                               | Readiness |
-| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------- | --------: |
-| Architecture, repository, CI              | ADR governance, reproducible migrations, dependency audit, boundary checker, lint/test/build gates                       | Modular-monolith consolidation, ownership completion, release operations                                   |    8.5/10 |
-| Identity, sessions, RBAC, audit           | Trusted login/refresh, tenant context, session replay protection, RBAC administration, durable audit                     | Operational retention, key rotation/runbooks, broader compliance controls                                  |    8.8/10 |
-| Inventory and reservations backend        | Ledger/FEFO integrity, provider stock reads, listing/receipt/adjustment commands, provider reservation reads/transitions | Safe creation, worker expiry, transfers, returns, damage, quarantine/recall, analytics                     |    7.5/10 |
-| Connected frontend                        | Login, shell, team/RBAC, audit, onboarding, settings, assigned-provider stock and reservation reads                      | Pharmacy overview preview and most role journeys remain unconnected                                        |    5.5/10 |
-| API gateway/application composition       | Health scaffold and shared HTTP controls                                                                                 | Accepted product routing/composition, contract tests, rate/timeout policy, observability                   |    1.5/10 |
-| Master patient index and clinical records | Schema-only medical-record foundation                                                                                    | Patient identity resolution, consent-aware access, encounters, notes, prescriptions, UI                    |    1.0/10 |
-| Compliance foundation                     | RBAC, audit, limited personal preference/privacy settings                                                                | Consent, verification, retention, deletion, legal hold, purpose/policy enforcement                         |    2.0/10 |
-| Unified event delivery                    | Transport-neutral event envelope only                                                                                    | Outbox/inbox persistence, dispatcher, idempotent consumers, retry/dead-letter evidence                     |    1.0/10 |
-| Notifications                             | Health-only application                                                                                                  | Templates, preferences, email/SMS/push adapters, workers, delivery evidence                                |    0.5/10 |
-| Billing and finance                       | Health-only application and schema fragments                                                                             | Invoices, journal, payments, insurance, reconciliation, audit, UI                                          |    0.5/10 |
-| Search and availability                   | Health-only application                                                                                                  | Tenant-safe discovery, geospatial/resource availability models and contracts                               |    0.5/10 |
-| Documents and workflow                    | No accepted runtime boundary                                                                                             | Storage, signatures, access policy, workflow definitions, approvals, audit                                 |    0.0/10 |
-| Supplier and procurement                  | No accepted end-to-end workflow                                                                                          | Supplier verification, purchase orders, approvals, receipt integration, dashboard                          |    0.5/10 |
-| Production operations                     | PR quality gates and deployment freeze                                                                                   | Deployment, secrets operations, observability, backup/restore, DR, performance, penetration test, runbooks |    2.0/10 |
+| Subsystem                                 | Accepted evidence                                                                                                       | Missing before V1 acceptance                                                                               | Readiness |
+| ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- | --------: |
+| Architecture, repository, CI              | ADR governance, reproducible migrations, dependency audit, boundary checker, lint/test/build gates                      | Modular-monolith consolidation, ownership completion, release operations                                   |    8.5/10 |
+| Identity, sessions, RBAC, audit           | Trusted login/refresh, tenant context, session replay protection, RBAC administration, durable audit                    | Operational retention, key rotation/runbooks, broader compliance controls                                  |    8.8/10 |
+| Inventory and reservations backend        | Ledger/FEFO integrity, reads, commands, reservation lifecycle/expiry, completed transfers, and damage write-off         | Batch-expiry reconciliation, safe creation, returns, quarantine/recall, analytics                          |    8.3/10 |
+| Connected frontend                        | Login, shell, team/RBAC, audit, onboarding, settings, assigned-provider stock, reservations, and truthful live overview | Mutation journeys and most healthcare role journeys remain unconnected                                     |    6.5/10 |
+| API gateway/application composition       | Health scaffold and shared HTTP controls                                                                                | Accepted product routing/composition, contract tests, rate/timeout policy, observability                   |    1.5/10 |
+| Master patient index and clinical records | Schema-only medical-record foundation                                                                                   | Patient identity resolution, consent-aware access, encounters, notes, prescriptions, UI                    |    1.0/10 |
+| Compliance foundation                     | RBAC, audit, limited personal preference/privacy settings                                                               | Consent, verification, retention, deletion, legal hold, purpose/policy enforcement                         |    2.0/10 |
+| Unified event delivery                    | Transport-neutral event envelope only                                                                                   | Outbox/inbox persistence, dispatcher, idempotent consumers, retry/dead-letter evidence                     |    1.0/10 |
+| Notifications                             | Health-only application                                                                                                 | Templates, preferences, email/SMS/push adapters, workers, delivery evidence                                |    0.5/10 |
+| Billing and finance                       | Health-only application and schema fragments                                                                            | Invoices, journal, payments, insurance, reconciliation, audit, UI                                          |    0.5/10 |
+| Search and availability                   | Health-only application                                                                                                 | Tenant-safe discovery, geospatial/resource availability models and contracts                               |    0.5/10 |
+| Documents and workflow                    | No accepted runtime boundary                                                                                            | Storage, signatures, access policy, workflow definitions, approvals, audit                                 |    0.0/10 |
+| Supplier and procurement                  | No accepted end-to-end workflow                                                                                         | Supplier verification, purchase orders, approvals, receipt integration, dashboard                          |    0.5/10 |
+| Production operations                     | PR quality gates and deployment freeze                                                                                  | Deployment, secrets operations, observability, backup/restore, DR, performance, penetration test, runbooks |    2.0/10 |
 
 ## Dependency-ordered closure path
 
-1. Synchronize status and handoff documents to accepted commit `6c68ee3`.
-2. G3.4 exact-commit evidence for the live assigned-provider stock workspace —
-   accepted in PR #18.
-3. G3.5 assigned-provider reservation reads — accepted in PR #20.
-4. Define and accept G3.6: remove fabricated dashboard claims using only the
-   accepted stock and reservation BFFs.
-5. Add remaining inventory operations as separate contracts: safe reservation
-   creation and worker expiry, transfers, returns, damage, quarantine/recall.
-6. Complete the compliance foundation before exposing patient or clinical data.
-7. Build event delivery before notification, workflow, analytics, or other
+1. G3.4–G3.6 assigned-provider stock, reservation, and truthful overview —
+   accepted.
+2. G3.7 reservation expiry, G3.8 completed transfers, and G3.9 damaged-stock
+   write-off — accepted.
+3. Implement accepted G3.10 physical batch expiry reconciliation without
+   fabricating disposal.
+4. Add remaining inventory operations as separate contracts: safe reservation
+   creation, returns, quarantine/recall, expiry visibility, and analytics.
+5. Complete the compliance foundation before exposing patient or clinical data.
+6. Build event delivery before notification, workflow, analytics, or other
    asynchronous platform behavior claims completion.
-8. Implement the remaining healthcare and platform milestones, then execute the
+7. Implement the remaining healthcare and platform milestones, then execute the
    production verification milestone.
 
 ## Next bounded implementation unit
 
-**G3.6 — Live operations overview** is next. Its proposed
-[sprint contract](../sprints/G3.6-live-operations-overview.md) is a truthfulness
-checkpoint that may compose only accepted G3.4 and G3.5 browser reads. It must:
+**G3.10 — Physical batch expiry reconciliation** is next. Its accepted
+[sprint contract](../sprints/G3.10-physical-batch-expiry-reconciliation.md) is a
+medicine-safety checkpoint that must:
 
-- remove fabricated value, risk, trend, priority, patient, and activity claims;
-- calculate only clearly labelled current-page values from validated data;
-- preserve independent stock and reservation loading/error states;
-- link to the complete live read workspaces;
-- add no mutation, analytics policy, backend, database, permission, or gateway
-  behavior.
+- use authoritative database time and bounded stable selection;
+- expire affected reservations and release every exact hold atomically;
+- mark due batches `EXPIRED` while preserving physical on-hand quantity;
+- record immutable tenant-system evidence without a stock movement; and
+- add no disposal, quarantine, recall, return, alert, notification, HTTP,
+  permission, frontend, gateway, or analytics claim.
 
 ## Release decision
 
