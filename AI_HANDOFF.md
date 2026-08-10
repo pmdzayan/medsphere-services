@@ -2,9 +2,9 @@
 
 **Last updated:** 2026-08-10
 
-**Current sprint:** G3.10 physical batch expiry reconciliation implementation
+**Current sprint:** Next dependency-ordered V1 contract selection
 
-**Next feature work:** Implement accepted ADR-011 and the G3.10 sprint contract
+**Next feature work:** Select and contract the highest-value dependency-ready V1 gap
 
 ## Mandatory startup sequence
 
@@ -82,10 +82,10 @@ The migration must be incremental:
   contract accepted in PR #31. Exact-head CI run `31371305767` passed and the
   implementation was accepted and squash-merged in PR #32 as `72fc92a`. It does
   not claim quarantine, disposal, recall, return, approval, or frontend behavior.
-- G3.10 is accepted as a bounded physical batch-expiry reconciliation worker.
-  It preserves on-hand quantity because expiry is not disposal, while expiring
-  reservations that hold due batches. Exact-head contract CI run `31385954854`
-  passed; implementation remains unaccepted until its own exact-head evidence.
+- G3.10 implements a bounded physical batch-expiry reconciliation worker. It
+  preserves on-hand quantity because expiry is not disposal, while expiring
+  reservations that hold due batches. Corrected exact-head implementation CI
+  run `31393057704` passed and PR #35 was squash-merged as `ad2d15b`.
 - S0.5 now defines `Batch` as physical/held quantity authority, uses an
   append-only movement ledger, and stores typed reservation items and
   allocations. Its accepted production HTTP boundary and live frontend
@@ -149,8 +149,8 @@ See `docs/audits/2026-07-20-cto-baseline.md` for the accepted baseline.
     as `5521ad5` after exact-head CI run `31357016150`
 20. G3.9 completed damaged-stock write-off — accepted and squash-merged in PR
     #32 as `72fc92a` after exact-head CI run `31371305767`
-21. G3.10 physical batch expiry reconciliation — implemented; exact-commit CI
-    and CTO acceptance required
+21. G3.10 physical batch expiry reconciliation — accepted and squash-merged in
+    PR #35 as `ad2d15b` after exact-head CI run `31393057704`
 22. Returns, safe creation, and later live mutations — blocked pending their
     own accepted contracts
 
@@ -160,11 +160,10 @@ If ownership transfers, resume at the first pending checkpoint. Do not use
 
 ## Exact continuation point
 
-Verify the G3.10 implementation against ADR-011 and
-`docs/sprints/G3.10-physical-batch-expiry-reconciliation.md`. Do not advance
-progress until exact-commit implementation CI and CTO acceptance. Reservation
-creation, returns, quarantine/recall, analytics policy, patient exposure, and
-Gates 2 and 4–9 remain blocked by their recorded dependencies.
+Select the next highest-value dependency-ready V1 gap from accepted source
+`ad2d15b`. Reservation creation, returns, quarantine/recall, analytics policy,
+patient exposure, and Gates 2 and 4–9 remain blocked by their recorded
+dependencies until a bounded contract explicitly resolves them.
 
 Cline may receive only a complete, bounded prompt for characterization tests or
 mechanical work whose contract is already fixed by ADR-005. Cline must not
