@@ -26,4 +26,4 @@ Every ADR includes decision, reason/context, alternatives, consequences, impleme
 | [ADR-007](0007-trusted-provider-access-scope.md)                     | Trusted provider access scope               | Accepted | 2026-08-02 |
 | [ADR-008](0008-application-boundaries-and-domain-event-contracts.md) | Application boundaries and event contracts  | Accepted | 2026-08-08 |
 | [ADR-009](0009-atomic-completed-inventory-transfer.md)               | Atomic completed inventory transfer         | Accepted | 2026-08-09 |
-| [ADR-010](0010-atomic-completed-damaged-stock-write-off.md)          | Atomic completed damaged-stock write-off    | Proposed | 2026-08-10 |
+| [ADR-010](0010-atomic-completed-damaged-stock-write-off.md)          | Atomic completed damaged-stock write-off    | Accepted | 2026-08-10 |

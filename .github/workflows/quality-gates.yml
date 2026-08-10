@@ -74,7 +74,7 @@ jobs:
       - name: Verify clean database migration and drift
         run: pnpm db:verify
 
-      - name: Verify populated S0.3 through AG-02A upgrade safety
+      - name: Verify populated S0.3 through G3.9 upgrade safety
         run: pnpm db:verify-upgrade
 
       - name: Check formatting

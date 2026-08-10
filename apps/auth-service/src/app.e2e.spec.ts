@@ -419,6 +419,7 @@ describe('S0.4 authentication and authorization HTTP security boundary', () => {
     ['POST', `/inventory/providers/${randomUUID()}/products/${randomUUID()}/batches`],
     ['POST', `/inventory/providers/${randomUUID()}/batches/${randomUUID()}/adjustments`],
     ['POST', `/inventory/providers/${randomUUID()}/transfers`],
+    ['POST', `/inventory/providers/${randomUUID()}/batches/${randomUUID()}/damage`],
   ] as const)('keeps an inventory mutation authenticated: %s %s', async (method, path) => {
     await expect(sendRequest(path, { method })).resolves.toMatchObject({ status: 401 });
     expect(hasAllPermissions).not.toHaveBeenCalled();

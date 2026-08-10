@@ -646,11 +646,12 @@ model StockMovement {
   onHandBefore Int
   onHandAfter  Int
 
-  referenceType  String? @db.VarChar(80)
-  referenceId    String? @db.VarChar(120)
-  reason         String? @db.VarChar(500)
-  idempotencyKey String  @db.VarChar(120)
-  commandHash    String? @db.VarChar(64)
+  referenceType         String? @db.VarChar(80)
+  referenceId           String? @db.VarChar(120)
+  reason                String? @db.VarChar(500)
+  idempotencyKey        String  @db.VarChar(120)
+  commandHash           String? @db.VarChar(64)
+  resultingBatchVersion Int?
 
   actorType         AuditActorType
   actorMembershipId String?           @db.Uuid

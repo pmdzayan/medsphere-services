@@ -1,6 +1,6 @@
 # ADR-010: Atomic Completed Damaged-Stock Write-off
 
-**Status:** Proposed
+**Status:** Accepted in PR #31; implementation acceptance pending
 
 **Date:** 2026-08-10
 

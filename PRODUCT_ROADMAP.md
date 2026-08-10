@@ -38,8 +38,8 @@ Ordered sprints:
     `b7bba10`
 15. G3.8 Completed inventory transfer — accepted and squash-merged in PR #29
     as `5521ad5`
-16. G3.9 Completed damaged-stock write-off — ADR and sprint contract proposed;
-    implementation blocked pending CTO acceptance
+16. G3.9 Completed damaged-stock write-off — implemented; exact-commit CI and
+    CTO acceptance required
 
 **Completion gate:** Accepted ADRs; protected review flow; clean migrations; deny-by-default authentication; tenant-isolation tests; integrated audit trail; atomic stock/reservation behavior; mandatory lint/test/build passing.
 

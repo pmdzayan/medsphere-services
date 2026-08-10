@@ -7,6 +7,7 @@ import { InventoryCommandService } from './inventory-command.service';
 import { InventoryRepository } from './inventory.repository';
 import { InventoryService } from './inventory.service';
 import { InventoryTransferService } from './inventory-transfer.service';
+import { InventoryDamageService } from './inventory-damage.service';
 import { ReservationLifecycleService } from './reservation-lifecycle.service';
 import { ReservationExpiryService } from './reservation-expiry.service';
 import { ReservationRepository } from './reservation.repository';
@@ -20,6 +21,7 @@ import { ReservationService } from './reservation.service';
     InventoryService,
     InventoryCommandService,
     InventoryTransferService,
+    InventoryDamageService,
     ReservationRepository,
     ReservationService,
     ReservationLifecycleService,

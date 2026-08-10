@@ -53,6 +53,9 @@ import { ReservationService } from './reservation.service';
 import { RecordCompletedTransferDto } from './dto/inventory-transfer.dto';
 import { CompletedTransferResponseDto } from './dto/inventory-transfer-response.dto';
 import { InventoryTransferService } from './inventory-transfer.service';
+import { RecordDamagedStockDto } from './dto/inventory-damage.dto';
+import { DamagedStockResponseDto } from './dto/inventory-damage-response.dto';
+import { InventoryDamageService } from './inventory-damage.service';
 
 @Controller('inventory')
 @ApiTags('Inventory')
@@ -66,7 +69,32 @@ export class InventoryController {
     private readonly reservations: ReservationService,
     private readonly reservationLifecycle: ReservationLifecycleService,
     private readonly inventoryTransfers: InventoryTransferService,
+    private readonly inventoryDamage: InventoryDamageService,
   ) {}
+
+  @Post('providers/:providerId/batches/:batchId/damage')
+  @HttpCode(HttpStatus.OK)
+  @Header('Cache-Control', 'private, no-store')
+  @RequirePermissions(PERMISSIONS.inventoryStockDamage)
+  @ApiOperation({ summary: 'Record an atomic completed damaged-stock write-off' })
+  @ApiOkResponse({ type: DamagedStockResponseDto })
+  @ApiNotFoundResponse({ description: 'Assigned provider batch not found' })
+  @ApiConflictResponse({ description: 'Stock, expiry, version, or idempotency conflict' })
+  recordDamagedStock(
+    @CurrentIdentity() identity: AuthenticatedIdentity,
+    @Param('providerId', new ParseUUIDPipe({ version: '4' })) providerId: string,
+    @Param('batchId', new ParseUUIDPipe({ version: '4' })) batchId: string,
+    @Body() dto: RecordDamagedStockDto,
+    @Req() request: MetadataHttpRequest,
+  ) {
+    return this.inventoryDamage.recordCompleted({
+      actor: identity,
+      providerId,
+      batchId,
+      ...dto,
+      request: extractRequestMetadata(request),
+    });
+  }
 
   @Post('providers/:providerId/transfers')
   @HttpCode(HttpStatus.OK)
