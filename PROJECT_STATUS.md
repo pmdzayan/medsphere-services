@@ -2,23 +2,22 @@
 
 **Status date:** 2026-08-10
 
-**Accepted source commit:** `72fc92a552e0cd44b074aef310d1199513bdf2e0`
+**Accepted source commit:** `ad2d15bc3eb2e803217b25faac0ddebfa89405a7`
 
 **Accepted stabilization baseline:** `4ea55a17e188410ddee45fa3ea6c016e22d6617a`
 
-**Current sprint:** G3.10 implementation — physical batch expiry reconciliation
+**Current sprint:** Next dependency-ordered V1 contract selection
 
 **Release state:** Not approved for production or real healthcare data
 
-**Full-roadmap engineering estimate:** 34% complete / 66% remaining
+**Full-roadmap engineering estimate:** 35% complete / 65% remaining
 
-## Current sprint
+## Most recent accepted sprint
 
 ### G3.10 — Physical Batch Expiry Reconciliation
 
-**Status:** Implemented; exact-commit CI and CTO acceptance required. Contract CI
-run `31385954854` passed, but implementation evidence is not yet accepted.
-Overall V1 progress remains 34% until implementation acceptance.
+**Status:** Accepted and squash-merged in PR #35 as `ad2d15b` after corrected
+exact-head CI run `31393057704` passed all required gates.
 
 **Selection reason:** Expired dates already fail availability checks, but
 `ACTIVE` batch state and future-dated reservation holds can remain unreconciled.
@@ -33,35 +32,27 @@ quantity, and records immutable tenant-system evidence. It does not claim
 physical disposal, alerts, notification delivery, quarantine, recall, or
 returns.
 
-## Most recent accepted sprint
+**Dependency:** ADR-005, G3.2, G3.7, G3.8, G3.9, and ADR-011 provide batch
+authority, reservation allocation release, serializable transactions, and the
+accepted physical-expiry contract.
 
-### G3.9 — Completed Damaged-Stock Write-off
-
-**Status:** Accepted and squash-merged in PR #32 as `72fc92a` after exact-head
-CI run `31371305767` passed all required gates.
-
-**Dependency:** ADR-005, G3.2, ADR-007, G3.7, and G3.8 provide batch authority,
-immutable movements, serializable commands, provider assignment, held-stock
-protection, and exact replay lessons.
-
-**Implementation authority:** ADR-001 through ADR-010, merged PRs #10–31, the
+**Implementation authority:** ADR-001 through ADR-011, merged PRs #10–34, the
 V1 gap matrix, and
-`docs/sprints/G3.9-completed-damaged-stock-write-off.md`. ADR-010 and the sprint
-contract were accepted in PR #31 as `11c1692`.
+`docs/sprints/G3.10-physical-batch-expiry-reconciliation.md`.
 
 **In scope**
 
-- one-batch completed damaged-stock write-off
-- live provider assignment and dedicated permission
-- available-only decrement preserving held and received quantities
-- immutable `DAMAGED` movement, exact replay snapshot, and tenant-user audit
-- real PostgreSQL rollback, idempotency, and concurrency evidence
+- bounded non-HTTP database-authoritative expiry worker
+- atomic expiry of reservations holding a due batch and release of all holds
+- physical on-hand preservation with no stock movement
+- immutable expiry evidence and tenant-system audit
+- real PostgreSQL migration, rollback, idempotency, and concurrency evidence
 
 **Out of scope**
 
-- inspection, evidence files, approval, reversal, quarantine, recall, or disposal
-- multi-batch, supplier return/refund, patient, or controlled-medicine workflow
-- returns, analytics, notifications, gateway, or frontend UI
+- physical disposal, quarantine, recall, supplier return/refund, or approval
+- expiry alerts, notification delivery, analytics, gateway, or frontend UI
+- patient reservation creation, partial fulfilment, or controlled medicine
 - production deployment or compliance approval
 
 ## CTO acceptance ledger
@@ -73,16 +64,15 @@ contract were accepted in PR #31 as `11c1692`.
 | Database reproducibility    | S0.2–S0.5, G3.1–G3.3, and corrected AG-02A accepted with clean and populated upgrade evidence | Accepted through `9c38792`            |
 | Identity and tenant context | S0.3 authentication and trusted tenant context merged                                         | Accepted                              |
 | Authorization and audit     | S0.4 tenant-safe RBAC and durable audit merged                                                | Accepted                              |
-| Inventory and reservation   | S0.5, G3.1–G3.3, G3.4–G3.6 reads/UI, G3.7 expiry, G3.8 transfers, and G3.9 damage             | Broader operations remain incomplete  |
+| Inventory and reservation   | S0.5, G3.1–G3.10 through reservation and physical batch expiry, transfer, and damage          | Broader operations remain incomplete  |
 | Frontend foundation         | Landing, login, shell, team/RBAC, audit, settings, onboarding, stock, and reservation reads   | Connected for accepted contracts      |
 | Pharmacy and inventory UI   | Assigned-provider stock, reservations, and bounded live overview use accepted reads           | Connected for accepted read contracts |
 | Remaining healthcare scope  | Most domain deployables are health-only scaffolds or absent                                   | Not implemented                       |
 
 ## Critical blockers
 
-1. G3.10 implementation requires exact-commit CI and CTO acceptance. Patient-safe
-   creation, returns, quarantine, and recall remain unmounted pending their own
-   accepted contracts and prerequisites.
+1. Patient-safe creation, returns, quarantine, and recall remain unmounted
+   pending their own accepted contracts and prerequisites.
 2. Inventory mutation UIs remain unconnected; the accepted stock, reservation,
    and overview workspaces are deliberately read-only.
 3. Consent, privacy operations, verification, retention, legal hold, and the
@@ -131,8 +121,8 @@ and [the Gates 1–20 verification](docs/audits/2026-08-01-gates-1-20-verificati
     #29 as `5521ad5` after exact-head CI run `31357016150`
 17. **G3.9 completed damaged-stock write-off** — accepted and squash-merged in
     PR #32 as `72fc92a` after exact-head CI run `31371305767`
-18. **G3.10 physical batch expiry reconciliation** — implemented; exact-commit
-    CI and CTO acceptance required
+18. **G3.10 physical batch expiry reconciliation** — accepted and squash-merged
+    in PR #35 as `ad2d15b` after exact-head CI run `31393057704`
 19. Resume remaining Inventory and Compliance milestones in dependency order
 
 Only one recovery sprint may be active at a time. Exact boundaries may be refined through an ADR, but dependencies must not be skipped.
@@ -140,7 +130,7 @@ Only one recovery sprint may be active at a time. Exact boundaries may be refine
 ## Progress reporting rule
 
 Progress is measured by accepted milestone criteria, not by the number of files
-or endpoints present. The README's 34% full-roadmap estimate and 32% frontend
+or endpoints present. The README's 35% full-roadmap estimate and 32% frontend
 estimate are planning indicators, not acceptance or release claims. They may
 change only when repository evidence and milestone acceptance change. Preview
 screens, placeholder services, unmounted routes, and schema-only foundations do

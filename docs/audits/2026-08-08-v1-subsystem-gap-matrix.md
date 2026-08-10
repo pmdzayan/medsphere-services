@@ -2,10 +2,10 @@
 
 **Audit date:** 2026-08-08
 
-**Accepted source commit:** `72fc92a552e0cd44b074aef310d1199513bdf2e0`
+**Accepted source commit:** `ad2d15bc3eb2e803217b25faac0ddebfa89405a7`
 
 **Decision:** Version 1 is not release-ready. The evidence-weighted full-roadmap
-estimate is approximately **34% complete**.
+estimate is approximately **35% complete**.
 
 ## Accepted since the prior gate audit
 
@@ -24,6 +24,8 @@ estimate is approximately **34% complete**.
   `5521ad5`.
 - G3.9 damaged-stock write-off passed exact-head CI and merged in PR #32 as
   `72fc92a`.
+- G3.10 physical batch-expiry reconciliation passed corrected exact-head CI run
+  `31393057704` and merged in PR #35 as `ad2d15b`.
 
 ## Evidence-weighted matrix
 
@@ -33,7 +35,7 @@ The readiness score is a planning aid, not a completion or compliance claim.
 | ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- | --------: |
 | Architecture, repository, CI              | ADR governance, reproducible migrations, dependency audit, boundary checker, lint/test/build gates                      | Modular-monolith consolidation, ownership completion, release operations                                   |    8.5/10 |
 | Identity, sessions, RBAC, audit           | Trusted login/refresh, tenant context, session replay protection, RBAC administration, durable audit                    | Operational retention, key rotation/runbooks, broader compliance controls                                  |    8.8/10 |
-| Inventory and reservations backend        | Ledger/FEFO integrity, reads, commands, reservation lifecycle/expiry, completed transfers, and damage write-off         | Batch-expiry reconciliation, safe creation, returns, quarantine/recall, analytics                          |    8.3/10 |
+| Inventory and reservations backend        | Ledger/FEFO integrity, reads, commands, reservation/batch expiry, completed transfers, and damage write-off             | Safe creation, returns, quarantine/recall, expiry visibility, analytics                                    |    8.5/10 |
 | Connected frontend                        | Login, shell, team/RBAC, audit, onboarding, settings, assigned-provider stock, reservations, and truthful live overview | Mutation journeys and most healthcare role journeys remain unconnected                                     |    6.5/10 |
 | API gateway/application composition       | Health scaffold and shared HTTP controls                                                                                | Accepted product routing/composition, contract tests, rate/timeout policy, observability                   |    1.5/10 |
 | Master patient index and clinical records | Schema-only medical-record foundation                                                                                   | Patient identity resolution, consent-aware access, encounters, notes, prescriptions, UI                    |    1.0/10 |
@@ -52,8 +54,8 @@ The readiness score is a planning aid, not a completion or compliance claim.
    accepted.
 2. G3.7 reservation expiry, G3.8 completed transfers, and G3.9 damaged-stock
    write-off — accepted.
-3. Verify and accept the implemented G3.10 physical batch expiry reconciliation
-   without fabricating disposal.
+3. G3.10 physical batch expiry reconciliation — accepted without fabricating
+   disposal.
 4. Add remaining inventory operations as separate contracts: safe reservation
    creation, returns, quarantine/recall, expiry visibility, and analytics.
 5. Complete the compliance foundation before exposing patient or clinical data.
@@ -64,16 +66,10 @@ The readiness score is a planning aid, not a completion or compliance claim.
 
 ## Next bounded implementation unit
 
-**G3.10 — Physical batch expiry reconciliation** is next. Its accepted
-[sprint contract](../sprints/G3.10-physical-batch-expiry-reconciliation.md) is a
-medicine-safety checkpoint that must:
-
-- use authoritative database time and bounded stable selection;
-- expire affected reservations and release every exact hold atomically;
-- mark due batches `EXPIRED` while preserving physical on-hand quantity;
-- record immutable tenant-system evidence without a stock movement; and
-- add no disposal, quarantine, recall, return, alert, notification, HTTP,
-  permission, frontend, gateway, or analytics claim.
+Selection is required from the remaining dependency-ready inventory and
+compliance gaps. No implementation may begin until a bounded contract records
+its authority, data boundary, security constraints, exclusions, and exact
+acceptance evidence.
 
 ## Release decision
 
