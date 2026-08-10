@@ -2,9 +2,9 @@
 
 **Last updated:** 2026-08-10
 
-**Current sprint:** G3.9 implementation — completed damaged-stock write-off
+**Current sprint:** Next dependency-ordered V1 contract selection
 
-**Next feature work:** Exact-commit CI and CTO acceptance for G3.9
+**Next feature work:** Select and contract the highest-value dependency-ready V1 gap
 
 ## Mandatory startup sequence
 
@@ -79,9 +79,9 @@ The migration must be incremental:
 - G3.8 passed exact-head CI run `31357016150` and was squash-merged in PR #29
   as `5521ad5` after CTO authorization.
 - G3.9 implements only an already confirmed damaged-stock write-off under the
-  contract accepted in PR #31. It does not claim quarantine, disposal, recall,
-  return, approval, or frontend behavior. Exact-commit CI and CTO acceptance
-  remain required.
+  contract accepted in PR #31. Exact-head CI run `31371305767` passed and the
+  implementation was accepted and squash-merged in PR #32 as `72fc92a`. It does
+  not claim quarantine, disposal, recall, return, approval, or frontend behavior.
 - S0.5 now defines `Batch` as physical/held quantity authority, uses an
   append-only movement ledger, and stores typed reservation items and
   allocations. Its accepted production HTTP boundary and live frontend
@@ -143,8 +143,10 @@ See `docs/audits/2026-07-20-cto-baseline.md` for the accepted baseline.
     `b7bba10`
 19. G3.8 completed inventory transfer — accepted and squash-merged in PR #29
     as `5521ad5` after exact-head CI run `31357016150`
-20. Returns/damage, safe creation, and later live
-    mutations — blocked pending their own accepted contracts
+20. G3.9 completed damaged-stock write-off — accepted and squash-merged in PR
+    #32 as `72fc92a` after exact-head CI run `31371305767`
+21. Returns, safe creation, and later live mutations — blocked pending their
+    own accepted contracts
 
 If ownership transfers, resume at the first pending checkpoint. Do not use
 `cline/s0.4-rbac-audit` or
@@ -152,10 +154,10 @@ If ownership transfers, resume at the first pending checkpoint. Do not use
 
 ## Exact continuation point
 
-Review the G3.9 implementation from accepted contract merge `11c1692`. Do not
-advance accepted source or progress until exact-commit CI and CTO acceptance.
-Reservation creation, returns, quarantine/recall, analytics policy, patient
-exposure, and Gates 2 and 4–9 remain blocked by their recorded dependencies.
+Select the next highest-value dependency-ready V1 gap from accepted source
+`72fc92a`. Reservation creation, returns, quarantine/recall, analytics policy,
+patient exposure, and Gates 2 and 4–9 remain blocked by their recorded
+dependencies until a bounded contract explicitly resolves them.
 
 Cline may receive only a complete, bounded prompt for characterization tests or
 mechanical work whose contract is already fixed by ADR-005. Cline must not
