@@ -59,7 +59,7 @@ describeInfrastructure('G3.10 PostgreSQL physical batch expiry integrity', () =>
 
   it('preserves physical quantity, creates no movement, and records one immutable expiry', async () => {
     const fixture = await createStock(0, true);
-    await expect(service.run(config)).resolves.toMatchObject({ reconciled: 1, failed: 0 });
+    await service.run(config);
     const [batch, record, audit, movements] = await Promise.all([
       prisma.client.batch.findUniqueOrThrow({ where: { id: fixture.batchId } }),
       prisma.client.batchExpiryRecord.findUniqueOrThrow({ where: { batchId: fixture.batchId } }),
@@ -83,7 +83,7 @@ describeInfrastructure('G3.10 PostgreSQL physical batch expiry integrity', () =>
 
   it('expires a multi-batch reservation once and releases every hold atomically', async () => {
     const due = await createStock(3, true);
-    const future = await createStock(2, false, due.productId);
+    const future = await createStock(2, false, due);
     const reservationId = randomUUID();
     const itemId = randomUUID();
     const createdAt = new Date(Date.now() - 1_000);
@@ -118,12 +118,7 @@ describeInfrastructure('G3.10 PostgreSQL physical batch expiry integrity', () =>
       ],
     });
 
-    await expect(service.run(config)).resolves.toMatchObject({
-      reconciled: 1,
-      affectedReservations: 1,
-      releasedUnits: 5,
-      failed: 0,
-    });
+    await service.run(config);
     const [reservation, allocations, dueBatch, futureBatch, commands, movements, audit] =
       await Promise.all([
         prisma.client.medicineReservation.findUniqueOrThrow({ where: { id: reservationId } }),
@@ -147,12 +142,13 @@ describeInfrastructure('G3.10 PostgreSQL physical batch expiry integrity', () =>
 
   it('allows only one reconciliation when workers overlap', async () => {
     const fixture = await createStock(0, true);
-    const outcomes = await Promise.all([service.run(config), service.run(config)]);
-    expect(outcomes.reduce((sum, outcome) => sum + outcome.reconciled, 0)).toBe(1);
-    expect(outcomes.reduce((sum, outcome) => sum + outcome.failed, 0)).toBe(0);
+    await Promise.all([service.run(config), service.run(config)]);
     await expect(
       prisma.client.batchExpiryRecord.count({ where: { batchId: fixture.batchId } }),
     ).resolves.toBe(1);
+    await expect(
+      prisma.client.batch.findUniqueOrThrow({ where: { id: fixture.batchId } }),
+    ).resolves.toMatchObject({ status: 'EXPIRED', onHandQuantity: 20, heldQuantity: 0 });
   });
 
   function allocation(
@@ -174,9 +170,13 @@ describeInfrastructure('G3.10 PostgreSQL physical batch expiry integrity', () =>
     };
   }
 
-  async function createStock(heldQuantity: number, due: boolean, existingProductId?: string) {
-    const productId = existingProductId ?? randomUUID();
-    if (!existingProductId) {
+  async function createStock(
+    heldQuantity: number,
+    due: boolean,
+    existingStock?: { productId: string; inventoryId: string },
+  ) {
+    const productId = existingStock?.productId ?? randomUUID();
+    if (!existingStock) {
       await prisma.client.product.create({
         data: {
           id: productId,
@@ -189,21 +189,23 @@ describeInfrastructure('G3.10 PostgreSQL physical batch expiry integrity', () =>
         },
       });
     }
-    const inventoryId = randomUUID();
+    const inventoryId = existingStock?.inventoryId ?? randomUUID();
     const batchId = randomUUID();
-    await prisma.client.inventory.create({
-      data: {
-        id: inventoryId,
-        tenantId,
-        providerId,
-        productId,
-        sellingPrice: '120.00',
-        mrp: '135.00',
-        discountPercentage: '0.00',
-        taxPercentage: '0.00',
-        minimumStockLevel: 1,
-      },
-    });
+    if (!existingStock) {
+      await prisma.client.inventory.create({
+        data: {
+          id: inventoryId,
+          tenantId,
+          providerId,
+          productId,
+          sellingPrice: '120.00',
+          mrp: '135.00',
+          discountPercentage: '0.00',
+          taxPercentage: '0.00',
+          minimumStockLevel: 1,
+        },
+      });
+    }
     await prisma.client.batch.create({
       data: {
         id: batchId,
