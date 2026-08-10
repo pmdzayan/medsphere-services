@@ -2,11 +2,11 @@
 
 **Status date:** 2026-08-09
 
-**Accepted source commit:** `b7bba10dc95571ad0ce60f4fa5e68886a6fbf9ae`
+**Accepted source commit:** `79d81aef47146d3eaad1bd398f0891ca1e0a2d9d`
 
 **Accepted stabilization baseline:** `4ea55a17e188410ddee45fa3ea6c016e22d6617a`
 
-**Current sprint:** G3.8 contract — completed inventory transfer
+**Current sprint:** G3.8 implementation — completed inventory transfer
 
 **Release state:** Not approved for production or real healthcare data
 
@@ -16,17 +16,17 @@
 
 ### G3.8 — Completed Inventory Transfer
 
-**Status:** ADR-009 and the G3.8 sprint contract are proposed for CTO review.
-Implementation has not started. Overall V1 progress remains 32%.
+**Status:** Implemented; exact-commit CI and CTO acceptance required. Overall
+V1 progress remains 32% until acceptance.
 
 **Dependency:** ADR-005, G3.2, ADR-007, and G3.7 provide batch authority,
 immutable movements, serializable commands, provider assignment, and safe held
 stock behavior. Destination inventory configuration must already exist.
 
-**Proposed implementation authority:** ADR-001 through ADR-009, merged PRs
-#10–27, the `docs/audits/2026-08-08-v1-subsystem-gap-matrix.md` audit, and
-`docs/sprints/G3.8-completed-inventory-transfer.md`. ADR-009 and the sprint
-contract must be accepted before implementation begins.
+**Implementation authority:** ADR-001 through ADR-009, merged PRs #10–28, the
+`docs/audits/2026-08-08-v1-subsystem-gap-matrix.md` audit, and
+`docs/sprints/G3.8-completed-inventory-transfer.md`. The contract was accepted
+in PR #28 as `79d81ae`.
 
 **In scope**
 
@@ -60,8 +60,8 @@ contract must be accepted before implementation begins.
 ## Critical blockers
 
 1. Patient-safe reservation creation, return, damage, quarantine, and recall
-   remain intentionally unmounted. G3.8 transfer implementation is blocked
-   until its proposed architecture and sprint contract are accepted.
+   remain intentionally unmounted. G3.8 acceptance remains gated on exact-head
+   CI and CTO review.
 2. Inventory mutation UIs remain unconnected; the accepted stock, reservation,
    and overview workspaces are deliberately read-only.
 3. Consent, privacy operations, verification, retention, legal hold, and the
@@ -106,8 +106,8 @@ and [the Gates 1–20 verification](docs/audits/2026-08-01-gates-1-20-verificati
     `63707b8`
 15. **G3.7 reservation expiry worker** — accepted and squash-merged in PR #26
     as `b7bba10`
-16. **G3.8 completed inventory transfer** — ADR and sprint contract proposed;
-    implementation blocked pending CTO acceptance
+16. **G3.8 completed inventory transfer** — contract accepted in PR #28 as
+    `79d81ae`; implementation awaits exact-commit CI and CTO acceptance
 17. Resume remaining Inventory and Compliance milestones in dependency order
 
 Only one recovery sprint may be active at a time. Exact boundaries may be refined through an ADR, but dependencies must not be skipped.
