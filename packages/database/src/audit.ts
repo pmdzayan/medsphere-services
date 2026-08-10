@@ -21,6 +21,7 @@ export const AUDIT_EVENT_TYPES = [
   'inventory.stock.adjusted',
   'inventory.stock.transferred',
   'inventory.stock.damaged',
+  'inventory.batch.expired',
   'inventory.reservation.created',
   'inventory.reservation.confirmed',
   'inventory.reservation.ready',
@@ -60,12 +61,19 @@ export const AUDIT_METADATA_KEYS = {
     'quantity',
   ],
   'inventory.stock.damaged': ['productId', 'quantity', 'onHandBefore', 'onHandAfter'],
+  'inventory.batch.expired': [
+    'productId',
+    'onHandQuantity',
+    'affectedReservations',
+    'releasedUnits',
+    'resultingVersion',
+  ],
   'inventory.reservation.created': ['itemCount', 'totalQuantity', 'expiresAt'],
   'inventory.reservation.confirmed': ['previousStatus', 'version'],
   'inventory.reservation.ready': ['previousStatus', 'version'],
   'inventory.reservation.completed': ['previousStatus', 'version', 'totalQuantity'],
   'inventory.reservation.cancelled': ['previousStatus', 'version', 'totalQuantity'],
-  'inventory.reservation.expired': ['previousStatus', 'version', 'totalQuantity'],
+  'inventory.reservation.expired': ['previousStatus', 'version', 'totalQuantity', 'cause'],
 } as const satisfies Record<AuditEventType, readonly string[]>;
 
 const AUDIT_EVENT_TYPE_SET = new Set<string>(AUDIT_EVENT_TYPES);
@@ -86,6 +94,7 @@ interface AuditEventInput {
   readonly resourceId?: string;
   readonly metadata?: AuditMetadata;
   readonly request?: AuditRequestContext;
+  readonly occurredAt?: Date;
 }
 
 export interface TenantUserAuditEventInput extends AuditEventInput {
@@ -228,6 +237,7 @@ export class AuditWriter {
       ipAddress: input.request?.ipAddress,
       userAgent: this.optionalBounded(input.request?.userAgent, 512, 'user agent'),
       metadata: validateAuditMetadata(input.eventType, input.metadata ?? {}),
+      occurredAt: this.optionalDate(input.occurredAt),
     };
   }
 
@@ -241,6 +251,14 @@ export class AuditWriter {
     }
     if (value.length === 0 || value.length > maximum) {
       throw new Error(`Invalid audit ${label}`);
+    }
+    return value;
+  }
+
+  private optionalDate(value: Date | undefined): Date | undefined {
+    if (value === undefined) return undefined;
+    if (!(value instanceof Date) || Number.isNaN(value.getTime())) {
+      throw new Error('Invalid audit occurrence timestamp');
     }
     return value;
   }

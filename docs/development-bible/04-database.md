@@ -107,6 +107,15 @@ held quantity not exceeding on-hand quantity, movement arithmetic equality,
 same-tenant composite foreign keys, deterministic uniqueness, immutable
 movement rows, explicit reservation transitions, and tenant-scoped idempotency.
 
+### G3.10 physical batch expiry evidence
+
+`BatchExpiryRecord` is the one-per-batch, append-only proof that a due physical
+batch was marked unusable. Composite foreign keys bind tenant, inventory,
+provider, product, and batch scope. It records the original expiry date,
+unchanged on-hand quantity, resulting batch version, and one database-authority
+timestamp used for both reconciliation and creation. Expiry changes no physical
+quantity and therefore creates no `StockMovement`.
+
 ## Table catalogue
 
 Types below describe the PostgreSQL representation. Columns are required unless marked nullable (`?`). Prisma-managed `updatedAt` values are application-generated during Prisma updates, not database triggers.

@@ -10,6 +10,7 @@ import { InventoryTransferService } from './inventory-transfer.service';
 import { InventoryDamageService } from './inventory-damage.service';
 import { ReservationLifecycleService } from './reservation-lifecycle.service';
 import { ReservationExpiryService } from './reservation-expiry.service';
+import { BatchExpiryService } from './batch-expiry.service';
 import { ReservationRepository } from './reservation.repository';
 import { ReservationService } from './reservation.service';
 
@@ -26,6 +27,7 @@ import { ReservationService } from './reservation.service';
     ReservationService,
     ReservationLifecycleService,
     ReservationExpiryService,
+    BatchExpiryService,
   ],
   exports: [InventoryService],
 })

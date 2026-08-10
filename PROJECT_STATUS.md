@@ -16,9 +16,9 @@
 
 ### G3.10 — Physical Batch Expiry Reconciliation
 
-**Status:** ADR-011 and the sprint contract are accepted for implementation after
-exact-head contract CI run `31385954854` passed and CTO review found no unresolved
-contract defect. Overall V1 progress remains 34% until implementation acceptance.
+**Status:** Implemented; exact-commit CI and CTO acceptance required. Contract CI
+run `31385954854` passed, but implementation evidence is not yet accepted.
+Overall V1 progress remains 34% until implementation acceptance.
 
 **Selection reason:** Expired dates already fail availability checks, but
 `ACTIVE` batch state and future-dated reservation holds can remain unreconciled.
@@ -80,9 +80,9 @@ contract were accepted in PR #31 as `11c1692`.
 
 ## Critical blockers
 
-1. G3.10 implementation is pending. Patient-safe creation, returns, quarantine,
-   and recall remain unmounted pending their own accepted contracts and
-   prerequisites.
+1. G3.10 implementation requires exact-commit CI and CTO acceptance. Patient-safe
+   creation, returns, quarantine, and recall remain unmounted pending their own
+   accepted contracts and prerequisites.
 2. Inventory mutation UIs remain unconnected; the accepted stock, reservation,
    and overview workspaces are deliberately read-only.
 3. Consent, privacy operations, verification, retention, legal hold, and the
@@ -131,8 +131,8 @@ and [the Gates 1–20 verification](docs/audits/2026-08-01-gates-1-20-verificati
     #29 as `5521ad5` after exact-head CI run `31357016150`
 17. **G3.9 completed damaged-stock write-off** — accepted and squash-merged in
     PR #32 as `72fc92a` after exact-head CI run `31371305767`
-18. **G3.10 physical batch expiry reconciliation** — ADR-011 and the sprint
-    contract accepted; implementation pending
+18. **G3.10 physical batch expiry reconciliation** — implemented; exact-commit
+    CI and CTO acceptance required
 19. Resume remaining Inventory and Compliance milestones in dependency order
 
 Only one recovery sprint may be active at a time. Exact boundaries may be refined through an ADR, but dependencies must not be skipped.

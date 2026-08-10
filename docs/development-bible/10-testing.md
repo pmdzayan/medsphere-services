@@ -168,6 +168,8 @@ S0.5 must add real PostgreSQL tests for:
 - deterministic FEFO under equal expiry and contention;
 - tenant-scoped idempotency; and
 - atomic stock/reservation audit evidence.
+- authoritative-time, bounded-selection, overlap, idempotency, rollback, and
+  append-only evidence for physical batch expiry without stock movement.
 
 HTTP tests must prove trusted identity, permission denial, tenant isolation,
 version and idempotency validation, bounded queries, and continued 404 behavior
