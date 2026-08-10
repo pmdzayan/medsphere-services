@@ -31,22 +31,22 @@ estimate is approximately **35% complete**.
 
 The readiness score is a planning aid, not a completion or compliance claim.
 
-| Subsystem                                 | Accepted evidence                                                                                                       | Missing before V1 acceptance                                                                               | Readiness |
-| ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- | --------: |
-| Architecture, repository, CI              | ADR governance, reproducible migrations, dependency audit, boundary checker, lint/test/build gates                      | Modular-monolith consolidation, ownership completion, release operations                                   |    8.5/10 |
-| Identity, sessions, RBAC, audit           | Trusted login/refresh, tenant context, session replay protection, RBAC administration, durable audit                    | Operational retention, key rotation/runbooks, broader compliance controls                                  |    8.8/10 |
-| Inventory and reservations backend        | Ledger/FEFO integrity, reads, commands, reservation/batch expiry, completed transfers, and damage write-off             | Safe creation, returns, quarantine/recall, expiry visibility, analytics                                    |    8.5/10 |
-| Connected frontend                        | Login, shell, team/RBAC, audit, onboarding, settings, assigned-provider stock, reservations, and truthful live overview | Mutation journeys and most healthcare role journeys remain unconnected                                     |    6.5/10 |
-| API gateway/application composition       | Health scaffold and shared HTTP controls                                                                                | Accepted product routing/composition, contract tests, rate/timeout policy, observability                   |    1.5/10 |
-| Master patient index and clinical records | Schema-only medical-record foundation                                                                                   | Patient identity resolution, consent-aware access, encounters, notes, prescriptions, UI                    |    1.0/10 |
-| Compliance foundation                     | RBAC, audit, limited personal preference/privacy settings                                                               | Consent, verification, retention, deletion, legal hold, purpose/policy enforcement                         |    2.0/10 |
-| Unified event delivery                    | Transport-neutral event envelope only                                                                                   | Outbox/inbox persistence, dispatcher, idempotent consumers, retry/dead-letter evidence                     |    1.0/10 |
-| Notifications                             | Health-only application                                                                                                 | Templates, preferences, email/SMS/push adapters, workers, delivery evidence                                |    0.5/10 |
-| Billing and finance                       | Health-only application and schema fragments                                                                            | Invoices, journal, payments, insurance, reconciliation, audit, UI                                          |    0.5/10 |
-| Search and availability                   | Health-only application                                                                                                 | Tenant-safe discovery, geospatial/resource availability models and contracts                               |    0.5/10 |
-| Documents and workflow                    | No accepted runtime boundary                                                                                            | Storage, signatures, access policy, workflow definitions, approvals, audit                                 |    0.0/10 |
-| Supplier and procurement                  | No accepted end-to-end workflow                                                                                         | Supplier verification, purchase orders, approvals, receipt integration, dashboard                          |    0.5/10 |
-| Production operations                     | PR quality gates and deployment freeze                                                                                  | Deployment, secrets operations, observability, backup/restore, DR, performance, penetration test, runbooks |    2.0/10 |
+| Subsystem                                 | Accepted evidence                                                                                                       | Missing before V1 acceptance                                                                                 | Readiness |
+| ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ | --------: |
+| Architecture, repository, CI              | ADR governance, reproducible migrations, dependency audit, boundary checker, lint/test/build gates                      | Modular-monolith consolidation, ownership completion, release operations                                     |    8.5/10 |
+| Identity, sessions, RBAC, audit           | Trusted login/refresh, tenant context, session replay protection, RBAC administration, durable audit                    | Operational retention, key rotation/runbooks, broader compliance controls                                    |    8.8/10 |
+| Inventory and reservations backend        | Ledger/FEFO integrity, reads, commands, reservation/batch expiry, completed transfers, and damage write-off             | G3.11 quarantine implementation/release, safe creation, returns, recall, focused expiry worklists, analytics |    8.5/10 |
+| Connected frontend                        | Login, shell, team/RBAC, audit, onboarding, settings, assigned-provider stock, reservations, and truthful live overview | Mutation journeys and most healthcare role journeys remain unconnected                                       |    6.5/10 |
+| API gateway/application composition       | Health scaffold and shared HTTP controls                                                                                | Accepted product routing/composition, contract tests, rate/timeout policy, observability                     |    1.5/10 |
+| Master patient index and clinical records | Schema-only medical-record foundation                                                                                   | Patient identity resolution, consent-aware access, encounters, notes, prescriptions, UI                      |    1.0/10 |
+| Compliance foundation                     | RBAC, audit, limited personal preference/privacy settings                                                               | Consent, verification, retention, deletion, legal hold, purpose/policy enforcement                           |    2.0/10 |
+| Unified event delivery                    | Transport-neutral event envelope only                                                                                   | Outbox/inbox persistence, dispatcher, idempotent consumers, retry/dead-letter evidence                       |    1.0/10 |
+| Notifications                             | Health-only application                                                                                                 | Templates, preferences, email/SMS/push adapters, workers, delivery evidence                                  |    0.5/10 |
+| Billing and finance                       | Health-only application and schema fragments                                                                            | Invoices, journal, payments, insurance, reconciliation, audit, UI                                            |    0.5/10 |
+| Search and availability                   | Health-only application                                                                                                 | Tenant-safe discovery, geospatial/resource availability models and contracts                                 |    0.5/10 |
+| Documents and workflow                    | No accepted runtime boundary                                                                                            | Storage, signatures, access policy, workflow definitions, approvals, audit                                   |    0.0/10 |
+| Supplier and procurement                  | No accepted end-to-end workflow                                                                                         | Supplier verification, purchase orders, approvals, receipt integration, dashboard                            |    0.5/10 |
+| Production operations                     | PR quality gates and deployment freeze                                                                                  | Deployment, secrets operations, observability, backup/restore, DR, performance, penetration test, runbooks   |    2.0/10 |
 
 ## Dependency-ordered closure path
 
@@ -56,8 +56,9 @@ The readiness score is a planning aid, not a completion or compliance claim.
    write-off — accepted.
 3. G3.10 physical batch expiry reconciliation — accepted without fabricating
    disposal.
-4. Add remaining inventory operations as separate contracts: safe reservation
-   creation, returns, quarantine/recall, expiry visibility, and analytics.
+4. Implement the accepted G3.11 one-way quarantine contract, then add remaining
+   inventory operations separately: safe creation, returns, quarantine release,
+   recall, focused expiry worklists, and analytics.
 5. Complete the compliance foundation before exposing patient or clinical data.
 6. Build event delivery before notification, workflow, analytics, or other
    asynchronous platform behavior claims completion.
@@ -66,10 +67,16 @@ The readiness score is a planning aid, not a completion or compliance claim.
 
 ## Next bounded implementation unit
 
-Selection is required from the remaining dependency-ready inventory and
-compliance gaps. No implementation may begin until a bounded contract records
-its authority, data boundary, security constraints, exclusions, and exact
-acceptance evidence.
+**G3.11 — One-way manual batch quarantine** is next. Its accepted
+[sprint contract](../sprints/G3.11-one-way-manual-batch-quarantine.md) is a
+medicine-safety boundary that must:
+
+- require trusted provider assignment and a dedicated permission;
+- atomically cancel every reservation holding the quarantined batch;
+- preserve physical on-hand quantity and create no stock movement;
+- record one immutable receipt and bounded tenant-user/system audits; and
+- add no release, recall, disposal, return, notification, free-text evidence,
+  mutation UI, gateway, or second service.
 
 ## Release decision
 

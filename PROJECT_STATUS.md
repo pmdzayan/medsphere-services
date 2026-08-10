@@ -6,11 +6,34 @@
 
 **Accepted stabilization baseline:** `4ea55a17e188410ddee45fa3ea6c016e22d6617a`
 
-**Current sprint:** Next dependency-ordered V1 contract selection
+**Current sprint:** G3.11 implementation — one-way manual batch quarantine
 
 **Release state:** Not approved for production or real healthcare data
 
 **Full-roadmap engineering estimate:** 35% complete / 65% remaining
+
+## Current sprint
+
+### G3.11 — One-Way Manual Batch Quarantine
+
+**Status:** Contract accepted; implementation not started. Overall V1 progress
+remains 35% until exact-head implementation CI and CTO acceptance.
+
+**Selection reason:** The accepted stock read already exposes expiry dates and
+batch states, so a separate visibility-only sprint would duplicate working
+behavior. Patient reservation creation remains blocked by privacy and authority;
+returns need supplier/refund policy; analytics needs event delivery; and full
+recall needs a broader regulatory lifecycle. A one-way quality quarantine is
+the strongest dependency-ready medicine-safety command.
+
+**Accepted boundary:** Assigned staff may move one active unexpired batch to
+`QUARANTINED`, atomically cancel reservations holding it, preserve physical
+quantity, and record immutable evidence. Release, recall, disposal, return,
+notifications, free-text evidence, and mutation UI are excluded.
+
+**Implementation authority:** ADR-001 through ADR-012, accepted source
+`df71854`, and
+`docs/sprints/G3.11-one-way-manual-batch-quarantine.md`.
 
 ## Most recent accepted sprint
 
@@ -71,8 +94,9 @@ V1 gap matrix, and
 
 ## Critical blockers
 
-1. Patient-safe creation, returns, quarantine, and recall remain unmounted
-   pending their own accepted contracts and prerequisites.
+1. G3.11 quarantine implementation requires exact-commit CI and CTO acceptance.
+   Quarantine release, patient-safe creation, returns, and recall remain
+   unmounted pending their own accepted contracts and prerequisites.
 2. Inventory mutation UIs remain unconnected; the accepted stock, reservation,
    and overview workspaces are deliberately read-only.
 3. Consent, privacy operations, verification, retention, legal hold, and the
@@ -123,7 +147,9 @@ and [the Gates 1–20 verification](docs/audits/2026-08-01-gates-1-20-verificati
     PR #32 as `72fc92a` after exact-head CI run `31371305767`
 18. **G3.10 physical batch expiry reconciliation** — accepted and squash-merged
     in PR #35 as `ad2d15b` after exact-head CI run `31393057704`
-19. Resume remaining Inventory and Compliance milestones in dependency order
+19. **G3.11 one-way manual batch quarantine** — contract accepted;
+    implementation not started
+20. Resume remaining Inventory and Compliance milestones in dependency order
 
 Only one recovery sprint may be active at a time. Exact boundaries may be refined through an ADR, but dependencies must not be skipped.
 
