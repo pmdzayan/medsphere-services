@@ -2,22 +2,22 @@
 
 **Status date:** 2026-08-10
 
-**Accepted source commit:** `093060809df31378298672e2288c9be0a68d63f7`
+**Accepted source commit:** `72fc92a552e0cd44b074aef310d1199513bdf2e0`
 
 **Accepted stabilization baseline:** `4ea55a17e188410ddee45fa3ea6c016e22d6617a`
 
-**Current sprint:** G3.9 implementation — completed damaged-stock write-off
+**Current sprint:** Next dependency-ordered V1 contract selection
 
 **Release state:** Not approved for production or real healthcare data
 
-**Full-roadmap engineering estimate:** 33% complete / 67% remaining
+**Full-roadmap engineering estimate:** 34% complete / 66% remaining
 
-## Current sprint
+## Most recent accepted sprint
 
 ### G3.9 — Completed Damaged-Stock Write-off
 
-**Status:** Implemented; exact-commit CI and CTO acceptance required. Overall V1
-progress remains 33% until acceptance.
+**Status:** Selection required. G3.9 is accepted and squash-merged in PR #32 as
+`72fc92a` after exact-head CI run `31371305767` passed all required gates.
 
 **Dependency:** ADR-005, G3.2, ADR-007, G3.7, and G3.8 provide batch authority,
 immutable movements, serializable commands, provider assignment, held-stock
@@ -59,8 +59,8 @@ contract were accepted in PR #31 as `11c1692`.
 
 ## Critical blockers
 
-1. G3.9 requires exact-commit CI and CTO acceptance. Patient-safe creation,
-   returns, quarantine, and recall remain unmounted pending their own contracts.
+1. Patient-safe creation, returns, quarantine, and recall remain unmounted
+   pending their own accepted contracts and prerequisites.
 2. Inventory mutation UIs remain unconnected; the accepted stock, reservation,
    and overview workspaces are deliberately read-only.
 3. Consent, privacy operations, verification, retention, legal hold, and the
@@ -107,8 +107,8 @@ and [the Gates 1–20 verification](docs/audits/2026-08-01-gates-1-20-verificati
     as `b7bba10`
 16. **G3.8 completed inventory transfer** — accepted and squash-merged in PR
     #29 as `5521ad5` after exact-head CI run `31357016150`
-17. **G3.9 completed damaged-stock write-off** — implemented; exact-commit CI
-    and CTO acceptance required
+17. **G3.9 completed damaged-stock write-off** — accepted and squash-merged in
+    PR #32 as `72fc92a` after exact-head CI run `31371305767`
 18. Resume remaining Inventory and Compliance milestones in dependency order
 
 Only one recovery sprint may be active at a time. Exact boundaries may be refined through an ADR, but dependencies must not be skipped.
@@ -116,7 +116,7 @@ Only one recovery sprint may be active at a time. Exact boundaries may be refine
 ## Progress reporting rule
 
 Progress is measured by accepted milestone criteria, not by the number of files
-or endpoints present. The README's 33% full-roadmap estimate and 32% frontend
+or endpoints present. The README's 34% full-roadmap estimate and 32% frontend
 estimate are planning indicators, not acceptance or release claims. They may
 change only when repository evidence and milestone acceptance change. Preview
 screens, placeholder services, unmounted routes, and schema-only foundations do

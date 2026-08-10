@@ -8,11 +8,11 @@ MedSphere is a planned multi-tenant healthcare ecosystem for patients, pharmacie
 
 **Status date:** 2026-08-10
 
-**Accepted evidence baseline:** `5521ad5` (PR #29 squash merge)
+**Accepted evidence baseline:** `72fc92a` (PR #32 squash merge)
 
-**Current sprint:** G3.9 damaged-stock write-off implemented; exact-commit CI and CTO acceptance required
+**Current sprint:** Next dependency-ordered V1 contract selection
 
-**Full-roadmap estimate:** **33% complete / 67% remaining**
+**Full-roadmap estimate:** **34% complete / 66% remaining**
 
 This is an engineering progress estimate against the complete MedSphere roadmap,
 including stabilization, healthcare-domain workflows, frontend applications,

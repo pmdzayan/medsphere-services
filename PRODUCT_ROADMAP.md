@@ -38,8 +38,8 @@ Ordered sprints:
     `b7bba10`
 15. G3.8 Completed inventory transfer — accepted and squash-merged in PR #29
     as `5521ad5`
-16. G3.9 Completed damaged-stock write-off — implemented; exact-commit CI and
-    CTO acceptance required
+16. G3.9 Completed damaged-stock write-off — accepted and squash-merged in PR
+    #32 as `72fc92a` after exact-head CI run `31371305767`
 
 **Completion gate:** Accepted ADRs; protected review flow; clean migrations; deny-by-default authentication; tenant-isolation tests; integrated audit trail; atomic stock/reservation behavior; mandatory lint/test/build passing.
 
