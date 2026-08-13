@@ -87,15 +87,19 @@ Hospital profiles, departments, branches, staff, beds, appointments, calendars, 
 
 **Status:** Planned for V1; not implemented.
 
-**Purpose:** Add a safety-critical blood-component inventory and near-real-time availability capability for verified hospital blood banks and standalone blood-bank providers.
+**Purpose:** Build a clinically controlled hospital-to-blood-bank network for near-real-time blood-component availability. The feature is primarily B2B: an authorized hospital or clinician records a real blood requirement, MedSphere discovers verified provider availability, and authorized blood-bank staff control any hold, allocation, or release.
 
-**Scope:** Verified blood-bank profiles; blood-component inventory; ABO/Rh classification; unit/bag identifiers; collection and expiry timestamps; auditable lifecycle states; near-real-time aggregate availability with freshness timestamps; authorized location-aware availability search; atomic holds/reservations; emergency requests; low-stock and urgent-request events; operational dashboards; tenant isolation; RBAC; durable audit; concurrency and idempotency protections.
+**Primary users:** Hospital/clinical staff create and track blood requirements; blood-bank staff maintain inventory and respond to requests; doctors may initiate or confirm the clinical need under accepted policy. Patients/families receive only restricted discovery or emergency-assistance access and cannot directly reserve, allocate, select, or release a blood unit. Donor workflows are outside this V1 boundary.
 
-**Clinical/privacy boundary:** Public or patient-facing views expose safe aggregate availability only. Donor identity and sensitive unit-level clinical data are not exposed. MedSphere does not determine transfusion compatibility or clinical release from ABO/Rh alone; crossmatch, compatibility testing, final unit selection, and transfusion authorization remain blood-bank/clinical responsibilities.
+**Scope:** Verified blood-bank profiles; blood-component inventory; ABO/Rh classification; unit/bag identifiers inside the provider boundary; collection and expiry timestamps; auditable lifecycle states; clinically triggered blood-requirement records; hospital-to-blood-bank requests; near-real-time aggregate availability with freshness timestamps; authorized location-aware search; atomic provider-side holds; bounded emergency escalation; low-stock and urgent-request events; hospital and blood-bank dashboards; tenant isolation; RBAC; durable audit; concurrency and idempotency protections.
 
-**Dependencies:** Core inventory safety; compliance prerequisites; verified-provider authority; shared search/live-availability infrastructure; event delivery; notification platform; frontend integration; production verification.
+**Reference flow:** Documented patient need → authorized hospital/doctor creates or confirms requirement → MedSphere searches verified aggregate availability → hospital sends request → blood bank confirms and may create an atomic hold → crossmatch/compatibility testing and final unit selection remain in the clinical/blood-bank workflow → authorized blood-bank release and lifecycle evidence are recorded.
 
-**Completion gate:** Accepted schema and migrations; tenant-safe authorization; immutable inventory evidence; audit coverage; concurrency/idempotency tests; API contracts; real PostgreSQL integration evidence; safe staff/patient frontend workflows; exact-head CI; security/privacy review; CTO acceptance.
+**Clinical/privacy boundary:** Public or patient-facing views expose safe aggregate availability and provider information only. Donor identity and sensitive unit-level clinical data are not exposed. A displayed availability count is not a guarantee of suitability for a specific patient. MedSphere does not determine transfusion compatibility or clinical release from ABO/Rh alone; crossmatch, compatibility testing, final unit selection, and transfusion authorization remain blood-bank/clinical responsibilities.
+
+**Dependencies:** Core inventory safety; compliance prerequisites; verified-provider authority; shared search/live-availability infrastructure; event delivery; notification platform; hospital/blood-bank frontend integration; restricted patient discovery/emergency assistance; production verification.
+
+**Completion gate:** Accepted schema and migrations; tenant-safe authorization; verified-provider authority; immutable inventory evidence; audit coverage; concurrency/idempotency tests; API contracts; real PostgreSQL integration evidence; hospital/blood-bank workflows; restricted patient-facing behavior; exact-head CI; security/privacy review; CTO acceptance.
 
 Detailed scope: [V1 Blood Bank and Live Blood Availability Scope](docs/sprints/V1-blood-bank-live-availability-scope.md).
 
@@ -117,7 +121,7 @@ Shared event delivery, notification engine, search/live-availability infrastruct
 
 ## Milestone 10 — Frontend
 
-Authentication, responsive dashboards and workflows for accepted backend modules, accessibility, dark mode, and contract-tested API integration. Blood-bank staff workflows and patient-safe live blood availability views are included once their backend contracts are accepted.
+Authentication, responsive dashboards and workflows for accepted backend modules, accessibility, dark mode, and contract-tested API integration. Blood availability frontend scope prioritizes hospital and blood-bank staff workflows. Patient-facing behavior, if enabled by policy, is limited to safe aggregate facility discovery, emergency assistance, and non-sensitive request status; patients do not directly reserve individual blood units.
 
 ## Milestone 11 — Verification and Production Release
 
