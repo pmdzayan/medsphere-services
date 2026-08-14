@@ -127,6 +127,7 @@ infrastructure('G3.11 PostgreSQL one-way batch quarantine integrity', () => {
     const reservationId = randomUUID();
     const itemId = randomUUID();
     const readyAt = new Date();
+    const createdAt = new Date(readyAt.getTime() - 1_000);
     await prisma.client.medicineReservation.create({
       data: {
         id: reservationId,
@@ -136,6 +137,7 @@ infrastructure('G3.11 PostgreSQL one-way batch quarantine integrity', () => {
         status: 'READY',
         confirmedAt: readyAt,
         readyAt,
+        createdAt,
         expiresAt: new Date(readyAt.getTime() + 86_400_000),
         idempotencyKey: `g311-reservation-${reservationId}`,
         creationHash: 'a'.repeat(64),
