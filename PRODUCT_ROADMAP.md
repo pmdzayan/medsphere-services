@@ -68,6 +68,9 @@ Ordered sprints:
     in PR #54 as `3e7a8c0` after exact-head CI run `31793020883`
 30. G3.23 Notification delivery foundation — accepted and squash-merged in PR
     #56 as `fcc6e46` after exact-head CI run `31796185118`
+31. G3.24 Reservation-ready notification consumer — implementation in review;
+    not accepted until exact-head CI, review, merge, and acceptance evidence
+    are complete
 
 **Completion gate:** Accepted ADRs; protected review flow; clean migrations; deny-by-default authentication; tenant-isolation tests; integrated audit trail; atomic stock/reservation behavior; mandatory lint/test/build passing.
 
