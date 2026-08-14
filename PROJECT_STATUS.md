@@ -2,11 +2,11 @@
 
 **Status date:** 2026-08-14
 
-**Accepted source commit:** `3c92e5d31bfb461e2db50d912073e2d3bd9091fe`
+**Accepted source commit:** `9f733a77228a8cfc479f64f776e26b57a4038186`
 
 **Accepted stabilization baseline:** `4ea55a17e188410ddee45fa3ea6c016e22d6617a`
 
-**Current sprint:** G3.17 live staff reservation creation acceptance
+**Current sprint:** G3.18 assigned-provider expiry worklist acceptance
 
 **Release state:** Not approved for production or real healthcare data
 
@@ -14,41 +14,41 @@
 
 ## Most recent accepted sprint
 
-### G3.16 — Assigned-Provider Staff Reservation Creation
-
-**Status:** Accepted and squash-merged in PR #46 as `3c92e5d` after exact-head
-CI run `31767059794` passed all required gates.
-
-**Selection reason:** The accepted reservation aggregate and assigned-provider
-stock/lifecycle boundaries could expose staff creation without adding public or
-patient-self-service authority.
-
-**Boundary:** One permission-protected assigned-provider staff command creates a
-future reservation for an active user in the same tenant, allocates visible
-active unexpired batches in deterministic FEFO order, and records holds and a
-bounded audit event atomically. Public/patient self-service, clinical content,
-prescriptions, delivery, payment, controlled medicine, substitution, partial
-allocation, notifications, and analytics remain excluded.
-
-**Implementation authority:** ADR-005, accepted source `3c92e5d`, and
-`docs/sprints/G3.16-assigned-provider-staff-reservation-creation.md`.
-
-## Active acceptance candidate
-
 ### G3.17 — Live Staff Reservation Creation
 
-**Status:** Implemented from accepted source `3c92e5d`; exact-head CI and CTO
-acceptance are required.
+**Status:** Accepted and squash-merged in PR #47 as `9f733a7` after exact-head
+CI run `31767805254` passed all required gates.
+
+**Selection reason:** G3.16 supplied the bounded staff command and the live
+assigned-provider workspace already exposed eligible stock and authoritative
+reservation refresh.
 
 **Boundary:** One-product staff creation from the selected assigned provider and
 live visible stock, with an opaque active tenant-user UUID, bounded quantity,
 future expiry, stable idempotency, explicit confirmation, strict same-origin BFF
 and receipt validation, and authoritative refresh. No identity directory,
 patient data, clinical context, notes, payment, delivery, substitution,
-multi-product composition, or offline mutation is added.
+multi-product composition, or offline mutation was added.
 
-**Implementation authority:** accepted G3.16 and
+**Implementation authority:** accepted G3.16, accepted source `9f733a7`, and
 `docs/sprints/G3.17-live-staff-reservation-creation.md`.
+
+## Active acceptance candidate
+
+### G3.18 — Assigned-Provider Expiry Worklist
+
+**Status:** Implemented from accepted source `9f733a7`; exact-head CI and CTO
+acceptance are required.
+
+**Boundary:** A permission-protected, assigned-provider, private no-store read
+lists active future physical batches with positive on-hand quantity inside a
+bounded 1–365 day horizon, stable expiry/UUID pagination, server observation
+timestamps, and exact held/available quantities. No reconciliation, quarantine,
+release, disposal, return, alert, forecast, patient, clinical, or supplier
+behavior is added.
+
+**Implementation authority:** accepted G3.10/G3.17 boundaries and
+`docs/sprints/G3.18-assigned-provider-expiry-worklist.md`.
 
 ## Earlier accepted sprint
 

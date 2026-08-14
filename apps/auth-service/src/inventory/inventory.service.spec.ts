@@ -20,6 +20,7 @@ describe('InventoryService', () => {
     repository = {
       hasProviderAccess: jest.fn(),
       listStock: jest.fn(),
+      listExpiryWorklist: jest.fn(),
     } as unknown as jest.Mocked<InventoryRepository>;
     service = new InventoryService(repository);
   });
@@ -91,5 +92,72 @@ describe('InventoryService', () => {
         expect.objectContaining({ batchNumber: 'EXPIRED', version: 2, availableQuantity: 0 }),
       ],
     });
+  });
+
+  it('conceals the expiry worklist without an active provider assignment', async () => {
+    repository.hasProviderAccess.mockResolvedValue(false);
+
+    await expect(
+      service.listExpiryWorklist(identity, randomUUID(), {
+        horizonDays: 30,
+        limit: 50,
+        offset: 0,
+      }),
+    ).rejects.toThrow(NotFoundException);
+    expect(repository.listExpiryWorklist).not.toHaveBeenCalled();
+  });
+
+  it('returns a stable bounded physical-batch expiry worklist', async () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-08-14T00:00:00.000Z'));
+    const providerId = randomUUID();
+    const batchId = randomUUID();
+    repository.hasProviderAccess.mockResolvedValue(true);
+    repository.listExpiryWorklist.mockResolvedValue({
+      total: 1,
+      data: [
+        {
+          id: batchId,
+          inventoryId: randomUUID(),
+          productId: randomUUID(),
+          batchNumber: 'EXP-001',
+          expiryDate: new Date('2026-08-20T00:00:00.000Z'),
+          version: 3,
+          onHandQuantity: 12,
+          heldQuantity: 5,
+          inventory: { sku: 'MED-EXP', isVisible: false },
+          product: { name: 'Medicine', genericName: 'Generic', brand: 'Brand' },
+        },
+      ],
+    });
+
+    const query = { horizonDays: 30, limit: 25, offset: 0 };
+    const result = await service.listExpiryWorklist(identity, providerId, query);
+
+    expect(repository.listExpiryWorklist).toHaveBeenCalledWith(
+      identity.tenantId,
+      providerId,
+      query,
+      new Date('2026-08-14T00:00:00.000Z'),
+      new Date('2026-09-13T00:00:00.000Z'),
+    );
+    expect(result).toMatchObject({
+      total: 1,
+      limit: 25,
+      offset: 0,
+      asOf: new Date('2026-08-14T00:00:00.000Z'),
+      horizonEndsAt: new Date('2026-09-13T00:00:00.000Z'),
+      data: [
+        {
+          batchId,
+          batchNumber: 'EXP-001',
+          version: 3,
+          onHandQuantity: 12,
+          heldQuantity: 5,
+          availableQuantity: 7,
+          isVisible: false,
+        },
+      ],
+    });
+    jest.useRealTimers();
   });
 });
