@@ -2,9 +2,10 @@
 
 **Last updated:** 2026-08-14
 
-**Current sprint:** G3.22 atomic inventory domain event producers — candidate
+**Current sprint:** Next sprint selection pending after G3.22 acceptance
 
-**Next feature work:** Complete bounded G3.22 from accepted source `56ca961`
+**Next feature work:** Select the dedicated Notification Delivery Foundation batch
+from accepted source `3e7a8c0`
 
 ## Mandatory startup sequence
 
@@ -178,8 +179,8 @@ See `docs/audits/2026-07-20-cto-baseline.md` for the accepted baseline.
     in PR #50 as `bed136e` after exact-head CI run `31769816895`
 32. G3.21 transactional event delivery foundation — accepted and squash-merged
     in PR #52 as `af48522` after exact-head CI run `31786107840`
-33. G3.22 atomic inventory domain event producers — candidate; review,
-    exact-head CI, and CTO acceptance required
+33. G3.22 atomic inventory domain event producers — accepted and squash-merged
+    in PR #54 as `3e7a8c0` after exact-head CI run `31793020883`
 34. Returns and later live mutations — blocked pending their own accepted
     contracts
 
@@ -189,12 +190,12 @@ If ownership transfers, resume at the first pending checkpoint. Do not use
 
 ## Exact continuation point
 
-Complete G3.22 from accepted source `56ca961` without expanding its producer
-catalogue. Notification delivery and analytics projections remain later bounded
-sprints requiring their own contracts, implementation, exact-head CI, and CTO
-acceptance. Do not combine G3.22 with
-quarantine release, public/patient reservation creation, returns, recall, or
-patient exposure.
+Select the dedicated Notification Delivery Foundation batch from accepted source
+`3e7a8c0`. Keep its provider-neutral contract, tenant-safe recipient/routing
+boundary, delivery worker and adapter abstraction, retry/dead-letter evidence,
+and operational security/observability boundary together. Do not mix Maps,
+FHIR, ABDM, quarantine release, public/patient reservation creation, returns,
+recall, or patient exposure into that batch.
 
 Cline may receive only a complete, bounded prompt for characterization tests or
 mechanical work whose contract is already fixed by ADR-005. Cline must not

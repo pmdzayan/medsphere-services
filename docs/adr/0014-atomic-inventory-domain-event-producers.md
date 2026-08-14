@@ -1,6 +1,6 @@
 # ADR-014: Atomic Inventory Domain Event Producers
 
-**Status:** Proposed
+**Status:** Accepted
 
 **Date:** 2026-08-14
 
