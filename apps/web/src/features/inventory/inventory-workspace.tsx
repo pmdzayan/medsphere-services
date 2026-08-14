@@ -8,10 +8,12 @@ import {
   getAssignedProviders,
   getProviderStock,
   quarantineBatch,
+  recordDamagedStock,
 } from '@/lib/api-client';
 import type {
   BatchQuarantineReason,
   BatchQuarantineResponse,
+  DamagedStockResponse,
   InventoryBatchStock,
   InventoryStockPage,
   ProviderAccess,
@@ -37,6 +39,12 @@ interface QuarantineTarget {
   idempotencyKey: string;
 }
 
+interface DamageTarget {
+  batch: InventoryBatchStock;
+  medicineName: string;
+  idempotencyKey: string;
+}
+
 export function InventoryWorkspace() {
   const [providers, setProviders] = useState<ProviderAccess[]>([]);
   const [providerId, setProviderId] = useState('');
@@ -52,6 +60,12 @@ export function InventoryWorkspace() {
   const [quarantineSubmitting, setQuarantineSubmitting] = useState(false);
   const [quarantineError, setQuarantineError] = useState<string | null>(null);
   const [quarantineReceipt, setQuarantineReceipt] = useState<BatchQuarantineResponse | null>(null);
+  const [damageTarget, setDamageTarget] = useState<DamageTarget | null>(null);
+  const [damageQuantity, setDamageQuantity] = useState('1');
+  const [damageReason, setDamageReason] = useState('');
+  const [damageSubmitting, setDamageSubmitting] = useState(false);
+  const [damageError, setDamageError] = useState<string | null>(null);
+  const [damageReceipt, setDamageReceipt] = useState<DamagedStockResponse | null>(null);
   const [error, setError] = useState<{ message: string; status?: number } | null>(null);
 
   const loadProviders = useCallback(async () => {
@@ -138,6 +152,53 @@ export function InventoryWorkspace() {
       setQuarantineError(toPublicError(mutationError, 'Unable to quarantine this batch.').message);
     } finally {
       setQuarantineSubmitting(false);
+    }
+  }
+
+  function openDamage(batch: InventoryBatchStock, medicineName: string) {
+    setDamageTarget({
+      batch,
+      medicineName,
+      idempotencyKey: `damaged-stock-${crypto.randomUUID()}`,
+    });
+    setDamageQuantity('1');
+    setDamageReason('');
+    setDamageError(null);
+  }
+
+  async function submitDamage(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!damageTarget || !providerId || damageSubmitting) return;
+    const quantity = Number(damageQuantity);
+    const reason = damageReason.trim();
+    if (
+      !Number.isSafeInteger(quantity) ||
+      quantity < 1 ||
+      quantity > damageTarget.batch.availableQuantity ||
+      reason.length < 1 ||
+      reason.length > 500
+    ) {
+      setDamageError('Enter a valid available quantity and a reason of 1–500 characters.');
+      return;
+    }
+    setDamageSubmitting(true);
+    setDamageError(null);
+    try {
+      const receipt = await recordDamagedStock(providerId, damageTarget.batch.id, {
+        expectedVersion: damageTarget.batch.version,
+        quantity,
+        idempotencyKey: damageTarget.idempotencyKey,
+        reason,
+      });
+      setDamageReceipt(receipt);
+      setDamageTarget(null);
+      await loadStock(providerId, query, offset);
+    } catch (mutationError) {
+      setDamageError(
+        toPublicError(mutationError, 'Unable to record damaged stock for this batch.').message,
+      );
+    } finally {
+      setDamageSubmitting(false);
     }
   }
 
@@ -303,7 +364,7 @@ export function InventoryWorkspace() {
           />
         ) : null}
         {!error && page?.data.length ? (
-          <InventoryTable page={page} onQuarantine={openQuarantine} />
+          <InventoryTable page={page} onQuarantine={openQuarantine} onDamage={openDamage} />
         ) : null}
 
         {!error && page && page.total > 0 ? (
@@ -342,6 +403,16 @@ export function InventoryWorkspace() {
           Batch quarantined. Physical quantity remains {quarantineReceipt.onHandQuantity};{' '}
           {quarantineReceipt.affectedReservationCount} reservation(s) were cancelled and{' '}
           {quarantineReceipt.releasedUnitCount} held unit(s) were released.
+        </div>
+      ) : null}
+
+      {damageReceipt ? (
+        <div
+          role="status"
+          className="rounded-2xl border border-rose-200 bg-rose-50 px-5 py-4 text-sm text-rose-900"
+        >
+          Damaged stock recorded. {damageReceipt.quantity} unit(s) were removed from physical
+          on-hand quantity: {damageReceipt.onHandBefore} → {damageReceipt.onHandAfter}.
         </div>
       ) : null}
 
@@ -419,6 +490,95 @@ export function InventoryWorkspace() {
         </div>
       ) : null}
 
+      {damageTarget ? (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="damage-title"
+          className="fixed inset-0 z-50 grid place-items-center bg-[#0d211a]/55 p-4"
+        >
+          <form
+            onSubmit={(event) => void submitDamage(event)}
+            className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl"
+          >
+            <p className="text-xs font-extrabold uppercase tracking-[.16em] text-rose-700">
+              Completed physical write-off
+            </p>
+            <h2
+              id="damage-title"
+              className="mt-2 font-[var(--font-display)] text-2xl font-bold text-[#17352a]"
+            >
+              Record damage for batch {damageTarget.batch.batchNumber}
+            </h2>
+            <p className="mt-2 text-sm leading-6 text-[#647870]">
+              Use this only after damage is physically confirmed for {damageTarget.medicineName}.
+              The accepted quantity is permanently removed from on-hand stock. This records the
+              write-off; it does not claim disposal or approval.
+            </p>
+            <div className="mt-5 grid gap-4">
+              <label>
+                <span className="mb-1.5 block text-xs font-bold text-[#38544b]">
+                  Damaged quantity
+                </span>
+                <input
+                  aria-label="Damaged quantity"
+                  type="number"
+                  min="1"
+                  max={damageTarget.batch.availableQuantity}
+                  step="1"
+                  value={damageQuantity}
+                  onChange={(event) => setDamageQuantity(event.target.value)}
+                  disabled={damageSubmitting}
+                  className="h-11 w-full rounded-xl border border-[#dce5e1] px-3 text-sm text-[#38544b]"
+                />
+                <span className="mt-1 block text-xs text-[#80908b]">
+                  Up to {damageTarget.batch.availableQuantity} currently available unit(s)
+                </span>
+              </label>
+              <label>
+                <span className="mb-1.5 block text-xs font-bold text-[#38544b]">
+                  Confirmed damage reason
+                </span>
+                <textarea
+                  aria-label="Confirmed damage reason"
+                  maxLength={500}
+                  value={damageReason}
+                  onChange={(event) => setDamageReason(event.target.value)}
+                  disabled={damageSubmitting}
+                  rows={4}
+                  className="w-full rounded-xl border border-[#dce5e1] px-3 py-2 text-sm text-[#38544b]"
+                />
+              </label>
+            </div>
+            {damageError ? (
+              <p
+                role="alert"
+                className="mt-4 rounded-xl bg-rose-50 px-3 py-2 text-sm text-rose-800"
+              >
+                {damageError}
+              </p>
+            ) : null}
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                disabled={damageSubmitting}
+                onClick={() => setDamageTarget(null)}
+                className="rounded-xl border border-[#dce5e1] px-4 py-2.5 text-sm font-bold text-[#536a62] disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={damageSubmitting}
+                className="rounded-xl bg-rose-700 px-4 py-2.5 text-sm font-bold text-white disabled:cursor-wait disabled:opacity-50"
+              >
+                {damageSubmitting ? 'Recording…' : 'Confirm damaged stock'}
+              </button>
+            </div>
+          </form>
+        </div>
+      ) : null}
+
       <p className="pb-2 text-center text-[11px] text-[#93a09c]">
         Live data · Provider assignment and command permission are rechecked for every request
       </p>
@@ -429,9 +589,11 @@ export function InventoryWorkspace() {
 function InventoryTable({
   page,
   onQuarantine,
+  onDamage,
 }: {
   page: InventoryStockPage;
   onQuarantine: (batch: InventoryBatchStock, medicineName: string) => void;
+  onDamage: (batch: InventoryBatchStock, medicineName: string) => void;
 }) {
   return (
     <div className="overflow-x-auto">
@@ -489,14 +651,26 @@ function InventoryTable({
                           {batch.availableQuantity} available
                         </p>
                         {batch.status === 'ACTIVE' ? (
-                          <button
-                            type="button"
-                            onClick={() => onQuarantine(batch, item.name)}
-                            className="mt-1.5 font-bold text-amber-700 hover:text-amber-800"
-                            aria-label={`Quarantine batch ${batch.batchNumber}`}
-                          >
-                            Quarantine batch
-                          </button>
+                          <span className="mt-1.5 flex flex-wrap gap-3">
+                            <button
+                              type="button"
+                              onClick={() => onQuarantine(batch, item.name)}
+                              className="font-bold text-amber-700 hover:text-amber-800"
+                              aria-label={`Quarantine batch ${batch.batchNumber}`}
+                            >
+                              Quarantine batch
+                            </button>
+                            {batch.availableQuantity > 0 ? (
+                              <button
+                                type="button"
+                                onClick={() => onDamage(batch, item.name)}
+                                className="font-bold text-rose-700 hover:text-rose-800"
+                                aria-label={`Record damage for batch ${batch.batchNumber}`}
+                              >
+                                Record damage
+                              </button>
+                            ) : null}
+                          </span>
                         ) : null}
                       </div>
                     ))

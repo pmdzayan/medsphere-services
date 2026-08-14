@@ -45,6 +45,27 @@ export interface BatchQuarantineResponse {
   replayed: boolean;
 }
 
+export interface DamagedStockRequest {
+  expectedVersion: number;
+  quantity: number;
+  idempotencyKey: string;
+  reason: string;
+}
+
+export interface DamagedStockResponse {
+  providerId: string;
+  inventoryId: string;
+  productId: string;
+  batchId: string;
+  movementId: string;
+  quantity: number;
+  onHandBefore: number;
+  onHandAfter: number;
+  resultingBatchVersion: number;
+  occurredAt: string;
+  replayed: boolean;
+}
+
 export interface InventoryStockItem {
   inventoryId: string;
   productId: string;
@@ -137,6 +158,54 @@ export function isBatchQuarantineResponse(value: unknown): value is BatchQuarant
     isQuantity(receipt.onHandQuantity) &&
     isQuantity(receipt.affectedReservationCount) &&
     isQuantity(receipt.releasedUnitCount) &&
+    isIntegerBetween(receipt.resultingBatchVersion, 1, 2_147_483_647) &&
+    isIsoDateTime(receipt.occurredAt) &&
+    typeof receipt.replayed === 'boolean'
+  );
+}
+
+export function isDamagedStockRequest(value: unknown): value is DamagedStockRequest {
+  if (!hasExactKeys(value, ['expectedVersion', 'quantity', 'idempotencyKey', 'reason'])) {
+    return false;
+  }
+  const request = value as Partial<DamagedStockRequest>;
+  return (
+    isIntegerBetween(request.expectedVersion, 1, 2_147_483_647) &&
+    isIntegerBetween(request.quantity, 1, 2_147_483_647) &&
+    isTrimmedBoundedString(request.idempotencyKey, 1, 120) &&
+    isTrimmedBoundedString(request.reason, 1, 500)
+  );
+}
+
+export function isDamagedStockResponse(value: unknown): value is DamagedStockResponse {
+  if (
+    !hasExactKeys(value, [
+      'providerId',
+      'inventoryId',
+      'productId',
+      'batchId',
+      'movementId',
+      'quantity',
+      'onHandBefore',
+      'onHandAfter',
+      'resultingBatchVersion',
+      'occurredAt',
+      'replayed',
+    ])
+  ) {
+    return false;
+  }
+  const receipt = value as Partial<DamagedStockResponse>;
+  return (
+    isCanonicalUuid(receipt.providerId) &&
+    isCanonicalUuid(receipt.inventoryId) &&
+    isCanonicalUuid(receipt.productId) &&
+    isCanonicalUuid(receipt.batchId) &&
+    isCanonicalUuid(receipt.movementId) &&
+    isIntegerBetween(receipt.quantity, 1, 2_147_483_647) &&
+    isIntegerBetween(receipt.onHandBefore, 1, Number.MAX_SAFE_INTEGER) &&
+    isQuantity(receipt.onHandAfter) &&
+    Number(receipt.onHandAfter) === Number(receipt.onHandBefore) - Number(receipt.quantity) &&
     isIntegerBetween(receipt.resultingBatchVersion, 1, 2_147_483_647) &&
     isIsoDateTime(receipt.occurredAt) &&
     typeof receipt.replayed === 'boolean'
@@ -261,6 +330,19 @@ function hasExactKeys(value: unknown, keys: readonly string[]): value is Record<
 
 function isBoundedString(value: unknown, maxLength: number): value is string {
   return typeof value === 'string' && value.trim().length > 0 && value.length <= maxLength;
+}
+
+function isTrimmedBoundedString(
+  value: unknown,
+  minLength: number,
+  maxLength: number,
+): value is string {
+  return (
+    typeof value === 'string' &&
+    value === value.trim() &&
+    value.length >= minLength &&
+    value.length <= maxLength
+  );
 }
 
 function isCurrency(value: unknown): value is string {

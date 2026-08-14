@@ -15,6 +15,8 @@ import type {
 import {
   type BatchQuarantineRequest,
   type BatchQuarantineResponse,
+  type DamagedStockRequest,
+  type DamagedStockResponse,
   toInventoryStockSearchParams,
   type InventoryStockFilters,
   type InventoryStockPage,
@@ -121,6 +123,23 @@ export async function quarantineBatch(
 ): Promise<BatchQuarantineResponse> {
   return requestJson<BatchQuarantineResponse>(
     `/api/inventory/providers/${encodeURIComponent(providerId)}/batches/${encodeURIComponent(batchId)}/quarantine`,
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(request),
+    },
+  );
+}
+
+export async function recordDamagedStock(
+  providerId: string,
+  batchId: string,
+  request: DamagedStockRequest,
+): Promise<DamagedStockResponse> {
+  return requestJson<DamagedStockResponse>(
+    `/api/inventory/providers/${encodeURIComponent(providerId)}/batches/${encodeURIComponent(
+      batchId,
+    )}/damage`,
     {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
