@@ -166,6 +166,7 @@ infrastructure('G3.24 PostgreSQL reservation notification consumer', () => {
 
   async function createReservation(): Promise<string> {
     const reservationId = randomUUID();
+    const readyAt = new Date();
     await prisma.client.medicineReservation.create({
       data: {
         id: reservationId,
@@ -174,7 +175,8 @@ infrastructure('G3.24 PostgreSQL reservation notification consumer', () => {
         subjectUserId,
         status: 'READY',
         expiresAt: new Date(Date.now() + 60_000),
-        readyAt: new Date(),
+        confirmedAt: readyAt,
+        readyAt,
         idempotencyKey: `g324-${reservationId}`,
         creationHash: 'a'.repeat(64),
         version: 2,
