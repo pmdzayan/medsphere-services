@@ -174,8 +174,8 @@ See `docs/audits/2026-07-20-cto-baseline.md` for the accepted baseline.
     #48 as `7c0befb` after exact-head CI run `31768462051`
 30. G3.19 live expiry worklist workspace — accepted and squash-merged in PR #49
     as `8e5db0b` after exact-head CI run `31769276564`
-31. G3.20 bounded quarantine investigation evidence — implemented; exact-head CI
-    and CTO acceptance required
+31. G3.20 bounded quarantine investigation evidence — accepted and squash-merged
+    in PR #50 as `bed136e` after exact-head CI run `31769816895`
 32. Returns and later live mutations — blocked pending their own accepted
     contracts
 
@@ -185,10 +185,10 @@ If ownership transfers, resume at the first pending checkpoint. Do not use
 
 ## Exact continuation point
 
-Accept or correct G3.20 from accepted source `8e5db0b` without skipping recorded
-dependencies. Quarantine release, public/patient reservation creation, returns, recall,
-analytics policy, patient exposure, and Gates 2 and 4–9 remain blocked until
-their recorded prerequisites are satisfied.
+Select the next dependency-safe sprint from accepted source `bed136e` without
+skipping recorded dependencies. Quarantine release, public/patient reservation
+creation, returns, recall, analytics policy, patient exposure, and Gates 2 and
+4–9 remain blocked until their recorded prerequisites are satisfied.
 
 Cline may receive only a complete, bounded prompt for characterization tests or
 mechanical work whose contract is already fixed by ADR-005. Cline must not

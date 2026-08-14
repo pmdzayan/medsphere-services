@@ -2,11 +2,11 @@
 
 **Status date:** 2026-08-14
 
-**Accepted source commit:** `8e5db0bfb646129556110b192486232d346453d7`
+**Accepted source commit:** `bed136eb45649e783815f31cb94f90e11a76aee3`
 
 **Accepted stabilization baseline:** `4ea55a17e188410ddee45fa3ea6c016e22d6617a`
 
-**Current sprint:** G3.20 bounded quarantine investigation evidence acceptance
+**Current sprint:** Next dependency-ordered sprint selection
 
 **Release state:** Not approved for production or real healthcare data
 
@@ -14,38 +14,24 @@
 
 ## Most recent accepted sprint
 
-### G3.19 — Live Expiry Worklist Workspace
-
-**Status:** Accepted and squash-merged in PR #49 as `8e5db0b` after exact-head
-CI run `31769276564` passed all required gates.
-
-**Selection reason:** G3.18 supplied the bounded read and the existing inventory
-workspace supplied assigned-provider navigation without requiring new backend
-authority.
-
-**Boundary:** A live read-only workspace exposes assigned-provider physical batch
-expiry evidence through a strict same-origin BFF, fixed bounded horizons,
-pagination, correlated timestamps and exact quantity validation. It added no
-mutation, alert, forecast, risk score, patient, clinical, or supplier behavior.
-
-**Implementation authority:** accepted G3.18, accepted source `8e5db0b`, and
-`docs/sprints/G3.19-live-expiry-worklist-workspace.md`.
-
-## Active acceptance candidate
-
 ### G3.20 — Bounded Quarantine Investigation Evidence
 
-**Status:** Implemented from accepted source `8e5db0b`; exact-head CI and CTO
-acceptance are required.
+**Status:** Accepted and squash-merged in PR #50 as `bed136e` after exact-head
+CI run `31769816895` passed all required gates.
+
+**Selection reason:** G3.11 supplied immutable one-way quarantine records, and
+assigned-provider access could expose a bounded evidence read without creating
+release or disposition authority.
 
 **Boundary:** A permission-protected, assigned-provider, private no-store read
 lists immutable quarantine records with bounded operational labels, reason code,
 opaque actor-membership attribution, physical quantity, reservation/release
 counts, resulting version and occurrence time. Command secrets, names/contact,
 release, recall, disposal, approval, supplier, patient, and clinical behavior
-are excluded.
+were excluded.
 
-**Implementation authority:** accepted G3.11/G3.12 boundaries and
+**Implementation authority:** accepted G3.11/G3.12 boundaries, accepted source
+`bed136e`, and
 `docs/sprints/G3.20-bounded-quarantine-investigation-evidence.md`.
 
 ## Earlier accepted sprint

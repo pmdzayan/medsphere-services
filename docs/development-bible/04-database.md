@@ -1,6 +1,6 @@
 # Volume 04 — Database Bible
 
-**Baseline:** Accepted through G3.16
+**Baseline:** Accepted through G3.20
 
 **Engine:** PostgreSQL 16
 
