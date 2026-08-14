@@ -8,9 +8,9 @@ MedSphere is a planned multi-tenant healthcare ecosystem for patients, pharmacie
 
 **Status date:** 2026-08-14
 
-**Accepted evidence baseline:** `8e5db0b` (PR #49 squash merge)
+**Accepted evidence baseline:** `bed136e` (PR #50 squash merge)
 
-**Current sprint:** G3.20 bounded quarantine investigation evidence acceptance
+**Current sprint:** Next dependency-ordered sprint selection
 
 **Full-roadmap estimate:** **40% complete / 60% remaining**
 
