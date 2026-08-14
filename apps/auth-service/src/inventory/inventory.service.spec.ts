@@ -54,6 +54,7 @@ describe('InventoryService', () => {
               manufacturingDate: null,
               expiryDate: new Date(Date.now() + 86_400_000),
               status: 'ACTIVE',
+              version: 4,
               onHandQuantity: 20,
               heldQuantity: 3,
             },
@@ -63,6 +64,7 @@ describe('InventoryService', () => {
               manufacturingDate: null,
               expiryDate: new Date(Date.now() - 86_400_000),
               status: 'EXPIRED',
+              version: 2,
               onHandQuantity: 10,
               heldQuantity: 1,
             },
@@ -85,8 +87,8 @@ describe('InventoryService', () => {
       totalHeldQuantity: 4,
       totalAvailableQuantity: 17,
       batches: [
-        expect.objectContaining({ batchNumber: 'VALID', availableQuantity: 17 }),
-        expect.objectContaining({ batchNumber: 'EXPIRED', availableQuantity: 0 }),
+        expect.objectContaining({ batchNumber: 'VALID', version: 4, availableQuantity: 17 }),
+        expect.objectContaining({ batchNumber: 'EXPIRED', version: 2, availableQuantity: 0 }),
       ],
     });
   });

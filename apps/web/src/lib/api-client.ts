@@ -13,6 +13,8 @@ import type {
   UpdateRoleRequest,
 } from './authorization-contract';
 import {
+  type BatchQuarantineRequest,
+  type BatchQuarantineResponse,
   toInventoryStockSearchParams,
   type InventoryStockFilters,
   type InventoryStockPage,
@@ -110,6 +112,21 @@ export async function getProviderStock(
 ): Promise<InventoryStockPage> {
   const search = toInventoryStockSearchParams(filters);
   return requestJson<InventoryStockPage>(`/api/inventory/stock?${search.toString()}`);
+}
+
+export async function quarantineBatch(
+  providerId: string,
+  batchId: string,
+  request: BatchQuarantineRequest,
+): Promise<BatchQuarantineResponse> {
+  return requestJson<BatchQuarantineResponse>(
+    `/api/inventory/providers/${encodeURIComponent(providerId)}/batches/${encodeURIComponent(batchId)}/quarantine`,
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(request),
+    },
+  );
 }
 
 export async function getProviderReservations(

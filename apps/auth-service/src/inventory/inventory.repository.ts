@@ -67,6 +67,7 @@ export class InventoryRepository {
               manufacturingDate: true,
               expiryDate: true,
               status: true,
+              version: true,
               onHandQuantity: true,
               heldQuantity: true,
             },

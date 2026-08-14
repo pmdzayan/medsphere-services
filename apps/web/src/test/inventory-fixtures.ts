@@ -30,6 +30,7 @@ export const validStockPage = {
           expiryDate: '2027-08-01T00:00:00.000Z',
           manufacturingDate: null,
           status: 'ACTIVE',
+          version: 4,
           onHandQuantity: 20,
           heldQuantity: 3,
           availableQuantity: 17,

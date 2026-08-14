@@ -5,6 +5,7 @@ import {
   getAuthorizationCatalogue,
   getProviderStock,
   getProviderReservations,
+  quarantineBatch,
   getPrivacyPreferences,
   getSupportedLanguages,
   register,
@@ -82,6 +83,44 @@ describe('authenticated API client', () => {
         { cache: 'no-store' },
       ],
     ]);
+  });
+
+  it('submits the exact versioned quarantine command through the same-origin boundary', async () => {
+    const request = {
+      expectedVersion: 4,
+      idempotencyKey: 'quarantine-command-1',
+      reasonCode: 'QUALITY_SUSPECT' as const,
+    };
+    const receipt = {
+      batchId: '73a97ec4-84f8-4a85-a493-b8d6feb84a27',
+      status: 'QUARANTINED',
+      reasonCode: 'QUALITY_SUSPECT',
+      onHandQuantity: 20,
+      affectedReservationCount: 1,
+      releasedUnitCount: 3,
+      resultingBatchVersion: 5,
+      occurredAt: '2026-08-14T01:00:00.000Z',
+      replayed: false,
+    };
+    const fetchMock = vi.fn().mockResolvedValue(Response.json(receipt));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(
+      quarantineBatch(
+        '7f51a0f3-3bd1-45d7-85f3-b8b725969df9',
+        '73a97ec4-84f8-4a85-a493-b8d6feb84a27',
+        request,
+      ),
+    ).resolves.toEqual(receipt);
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/inventory/providers/7f51a0f3-3bd1-45d7-85f3-b8b725969df9/batches/73a97ec4-84f8-4a85-a493-b8d6feb84a27/quarantine',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(request),
+        cache: 'no-store',
+      },
+    );
   });
 
   it('loads selected provider reservations with accepted filters', async () => {

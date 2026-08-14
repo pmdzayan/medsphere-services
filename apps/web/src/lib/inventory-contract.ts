@@ -12,9 +12,37 @@ export interface InventoryBatchStock {
   expiryDate: string;
   manufacturingDate: string | null;
   status: 'ACTIVE' | 'EXPIRED' | 'EXHAUSTED' | 'QUARANTINED';
+  version: number;
   onHandQuantity: number;
   heldQuantity: number;
   availableQuantity: number;
+}
+
+export const BATCH_QUARANTINE_REASONS = [
+  'QUALITY_SUSPECT',
+  'TEMPERATURE_EXCURSION',
+  'PACKAGING_COMPROMISED',
+  'STORAGE_DEVIATION',
+] as const;
+
+export type BatchQuarantineReason = (typeof BATCH_QUARANTINE_REASONS)[number];
+
+export interface BatchQuarantineRequest {
+  expectedVersion: number;
+  idempotencyKey: string;
+  reasonCode: BatchQuarantineReason;
+}
+
+export interface BatchQuarantineResponse {
+  batchId: string;
+  status: 'QUARANTINED';
+  reasonCode: BatchQuarantineReason;
+  onHandQuantity: number;
+  affectedReservationCount: number;
+  releasedUnitCount: number;
+  resultingBatchVersion: number;
+  occurredAt: string;
+  replayed: boolean;
 }
 
 export interface InventoryStockItem {
@@ -69,6 +97,49 @@ export function isInventoryStockPage(value: unknown): value is InventoryStockPag
     isIntegerBetween(page.offset, 0, 10_000) &&
     page.data.length <= Number(page.limit) &&
     page.data.length <= Math.max(Number(page.total) - Number(page.offset), 0)
+  );
+}
+
+export function isBatchQuarantineRequest(value: unknown): value is BatchQuarantineRequest {
+  if (!hasExactKeys(value, ['expectedVersion', 'idempotencyKey', 'reasonCode'])) return false;
+  const request = value as Partial<BatchQuarantineRequest>;
+  return (
+    isIntegerBetween(request.expectedVersion, 1, 2_147_483_647) &&
+    typeof request.idempotencyKey === 'string' &&
+    request.idempotencyKey === request.idempotencyKey.trim() &&
+    request.idempotencyKey.length >= 8 &&
+    request.idempotencyKey.length <= 120 &&
+    BATCH_QUARANTINE_REASONS.includes(request.reasonCode as BatchQuarantineReason)
+  );
+}
+
+export function isBatchQuarantineResponse(value: unknown): value is BatchQuarantineResponse {
+  if (
+    !hasExactKeys(value, [
+      'batchId',
+      'status',
+      'reasonCode',
+      'onHandQuantity',
+      'affectedReservationCount',
+      'releasedUnitCount',
+      'resultingBatchVersion',
+      'occurredAt',
+      'replayed',
+    ])
+  ) {
+    return false;
+  }
+  const receipt = value as Partial<BatchQuarantineResponse>;
+  return (
+    isCanonicalUuid(receipt.batchId) &&
+    receipt.status === 'QUARANTINED' &&
+    BATCH_QUARANTINE_REASONS.includes(receipt.reasonCode as BatchQuarantineReason) &&
+    isQuantity(receipt.onHandQuantity) &&
+    isQuantity(receipt.affectedReservationCount) &&
+    isQuantity(receipt.releasedUnitCount) &&
+    isIntegerBetween(receipt.resultingBatchVersion, 1, 2_147_483_647) &&
+    isIsoDateTime(receipt.occurredAt) &&
+    typeof receipt.replayed === 'boolean'
   );
 }
 
@@ -153,6 +224,7 @@ function isInventoryBatchStock(value: unknown): value is InventoryBatchStock {
       'expiryDate',
       'manufacturingDate',
       'status',
+      'version',
       'onHandQuantity',
       'heldQuantity',
       'availableQuantity',
@@ -170,6 +242,7 @@ function isInventoryBatchStock(value: unknown): value is InventoryBatchStock {
       batch.status === 'EXPIRED' ||
       batch.status === 'EXHAUSTED' ||
       batch.status === 'QUARANTINED') &&
+    isIntegerBetween(batch.version, 1, 2_147_483_647) &&
     isQuantity(batch.onHandQuantity) &&
     isQuantity(batch.heldQuantity) &&
     isQuantity(batch.availableQuantity) &&

@@ -16,6 +16,9 @@ export class InventoryBatchStockResponseDto {
   @ApiProperty({ enum: ['ACTIVE', 'EXPIRED', 'EXHAUSTED', 'QUARANTINED'] })
   status!: 'ACTIVE' | 'EXPIRED' | 'EXHAUSTED' | 'QUARANTINED';
 
+  @ApiProperty({ minimum: 1, description: 'Optimistic concurrency token for batch commands' })
+  version!: number;
+
   @ApiProperty()
   onHandQuantity!: number;
 
