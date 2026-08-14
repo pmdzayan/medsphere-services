@@ -3,6 +3,7 @@ import { AuthenticatedIdentity } from '../auth/auth.types';
 import { PrismaService } from '../prisma/prisma.service';
 import { InventoryStockQueryDto } from './dto/inventory-stock-query.dto';
 import { InventoryExpiryQueryDto } from './dto/inventory-expiry-query.dto';
+import { InventoryQuarantineEvidenceQueryDto } from './dto/inventory-quarantine-evidence-query.dto';
 
 @Injectable()
 export class InventoryRepository {
@@ -126,6 +127,40 @@ export class InventoryRepository {
         skip: query.offset,
       }),
       this.prisma.client.batch.count({ where }),
+    ]);
+    return { data, total };
+  }
+
+  async listQuarantineEvidence(
+    tenantId: string,
+    providerId: string,
+    query: InventoryQuarantineEvidenceQueryDto,
+  ) {
+    const where = { tenantId, providerId } as const;
+    const [data, total] = await Promise.all([
+      this.prisma.client.batchQuarantineRecord.findMany({
+        where,
+        select: {
+          id: true,
+          inventoryId: true,
+          batchId: true,
+          productId: true,
+          actorMembershipId: true,
+          reasonCode: true,
+          onHandQuantity: true,
+          affectedReservationCount: true,
+          releasedUnitCount: true,
+          resultingBatchVersion: true,
+          occurredAt: true,
+          inventory: { select: { sku: true } },
+          product: { select: { name: true, genericName: true, brand: true } },
+          batch: { select: { batchNumber: true, status: true } },
+        },
+        orderBy: [{ occurredAt: 'desc' }, { id: 'desc' }],
+        take: query.limit,
+        skip: query.offset,
+      }),
+      this.prisma.client.batchQuarantineRecord.count({ where }),
     ]);
     return { data, total };
   }

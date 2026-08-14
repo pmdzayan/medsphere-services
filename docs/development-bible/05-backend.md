@@ -1,10 +1,10 @@
 # Volume 05 — Backend Bible: Identity, Authorization, Audit, and Inventory
 
-**Sprints:** Accepted through G3.18; G3.19 frontend candidate active
+**Sprints:** Accepted through G3.19; G3.20 read candidate active
 
 **Decisions:** ADR-003 through ADR-007
 
-**Status:** G3.18 accepted; G3.19 exact-head CI and CTO acceptance required; not production-approved
+**Status:** G3.19 accepted; G3.20 exact-head CI and CTO acceptance required; not production-approved
 
 ## Purpose and boundary
 

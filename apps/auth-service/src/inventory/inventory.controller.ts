@@ -64,6 +64,8 @@ import { ProviderReservationCreationResponseDto } from './dto/reservation-creati
 import { ReservationCreationService } from './reservation-creation.service';
 import { InventoryExpiryQueryDto } from './dto/inventory-expiry-query.dto';
 import { InventoryExpiryWorklistResponseDto } from './dto/inventory-expiry-response.dto';
+import { InventoryQuarantineEvidenceQueryDto } from './dto/inventory-quarantine-evidence-query.dto';
+import { InventoryQuarantineEvidenceResponseDto } from './dto/inventory-quarantine-evidence-response.dto';
 
 @Controller('inventory')
 @ApiTags('Inventory')
@@ -254,6 +256,20 @@ export class InventoryController {
     @Query() query: InventoryExpiryQueryDto,
   ) {
     return this.inventoryService.listExpiryWorklist(identity, providerId, query);
+  }
+
+  @Get('providers/:providerId/quarantine-evidence')
+  @Header('Cache-Control', 'private, no-store')
+  @RequirePermissions(PERMISSIONS.inventoryStockRead)
+  @ApiOperation({ summary: 'List immutable quarantine evidence for an assigned provider' })
+  @ApiOkResponse({ type: InventoryQuarantineEvidenceResponseDto })
+  @ApiNotFoundResponse({ description: 'Provider quarantine evidence not found' })
+  listQuarantineEvidence(
+    @CurrentIdentity() identity: AuthenticatedIdentity,
+    @Param('providerId', new ParseUUIDPipe({ version: '4' })) providerId: string,
+    @Query() query: InventoryQuarantineEvidenceQueryDto,
+  ) {
+    return this.inventoryService.listQuarantineEvidence(identity, providerId, query);
   }
 
   @Put('providers/:providerId/products/:productId')

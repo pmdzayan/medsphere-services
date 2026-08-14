@@ -58,8 +58,10 @@ Ordered sprints:
     #47 as `9f733a7` after exact-head CI run `31767805254`
 25. G3.18 Assigned-provider expiry worklist — accepted and squash-merged in PR
     #48 as `7c0befb` after exact-head CI run `31768462051`
-26. G3.19 Live expiry worklist workspace — implemented; exact-head CI and CTO
-    acceptance required
+26. G3.19 Live expiry worklist workspace — accepted and squash-merged in PR #49
+    as `8e5db0b` after exact-head CI run `31769276564`
+27. G3.20 Bounded quarantine investigation evidence — implemented; exact-head
+    CI and CTO acceptance required
 
 **Completion gate:** Accepted ADRs; protected review flow; clean migrations; deny-by-default authentication; tenant-isolation tests; integrated audit trail; atomic stock/reservation behavior; mandatory lint/test/build passing.
 
