@@ -29,12 +29,15 @@ function harness() {
     ...tx,
     $transaction: jest.fn(async (fn: (db: typeof tx) => Promise<unknown>) => fn(tx)),
   };
+  const events = { appendTenantUser: jest.fn() };
   return {
     tx,
     client,
+    events,
     service: new InventoryTransferService(
       { client } as never,
       { appendTenantUser: jest.fn() } as never,
+      events as never,
     ),
   };
 }

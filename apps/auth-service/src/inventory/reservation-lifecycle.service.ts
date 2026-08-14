@@ -15,6 +15,7 @@ import {
 import type { AuditMetadata } from '@medsphere/database';
 import { PrismaService } from '../prisma/prisma.service';
 import { assertTrustedProviderAccess } from './inventory-access';
+import { InventoryEventWriter } from './inventory-event-writer';
 import type {
   ProviderReservationResultStatus,
   ProviderReservationTransition,
@@ -40,6 +41,7 @@ export class ReservationLifecycleService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditWriter,
+    private readonly events: InventoryEventWriter,
   ) {}
 
   async transition(
@@ -162,6 +164,7 @@ export class ReservationLifecycleService {
           rule.to,
           resultingVersion,
           totalQuantity,
+          now,
         );
         await transaction.medicineReservationCommand.create({
           data: {
@@ -289,6 +292,7 @@ export class ReservationLifecycleService {
     resultingStatus: ProviderReservationResultStatus,
     version: number,
     totalQuantity: number,
+    occurredAt: Date,
   ): Promise<void> {
     const suffix = resultingStatus.toLowerCase() as
       'confirmed' | 'ready' | 'completed' | 'cancelled';
@@ -303,8 +307,22 @@ export class ReservationLifecycleService {
       outcome: 'SUCCEEDED',
       resourceType: 'MedicineReservation',
       resourceId: command.reservationId,
+      occurredAt,
       metadata,
       request: command.request,
+    });
+    await this.events.appendTenantUser(transaction, command.actor, {
+      eventType: `inventory.reservation.${suffix}`,
+      aggregateType: 'MedicineReservation',
+      aggregateId: command.reservationId,
+      occurredAt,
+      payload: {
+        providerId: command.providerId,
+        previousStatus,
+        status: resultingStatus,
+        version,
+        totalQuantity,
+      },
     });
   }
 

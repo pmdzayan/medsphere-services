@@ -27,11 +27,13 @@ function harness() {
     ),
   };
   const audit = { appendTenantUser: jest.fn() };
+  const events = { appendTenantUser: jest.fn() };
   return {
     transaction,
     client,
     audit,
-    service: new InventoryDamageService({ client } as never, audit as never),
+    events,
+    service: new InventoryDamageService({ client } as never, audit as never, events as never),
   };
 }
 

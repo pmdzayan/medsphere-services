@@ -14,6 +14,7 @@ import {
 import { AuditWriter } from '../audit/audit-writer.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { assertTrustedProviderAccess } from './inventory-access';
+import { InventoryEventWriter } from './inventory-event-writer';
 import { InsufficientReservationStockError, planReservationFefo } from './reservation-fefo';
 import type {
   CreateProviderReservationCommand,
@@ -29,6 +30,7 @@ export class ReservationCreationService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditWriter,
+    private readonly events: InventoryEventWriter,
   ) {}
 
   async create(
@@ -221,6 +223,20 @@ export class ReservationCreationService {
             expiresAt: command.expiresAt.toISOString(),
           },
           request: command.request,
+        });
+        await this.events.appendTenantUser(transaction, command.actor, {
+          eventType: 'inventory.reservation.created',
+          aggregateType: 'MedicineReservation',
+          aggregateId: reservationId,
+          occurredAt,
+          payload: {
+            providerId: command.providerId,
+            status: 'PENDING',
+            version: 1,
+            itemCount: items.length,
+            totalQuantity,
+            expiresAt: command.expiresAt.toISOString(),
+          },
         });
         return {
           reservationId,

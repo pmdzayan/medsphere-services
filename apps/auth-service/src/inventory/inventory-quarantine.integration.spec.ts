@@ -3,6 +3,7 @@ import { AuditWriter } from '../audit/audit-writer.service';
 import { isInfrastructureTestEnabled, requireEnv } from '../auth/testing/infrastructure-test-gate';
 import { PrismaService } from '../prisma/prisma.service';
 import { InventoryQuarantineService } from './inventory-quarantine.service';
+import { InventoryEventWriter } from './inventory-event-writer';
 
 const infrastructure = isInfrastructureTestEnabled() ? describe : describe.skip;
 if (isInfrastructureTestEnabled()) requireEnv('DATABASE_URL');
@@ -14,7 +15,11 @@ infrastructure('G3.11 PostgreSQL one-way batch quarantine integrity', () => {
   const membershipId = randomUUID();
   const providerId = randomUUID();
   const actor = { tenantId, userId, membershipId };
-  const service = new InventoryQuarantineService(prisma, new AuditWriter());
+  const service = new InventoryQuarantineService(
+    prisma,
+    new AuditWriter(),
+    new InventoryEventWriter(),
+  );
 
   beforeAll(async () => {
     await prisma.client.tenant.create({

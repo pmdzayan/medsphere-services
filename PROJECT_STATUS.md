@@ -2,15 +2,30 @@
 
 **Status date:** 2026-08-14
 
-**Accepted source commit:** `af48522d95622602af9b55ded9c18aaef962c676`
+**Accepted source commit:** `56ca961cddd7a00b64ceea335deca0616cdd967c`
 
 **Accepted stabilization baseline:** `4ea55a17e188410ddee45fa3ea6c016e22d6617a`
 
-**Current sprint:** Next sprint selection pending after G3.21 acceptance
+**Current sprint:** G3.22 atomic inventory domain event producers — candidate
 
 **Release state:** Not approved for production or real healthcare data
 
 **Full-roadmap engineering estimate:** 40% complete / 60% remaining
+
+## Active candidate sprint
+
+### G3.22 — Atomic Inventory Domain Event Producers
+
+**Status:** Candidate on accepted source `56ca961`; implementation review,
+exact-head CI, and CTO acceptance are required.
+
+**Boundary:** Emit version-1 events from accepted reservation, expiry,
+quarantine, damaged-stock, and completed-transfer transactions. No notification
+consumer/provider, analytics projection, broker, external API, patient/contact
+payload, production approval, or real healthcare data is included.
+
+**Architecture review:** proposed ADR-014 and
+`docs/sprints/G3.22-atomic-inventory-domain-event-producers.md`.
 
 ## Most recent accepted sprint
 

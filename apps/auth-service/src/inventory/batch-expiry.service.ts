@@ -5,6 +5,7 @@ import { AuditWriter } from '../audit/audit-writer.service';
 import { PrismaService } from '../prisma/prisma.service';
 import type { BatchExpiryConfig } from './batch-expiry.config';
 import { releaseHeldAllocations } from './reservation-allocation-release';
+import { InventoryEventWriter } from './inventory-event-writer';
 
 const ACTIVE_RESERVATION_STATUSES = ['PENDING', 'CONFIRMED', 'READY'] as const;
 
@@ -30,6 +31,7 @@ export class BatchExpiryService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditWriter,
+    private readonly events: InventoryEventWriter,
   ) {}
 
   async run(config: BatchExpiryConfig): Promise<BatchExpirySummary> {
@@ -288,6 +290,26 @@ export class BatchExpiryService {
             cause: 'BATCH_EXPIRY',
           },
         });
+        await this.events.appendTenantSystem(
+          transaction,
+          reservation.tenantId,
+          'batch-expiry-worker',
+          {
+            eventType: 'inventory.reservation.expired',
+            aggregateType: 'MedicineReservation',
+            aggregateId: reservation.id,
+            occurredAt: asOf,
+            payload: {
+              providerId: reservation.providerId,
+              previousStatus: reservation.status,
+              status: 'EXPIRED',
+              version: resultingVersion,
+              totalQuantity: allocatedQuantity,
+              cause: 'BATCH_EXPIRY',
+              batchId: batch.id,
+            },
+          },
+        );
         releasedUnits = safeAdd(
           releasedUnits,
           allocatedQuantity,
@@ -369,6 +391,21 @@ export class BatchExpiryService {
           affectedReservations,
           releasedUnits,
           resultingVersion: resultingBatchVersion,
+        },
+      });
+      await this.events.appendTenantSystem(transaction, batch.tenantId, 'batch-expiry-worker', {
+        eventType: 'inventory.batch.expired',
+        aggregateType: 'Batch',
+        aggregateId: batch.id,
+        occurredAt: asOf,
+        payload: {
+          providerId: batch.providerId,
+          productId: batch.productId,
+          status: 'EXPIRED',
+          onHandQuantity: releasable.onHandQuantity,
+          affectedReservations,
+          releasedUnits,
+          version: resultingBatchVersion,
         },
       });
       return { status: 'RECONCILED', affectedReservations, releasedUnits };

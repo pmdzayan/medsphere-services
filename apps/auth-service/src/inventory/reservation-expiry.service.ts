@@ -4,6 +4,7 @@ import { Prisma, hasPrismaCode, withSerializableRetry } from '@medsphere/databas
 import { AuditWriter } from '../audit/audit-writer.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { releaseHeldAllocations } from './reservation-allocation-release';
+import { InventoryEventWriter } from './inventory-event-writer';
 import type { ReservationExpiryConfig } from './reservation-expiry.config';
 
 const ACTIVE_STATUSES = ['PENDING', 'CONFIRMED', 'READY'] as const;
@@ -22,6 +23,7 @@ export class ReservationExpiryService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditWriter,
+    private readonly events: InventoryEventWriter,
   ) {}
 
   async run(config: ReservationExpiryConfig): Promise<ReservationExpirySummary> {
@@ -201,6 +203,25 @@ export class ReservationExpiryService {
           totalQuantity: allocatedQuantity,
         },
       });
+      await this.events.appendTenantSystem(
+        transaction,
+        reservation.tenantId,
+        'reservation-expiry-worker',
+        {
+          eventType: 'inventory.reservation.expired',
+          aggregateType: 'MedicineReservation',
+          aggregateId: reservation.id,
+          occurredAt: asOf,
+          payload: {
+            providerId: reservation.providerId,
+            previousStatus: reservation.status,
+            status: 'EXPIRED',
+            version: resultingVersion,
+            totalQuantity: allocatedQuantity,
+            cause: 'RESERVATION_EXPIRY',
+          },
+        },
+      );
       return 'EXPIRED';
     });
   }

@@ -4,12 +4,13 @@ import type { AuthenticatedIdentity } from '../auth/auth.types';
 import { isInfrastructureTestEnabled, requireEnv } from '../auth/testing/infrastructure-test-gate';
 import { PrismaService } from '../prisma/prisma.service';
 import { InventoryTransferService } from './inventory-transfer.service';
+import { InventoryEventWriter } from './inventory-event-writer';
 const infra = isInfrastructureTestEnabled() ? describe : describe.skip;
 if (isInfrastructureTestEnabled()) requireEnv('DATABASE_URL');
 
 infra('G3.8 PostgreSQL completed transfer integrity', () => {
   const prisma = new PrismaService(),
-    service = new InventoryTransferService(prisma, new AuditWriter());
+    service = new InventoryTransferService(prisma, new AuditWriter(), new InventoryEventWriter());
   const tenantId = randomUUID(),
     userId = randomUUID(),
     membershipId = randomUUID(),

@@ -5,6 +5,7 @@ import { isInfrastructureTestEnabled, requireEnv } from '../auth/testing/infrast
 import { PrismaService } from '../prisma/prisma.service';
 import { ReservationExpiryService } from './reservation-expiry.service';
 import { ReservationLifecycleService } from './reservation-lifecycle.service';
+import { InventoryEventWriter } from './inventory-event-writer';
 
 const describeExpiryInfrastructure = isInfrastructureTestEnabled() ? describe : describe.skip;
 
@@ -12,8 +13,16 @@ if (isInfrastructureTestEnabled()) requireEnv('DATABASE_URL');
 
 describeExpiryInfrastructure('G3.7 PostgreSQL reservation expiry integrity', () => {
   const prisma = new PrismaService();
-  const service = new ReservationExpiryService(prisma, new AuditWriter());
-  const lifecycle = new ReservationLifecycleService(prisma, new AuditWriter());
+  const service = new ReservationExpiryService(
+    prisma,
+    new AuditWriter(),
+    new InventoryEventWriter(),
+  );
+  const lifecycle = new ReservationLifecycleService(
+    prisma,
+    new AuditWriter(),
+    new InventoryEventWriter(),
+  );
   const tenantId = randomUUID();
   const userId = randomUUID();
   const membershipId = randomUUID();

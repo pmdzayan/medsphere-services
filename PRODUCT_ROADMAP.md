@@ -64,6 +64,8 @@ Ordered sprints:
     in PR #50 as `bed136e` after exact-head CI run `31769816895`
 28. G3.21 Transactional event delivery foundation — accepted and squash-merged
     in PR #52 as `af48522` after exact-head CI run `31786107840`
+29. G3.22 Atomic inventory domain event producers — active candidate from
+    accepted source `56ca961`; exact-head CI and acceptance pending
 
 **Completion gate:** Accepted ADRs; protected review flow; clean migrations; deny-by-default authentication; tenant-isolation tests; integrated audit trail; atomic stock/reservation behavior; mandatory lint/test/build passing.
 

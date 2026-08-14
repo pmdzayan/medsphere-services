@@ -2,9 +2,9 @@
 
 **Last updated:** 2026-08-14
 
-**Current sprint:** Next sprint selection pending after G3.21 acceptance
+**Current sprint:** G3.22 atomic inventory domain event producers — candidate
 
-**Next feature work:** Select one dependency-ordered sprint from accepted source `af48522`
+**Next feature work:** Complete bounded G3.22 from accepted source `56ca961`
 
 ## Mandatory startup sequence
 
@@ -178,7 +178,9 @@ See `docs/audits/2026-07-20-cto-baseline.md` for the accepted baseline.
     in PR #50 as `bed136e` after exact-head CI run `31769816895`
 32. G3.21 transactional event delivery foundation — accepted and squash-merged
     in PR #52 as `af48522` after exact-head CI run `31786107840`
-33. Returns and later live mutations — blocked pending their own accepted
+33. G3.22 atomic inventory domain event producers — candidate; review,
+    exact-head CI, and CTO acceptance required
+34. Returns and later live mutations — blocked pending their own accepted
     contracts
 
 If ownership transfers, resume at the first pending checkpoint. Do not use
@@ -187,10 +189,10 @@ If ownership transfers, resume at the first pending checkpoint. Do not use
 
 ## Exact continuation point
 
-Select the next bounded sprint from accepted source `af48522` without skipping
-recorded dependencies. Event producers, notification delivery, and analytics
-projections are now prerequisite-ready, but each still requires its own contract,
-implementation, exact-head CI, and CTO acceptance. Do not combine them with
+Complete G3.22 from accepted source `56ca961` without expanding its producer
+catalogue. Notification delivery and analytics projections remain later bounded
+sprints requiring their own contracts, implementation, exact-head CI, and CTO
+acceptance. Do not combine G3.22 with
 quarantine release, public/patient reservation creation, returns, recall, or
 patient exposure.
 

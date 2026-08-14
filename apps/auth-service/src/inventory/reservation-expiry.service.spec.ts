@@ -41,12 +41,17 @@ function createHarness() {
     ),
   };
   const audit = { appendTenantSystem: jest.fn() };
-  const service = new ReservationExpiryService({ client } as never, audit as never);
+  const events = { appendTenantSystem: jest.fn() };
+  const service = new ReservationExpiryService(
+    { client } as never,
+    audit as never,
+    events as never,
+  );
   transaction.medicineReservation.updateMany.mockResolvedValue({ count: 1 });
   transaction.medicineReservationAllocation.updateMany.mockResolvedValue({ count: 1 });
   transaction.medicineReservationCommand.create.mockResolvedValue({ id: 'command-1' });
   transaction.batch.updateMany.mockResolvedValue({ count: 1 });
-  return { audit, client, service, transaction };
+  return { audit, client, events, service, transaction };
 }
 
 describe('ReservationExpiryService', () => {
@@ -104,6 +109,15 @@ describe('ReservationExpiryService', () => {
           version: 4,
           totalQuantity: 4,
         },
+      }),
+    );
+    expect(harness.events.appendTenantSystem).toHaveBeenCalledWith(
+      harness.transaction,
+      candidate.tenantId,
+      'reservation-expiry-worker',
+      expect.objectContaining({
+        eventType: 'inventory.reservation.expired',
+        payload: expect.objectContaining({ cause: 'RESERVATION_EXPIRY', status: 'EXPIRED' }),
       }),
     );
   });

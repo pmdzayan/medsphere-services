@@ -3,6 +3,7 @@ import { AuditWriter } from '../audit/audit-writer.service';
 import { isInfrastructureTestEnabled, requireEnv } from '../auth/testing/infrastructure-test-gate';
 import { PrismaService } from '../prisma/prisma.service';
 import { ReservationCreationService } from './reservation-creation.service';
+import { InventoryEventWriter } from './inventory-event-writer';
 
 const infrastructure = isInfrastructureTestEnabled() ? describe : describe.skip;
 if (isInfrastructureTestEnabled()) requireEnv('DATABASE_URL');
@@ -15,7 +16,11 @@ infrastructure('G3.16 PostgreSQL staff reservation creation integrity', () => {
   const membershipId = randomUUID();
   const providerId = randomUUID();
   const actor = { tenantId, userId: actorUserId, membershipId };
-  const service = new ReservationCreationService(prisma, new AuditWriter());
+  const service = new ReservationCreationService(
+    prisma,
+    new AuditWriter(),
+    new InventoryEventWriter(),
+  );
 
   beforeAll(async () => {
     await prisma.client.tenant.create({

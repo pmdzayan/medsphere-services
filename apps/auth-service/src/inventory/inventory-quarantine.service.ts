@@ -14,6 +14,7 @@ import {
 import { AuditWriter } from '../audit/audit-writer.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { assertTrustedProviderAccess } from './inventory-access';
+import { InventoryEventWriter } from './inventory-event-writer';
 import {
   BATCH_QUARANTINE_REASONS,
   BatchQuarantineResult,
@@ -31,6 +32,7 @@ export class InventoryQuarantineService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditWriter,
+    private readonly events: InventoryEventWriter,
   ) {}
 
   async quarantine(
@@ -235,6 +237,26 @@ export class InventoryQuarantineService {
               cause: 'BATCH_QUARANTINE',
             },
           });
+          await this.events.appendTenantSystem(
+            transaction,
+            reservation.tenantId,
+            'inventory-quarantine-service',
+            {
+              eventType: 'inventory.reservation.cancelled',
+              aggregateType: 'MedicineReservation',
+              aggregateId: reservation.id,
+              occurredAt,
+              payload: {
+                providerId: reservation.providerId,
+                previousStatus: reservation.status,
+                status: 'CANCELLED',
+                version: resultingReservationVersion,
+                totalQuantity: allocatedQuantity,
+                cause: 'BATCH_QUARANTINE',
+                batchId: batch.id,
+              },
+            },
+          );
           releasedUnitCount = safeAdd(
             releasedUnitCount,
             allocatedQuantity,
@@ -333,6 +355,22 @@ export class InventoryQuarantineService {
             affectedReservations: reservationIds.length,
             releasedUnits: releasedUnitCount,
             resultingVersion: resultingBatchVersion,
+          },
+        });
+        await this.events.appendTenantUser(transaction, command.actor, {
+          eventType: 'inventory.batch.quarantined',
+          aggregateType: 'Batch',
+          aggregateId: batch.id,
+          occurredAt,
+          payload: {
+            providerId: batch.providerId,
+            productId: batch.productId,
+            status: 'QUARANTINED',
+            reasonCode: command.reasonCode,
+            onHandQuantity: releasable.onHandQuantity,
+            affectedReservations: reservationIds.length,
+            releasedUnits: releasedUnitCount,
+            version: resultingBatchVersion,
           },
         });
 

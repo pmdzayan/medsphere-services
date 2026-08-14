@@ -5,13 +5,14 @@ import type { AuthenticatedIdentity } from '../auth/auth.types';
 import { isInfrastructureTestEnabled, requireEnv } from '../auth/testing/infrastructure-test-gate';
 import { PrismaService } from '../prisma/prisma.service';
 import { InventoryDamageService } from './inventory-damage.service';
+import { InventoryEventWriter } from './inventory-event-writer';
 
 const infrastructure = isInfrastructureTestEnabled() ? describe : describe.skip;
 if (isInfrastructureTestEnabled()) requireEnv('DATABASE_URL');
 
 infrastructure('G3.9 PostgreSQL completed damaged-stock integrity', () => {
   const prisma = new PrismaService();
-  const service = new InventoryDamageService(prisma, new AuditWriter());
+  const service = new InventoryDamageService(prisma, new AuditWriter(), new InventoryEventWriter());
   const tenantId = randomUUID();
   const userId = randomUUID();
   const membershipId = randomUUID();
@@ -102,7 +103,7 @@ infrastructure('G3.9 PostgreSQL completed damaged-stock integrity', () => {
     });
     expect(replay).toEqual({ ...first, replayed: true });
 
-    const [batch, movement, auditEvents] = await Promise.all([
+    const [batch, movement, auditEvents, outboxEvents] = await Promise.all([
       prisma.client.batch.findUniqueOrThrow({ where: { id: fixture.batchId } }),
       prisma.client.stockMovement.findUniqueOrThrow({
         where: { tenantId_idempotencyKey: { tenantId, idempotencyKey } },
@@ -113,6 +114,14 @@ infrastructure('G3.9 PostgreSQL completed damaged-stock integrity', () => {
           resourceId: fixture.batchId,
           eventType: 'inventory.stock.damaged',
         },
+      }),
+      prisma.client.outboxEvent.findMany({
+        where: {
+          tenantId,
+          aggregateId: fixture.batchId,
+          eventType: 'inventory.stock.damaged',
+        },
+        orderBy: { occurredAt: 'asc' },
       }),
     ]);
     expect(batch).toMatchObject({
@@ -149,6 +158,26 @@ infrastructure('G3.9 PostgreSQL completed damaged-stock integrity', () => {
       ]),
     );
     expect(JSON.stringify(auditEvents)).not.toContain(command.reason);
+    expect(outboxEvents).toHaveLength(2);
+    expect(outboxEvents[0]).toMatchObject({
+      eventType: 'inventory.stock.damaged',
+      eventVersion: 1,
+      aggregateType: 'Batch',
+      aggregateId: fixture.batchId,
+      actorType: 'TENANT_USER',
+      actorMembershipId: membershipId,
+      actorUserId: userId,
+      payload: {
+        providerId,
+        inventoryId: fixture.inventoryId,
+        productId: fixture.productId,
+        quantity: 2,
+        onHandBefore: 10,
+        onHandAfter: 8,
+        version: 2,
+      },
+    });
+    expect(JSON.stringify(outboxEvents)).not.toContain(command.reason);
   });
 
   it('exhausts only an unheld zero balance and rejects missing, stale, expired, or held stock', async () => {
@@ -293,7 +322,11 @@ infrastructure('G3.9 PostgreSQL completed damaged-stock integrity', () => {
         throw new Error('forced audit failure');
       }
     }
-    const failingService = new InventoryDamageService(prisma, new FailingAuditWriter());
+    const failingService = new InventoryDamageService(
+      prisma,
+      new FailingAuditWriter(),
+      new InventoryEventWriter(),
+    );
 
     await expect(
       failingService.recordCompleted({
@@ -311,6 +344,47 @@ infrastructure('G3.9 PostgreSQL completed damaged-stock integrity', () => {
     ).resolves.toMatchObject({ onHandQuantity: 6, heldQuantity: 1, version: 1 });
     await expect(
       prisma.client.stockMovement.count({ where: { tenantId, idempotencyKey } }),
+    ).resolves.toBe(0);
+  });
+
+  it('rolls back state, movement, and audit when outbox persistence fails', async () => {
+    const fixture = await stock(6, 1);
+    const idempotencyKey = `outbox-rollback-${randomUUID()}`;
+    class FailingInventoryEventWriter extends InventoryEventWriter {
+      override async appendTenantUser(): Promise<void> {
+        throw new Error('forced outbox failure');
+      }
+    }
+    const failingService = new InventoryDamageService(
+      prisma,
+      new AuditWriter(),
+      new FailingInventoryEventWriter(),
+    );
+
+    await expect(
+      failingService.recordCompleted({
+        actor,
+        providerId,
+        batchId: fixture.batchId,
+        expectedVersion: 1,
+        quantity: 2,
+        idempotencyKey,
+        reason: 'Outbox rollback fixture',
+      }),
+    ).rejects.toThrow('forced outbox failure');
+    await expect(
+      prisma.client.batch.findUniqueOrThrow({ where: { id: fixture.batchId } }),
+    ).resolves.toMatchObject({ onHandQuantity: 6, heldQuantity: 1, version: 1 });
+    await expect(
+      prisma.client.stockMovement.count({ where: { tenantId, idempotencyKey } }),
+    ).resolves.toBe(0);
+    await expect(
+      prisma.client.auditEvent.count({
+        where: { tenantId, resourceId: fixture.batchId, eventType: 'inventory.stock.damaged' },
+      }),
+    ).resolves.toBe(0);
+    await expect(
+      prisma.client.outboxEvent.count({ where: { tenantId, aggregateId: fixture.batchId } }),
     ).resolves.toBe(0);
   });
 
