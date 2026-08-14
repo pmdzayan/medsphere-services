@@ -28,7 +28,7 @@ CREATE TABLE "NotificationDelivery" (
 
   CONSTRAINT "NotificationDelivery_pkey" PRIMARY KEY ("id"),
   CONSTRAINT "NotificationDelivery_id_tenantId_key" UNIQUE ("id", "tenantId"),
-  CONSTRAINT "NotificationDelivery_tenant_source_workflow_recipient_channel_key"
+  CONSTRAINT "NotificationDelivery_tenantId_sourceEventId_workflowKey_rec_key"
     UNIQUE ("tenantId", "sourceEventId", "workflowKey", "recipientType", "recipientReferenceId", "channel"),
   CONSTRAINT "NotificationDelivery_templateVersion_check" CHECK ("templateVersion" > 0),
   CONSTRAINT "NotificationDelivery_attemptCount_check" CHECK ("attemptCount" >= 0),
@@ -57,7 +57,7 @@ CREATE INDEX "NotificationDelivery_tenantId_createdAt_id_idx"
 ON "NotificationDelivery"("tenantId", "createdAt" DESC, "id" DESC);
 CREATE INDEX "NotificationDelivery_tenantId_status_createdAt_idx"
 ON "NotificationDelivery"("tenantId", "status", "createdAt" DESC);
-CREATE INDEX "NotificationDelivery_tenantId_recipient_createdAt_idx"
+CREATE INDEX "NotificationDelivery_tenantId_recipientType_recipientRefere_idx"
 ON "NotificationDelivery"("tenantId", "recipientType", "recipientReferenceId", "createdAt" DESC);
 
 ALTER TABLE "NotificationDelivery"
