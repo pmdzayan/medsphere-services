@@ -125,6 +125,39 @@ export interface InventoryStockFilters {
   offset?: number;
 }
 
+export interface InventoryExpiryWorklistItem {
+  inventoryId: string;
+  batchId: string;
+  productId: string;
+  name: string;
+  genericName: string | null;
+  brand: string;
+  sku: string | null;
+  isVisible: boolean;
+  batchNumber: string;
+  expiryDate: string;
+  version: number;
+  onHandQuantity: number;
+  heldQuantity: number;
+  availableQuantity: number;
+}
+
+export interface InventoryExpiryWorklistPage {
+  data: InventoryExpiryWorklistItem[];
+  total: number;
+  limit: number;
+  offset: number;
+  asOf: string;
+  horizonEndsAt: string;
+}
+
+export interface InventoryExpiryWorklistFilters {
+  providerId: string;
+  horizonDays?: number;
+  limit?: number;
+  offset?: number;
+}
+
 const uuidV4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const decimalCurrency = /^(?:0|[1-9]\d{0,11})(?:\.\d{1,2})?$/;
 
@@ -148,6 +181,48 @@ export function isInventoryStockPage(value: unknown): value is InventoryStockPag
     page.data.length <= Number(page.limit) &&
     page.data.length <= Math.max(Number(page.total) - Number(page.offset), 0)
   );
+}
+
+export function isInventoryExpiryWorklistPage(
+  value: unknown,
+  expectedHorizonDays?: number,
+): value is InventoryExpiryWorklistPage {
+  if (!hasExactKeys(value, ['data', 'total', 'limit', 'offset', 'asOf', 'horizonEndsAt'])) {
+    return false;
+  }
+  const page = value as Partial<InventoryExpiryWorklistPage>;
+  if (
+    !Array.isArray(page.data) ||
+    !page.data.every(isInventoryExpiryWorklistItem) ||
+    !isIntegerBetween(page.total, 0, Number.MAX_SAFE_INTEGER) ||
+    !isIntegerBetween(page.limit, 1, 100) ||
+    !isIntegerBetween(page.offset, 0, 10_000) ||
+    !isIsoDateTime(page.asOf) ||
+    !isIsoDateTime(page.horizonEndsAt) ||
+    new Date(page.horizonEndsAt).getTime() <= new Date(page.asOf).getTime() ||
+    page.data.length > page.limit ||
+    page.data.length > Math.max(page.total - page.offset, 0)
+  ) {
+    return false;
+  }
+  const asOf = new Date(page.asOf).getTime();
+  const horizon = new Date(page.horizonEndsAt).getTime();
+  if (
+    (expectedHorizonDays !== undefined && horizon - asOf !== expectedHorizonDays * 86_400_000) ||
+    new Set(page.data.map(({ batchId }) => batchId)).size !== page.data.length
+  ) {
+    return false;
+  }
+  return page.data.every((item, index) => {
+    const expiry = new Date(item.expiryDate).getTime();
+    if (expiry <= asOf || expiry > horizon) return false;
+    const previous = page.data?.[index - 1];
+    return (
+      !previous ||
+      previous.expiryDate < item.expiryDate ||
+      (previous.expiryDate === item.expiryDate && previous.batchId <= item.batchId)
+    );
+  });
 }
 
 export function isBatchQuarantineRequest(value: unknown): value is BatchQuarantineRequest {
@@ -327,6 +402,16 @@ export function toInventoryStockSearchParams(filters: InventoryStockFilters): UR
   return search;
 }
 
+export function toInventoryExpirySearchParams(
+  filters: InventoryExpiryWorklistFilters,
+): URLSearchParams {
+  const search = new URLSearchParams({ providerId: filters.providerId });
+  if (filters.horizonDays !== undefined) search.set('horizonDays', String(filters.horizonDays));
+  if (filters.limit !== undefined) search.set('limit', String(filters.limit));
+  if (filters.offset !== undefined) search.set('offset', String(filters.offset));
+  return search;
+}
+
 function isProviderAccess(value: unknown): value is ProviderAccess {
   if (
     !hasExactKeys(value, ['membershipId', 'providerId', 'businessName', 'providerType', 'isActive'])
@@ -425,6 +510,48 @@ function isInventoryBatchStock(value: unknown): value is InventoryBatchStock {
     Number(batch.heldQuantity) <= Number(batch.onHandQuantity) &&
     Number(batch.availableQuantity) <= Number(batch.onHandQuantity) - Number(batch.heldQuantity) &&
     (batch.status === 'ACTIVE' || batch.availableQuantity === 0)
+  );
+}
+
+function isInventoryExpiryWorklistItem(value: unknown): value is InventoryExpiryWorklistItem {
+  if (
+    !hasExactKeys(value, [
+      'inventoryId',
+      'batchId',
+      'productId',
+      'name',
+      'genericName',
+      'brand',
+      'sku',
+      'isVisible',
+      'batchNumber',
+      'expiryDate',
+      'version',
+      'onHandQuantity',
+      'heldQuantity',
+      'availableQuantity',
+    ])
+  ) {
+    return false;
+  }
+  const item = value as Partial<InventoryExpiryWorklistItem>;
+  return (
+    isCanonicalUuid(item.inventoryId) &&
+    isCanonicalUuid(item.batchId) &&
+    isCanonicalUuid(item.productId) &&
+    isBoundedString(item.name, 240) &&
+    (item.genericName === null || isBoundedString(item.genericName, 240)) &&
+    isBoundedString(item.brand, 240) &&
+    (item.sku === null || isBoundedString(item.sku, 120)) &&
+    typeof item.isVisible === 'boolean' &&
+    isBoundedString(item.batchNumber, 120) &&
+    isIsoDateTime(item.expiryDate) &&
+    isIntegerBetween(item.version, 1, 2_147_483_647) &&
+    isIntegerBetween(item.onHandQuantity, 1, Number.MAX_SAFE_INTEGER) &&
+    isQuantity(item.heldQuantity) &&
+    isQuantity(item.availableQuantity) &&
+    item.heldQuantity <= item.onHandQuantity &&
+    item.availableQuantity === item.onHandQuantity - item.heldQuantity
   );
 }
 

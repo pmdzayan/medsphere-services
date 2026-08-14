@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { validProviders, validStockPage } from '@/test/inventory-fixtures';
+import { validExpiryWorklistPage, validProviders, validStockPage } from '@/test/inventory-fixtures';
 import {
   isBatchQuarantineRequest,
   isBatchQuarantineResponse,
@@ -8,6 +8,7 @@ import {
   isDamagedStockRequest,
   isDamagedStockResponse,
   isInventoryStockPage,
+  isInventoryExpiryWorklistPage,
   isProviderAccessList,
 } from './inventory-contract';
 
@@ -15,6 +16,27 @@ describe('inventory boundary contracts', () => {
   it('accepts exact assigned-provider and stock responses', () => {
     expect(isProviderAccessList(validProviders)).toBe(true);
     expect(isInventoryStockPage(validStockPage)).toBe(true);
+  });
+
+  it('accepts only correlated, ordered expiry worklist responses', () => {
+    expect(isInventoryExpiryWorklistPage(validExpiryWorklistPage)).toBe(true);
+    expect(isInventoryExpiryWorklistPage({ ...validExpiryWorklistPage, tenantId: 'leak' })).toBe(
+      false,
+    );
+    expect(
+      isInventoryExpiryWorklistPage({
+        ...validExpiryWorklistPage,
+        data: [{ ...validExpiryWorklistPage.data[0], availableQuantity: 18 }],
+      }),
+    ).toBe(false);
+    expect(isInventoryExpiryWorklistPage(validExpiryWorklistPage, 30)).toBe(true);
+    expect(isInventoryExpiryWorklistPage(validExpiryWorklistPage, 7)).toBe(false);
+    expect(
+      isInventoryExpiryWorklistPage({
+        ...validExpiryWorklistPage,
+        data: [{ ...validExpiryWorklistPage.data[0], expiryDate: validExpiryWorklistPage.asOf }],
+      }),
+    ).toBe(false);
   });
 
   it('rejects over-broad and malformed provider responses', () => {

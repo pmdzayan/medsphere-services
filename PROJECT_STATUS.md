@@ -2,11 +2,11 @@
 
 **Status date:** 2026-08-14
 
-**Accepted source commit:** `9f733a77228a8cfc479f64f776e26b57a4038186`
+**Accepted source commit:** `7c0befbcd2a292f36a03c7c328955b330dccfcc4`
 
 **Accepted stabilization baseline:** `4ea55a17e188410ddee45fa3ea6c016e22d6617a`
 
-**Current sprint:** G3.18 assigned-provider expiry worklist acceptance
+**Current sprint:** G3.19 live expiry worklist workspace acceptance
 
 **Release state:** Not approved for production or real healthcare data
 
@@ -14,41 +14,39 @@
 
 ## Most recent accepted sprint
 
-### G3.17 — Live Staff Reservation Creation
-
-**Status:** Accepted and squash-merged in PR #47 as `9f733a7` after exact-head
-CI run `31767805254` passed all required gates.
-
-**Selection reason:** G3.16 supplied the bounded staff command and the live
-assigned-provider workspace already exposed eligible stock and authoritative
-reservation refresh.
-
-**Boundary:** One-product staff creation from the selected assigned provider and
-live visible stock, with an opaque active tenant-user UUID, bounded quantity,
-future expiry, stable idempotency, explicit confirmation, strict same-origin BFF
-and receipt validation, and authoritative refresh. No identity directory,
-patient data, clinical context, notes, payment, delivery, substitution,
-multi-product composition, or offline mutation was added.
-
-**Implementation authority:** accepted G3.16, accepted source `9f733a7`, and
-`docs/sprints/G3.17-live-staff-reservation-creation.md`.
-
-## Active acceptance candidate
-
 ### G3.18 — Assigned-Provider Expiry Worklist
 
-**Status:** Implemented from accepted source `9f733a7`; exact-head CI and CTO
-acceptance are required.
+**Status:** Accepted and squash-merged in PR #48 as `7c0befb` after exact-head
+CI run `31768462051` passed all required gates.
+
+**Selection reason:** The accepted physical-batch expiry authority and existing
+assigned-provider access made a bounded read possible without inventing alert or
+disposition policy.
 
 **Boundary:** A permission-protected, assigned-provider, private no-store read
 lists active future physical batches with positive on-hand quantity inside a
 bounded 1–365 day horizon, stable expiry/UUID pagination, server observation
 timestamps, and exact held/available quantities. No reconciliation, quarantine,
 release, disposal, return, alert, forecast, patient, clinical, or supplier
-behavior is added.
+behavior was added.
 
-**Implementation authority:** accepted G3.10/G3.17 boundaries and
-`docs/sprints/G3.18-assigned-provider-expiry-worklist.md`.
+**Implementation authority:** accepted G3.10/G3.17 boundaries, accepted source
+`7c0befb`, and `docs/sprints/G3.18-assigned-provider-expiry-worklist.md`.
+
+## Active acceptance candidate
+
+### G3.19 — Live Expiry Worklist Workspace
+
+**Status:** Implemented from accepted source `7c0befb`; exact-head CI and CTO
+acceptance are required.
+
+**Boundary:** A live read-only workspace exposes assigned-provider physical batch
+expiry evidence through a strict same-origin BFF, fixed bounded horizons,
+pagination, correlated timestamps and exact quantity validation. It adds no
+mutation, alert, forecast, risk score, patient, clinical, or supplier behavior.
+
+**Implementation authority:** accepted G3.18 and
+`docs/sprints/G3.19-live-expiry-worklist-workspace.md`.
 
 ## Earlier accepted sprint
 

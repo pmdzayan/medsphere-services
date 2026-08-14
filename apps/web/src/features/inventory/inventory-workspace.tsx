@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { MetricCard, SectionCard, StatusBadge } from '@/components/platform/dashboard-primitives';
 import { Icon } from '@/components/platform/icon';
@@ -298,15 +299,23 @@ export function InventoryWorkspace() {
             membership.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => providerId && void loadStock(providerId, query, offset)}
-          disabled={!providerId || stockLoading}
-          className="inline-flex w-fit items-center gap-2 rounded-xl border border-[#d8e2de] bg-white px-4 py-2.5 text-sm font-bold text-[#436158] disabled:cursor-wait disabled:opacity-50"
-        >
-          <Icon name="refresh" className={`size-4 ${stockLoading ? 'animate-spin' : ''}`} />
-          Refresh stock
-        </button>
+        <div className="flex flex-wrap gap-3">
+          <Link
+            href="/inventory/expiry"
+            className="inline-flex w-fit items-center rounded-xl bg-amber-600 px-4 py-2.5 text-sm font-bold text-white"
+          >
+            Expiry worklist
+          </Link>
+          <button
+            type="button"
+            onClick={() => providerId && void loadStock(providerId, query, offset)}
+            disabled={!providerId || stockLoading}
+            className="inline-flex w-fit items-center gap-2 rounded-xl border border-[#d8e2de] bg-white px-4 py-2.5 text-sm font-bold text-[#436158] disabled:cursor-wait disabled:opacity-50"
+          >
+            <Icon name="refresh" className={`size-4 ${stockLoading ? 'animate-spin' : ''}`} />
+            Refresh stock
+          </button>
+        </div>
       </header>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">

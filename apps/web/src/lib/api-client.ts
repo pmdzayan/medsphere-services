@@ -22,6 +22,9 @@ import {
   toInventoryStockSearchParams,
   type InventoryStockFilters,
   type InventoryStockPage,
+  toInventoryExpirySearchParams,
+  type InventoryExpiryWorklistFilters,
+  type InventoryExpiryWorklistPage,
   type ProviderAccess,
 } from './inventory-contract';
 import type {
@@ -120,6 +123,15 @@ export async function getProviderStock(
 ): Promise<InventoryStockPage> {
   const search = toInventoryStockSearchParams(filters);
   return requestJson<InventoryStockPage>(`/api/inventory/stock?${search.toString()}`);
+}
+
+export async function getProviderExpiryWorklist(
+  filters: InventoryExpiryWorklistFilters,
+): Promise<InventoryExpiryWorklistPage> {
+  const search = toInventoryExpirySearchParams(filters);
+  return requestJson<InventoryExpiryWorklistPage>(
+    `/api/inventory/expiry-worklist?${search.toString()}`,
+  );
 }
 
 export async function quarantineBatch(

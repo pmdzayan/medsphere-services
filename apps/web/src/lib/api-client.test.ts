@@ -4,6 +4,7 @@ import {
   getAssignedProviders,
   getAuthorizationCatalogue,
   getProviderStock,
+  getProviderExpiryWorklist,
   getProviderReservations,
   quarantineBatch,
   recordDamagedStock,
@@ -86,6 +87,31 @@ describe('authenticated API client', () => {
         { cache: 'no-store' },
       ],
     ]);
+  });
+
+  it('loads the bounded expiry worklist through the same-origin route', async () => {
+    const page = {
+      data: [],
+      total: 0,
+      limit: 25,
+      offset: 0,
+      asOf: '2026-08-14T00:00:00.000Z',
+      horizonEndsAt: '2026-09-13T00:00:00.000Z',
+    };
+    const fetchMock = vi.fn().mockResolvedValue(Response.json(page));
+    vi.stubGlobal('fetch', fetchMock);
+    await expect(
+      getProviderExpiryWorklist({
+        providerId: 'provider-id',
+        horizonDays: 30,
+        limit: 25,
+        offset: 0,
+      }),
+    ).resolves.toEqual(page);
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/inventory/expiry-worklist?providerId=provider-id&horizonDays=30&limit=25&offset=0',
+      { cache: 'no-store' },
+    );
   });
 
   it('submits the exact versioned quarantine command through the same-origin boundary', async () => {
