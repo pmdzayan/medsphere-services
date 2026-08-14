@@ -2,6 +2,8 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { AuthenticatedIdentity } from '../auth/auth.types';
 import { InventoryStockQueryDto } from './dto/inventory-stock-query.dto';
 import { InventoryStockListResponseDto } from './dto/inventory-stock-response.dto';
+import { InventoryExpiryQueryDto } from './dto/inventory-expiry-query.dto';
+import { InventoryExpiryWorklistResponseDto } from './dto/inventory-expiry-response.dto';
 import { InventoryRepository } from './inventory.repository';
 
 @Injectable()
@@ -56,6 +58,48 @@ export class InventoryService {
       total: result.total,
       limit: query.limit,
       offset: query.offset,
+    };
+  }
+
+  async listExpiryWorklist(
+    identity: AuthenticatedIdentity,
+    providerId: string,
+    query: InventoryExpiryQueryDto,
+  ): Promise<InventoryExpiryWorklistResponseDto> {
+    if (!(await this.repository.hasProviderAccess(identity, providerId))) {
+      throw new NotFoundException('Provider expiry worklist not found');
+    }
+    const asOf = new Date();
+    const horizonEndsAt = new Date(asOf.getTime() + query.horizonDays * 86_400_000);
+    const result = await this.repository.listExpiryWorklist(
+      identity.tenantId,
+      providerId,
+      query,
+      asOf,
+      horizonEndsAt,
+    );
+    return {
+      data: result.data.map((batch) => ({
+        inventoryId: batch.inventoryId,
+        batchId: batch.id,
+        productId: batch.productId,
+        name: batch.product.name,
+        genericName: batch.product.genericName,
+        brand: batch.product.brand,
+        sku: batch.inventory.sku,
+        isVisible: batch.inventory.isVisible,
+        batchNumber: batch.batchNumber,
+        expiryDate: batch.expiryDate,
+        version: batch.version,
+        onHandQuantity: batch.onHandQuantity,
+        heldQuantity: batch.heldQuantity,
+        availableQuantity: Math.max(0, batch.onHandQuantity - batch.heldQuantity),
+      })),
+      total: result.total,
+      limit: query.limit,
+      offset: query.offset,
+      asOf,
+      horizonEndsAt,
     };
   }
 }

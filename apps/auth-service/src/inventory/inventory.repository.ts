@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { AuthenticatedIdentity } from '../auth/auth.types';
 import { PrismaService } from '../prisma/prisma.service';
 import { InventoryStockQueryDto } from './dto/inventory-stock-query.dto';
+import { InventoryExpiryQueryDto } from './dto/inventory-expiry-query.dto';
 
 @Injectable()
 export class InventoryRepository {
@@ -84,6 +85,47 @@ export class InventoryRepository {
         skip: query.offset,
       }),
       this.prisma.client.inventory.count({ where }),
+    ]);
+    return { data, total };
+  }
+
+  async listExpiryWorklist(
+    tenantId: string,
+    providerId: string,
+    query: InventoryExpiryQueryDto,
+    asOf: Date,
+    horizonEndsAt: Date,
+  ) {
+    const where = {
+      tenantId,
+      providerId,
+      deletedAt: null,
+      status: 'ACTIVE' as const,
+      onHandQuantity: { gt: 0 },
+      expiryDate: { gt: asOf, lte: horizonEndsAt },
+      inventory: { deletedAt: null },
+      product: { isActive: true, deletedAt: null },
+    } as const;
+    const [data, total] = await Promise.all([
+      this.prisma.client.batch.findMany({
+        where,
+        select: {
+          id: true,
+          inventoryId: true,
+          productId: true,
+          batchNumber: true,
+          expiryDate: true,
+          version: true,
+          onHandQuantity: true,
+          heldQuantity: true,
+          inventory: { select: { sku: true, isVisible: true } },
+          product: { select: { name: true, genericName: true, brand: true } },
+        },
+        orderBy: [{ expiryDate: 'asc' }, { id: 'asc' }],
+        take: query.limit,
+        skip: query.offset,
+      }),
+      this.prisma.client.batch.count({ where }),
     ]);
     return { data, total };
   }

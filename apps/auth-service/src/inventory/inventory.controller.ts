@@ -62,6 +62,8 @@ import { InventoryQuarantineService } from './inventory-quarantine.service';
 import { CreateProviderReservationDto } from './dto/reservation-creation.dto';
 import { ProviderReservationCreationResponseDto } from './dto/reservation-creation-response.dto';
 import { ReservationCreationService } from './reservation-creation.service';
+import { InventoryExpiryQueryDto } from './dto/inventory-expiry-query.dto';
+import { InventoryExpiryWorklistResponseDto } from './dto/inventory-expiry-response.dto';
 
 @Controller('inventory')
 @ApiTags('Inventory')
@@ -238,6 +240,20 @@ export class InventoryController {
     @Query() query: InventoryStockQueryDto,
   ) {
     return this.inventoryService.listStock(identity, providerId, query);
+  }
+
+  @Get('providers/:providerId/expiry-worklist')
+  @Header('Cache-Control', 'private, no-store')
+  @RequirePermissions(PERMISSIONS.inventoryStockRead)
+  @ApiOperation({ summary: 'List active physical batches approaching expiry' })
+  @ApiOkResponse({ type: InventoryExpiryWorklistResponseDto })
+  @ApiNotFoundResponse({ description: 'Provider expiry worklist not found' })
+  listExpiryWorklist(
+    @CurrentIdentity() identity: AuthenticatedIdentity,
+    @Param('providerId', new ParseUUIDPipe({ version: '4' })) providerId: string,
+    @Query() query: InventoryExpiryQueryDto,
+  ) {
+    return this.inventoryService.listExpiryWorklist(identity, providerId, query);
   }
 
   @Put('providers/:providerId/products/:productId')

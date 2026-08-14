@@ -54,7 +54,9 @@ Ordered sprints:
     #44 as `bc26e2a` after exact-head CI run `31764479220`
 23. G3.16 Assigned-provider staff reservation creation — accepted and
     squash-merged in PR #46 as `3c92e5d` after exact-head CI run `31767059794`
-24. G3.17 Live staff reservation creation — implemented; exact-head CI and CTO
+24. G3.17 Live staff reservation creation — accepted and squash-merged in PR
+    #47 as `9f733a7` after exact-head CI run `31767805254`
+25. G3.18 Assigned-provider expiry worklist — implemented; exact-head CI and CTO
     acceptance required
 
 **Completion gate:** Accepted ADRs; protected review flow; clean migrations; deny-by-default authentication; tenant-isolation tests; integrated audit trail; atomic stock/reservation behavior; mandatory lint/test/build passing.
