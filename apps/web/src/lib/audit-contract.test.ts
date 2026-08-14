@@ -41,6 +41,29 @@ describe('audit frontend contract', () => {
     ).toBe(false);
   });
 
+  it('accepts only the bounded G3.11 batch-quarantine metadata contract', () => {
+    const quarantine = {
+      ...event,
+      eventType: 'inventory.batch.quarantined',
+      resourceType: 'Batch',
+      metadata: {
+        productId: '7c8423f1-f7ab-4a74-b925-23c1188e109c',
+        reasonCode: 'QUALITY_SUSPECT',
+        onHandQuantity: 20,
+        affectedReservations: 1,
+        releasedUnits: 4,
+        resultingVersion: 5,
+      },
+    };
+    expect(isAuditEventPage({ data: [quarantine], nextCursor: null })).toBe(true);
+    expect(
+      isAuditEventPage({
+        data: [{ ...quarantine, metadata: { ...quarantine.metadata, reason: 'free text' } }],
+        nextCursor: null,
+      }),
+    ).toBe(false);
+  });
+
   it('rejects unknown event types and outcomes', () => {
     expect(
       isAuditEventPage({ data: [{ ...event, eventType: 'patient.exported' }], nextCursor: null }),

@@ -1,6 +1,7 @@
 # Volume 04 — Database Bible
 
-**Baseline:** S0.2 through S0.5 and G3.1–G3.2 accepted and merged; G3.3 active
+**Baseline:** Accepted through G3.10; G3.11 implemented pending exact-head CI
+and CTO acceptance
 
 **Engine:** PostgreSQL 16
 
@@ -12,13 +13,15 @@
 
 ## Acceptance boundary
 
-This volume documents the accepted database through G3.2 and the G3.3 reservation
-target. S0.5 established tenant-scoped batch quantity authority, an append-only
+This volume documents the accepted database through G3.10 and the implemented
+G3.11 quarantine candidate. S0.5 established tenant-scoped batch quantity authority, an append-only
 stock ledger, typed medicine reservations, deterministic FEFO allocations, and
 idempotent command receipts. G3.1 added composite membership-provider access.
 G3.2 added migration-owned permissions and constrained command hashes for the
-first accepted stock mutations. G3.3 adds migration-owned reservation read and
-manage permissions without changing the aggregate schema. Consent, privacy, retention, and remaining
+first accepted stock mutations. Later accepted sprints added reservation
+lifecycle, transfer, damage, and physical-expiry evidence. G3.11 adds a
+terminal quarantine state, permission, and immutable quarantine record. Consent,
+privacy, retention, and remaining
 product domains continue through dependency-ordered sprints.
 
 No production or real healthcare data is approved.
@@ -36,6 +39,11 @@ No production or real healthcare data is approved.
 |     7 | `20260802120000_trusted_provider_stock_read`                     | Trusted provider assignments and inventory-read permission             |
 |     8 | `20260802160000_inventory_stock_commands`                        | Stock command hashes and listing/receipt/adjust permissions            |
 |     9 | `20260802180000_provider_reservation_operations`                 | Provider reservation read/manage permissions                           |
+|    10 | `20260808210000_session_credential_integrity`                    | Session credential integrity constraints                               |
+|    11 | `20260809160000_completed_inventory_transfer`                    | Completed transfer evidence and audit                                  |
+|    12 | `20260810140000_completed_damaged_stock_write_off`               | Damage write-off evidence and audit                                    |
+|    13 | `20260810180000_physical_batch_expiry_reconciliation`            | Physical expiry evidence and system audit                              |
+|    14 | `20260810200000_one_way_manual_batch_quarantine`                 | Terminal quarantine evidence, permission, and audit                    |
 
 Migration history is append-only under ADR-002. Applied migrations are never edited or deleted. Shared databases use `prisma migrate deploy`; `prisma db push` is prohibited.
 
@@ -53,24 +61,25 @@ pnpm db:verify
 
 ## Enum catalogue
 
-| Enum                 | Values                                                                                                                                           |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `UserStatus`         | `ACTIVE`, `INACTIVE`, `SUSPENDED`, `PENDING_VERIFICATION`                                                                                        |
-| `SessionStatus`      | `ACTIVE`, `ROTATED`, `EXPIRED`, `REVOKED`, `COMPROMISED`                                                                                         |
-| `MembershipStatus`   | `PENDING`, `ACTIVE`, `SUSPENDED`, `REVOKED`                                                                                                      |
-| `AuditActorType`     | `TENANT_USER`, `PLATFORM_USER`, `SYSTEM`                                                                                                         |
-| `AuditScope`         | `TENANT`, `PLATFORM`                                                                                                                             |
-| `AuditOutcome`       | `SUCCEEDED`, `DENIED`, `FAILED`                                                                                                                  |
-| `ProviderType`       | `PHARMACY`, `HOSPITAL`                                                                                                                           |
-| `VerificationStatus` | `PENDING`, `UNDER_REVIEW`, `APPROVED`, `REJECTED`, `SUSPENDED`, `EXPIRED`                                                                        |
-| `ProductCategory`    | `MEDICINE`, `OTC`, `COSMETIC`, `AYURVEDIC`, `SUPPLEMENT`, `BABY_CARE`, `PERSONAL_CARE`, `MEDICAL_DEVICE`                                         |
-| `DosageForm`         | `TABLET`, `SYRUP`, `INJECTION`, `CREAM`, `OINTMENT`, `CAPSULE`, `DROPS`, `INHALER`, `SPRAY`, `LOTION`, `GEL`, `POWDER`, `SOLUTION`, `SUSPENSION` |
-| `RoleType`           | `SYSTEM`, `TENANT`                                                                                                                               |
-| `BatchStatus`        | `ACTIVE`, `EXPIRED`, `EXHAUSTED`                                                                                                                 |
-| `StockMovementType`  | `STOCK_IN`, `STOCK_OUT`, `ADJUSTMENT`, `TRANSFER_IN`, `TRANSFER_OUT`, `RETURN`, `RETURN_IN`, `RETURN_OUT`, `EXPIRED`, `DAMAGED`                  |
-| `MedicalRecordType`  | `PRESCRIPTION`, `LAB_REPORT`, `XRAY`, `MRI`, `CT_SCAN`, `VACCINATION`, `DISCHARGE_SUMMARY`, `INSURANCE`, `OTHER`                                 |
-| `ReservationType`    | `MEDICINE_PICKUP`, `HOSPITAL_APPOINTMENT`, `LAB_TEST`, `VACCINATION`                                                                             |
-| `ReservationStatus`  | `PENDING`, `CONFIRMED`, `READY`, `COMPLETED`, `CANCELLED`, `EXPIRED`                                                                             |
+| Enum                    | Values                                                                                                                                           |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `UserStatus`            | `ACTIVE`, `INACTIVE`, `SUSPENDED`, `PENDING_VERIFICATION`                                                                                        |
+| `SessionStatus`         | `ACTIVE`, `ROTATED`, `EXPIRED`, `REVOKED`, `COMPROMISED`                                                                                         |
+| `MembershipStatus`      | `PENDING`, `ACTIVE`, `SUSPENDED`, `REVOKED`                                                                                                      |
+| `AuditActorType`        | `TENANT_USER`, `PLATFORM_USER`, `SYSTEM`                                                                                                         |
+| `AuditScope`            | `TENANT`, `PLATFORM`                                                                                                                             |
+| `AuditOutcome`          | `SUCCEEDED`, `DENIED`, `FAILED`                                                                                                                  |
+| `ProviderType`          | `PHARMACY`, `HOSPITAL`                                                                                                                           |
+| `VerificationStatus`    | `PENDING`, `UNDER_REVIEW`, `APPROVED`, `REJECTED`, `SUSPENDED`, `EXPIRED`                                                                        |
+| `ProductCategory`       | `MEDICINE`, `OTC`, `COSMETIC`, `AYURVEDIC`, `SUPPLEMENT`, `BABY_CARE`, `PERSONAL_CARE`, `MEDICAL_DEVICE`                                         |
+| `DosageForm`            | `TABLET`, `SYRUP`, `INJECTION`, `CREAM`, `OINTMENT`, `CAPSULE`, `DROPS`, `INHALER`, `SPRAY`, `LOTION`, `GEL`, `POWDER`, `SOLUTION`, `SUSPENSION` |
+| `RoleType`              | `SYSTEM`, `TENANT`                                                                                                                               |
+| `BatchStatus`           | `ACTIVE`, `EXPIRED`, `EXHAUSTED`, `QUARANTINED`                                                                                                  |
+| `BatchQuarantineReason` | `QUALITY_SUSPECT`, `TEMPERATURE_EXCURSION`, `PACKAGING_COMPROMISED`, `STORAGE_DEVIATION`                                                         |
+| `StockMovementType`     | `STOCK_IN`, `STOCK_OUT`, `ADJUSTMENT`, `TRANSFER_IN`, `TRANSFER_OUT`, `RETURN`, `RETURN_IN`, `RETURN_OUT`, `EXPIRED`, `DAMAGED`                  |
+| `MedicalRecordType`     | `PRESCRIPTION`, `LAB_REPORT`, `XRAY`, `MRI`, `CT_SCAN`, `VACCINATION`, `DISCHARGE_SUMMARY`, `INSURANCE`, `OTHER`                                 |
+| `ReservationType`       | `MEDICINE_PICKUP`, `HOSPITAL_APPOINTMENT`, `LAB_TEST`, `VACCINATION`                                                                             |
+| `ReservationStatus`     | `PENDING`, `CONFIRMED`, `READY`, `COMPLETED`, `CANCELLED`, `EXPIRED`                                                                             |
 
 ## Provisional model ownership
 
@@ -115,6 +124,16 @@ provider, product, and batch scope. It records the original expiry date,
 unchanged on-hand quantity, resulting batch version, and one database-authority
 timestamp used for both reconciliation and creation. Expiry changes no physical
 quantity and therefore creates no `StockMovement`.
+
+### G3.11 one-way batch quarantine evidence
+
+`BatchQuarantineRecord` is the one-per-batch, append-only proof of an assigned
+staff quarantine command. Composite foreign keys bind tenant, inventory,
+provider, product, batch, and actor membership scope. It records a bounded
+reason, unchanged on-hand quantity, affected reservation and released-unit
+counts, idempotency hash, resulting batch version, and database-authority time.
+Quarantine releases all reservation holds but changes no physical quantity and
+therefore creates no `StockMovement`.
 
 ## Table catalogue
 

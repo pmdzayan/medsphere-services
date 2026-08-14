@@ -16,8 +16,8 @@
 
 ### G3.11 — One-Way Manual Batch Quarantine
 
-**Status:** Contract accepted; implementation not started. Overall V1 progress
-remains 35% until exact-head implementation CI and CTO acceptance.
+**Status:** Implemented; exact-commit CI and CTO acceptance required. Overall
+V1 progress remains 35% until both gates pass.
 
 **Selection reason:** The accepted stock read already exposes expiry dates and
 batch states, so a separate visibility-only sprint would duplicate working
@@ -147,8 +147,8 @@ and [the Gates 1–20 verification](docs/audits/2026-08-01-gates-1-20-verificati
     PR #32 as `72fc92a` after exact-head CI run `31371305767`
 18. **G3.10 physical batch expiry reconciliation** — accepted and squash-merged
     in PR #35 as `ad2d15b` after exact-head CI run `31393057704`
-19. **G3.11 one-way manual batch quarantine** — contract accepted;
-    implementation not started
+19. **G3.11 one-way manual batch quarantine** — implemented; exact-commit CI
+    and CTO acceptance required
 20. Resume remaining Inventory and Compliance milestones in dependency order
 
 Only one recovery sprint may be active at a time. Exact boundaries may be refined through an ADR, but dependencies must not be skipped.

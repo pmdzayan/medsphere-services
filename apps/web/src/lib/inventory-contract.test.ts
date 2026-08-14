@@ -49,4 +49,39 @@ describe('inventory boundary contracts', () => {
       }),
     ).toBe(true);
   });
+
+  it('accepts quarantined physical stock only when availability is zero', () => {
+    const item = validStockPage.data[0];
+    const quarantined = {
+      ...validStockPage,
+      data: [
+        {
+          ...item,
+          totalHeldQuantity: 0,
+          totalAvailableQuantity: 0,
+          batches: [
+            {
+              ...item.batches[0],
+              status: 'QUARANTINED',
+              heldQuantity: 0,
+              availableQuantity: 0,
+            },
+          ],
+        },
+      ],
+    } as const;
+    expect(isInventoryStockPage(quarantined)).toBe(true);
+    expect(
+      isInventoryStockPage({
+        ...quarantined,
+        data: [
+          {
+            ...quarantined.data[0],
+            totalAvailableQuantity: 1,
+            batches: [{ ...quarantined.data[0].batches[0], availableQuantity: 1 }],
+          },
+        ],
+      }),
+    ).toBe(false);
+  });
 });

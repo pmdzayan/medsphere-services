@@ -4,7 +4,7 @@
 
 **Current sprint:** G3.11 implementation — one-way manual batch quarantine
 
-**Next feature work:** Implement accepted ADR-012 and the G3.11 sprint contract
+**Next feature work:** Verify and accept the implemented ADR-012/G3.11 boundary
 
 ## Mandatory startup sequence
 
@@ -89,7 +89,8 @@ The migration must be incremental:
 - G3.11 accepts only a one-way assigned-provider quarantine command. It must
   preserve physical quantity, cancel every reservation holding the batch, and
   add no release, recall, disposal, return, notification, or mutation UI.
-  Implementation has not started and V1 remains 35%.
+  Implementation is complete locally; exact-commit CI and CTO acceptance are
+  required, and V1 remains 35%.
 - S0.5 now defines `Batch` as physical/held quantity authority, uses an
   append-only movement ledger, and stores typed reservation items and
   allocations. Its accepted production HTTP boundary and live frontend
@@ -155,8 +156,8 @@ See `docs/audits/2026-07-20-cto-baseline.md` for the accepted baseline.
     #32 as `72fc92a` after exact-head CI run `31371305767`
 21. G3.10 physical batch expiry reconciliation — accepted and squash-merged in
     PR #35 as `ad2d15b` after exact-head CI run `31393057704`
-22. G3.11 one-way manual batch quarantine — contract accepted; implementation
-    not started
+22. G3.11 one-way manual batch quarantine — implemented; exact-commit CI and
+    CTO acceptance required
 23. Returns, safe creation, and later live mutations — blocked pending their
     own accepted contracts
 
@@ -166,9 +167,9 @@ If ownership transfers, resume at the first pending checkpoint. Do not use
 
 ## Exact continuation point
 
-Implement G3.11 from accepted base `df71854` against ADR-012 and
-`docs/sprints/G3.11-one-way-manual-batch-quarantine.md`. Do not advance
-progress until exact-commit implementation CI and CTO acceptance. Quarantine
+Verify the G3.11 implementation against ADR-012 and
+`docs/sprints/G3.11-one-way-manual-batch-quarantine.md`. Do not advance progress
+until exact-commit implementation CI and CTO acceptance. Quarantine
 release, reservation creation, returns, recall, analytics policy, patient
 exposure, and Gates 2 and 4–9 remain blocked by their recorded dependencies.
 

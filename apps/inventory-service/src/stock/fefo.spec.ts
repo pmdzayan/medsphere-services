@@ -21,6 +21,12 @@ function candidate(overrides: Partial<FefoCandidate> & Pick<FefoCandidate, 'id'>
 }
 
 describe('planFefoAllocation', () => {
+  it('excludes quarantined batches from eligible stock', () => {
+    expect(() =>
+      planFefoAllocation([candidate({ status: 'QUARANTINED', onHandQuantity: 10 })], 1, asOf),
+    ).toThrow(InsufficientFefoStockError);
+  });
+
   it('uses expiry, manufacturing date, creation time, and id as stable tie-breakers', () => {
     const allocations = planFefoAllocation(
       [

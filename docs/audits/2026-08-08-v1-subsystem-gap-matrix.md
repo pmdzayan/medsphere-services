@@ -56,9 +56,9 @@ The readiness score is a planning aid, not a completion or compliance claim.
    write-off — accepted.
 3. G3.10 physical batch expiry reconciliation — accepted without fabricating
    disposal.
-4. Implement the accepted G3.11 one-way quarantine contract, then add remaining
-   inventory operations separately: safe creation, returns, quarantine release,
-   recall, focused expiry worklists, and analytics.
+4. Verify and accept the implemented G3.11 one-way quarantine boundary, then add
+   remaining inventory operations separately: safe creation, returns,
+   quarantine release, recall, focused expiry worklists, and analytics.
 5. Complete the compliance foundation before exposing patient or clinical data.
 6. Build event delivery before notification, workflow, analytics, or other
    asynchronous platform behavior claims completion.
@@ -67,7 +67,8 @@ The readiness score is a planning aid, not a completion or compliance claim.
 
 ## Next bounded implementation unit
 
-**G3.11 — One-way manual batch quarantine** is next. Its accepted
+**G3.11 — One-way manual batch quarantine** is implemented and awaits exact-head
+CI plus CTO acceptance. Its accepted
 [sprint contract](../sprints/G3.11-one-way-manual-batch-quarantine.md) is a
 medicine-safety boundary that must:
 

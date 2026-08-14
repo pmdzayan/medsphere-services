@@ -30,6 +30,7 @@ const upgradeMigrations = [
   '20260809160000_completed_inventory_transfer',
   '20260810140000_completed_damaged_stock_write_off',
   '20260810180000_physical_batch_expiry_reconciliation',
+  '20260810200000_one_way_manual_batch_quarantine',
 ];
 const pnpmCommand = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm';
 
@@ -362,11 +363,12 @@ BEGIN
         'inventory.stock.adjust',
         'inventory.stock.transfer',
         'inventory.stock.damage',
+        'inventory.batch.quarantine',
         'inventory.reservations.read',
         'inventory.reservations.manage'
       )
-  ) <> 10 THEN
-    RAISE EXCEPTION 'Gate 3 through G3.10 permissions were not assigned to the tenant administrator';
+  ) <> 11 THEN
+    RAISE EXCEPTION 'Gate 3 through G3.11 permissions were not assigned to the tenant administrator';
   END IF;
   IF NOT EXISTS (
     SELECT 1 FROM pg_constraint
@@ -394,6 +396,17 @@ BEGIN
       AND contype = 'c'
   ) THEN
     RAISE EXCEPTION 'Batch expiry audit metadata constraint is missing';
+  END IF;
+  IF to_regclass('"BatchQuarantineRecord"') IS NULL THEN
+    RAISE EXCEPTION 'Batch quarantine evidence table is missing';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conrelid = '"AuditEvent"'::regclass
+      AND conname = 'AuditEvent_batch_quarantine_metadata_check'
+      AND contype = 'c'
+  ) THEN
+    RAISE EXCEPTION 'Batch quarantine audit metadata constraint is missing';
   END IF;
   IF (
     SELECT count(*) FROM "UserSession"
@@ -514,4 +527,4 @@ ${batchRow({ id: batchOne, batchNumber: 'BATCH-001', quantity: 0, initial: 0 })}
   expectedFailure: 'S0.5 migration blocked: invalid legacy batch values',
 });
 
-process.stdout.write('S0.5 through G3.10 populated upgrade verification passed.\n');
+process.stdout.write('S0.5 through G3.11 populated upgrade verification passed.\n');
