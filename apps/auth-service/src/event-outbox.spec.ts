@@ -129,9 +129,8 @@ describe('G3.21 transactional event delivery foundation', () => {
       eventInboxReceipt: { createMany: jest.fn().mockResolvedValue({ count: 0 }) },
     } as unknown as Prisma.TransactionClient;
     const duplicateHost = {
-      $transaction: jest.fn(
-        async (callback: (tx: Prisma.TransactionClient) => Promise<unknown>) =>
-          callback(duplicateTransaction),
+      $transaction: jest.fn(async (callback: (tx: Prisma.TransactionClient) => Promise<unknown>) =>
+        callback(duplicateTransaction),
       ),
     };
     await expect(

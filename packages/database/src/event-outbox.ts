@@ -9,8 +9,7 @@ const SYSTEM_SERVICE_LIMIT = 80;
 const PAYLOAD_LIMIT_BYTES = 12 * 1024;
 const FORBIDDEN_PAYLOAD_KEY =
   /(password|credential|token|secret|authorization|email|phone|medical|clinical)/i;
-const UUID_PATTERN =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export type OutboxDatabase = Pick<Prisma.TransactionClient, 'outboxEvent'>;
 export type TenantDomainEvent = DomainEventEnvelope<Prisma.InputJsonObject> & {
@@ -102,8 +101,7 @@ export async function appendOutboxEvent(
       aggregateType: event.aggregateType,
       aggregateId: event.aggregateId,
       actorType: event.actor.actorType,
-      actorMembershipId:
-        event.actor.actorType === 'TENANT_USER' ? event.actor.membershipId : null,
+      actorMembershipId: event.actor.actorType === 'TENANT_USER' ? event.actor.membershipId : null,
       actorUserId: event.actor.actorType === 'TENANT_USER' ? event.actor.userId : null,
       systemService: event.actor.actorType === 'SYSTEM' ? event.actor.service : null,
       correlationId: event.correlationId,

@@ -5,10 +5,7 @@ import {
   consumeOutboxEventOnce,
   markOutboxDelivered,
 } from '@medsphere/database';
-import {
-  isInfrastructureTestEnabled,
-  requireEnv,
-} from './auth/testing/infrastructure-test-gate';
+import { isInfrastructureTestEnabled, requireEnv } from './auth/testing/infrastructure-test-gate';
 import { PrismaService } from './prisma/prisma.service';
 
 const infrastructure = isInfrastructureTestEnabled() ? describe : describe.skip;
@@ -92,11 +89,7 @@ infrastructure('G3.21 PostgreSQL transactional event delivery', () => {
     });
 
     await expect(
-      markOutboxDelivered(
-        prisma.client,
-        { eventId, lockToken: randomUUID() },
-        new Date(),
-      ),
+      markOutboxDelivered(prisma.client, { eventId, lockToken: randomUUID() }, new Date()),
     ).rejects.toThrow('Outbox delivery lease was lost');
     await markOutboxDelivered(prisma.client, claimed[0]!, new Date());
     await expect(

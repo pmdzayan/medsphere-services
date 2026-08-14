@@ -32,7 +32,7 @@
     "db:verify": "pnpm --filter @medsphere/database prisma:verify",
     "db:verify-upgrade": "pnpm --filter @medsphere/database prisma:verify-upgrade",
     "format": "prettier --write \"**/*.{ts,js,mjs,json,md,yml,yaml}\"",
-    "format:check": "prettier --write \"**/*.{ts,js,mjs,json,md,yml,yaml}\" && git diff --exit-code",
+    "format:check": "prettier --check \"**/*.{ts,js,mjs,json,md,yml,yaml}\"",
     "clean": "turbo run clean && rimraf node_modules .turbo",
     "postinstall": "pnpm --filter @medsphere/database prisma:generate",
     "prepare": "husky"
