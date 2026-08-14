@@ -2,9 +2,9 @@
 
 **Last updated:** 2026-08-14
 
-**Current sprint:** Next dependency-ready sprint selection
+**Current sprint:** G3.21 transactional event delivery foundation candidate
 
-**Next feature work:** Select the next unblocked inventory or compliance sprint
+**Next feature work:** Accept or correct G3.21; do not start event producers
 
 ## Mandatory startup sequence
 
@@ -185,10 +185,11 @@ If ownership transfers, resume at the first pending checkpoint. Do not use
 
 ## Exact continuation point
 
-Select the next dependency-safe sprint from accepted source `bed136e` without
-skipping recorded dependencies. Quarantine release, public/patient reservation
-creation, returns, recall, analytics policy, patient exposure, and Gates 2 and
-4–9 remain blocked until their recorded prerequisites are satisfied.
+Accept or correct G3.21 from accepted source `c0db6c8` without skipping recorded
+dependencies. Do not wire inventory producers, notifications, analytics,
+quarantine release, public/patient reservation creation, returns, recall, or
+patient exposure until the candidate passes exact-head PostgreSQL CI and CTO
+acceptance.
 
 Cline may receive only a complete, bounded prompt for characterization tests or
 mechanical work whose contract is already fixed by ADR-005. Cline must not

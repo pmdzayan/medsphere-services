@@ -421,6 +421,9 @@ importers:
 
   packages/database:
     dependencies:
+      '@medsphere/types':
+        specifier: workspace:*
+        version: link:../types
       '@prisma/client':
         specifier: ^5.10.2
         version: 5.22.0(prisma@5.22.0)

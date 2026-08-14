@@ -1,6 +1,6 @@
 # Volume 04 — Database Bible
 
-**Baseline:** Accepted through G3.20
+**Baseline:** Accepted through G3.20; G3.21 event-delivery persistence candidate
 
 **Engine:** PostgreSQL 16
 
