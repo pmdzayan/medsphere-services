@@ -4,6 +4,8 @@ import { InventoryStockQueryDto } from './dto/inventory-stock-query.dto';
 import { InventoryStockListResponseDto } from './dto/inventory-stock-response.dto';
 import { InventoryExpiryQueryDto } from './dto/inventory-expiry-query.dto';
 import { InventoryExpiryWorklistResponseDto } from './dto/inventory-expiry-response.dto';
+import { InventoryQuarantineEvidenceQueryDto } from './dto/inventory-quarantine-evidence-query.dto';
+import { InventoryQuarantineEvidenceResponseDto } from './dto/inventory-quarantine-evidence-response.dto';
 import { InventoryRepository } from './inventory.repository';
 
 @Injectable()
@@ -100,6 +102,45 @@ export class InventoryService {
       offset: query.offset,
       asOf,
       horizonEndsAt,
+    };
+  }
+
+  async listQuarantineEvidence(
+    identity: AuthenticatedIdentity,
+    providerId: string,
+    query: InventoryQuarantineEvidenceQueryDto,
+  ): Promise<InventoryQuarantineEvidenceResponseDto> {
+    if (!(await this.repository.hasProviderAccess(identity, providerId))) {
+      throw new NotFoundException('Provider quarantine evidence not found');
+    }
+    const result = await this.repository.listQuarantineEvidence(
+      identity.tenantId,
+      providerId,
+      query,
+    );
+    return {
+      data: result.data.map((record) => ({
+        recordId: record.id,
+        inventoryId: record.inventoryId,
+        batchId: record.batchId,
+        productId: record.productId,
+        actorMembershipId: record.actorMembershipId,
+        name: record.product.name,
+        genericName: record.product.genericName,
+        brand: record.product.brand,
+        sku: record.inventory.sku,
+        batchNumber: record.batch.batchNumber,
+        currentStatus: record.batch.status,
+        reasonCode: record.reasonCode,
+        onHandQuantity: record.onHandQuantity,
+        affectedReservationCount: record.affectedReservationCount,
+        releasedUnitCount: record.releasedUnitCount,
+        resultingBatchVersion: record.resultingBatchVersion,
+        occurredAt: record.occurredAt,
+      })),
+      total: result.total,
+      limit: query.limit,
+      offset: query.offset,
     };
   }
 }

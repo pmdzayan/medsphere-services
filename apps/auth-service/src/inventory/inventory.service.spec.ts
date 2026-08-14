@@ -21,6 +21,7 @@ describe('InventoryService', () => {
       hasProviderAccess: jest.fn(),
       listStock: jest.fn(),
       listExpiryWorklist: jest.fn(),
+      listQuarantineEvidence: jest.fn(),
     } as unknown as jest.Mocked<InventoryRepository>;
     service = new InventoryService(repository);
   });
@@ -159,5 +160,66 @@ describe('InventoryService', () => {
       ],
     });
     jest.useRealTimers();
+  });
+
+  it('conceals quarantine evidence without an active provider assignment', async () => {
+    repository.hasProviderAccess.mockResolvedValue(false);
+    await expect(
+      service.listQuarantineEvidence(identity, randomUUID(), { limit: 50, offset: 0 }),
+    ).rejects.toThrow(NotFoundException);
+    expect(repository.listQuarantineEvidence).not.toHaveBeenCalled();
+  });
+
+  it('returns bounded quarantine evidence without command secrets', async () => {
+    const providerId = randomUUID();
+    const recordId = randomUUID();
+    const actorMembershipId = randomUUID();
+    repository.hasProviderAccess.mockResolvedValue(true);
+    repository.listQuarantineEvidence.mockResolvedValue({
+      total: 1,
+      data: [
+        {
+          id: recordId,
+          inventoryId: randomUUID(),
+          batchId: randomUUID(),
+          productId: randomUUID(),
+          actorMembershipId,
+          reasonCode: 'QUALITY_SUSPECT',
+          onHandQuantity: 12,
+          affectedReservationCount: 2,
+          releasedUnitCount: 5,
+          resultingBatchVersion: 4,
+          occurredAt: new Date('2026-08-14T01:00:00.000Z'),
+          inventory: { sku: 'MED-Q' },
+          product: { name: 'Medicine', genericName: 'Generic', brand: 'Brand' },
+          batch: { batchNumber: 'Q-001', status: 'QUARANTINED' },
+        },
+      ],
+    });
+    const query = { limit: 25, offset: 0 };
+    const result = await service.listQuarantineEvidence(identity, providerId, query);
+    expect(repository.listQuarantineEvidence).toHaveBeenCalledWith(
+      identity.tenantId,
+      providerId,
+      query,
+    );
+    expect(result).toEqual({
+      data: [
+        expect.objectContaining({
+          recordId,
+          actorMembershipId,
+          batchNumber: 'Q-001',
+          currentStatus: 'QUARANTINED',
+          reasonCode: 'QUALITY_SUSPECT',
+          affectedReservationCount: 2,
+          releasedUnitCount: 5,
+        }),
+      ],
+      total: 1,
+      limit: 25,
+      offset: 0,
+    });
+    expect(result.data[0]).not.toHaveProperty('idempotencyKey');
+    expect(result.data[0]).not.toHaveProperty('commandHash');
   });
 });

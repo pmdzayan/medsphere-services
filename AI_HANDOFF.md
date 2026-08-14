@@ -172,9 +172,11 @@ See `docs/audits/2026-07-20-cto-baseline.md` for the accepted baseline.
     as `9f733a7` after exact-head CI run `31767805254`
 29. G3.18 assigned-provider expiry worklist — accepted and squash-merged in PR
     #48 as `7c0befb` after exact-head CI run `31768462051`
-30. G3.19 live expiry worklist workspace — implemented; exact-head CI and CTO
-    acceptance required
-31. Returns and later live mutations — blocked pending their own accepted
+30. G3.19 live expiry worklist workspace — accepted and squash-merged in PR #49
+    as `8e5db0b` after exact-head CI run `31769276564`
+31. G3.20 bounded quarantine investigation evidence — implemented; exact-head CI
+    and CTO acceptance required
+32. Returns and later live mutations — blocked pending their own accepted
     contracts
 
 If ownership transfers, resume at the first pending checkpoint. Do not use
@@ -183,7 +185,7 @@ If ownership transfers, resume at the first pending checkpoint. Do not use
 
 ## Exact continuation point
 
-Accept or correct G3.19 from accepted source `7c0befb` without skipping recorded
+Accept or correct G3.20 from accepted source `8e5db0b` without skipping recorded
 dependencies. Quarantine release, public/patient reservation creation, returns, recall,
 analytics policy, patient exposure, and Gates 2 and 4–9 remain blocked until
 their recorded prerequisites are satisfied.
