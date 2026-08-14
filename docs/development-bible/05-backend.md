@@ -1,10 +1,10 @@
 # Volume 05 — Backend Bible: Identity, Authorization, Audit, and Inventory
 
-**Sprints:** Accepted through G3.20
+**Sprints:** Accepted through G3.20; G3.21 event-delivery foundation candidate
 
 **Decisions:** ADR-003 through ADR-007
 
-**Status:** G3.20 accepted; not production-approved
+**Status:** G3.20 accepted; G3.21 exact-head CI and CTO acceptance required; not production-approved
 
 ## Purpose and boundary
 

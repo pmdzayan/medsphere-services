@@ -29,3 +29,4 @@ Every ADR includes decision, reason/context, alternatives, consequences, impleme
 | [ADR-010](0010-atomic-completed-damaged-stock-write-off.md)          | Atomic completed damaged-stock write-off    | Accepted | 2026-08-10 |
 | [ADR-011](0011-physical-batch-expiry-reconciliation.md)              | Physical batch expiry reconciliation        | Accepted | 2026-08-10 |
 | [ADR-012](0012-one-way-manual-batch-quarantine.md)                   | One-way manual batch quarantine             | Accepted | 2026-08-10 |
+| [ADR-013](0013-transactional-event-delivery-foundation.md)          | Transactional event delivery foundation     | Proposed | 2026-08-14 |

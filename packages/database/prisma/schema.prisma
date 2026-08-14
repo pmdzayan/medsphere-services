@@ -149,6 +149,14 @@ enum MedicineReservationCommandType {
   EXPIRE
 }
 
+enum OutboxEventStatus {
+  PENDING
+  PROCESSING
+  FAILED
+  DELIVERED
+  DEAD_LETTER
+}
+
 model Tenant {
   id String @id @default(uuid()) @db.Uuid
 
@@ -183,6 +191,8 @@ model Tenant {
   inventoryTransfers             InventoryTransfer[]
   batchExpiryRecords             BatchExpiryRecord[]
   batchQuarantineRecords         BatchQuarantineRecord[]
+  outboxEvents                   OutboxEvent[]
+  eventInboxReceipts             EventInboxReceipt[]
 
   @@index([slug])
 }
@@ -241,6 +251,7 @@ model TenantMembership {
   stockMovements         StockMovement[]
   providerAccess         MembershipProviderAccess[]
   batchQuarantineRecords BatchQuarantineRecord[]
+  outboxEvents           OutboxEvent[]
 
   @@unique([tenantId, userId])
   @@unique([id, tenantId])
@@ -741,7 +752,8 @@ model StockMovement {
 
   actorType         AuditActorType
   actorMembershipId String?           @db.Uuid
-  actorMembership   TenantMembership? @relation(fields: [actorMembershipId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  actorUserId       String?           @db.Uuid
+  actorMembership   TenantMembership? @relation(fields: [actorMembershipId, actorUserId, tenantId], references: [id, userId, tenantId], onDelete: Restrict)
 
   occurredAt DateTime @default(now())
   createdAt  DateTime @default(now())
@@ -822,6 +834,55 @@ model AuditEvent {
   @@index([actorMembershipId, occurredAt(sort: Desc)])
   @@index([platformActorUserId, occurredAt(sort: Desc)])
   @@index([resourceType, resourceId, occurredAt(sort: Desc)])
+}
+
+model OutboxEvent {
+  id                String            @id @default(uuid()) @db.Uuid
+  tenantId          String            @db.Uuid
+  tenant            Tenant            @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  eventType         String            @db.VarChar(120)
+  eventVersion      Int               @default(1)
+  aggregateType     String            @db.VarChar(80)
+  aggregateId       String            @db.VarChar(120)
+  actorType         AuditActorType
+  actorMembershipId String?           @db.Uuid
+  actorMembership   TenantMembership? @relation(fields: [actorMembershipId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  systemService     String?           @db.VarChar(80)
+  correlationId     String?           @db.VarChar(120)
+  causationId       String?           @db.VarChar(120)
+  payload           Json
+  occurredAt        DateTime
+  status            OutboxEventStatus @default(PENDING)
+  attemptCount      Int               @default(0)
+  availableAt       DateTime          @default(now())
+  lockedAt          DateTime?
+  lockedUntil       DateTime?
+  lockToken         String?           @db.VarChar(64)
+  deliveredAt       DateTime?
+  lastErrorCode     String?           @db.VarChar(80)
+  createdAt         DateTime          @default(now())
+
+  inboxReceipts EventInboxReceipt[]
+
+  @@unique([id, tenantId])
+  @@index([status, availableAt, occurredAt, id])
+  @@index([tenantId, occurredAt(sort: Desc), id(sort: Desc)])
+  @@index([tenantId, eventType, occurredAt(sort: Desc)])
+  @@index([aggregateType, aggregateId, occurredAt])
+  @@index([actorMembershipId, occurredAt(sort: Desc)])
+}
+
+model EventInboxReceipt {
+  id           String      @id @default(uuid()) @db.Uuid
+  tenantId     String      @db.Uuid
+  tenant       Tenant      @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  consumerName String      @db.VarChar(80)
+  eventId      String      @db.Uuid
+  event        OutboxEvent @relation(fields: [eventId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  processedAt  DateTime    @default(now())
+
+  @@unique([consumerName, eventId])
+  @@index([tenantId, processedAt(sort: Desc), id(sort: Desc)])
 }
 
 enum MedicalRecordType {
