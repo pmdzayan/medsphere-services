@@ -6,7 +6,7 @@
 
 **Accepted stabilization baseline:** `4ea55a17e188410ddee45fa3ea6c016e22d6617a`
 
-**Current sprint:** First bounded notification workflow selection pending
+**Current sprint:** G3.24 reservation-ready notification consumer in review
 
 **Release state:** Not approved for production or real healthcare data
 
@@ -27,6 +27,21 @@ approval, or real healthcare data is included.
 
 **Implementation authority:** accepted ADR-015, accepted source `fcc6e46`, and
 `docs/sprints/G3.23-notification-delivery-foundation.md`.
+
+## Active sprint
+
+### G3.24 — Reservation-Ready Notification Consumer
+
+**Status:** Implementation in review; not accepted
+
+**Boundary:** Exact `inventory.reservation.ready` version-1 validation,
+authoritative event and reservation reload, G3.21 inbox deduplication, and one
+opaque-membership G3.23 queue intent. No destination resolution, generalized
+composition, provider activation, external call, or production claim is
+included.
+
+**Implementation authority:** proposed ADR-016 and
+`docs/sprints/G3.24-reservation-ready-notification-consumer.md`.
 
 ## Earlier accepted sprint
 

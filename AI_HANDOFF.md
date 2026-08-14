@@ -2,10 +2,10 @@
 
 **Last updated:** 2026-08-14
 
-**Current sprint:** First bounded notification workflow selection pending
+**Current sprint:** G3.24 reservation-ready notification consumer in review
 
-**Next feature work:** Select the first reservation/expiry notification workflow
-from accepted source `fcc6e46`
+**Next feature work:** Complete G3.24 review, exact-head CI, merge, and acceptance
+before starting recipient resolution
 
 ## Mandatory startup sequence
 
@@ -192,12 +192,12 @@ If ownership transfers, resume at the first pending checkpoint. Do not use
 
 ## Exact continuation point
 
-Select the first bounded notification workflow from accepted source `fcc6e46`
-under accepted ADR-015. Reservation/expiry is the preferred candidate and must
-consume accepted G3.22 events through the G3.23 queue rather than call a
-provider from an inventory transaction. Keep provider selection, Maps, FHIR,
-ABDM, quarantine release, public/patient reservation creation, returns, recall,
-and patient exposure out of that workflow.
+Complete G3.24 from accepted base `2fbe336`. It selects only
+`inventory.reservation.ready` version 1 and must pass implementation review,
+exact-head CI, merge, and acceptance synchronization before G3.25 recipient
+resolution starts. Keep provider selection, generalized composition, Maps,
+FHIR, ABDM, quarantine release, public/patient reservation creation, returns,
+recall, and patient exposure out of G3.24.
 
 Cline may receive only a complete, bounded prompt for characterization tests or
 mechanical work whose contract is already fixed by ADR-005. Cline must not

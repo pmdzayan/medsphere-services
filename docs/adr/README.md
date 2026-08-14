@@ -32,3 +32,4 @@ Every ADR includes decision, reason/context, alternatives, consequences, impleme
 | [ADR-013](0013-transactional-event-delivery-foundation.md)           | Transactional event delivery foundation     | Accepted | 2026-08-14 |
 | [ADR-014](0014-atomic-inventory-domain-event-producers.md)           | Atomic inventory domain event producers     | Accepted | 2026-08-14 |
 | [ADR-015](0015-provider-neutral-notification-delivery-foundation.md) | Provider-neutral notification delivery      | Accepted | 2026-08-14 |
+| [ADR-016](0016-reservation-ready-notification-consumer.md)           | Reservation-ready notification consumer     | Proposed | 2026-08-14 |
