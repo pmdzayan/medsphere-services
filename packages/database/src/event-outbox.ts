@@ -9,7 +9,8 @@ const SYSTEM_SERVICE_LIMIT = 80;
 const PAYLOAD_LIMIT_BYTES = 12 * 1024;
 const FORBIDDEN_PAYLOAD_KEY =
   /(password|credential|token|secret|authorization|email|phone|medical|clinical)/i;
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export type OutboxDatabase = Pick<Prisma.TransactionClient, 'outboxEvent'>;
 export type TenantDomainEvent = DomainEventEnvelope<Prisma.InputJsonObject> & {
@@ -184,7 +185,11 @@ export async function markOutboxDelivered(
 export async function markOutboxFailed(
   database: OutboxRelayHost,
   event: Pick<ClaimedOutboxEvent, 'eventId' | 'lockToken' | 'attemptCount'>,
-  input: { readonly now: Date; readonly errorCode: string; readonly maximumAttempts?: number },
+  input: {
+    readonly now: Date;
+    readonly errorCode: string;
+    readonly maximumAttempts?: number;
+  },
 ): Promise<'FAILED' | 'DEAD_LETTER'> {
   assertBounded(input.errorCode, 80, 'Outbox error code');
   const maximumAttempts = input.maximumAttempts ?? 10;
@@ -213,7 +218,11 @@ export async function markOutboxFailed(
 
 export async function consumeOutboxEventOnce<T>(
   host: OutboxTransactionHost,
-  input: { readonly tenantId: string; readonly eventId: string; readonly consumerName: string },
+  input: {
+    readonly tenantId: string;
+    readonly eventId: string;
+    readonly consumerName: string;
+  },
   operation: (transaction: Prisma.TransactionClient) => Promise<T>,
 ): Promise<{ readonly processed: boolean; readonly result?: T }> {
   assertUuid(input.tenantId, 'Inbox tenant id');

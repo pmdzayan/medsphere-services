@@ -76,10 +76,14 @@ describe('G3.21 transactional event delivery foundation', () => {
     );
 
     await expect(
-      markOutboxFailed(database, { ...claimed, attemptCount: 10 }, {
-        now,
-        errorCode: 'PROVIDER_REJECTED',
-      }),
+      markOutboxFailed(
+        database,
+        { ...claimed, attemptCount: 10 },
+        {
+          now,
+          errorCode: 'PROVIDER_REJECTED',
+        },
+      ),
     ).resolves.toBe('DEAD_LETTER');
   });
 
@@ -101,7 +105,9 @@ describe('G3.21 transactional event delivery foundation', () => {
 
   it('runs first delivery atomically and treats duplicate receipts as no-ops', async () => {
     const createMany = jest.fn().mockResolvedValue({ count: 1 });
-    const transaction = { eventInboxReceipt: { createMany } } as unknown as Prisma.TransactionClient;
+    const transaction = {
+      eventInboxReceipt: { createMany },
+    } as unknown as Prisma.TransactionClient;
     const host = {
       $transaction: jest.fn(async (operation: (tx: Prisma.TransactionClient) => Promise<unknown>) =>
         operation(transaction),

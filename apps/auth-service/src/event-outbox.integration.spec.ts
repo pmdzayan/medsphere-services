@@ -5,7 +5,10 @@ import {
   consumeOutboxEventOnce,
   markOutboxDelivered,
 } from '@medsphere/database';
-import { isInfrastructureTestEnabled, requireEnv } from './auth/testing/infrastructure-test-gate';
+import {
+  isInfrastructureTestEnabled,
+  requireEnv,
+} from './auth/testing/infrastructure-test-gate';
 import { PrismaService } from './prisma/prisma.service';
 
 const infrastructure = isInfrastructureTestEnabled() ? describe : describe.skip;
@@ -96,8 +99,9 @@ infrastructure('G3.21 PostgreSQL transactional event delivery', () => {
       ),
     ).rejects.toThrow('Outbox delivery lease was lost');
     await markOutboxDelivered(prisma.client, claimed[0]!, new Date());
-    await expect(prisma.client.outboxEvent.findUniqueOrThrow({ where: { id: eventId } })).resolves
-      .toMatchObject({ status: 'DELIVERED', attemptCount: 1 });
+    await expect(
+      prisma.client.outboxEvent.findUniqueOrThrow({ where: { id: eventId } }),
+    ).resolves.toMatchObject({ status: 'DELIVERED', attemptCount: 1 });
   });
 
   it('runs a consumer effect once under duplicate concurrent delivery', async () => {
@@ -118,8 +122,9 @@ infrastructure('G3.21 PostgreSQL transactional event delivery', () => {
     const results = await Promise.all([consume(), consume()]);
     expect(results.filter(({ processed }) => processed)).toHaveLength(1);
     expect(results.filter(({ processed }) => !processed)).toHaveLength(1);
-    await expect(prisma.client.tenant.findUniqueOrThrow({ where: { id: tenantId } })).resolves
-      .toMatchObject({ version: before.version + 1 });
+    await expect(
+      prisma.client.tenant.findUniqueOrThrow({ where: { id: tenantId } }),
+    ).resolves.toMatchObject({ version: before.version + 1 });
     await expect(
       prisma.client.eventInboxReceipt.count({
         where: { consumerName: 'g321-test-projection', eventId },
