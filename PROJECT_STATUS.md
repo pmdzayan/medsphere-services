@@ -2,11 +2,11 @@
 
 **Status date:** 2026-08-14
 
-**Accepted source commit:** `bed136eb45649e783815f31cb94f90e11a76aee3`
+**Accepted source commit:** `af48522d95622602af9b55ded9c18aaef962c676`
 
 **Accepted stabilization baseline:** `4ea55a17e188410ddee45fa3ea6c016e22d6617a`
 
-**Current sprint:** G3.21 transactional event delivery foundation candidate
+**Current sprint:** Next sprint selection pending after G3.21 acceptance
 
 **Release state:** Not approved for production or real healthcare data
 
@@ -14,40 +14,37 @@
 
 ## Most recent accepted sprint
 
-### G3.20 — Bounded Quarantine Investigation Evidence
-
-**Status:** Accepted and squash-merged in PR #50 as `bed136e` after exact-head
-CI run `31769816895` passed all required gates.
-
-**Selection reason:** G3.11 supplied immutable one-way quarantine records, and
-assigned-provider access could expose a bounded evidence read without creating
-release or disposition authority.
-
-**Boundary:** A permission-protected, assigned-provider, private no-store read
-lists immutable quarantine records with bounded operational labels, reason code,
-opaque actor-membership attribution, physical quantity, reservation/release
-counts, resulting version and occurrence time. Command secrets, names/contact,
-release, recall, disposal, approval, supplier, patient, and clinical behavior
-were excluded.
-
-**Implementation authority:** accepted G3.11/G3.12 boundaries, accepted source
-`bed136e`, and
-`docs/sprints/G3.20-bounded-quarantine-investigation-evidence.md`.
-
-## Active implementation candidate
-
 ### G3.21 — Transactional Event Delivery Foundation
 
-**Status:** Implemented on a candidate branch; exact-head PostgreSQL CI and CTO
-acceptance are required.
+**Status:** Accepted and squash-merged in PR #52 as `af48522` after exact-head
+CI run `31786107840` passed all required gates.
+
+**Selection reason:** Notifications, analytics, and asynchronous workflows
+required durable event delivery before any producer or provider could be added
+safely.
 
 **Boundary:** Tenant-scoped immutable outbox envelopes, bounded leased claims,
 coded retry/dead-letter transitions, and serializable inbox deduplication. No
 broker, transport provider, notification, analytics projection, producer wiring,
 replay UI, or production delivery is claimed.
 
-**Implementation authority:** proposed ADR-013 and
+**Implementation authority:** accepted ADR-013, accepted source `af48522`, and
 `docs/sprints/G3.21-transactional-event-delivery-foundation.md`.
+
+## Earlier accepted sprint
+
+### G3.20 — Bounded Quarantine Investigation Evidence
+
+**Status:** Accepted and squash-merged in PR #50 as `bed136e` after exact-head
+CI run `31769816895` passed all required gates.
+
+**Boundary:** A permission-protected, assigned-provider, private no-store read
+lists immutable quarantine records with bounded operational labels and opaque
+actor attribution. Release, recall, disposal, approval, supplier, patient, and
+clinical behavior were excluded.
+
+**Implementation authority:** accepted G3.11/G3.12 boundaries and
+`docs/sprints/G3.20-bounded-quarantine-investigation-evidence.md`.
 
 ## Earlier accepted sprint
 
@@ -206,8 +203,8 @@ and [the Gates 1–20 verification](docs/audits/2026-08-01-gates-1-20-verificati
 23. **G3.15 live completed inventory transfer** — accepted and squash-merged in
     PR #44 as `bc26e2a` after exact-head CI run `31764479220`
 24. **G3.16–G3.20 inventory operations and evidence** — accepted through PR #50
-25. **G3.21 transactional event delivery foundation** — implementation
-    candidate; exact-head CI and CTO acceptance required
+25. **G3.21 transactional event delivery foundation** — accepted and
+    squash-merged in PR #52 as `af48522` after exact-head CI run `31786107840`
 26. Resume producer wiring, Inventory, and Compliance milestones in dependency order
 
 Only one recovery sprint may be active at a time. Exact boundaries may be refined through an ADR, but dependencies must not be skipped.

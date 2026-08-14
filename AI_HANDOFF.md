@@ -2,9 +2,9 @@
 
 **Last updated:** 2026-08-14
 
-**Current sprint:** G3.21 transactional event delivery foundation candidate
+**Current sprint:** Next sprint selection pending after G3.21 acceptance
 
-**Next feature work:** Accept or correct G3.21; do not start event producers
+**Next feature work:** Select one dependency-ordered sprint from accepted source `af48522`
 
 ## Mandatory startup sequence
 
@@ -176,7 +176,9 @@ See `docs/audits/2026-07-20-cto-baseline.md` for the accepted baseline.
     as `8e5db0b` after exact-head CI run `31769276564`
 31. G3.20 bounded quarantine investigation evidence — accepted and squash-merged
     in PR #50 as `bed136e` after exact-head CI run `31769816895`
-32. Returns and later live mutations — blocked pending their own accepted
+32. G3.21 transactional event delivery foundation — accepted and squash-merged
+    in PR #52 as `af48522` after exact-head CI run `31786107840`
+33. Returns and later live mutations — blocked pending their own accepted
     contracts
 
 If ownership transfers, resume at the first pending checkpoint. Do not use
@@ -185,11 +187,12 @@ If ownership transfers, resume at the first pending checkpoint. Do not use
 
 ## Exact continuation point
 
-Accept or correct G3.21 from accepted source `c0db6c8` without skipping recorded
-dependencies. Do not wire inventory producers, notifications, analytics,
+Select the next bounded sprint from accepted source `af48522` without skipping
+recorded dependencies. Event producers, notification delivery, and analytics
+projections are now prerequisite-ready, but each still requires its own contract,
+implementation, exact-head CI, and CTO acceptance. Do not combine them with
 quarantine release, public/patient reservation creation, returns, recall, or
-patient exposure until the candidate passes exact-head PostgreSQL CI and CTO
-acceptance.
+patient exposure.
 
 Cline may receive only a complete, bounded prompt for characterization tests or
 mechanical work whose contract is already fixed by ADR-005. Cline must not
