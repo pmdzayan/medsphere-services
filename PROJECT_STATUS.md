@@ -2,39 +2,52 @@
 
 **Status date:** 2026-08-14
 
-**Accepted source commit:** `d3647944c86ecd3a71323ddb8486fe1aa60c5403`
+**Accepted source commit:** `85fdf53ce606e8490b9fb988613422efd5bd8f01`
 
 **Accepted stabilization baseline:** `4ea55a17e188410ddee45fa3ea6c016e22d6617a`
 
-**Current sprint:** G3.12 implementation — live batch quarantine workspace
+**Current sprint:** G3.13 implementation — live damaged-stock write-off
 
 **Release state:** Not approved for production or real healthcare data
 
-**Full-roadmap engineering estimate:** 36% complete / 64% remaining
+**Full-roadmap engineering estimate:** 37% complete / 63% remaining
 
 ## Current sprint
 
-### G3.12 — Live Batch Quarantine Workspace
+### G3.13 — Live Damaged-Stock Write-Off
 
 **Status:** Implemented locally; exact-head CI and CTO acceptance required.
-Overall V1 progress remains 36% until both gates pass.
+Overall V1 progress remains 37% until both gates pass.
 
-**Selection reason:** G3.11 accepted the one-way quarantine command while
-deliberately excluding its mutation UI. Connecting that existing boundary is
-dependency-ready; release, recall, returns, analytics, and patient exposure
-still require policy or platform prerequisites that are not accepted.
+**Selection reason:** G3.9 already accepted an atomic, completed damaged-stock
+write-off and G3.12 exposed the required batch concurrency token. Connecting
+that existing boundary is dependency-ready; returns, recall, analytics, and
+patient exposure still require unaccepted prerequisites.
 
-**Boundary:** Expose the batch version as a concurrency token, proxy the exact
-same-origin quarantine command, validate the immutable receipt, require an
-explicit one-way confirmation with an allowlisted reason, and refresh live
-stock after success. Backend assignment and permission checks remain
-authoritative. No release, recall, disposal, return, free text, or patient
-behavior is added.
+**Boundary:** Proxy the exact same-origin completed damaged-stock command,
+validate conservation in its receipt, restrict quantity to currently available
+stock, require explicit physical-confirmation reason, and refresh live stock
+after success. Backend assignment, permission, state, expiry, version,
+transaction, idempotency, and audit remain authoritative. No disposal,
+approval, return, refund, recall, or patient behavior is added.
 
 **Implementation authority:** ADR-001 through ADR-012, accepted source
-`0bfe951`, and `docs/sprints/G3.12-live-batch-quarantine-workspace.md`.
+`85fdf53`, and `docs/sprints/G3.13-live-damaged-stock-workspace.md`.
 
 ## Most recent accepted sprint
+
+### G3.12 — Live Batch Quarantine Workspace
+
+**Status:** Accepted and squash-merged in PR #41 as `85fdf53` after exact-head
+CI run `31762213509` passed all required gates.
+
+**Accepted boundary:** Positive batch concurrency token, exact same-origin BFF,
+strict request/receipt contracts, explicit one-way confirmation, stable
+idempotency, authoritative refresh, and bounded receipt evidence. Backend
+assignment and permission remained authoritative; no release, recall, disposal,
+return, or patient behavior was added.
+
+## Earlier accepted sprint
 
 ### G3.11 — One-Way Manual Batch Quarantine
 
@@ -102,17 +115,17 @@ V1 gap matrix, and
 
 ## CTO acceptance ledger
 
-| Area                        | Repository evidence                                                                           | CTO status                            |
-| --------------------------- | --------------------------------------------------------------------------------------------- | ------------------------------------- |
-| Planning and architecture   | ADR-001 and S0.1 governance merged in PR #1                                                   | Accepted baseline                     |
-| Monorepo/tooling foundation | PNPM, Turbo, TypeScript, NestJS, Prisma, shared packages, and quality gates exist             | Accepted stabilization foundation     |
-| Database reproducibility    | S0.2–S0.5, G3.1–G3.3, and corrected AG-02A accepted with clean and populated upgrade evidence | Accepted through `9c38792`            |
-| Identity and tenant context | S0.3 authentication and trusted tenant context merged                                         | Accepted                              |
-| Authorization and audit     | S0.4 tenant-safe RBAC and durable audit merged                                                | Accepted                              |
-| Inventory and reservation   | S0.5 and G3.1–G3.11 through reservation, transfer, damage, expiry, and one-way quarantine     | Broader operations remain incomplete  |
-| Frontend foundation         | Landing, login, shell, team/RBAC, audit, settings, onboarding, stock, and reservation reads   | Connected for accepted contracts      |
-| Pharmacy and inventory UI   | Assigned-provider stock, reservations, and bounded live overview use accepted reads           | Connected for accepted read contracts |
-| Remaining healthcare scope  | Most domain deployables are health-only scaffolds or absent                                   | Not implemented                       |
+| Area                        | Repository evidence                                                                            | CTO status                               |
+| --------------------------- | ---------------------------------------------------------------------------------------------- | ---------------------------------------- |
+| Planning and architecture   | ADR-001 and S0.1 governance merged in PR #1                                                    | Accepted baseline                        |
+| Monorepo/tooling foundation | PNPM, Turbo, TypeScript, NestJS, Prisma, shared packages, and quality gates exist              | Accepted stabilization foundation        |
+| Database reproducibility    | S0.2–S0.5, G3.1–G3.3, and corrected AG-02A accepted with clean and populated upgrade evidence  | Accepted through `9c38792`               |
+| Identity and tenant context | S0.3 authentication and trusted tenant context merged                                          | Accepted                                 |
+| Authorization and audit     | S0.4 tenant-safe RBAC and durable audit merged                                                 | Accepted                                 |
+| Inventory and reservation   | S0.5 and G3.1–G3.12 through one-way quarantine and its live assigned-provider workspace        | Broader operations remain incomplete     |
+| Frontend foundation         | Landing, login, shell, team/RBAC, audit, settings, onboarding, stock, and reservation reads    | Connected for accepted contracts         |
+| Pharmacy and inventory UI   | Assigned-provider stock, reservations, overview, and one-way quarantine use accepted contracts | Damage and broader mutations remain open |
+| Remaining healthcare scope  | Most domain deployables are health-only scaffolds or absent                                    | Not implemented                          |
 
 ## Critical blockers
 
@@ -170,14 +183,16 @@ and [the Gates 1–20 verification](docs/audits/2026-08-01-gates-1-20-verificati
     in PR #35 as `ad2d15b` after exact-head CI run `31393057704`
 19. **G3.11 one-way manual batch quarantine** — accepted and squash-merged in
     PR #38 as `d364794` after exact-head CI run `31761072418`
-20. Resume remaining Inventory and Compliance milestones in dependency order
+20. **G3.12 live batch quarantine workspace** — accepted and squash-merged in
+    PR #41 as `85fdf53` after exact-head CI run `31762213509`
+21. Resume remaining Inventory and Compliance milestones in dependency order
 
 Only one recovery sprint may be active at a time. Exact boundaries may be refined through an ADR, but dependencies must not be skipped.
 
 ## Progress reporting rule
 
 Progress is measured by accepted milestone criteria, not by the number of files
-or endpoints present. The README's 36% full-roadmap estimate and 32% frontend
+or endpoints present. The README's 37% full-roadmap estimate and 32% frontend
 estimate are planning indicators, not acceptance or release claims. They may
 change only when repository evidence and milestone acceptance change. Preview
 screens, placeholder services, unmounted routes, and schema-only foundations do

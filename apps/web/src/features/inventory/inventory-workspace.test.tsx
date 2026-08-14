@@ -5,6 +5,7 @@ import {
   getAssignedProviders,
   getProviderStock,
   quarantineBatch,
+  recordDamagedStock,
 } from '@/lib/api-client';
 import type { InventoryStockPage, ProviderAccess } from '@/lib/inventory-contract';
 import { InventoryWorkspace } from './inventory-workspace';
@@ -16,6 +17,7 @@ vi.mock('@/lib/api-client', async () => {
     getAssignedProviders: vi.fn(),
     getProviderStock: vi.fn(),
     quarantineBatch: vi.fn(),
+    recordDamagedStock: vi.fn(),
   };
 });
 
@@ -83,6 +85,19 @@ beforeEach(() => {
     releasedUnitCount: 3,
     resultingBatchVersion: 5,
     occurredAt: '2026-08-14T01:00:00.000Z',
+    replayed: false,
+  });
+  vi.mocked(recordDamagedStock).mockResolvedValue({
+    providerId: providers[0].providerId,
+    inventoryId: page.data[0].inventoryId,
+    productId: page.data[0].productId,
+    batchId: page.data[0].batches[0].id,
+    movementId: '52f2d7a4-0948-49c4-a0a8-afbf88503a5c',
+    quantity: 2,
+    onHandBefore: 20,
+    onHandAfter: 18,
+    resultingBatchVersion: 5,
+    occurredAt: '2026-08-14T02:00:00.000Z',
     replayed: false,
   });
 });
@@ -175,6 +190,45 @@ describe('InventoryWorkspace live integration', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Confirm quarantine' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('Batch version conflict');
     expect(screen.getByRole('dialog')).toBeVisible();
+  });
+
+  it('records only a confirmed available damaged quantity and refreshes live stock', async () => {
+    vi.stubGlobal('crypto', { randomUUID: () => '22222222-2222-4222-8222-222222222222' });
+    render(<InventoryWorkspace />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Record damage for batch BATCH-1' }));
+    expect(screen.getByRole('dialog')).toHaveTextContent('does not claim disposal or approval');
+    fireEvent.change(screen.getByLabelText('Damaged quantity'), { target: { value: '2' } });
+    fireEvent.change(screen.getByLabelText('Confirmed damage reason'), {
+      target: { value: ' Two sealed packs were physically damaged during handling. ' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm damaged stock' }));
+
+    await waitFor(() =>
+      expect(recordDamagedStock).toHaveBeenCalledWith(
+        providers[0].providerId,
+        page.data[0].batches[0].id,
+        {
+          expectedVersion: 4,
+          quantity: 2,
+          idempotencyKey: 'damaged-stock-22222222-2222-4222-8222-222222222222',
+          reason: 'Two sealed packs were physically damaged during handling.',
+        },
+      ),
+    );
+    expect(await screen.findByText(/20 → 18/)).toBeVisible();
+    expect(getProviderStock).toHaveBeenCalledTimes(2);
+  });
+
+  it('rejects damage above available stock before the API call', async () => {
+    render(<InventoryWorkspace />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Record damage for batch BATCH-1' }));
+    fireEvent.change(screen.getByLabelText('Damaged quantity'), { target: { value: '18' } });
+    fireEvent.change(screen.getByLabelText('Confirmed damage reason'), {
+      target: { value: 'Confirmed physical damage.' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm damaged stock' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('valid available quantity');
+    expect(recordDamagedStock).not.toHaveBeenCalled();
   });
 
   it('shows assignment-empty and permission-restricted states', async () => {

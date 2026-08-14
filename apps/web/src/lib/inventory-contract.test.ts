@@ -3,6 +3,8 @@ import { validProviders, validStockPage } from '@/test/inventory-fixtures';
 import {
   isBatchQuarantineRequest,
   isBatchQuarantineResponse,
+  isDamagedStockRequest,
+  isDamagedStockResponse,
   isInventoryStockPage,
   isProviderAccessList,
 } from './inventory-contract';
@@ -112,5 +114,34 @@ describe('inventory boundary contracts', () => {
     expect(isBatchQuarantineRequest({ ...request, expectedVersion: 0 })).toBe(false);
     expect(isBatchQuarantineResponse(receipt)).toBe(true);
     expect(isBatchQuarantineResponse({ ...receipt, tenantId: 'leak' })).toBe(false);
+  });
+
+  it('accepts only exact damaged-stock commands and conserving receipts', () => {
+    const request = {
+      expectedVersion: 4,
+      quantity: 2,
+      idempotencyKey: 'damage-command-1',
+      reason: 'Two sealed packs were physically damaged during handling.',
+    };
+    const receipt = {
+      providerId: validProviders[0].providerId,
+      inventoryId: validStockPage.data[0].inventoryId,
+      productId: validStockPage.data[0].productId,
+      batchId: validStockPage.data[0].batches[0].id,
+      movementId: '52f2d7a4-0948-49c4-a0a8-afbf88503a5c',
+      quantity: 2,
+      onHandBefore: 20,
+      onHandAfter: 18,
+      resultingBatchVersion: 5,
+      occurredAt: '2026-08-14T02:00:00.000Z',
+      replayed: false,
+    };
+    expect(isDamagedStockRequest(request)).toBe(true);
+    expect(isDamagedStockRequest({ ...request, quantity: 0 })).toBe(false);
+    expect(isDamagedStockRequest({ ...request, reason: ` ${request.reason}` })).toBe(false);
+    expect(isDamagedStockRequest({ ...request, tenantId: 'attacker' })).toBe(false);
+    expect(isDamagedStockResponse(receipt)).toBe(true);
+    expect(isDamagedStockResponse({ ...receipt, onHandAfter: 19 })).toBe(false);
+    expect(isDamagedStockResponse({ ...receipt, internal: true })).toBe(false);
   });
 });

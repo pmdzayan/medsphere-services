@@ -2,9 +2,9 @@
 
 **Last updated:** 2026-08-14
 
-**Current sprint:** G3.12 implementation — live batch quarantine workspace
+**Current sprint:** G3.13 implementation — live damaged-stock write-off
 
-**Next feature work:** Verify and accept the G3.12 live quarantine workspace
+**Next feature work:** Verify and accept the G3.13 live damaged-stock workspace
 
 ## Mandatory startup sequence
 
@@ -158,7 +158,11 @@ See `docs/audits/2026-07-20-cto-baseline.md` for the accepted baseline.
     PR #35 as `ad2d15b` after exact-head CI run `31393057704`
 22. G3.11 one-way manual batch quarantine — accepted and squash-merged in PR
     #38 as `d364794` after exact-head CI run `31761072418`
-23. Returns, safe creation, and later live mutations — blocked pending their
+23. G3.12 live batch quarantine workspace — accepted and squash-merged in PR
+    #41 as `85fdf53` after exact-head CI run `31762213509`
+24. G3.13 live damaged-stock write-off — implemented; exact-head CI and CTO
+    acceptance required
+25. Returns, safe creation, and later live mutations — blocked pending their
     own accepted contracts
 
 If ownership transfers, resume at the first pending checkpoint. Do not use
@@ -167,11 +171,11 @@ If ownership transfers, resume at the first pending checkpoint. Do not use
 
 ## Exact continuation point
 
-Verify G3.12 against `docs/sprints/G3.12-live-batch-quarantine-workspace.md`
-from accepted baseline `0bfe951`. Do not increase progress until exact-head CI
-and CTO acceptance pass. Quarantine release, reservation creation, returns,
-recall, analytics policy, patient exposure, and Gates 2 and 4–9 remain blocked
-until their recorded prerequisites are satisfied.
+Verify G3.13 against `docs/sprints/G3.13-live-damaged-stock-workspace.md` from
+accepted baseline `85fdf53`. Do not increase progress until exact-head CI and
+CTO acceptance pass. Quarantine release, reservation creation, returns, recall,
+analytics policy, patient exposure, and Gates 2 and 4–9 remain blocked until
+their recorded prerequisites are satisfied.
 
 Cline may receive only a complete, bounded prompt for characterization tests or
 mechanical work whose contract is already fixed by ADR-005. Cline must not

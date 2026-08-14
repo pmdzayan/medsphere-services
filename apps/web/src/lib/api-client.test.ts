@@ -6,6 +6,7 @@ import {
   getProviderStock,
   getProviderReservations,
   quarantineBatch,
+  recordDamagedStock,
   getPrivacyPreferences,
   getSupportedLanguages,
   register,
@@ -114,6 +115,43 @@ describe('authenticated API client', () => {
     ).resolves.toEqual(receipt);
     expect(fetchMock).toHaveBeenCalledWith(
       '/api/inventory/providers/7f51a0f3-3bd1-45d7-85f3-b8b725969df9/batches/73a97ec4-84f8-4a85-a493-b8d6feb84a27/quarantine',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(request),
+        cache: 'no-store',
+      },
+    );
+  });
+
+  it('submits the exact completed damaged-stock command through the same-origin boundary', async () => {
+    const request = {
+      expectedVersion: 4,
+      quantity: 2,
+      idempotencyKey: 'damage-command-1',
+      reason: 'Two sealed packs were physically damaged during handling.',
+    };
+    const receipt = {
+      providerId: '7f51a0f3-3bd1-45d7-85f3-b8b725969df9',
+      inventoryId: 'f63f50dd-49b0-4a77-bc04-f7d00db58dd5',
+      productId: '8b4d574f-48c6-4231-8851-e65edc9f9d42',
+      batchId: '73a97ec4-84f8-4a85-a493-b8d6feb84a27',
+      movementId: '52f2d7a4-0948-49c4-a0a8-afbf88503a5c',
+      quantity: 2,
+      onHandBefore: 20,
+      onHandAfter: 18,
+      resultingBatchVersion: 5,
+      occurredAt: '2026-08-14T02:00:00.000Z',
+      replayed: false,
+    };
+    const fetchMock = vi.fn().mockResolvedValue(Response.json(receipt));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(recordDamagedStock(receipt.providerId, receipt.batchId, request)).resolves.toEqual(
+      receipt,
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      `/api/inventory/providers/${receipt.providerId}/batches/${receipt.batchId}/damage`,
       {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
