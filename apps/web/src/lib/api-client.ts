@@ -34,6 +34,8 @@ import type {
 import {
   toReservationSearchParams,
   type ProviderReservationPage,
+  type ReservationCreationRequest,
+  type ReservationCreationResponse,
   type ReservationFilters,
   type ReservationTransitionRequest,
   type ReservationTransitionResponse,
@@ -182,6 +184,20 @@ export async function transitionProviderReservation(
     `/api/inventory/providers/${encodeURIComponent(providerId)}/reservations/${encodeURIComponent(
       reservationId,
     )}/transitions`,
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(request),
+    },
+  );
+}
+
+export async function createProviderReservation(
+  providerId: string,
+  request: ReservationCreationRequest,
+): Promise<ReservationCreationResponse> {
+  return requestJson<ReservationCreationResponse>(
+    `/api/inventory/providers/${encodeURIComponent(providerId)}/reservations`,
     {
       method: 'POST',
       headers: { 'content-type': 'application/json' },

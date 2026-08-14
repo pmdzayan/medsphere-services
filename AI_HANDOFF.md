@@ -166,9 +166,11 @@ See `docs/audits/2026-07-20-cto-baseline.md` for the accepted baseline.
     #43 as `7feacbb` after exact-head CI run `31763879935`
 26. G3.15 live completed inventory transfer — accepted and squash-merged in PR
     #44 as `bc26e2a` after exact-head CI run `31764479220`
-27. G3.16 assigned-provider staff reservation creation — implemented; exact-head
-    CI and CTO acceptance required
-28. Returns and later live mutations — blocked pending their own accepted
+27. G3.16 assigned-provider staff reservation creation — accepted and
+    squash-merged in PR #46 as `3c92e5d` after exact-head CI run `31767059794`
+28. G3.17 live staff reservation creation — implemented; exact-head CI and CTO
+    acceptance required
+29. Returns and later live mutations — blocked pending their own accepted
     contracts
 
 If ownership transfers, resume at the first pending checkpoint. Do not use
@@ -177,7 +179,7 @@ If ownership transfers, resume at the first pending checkpoint. Do not use
 
 ## Exact continuation point
 
-Accept or correct G3.16 from remote head `c82ff7d` without skipping recorded
+Accept or correct G3.17 from accepted source `3c92e5d` without skipping recorded
 dependencies. Quarantine release, public/patient reservation creation, returns, recall,
 analytics policy, patient exposure, and Gates 2 and 4–9 remain blocked until
 their recorded prerequisites are satisfied.

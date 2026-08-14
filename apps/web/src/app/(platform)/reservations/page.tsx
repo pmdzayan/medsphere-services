@@ -3,7 +3,7 @@ import { ReservationWorkspace } from '@/features/reservations/reservation-worksp
 
 export const metadata: Metadata = {
   title: 'Reservations | MedSphere',
-  description: 'Read-only assigned-provider medicine reservations.',
+  description: 'Assigned-provider medicine reservation reads and bounded staff actions.',
 };
 
 export default function ReservationsPage() {

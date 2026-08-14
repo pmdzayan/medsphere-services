@@ -2,13 +2,16 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   ApiError,
+  createProviderReservation,
   getAssignedProviders,
   getProviderReservations,
+  getProviderStock,
   transitionProviderReservation,
 } from '@/lib/api-client';
-import type { ProviderAccess } from '@/lib/inventory-contract';
+import type { InventoryStockPage, ProviderAccess } from '@/lib/inventory-contract';
 import type { ProviderReservationPage } from '@/lib/reservation-contract';
 import { validReservationPage } from '@/test/reservation-fixtures';
+import { validStockPage } from '@/test/inventory-fixtures';
 import { ReservationWorkspace } from './reservation-workspace';
 
 vi.mock('@/lib/api-client', async () => {
@@ -17,6 +20,8 @@ vi.mock('@/lib/api-client', async () => {
     ...actual,
     getAssignedProviders: vi.fn(),
     getProviderReservations: vi.fn(),
+    getProviderStock: vi.fn(),
+    createProviderReservation: vi.fn(),
     transitionProviderReservation: vi.fn(),
   };
 });
@@ -37,12 +42,22 @@ const providers: ProviderAccess[] = [
     isActive: true,
   },
 ];
-const page = structuredClone(validReservationPage) as ProviderReservationPage;
+const page = structuredClone(validReservationPage) as unknown as ProviderReservationPage;
+const stockPage = structuredClone(validStockPage) as unknown as InventoryStockPage;
 
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(getAssignedProviders).mockResolvedValue(providers);
   vi.mocked(getProviderReservations).mockResolvedValue({ ...page, total: 30 });
+  vi.mocked(getProviderStock).mockResolvedValue(stockPage);
+  vi.mocked(createProviderReservation).mockResolvedValue({
+    reservationId: '73a97ec4-84f8-4a85-a493-b8d6feb84a27',
+    status: 'PENDING',
+    version: 1,
+    itemCount: 1,
+    totalQuantity: 2,
+    replayed: false,
+  });
   vi.mocked(transitionProviderReservation).mockResolvedValue({
     reservationId: page.data[0].id,
     status: 'READY',
@@ -88,6 +103,50 @@ describe('ReservationWorkspace live integration', () => {
     );
     expect(await screen.findByRole('status')).toHaveTextContent('now Ready at version 3');
     expect(getProviderReservations).toHaveBeenCalledTimes(2);
+  });
+
+  it('creates a single-product FEFO reservation and refreshes authoritative records', async () => {
+    vi.stubGlobal('crypto', { randomUUID: () => '33333333-3333-4333-8333-333333333333' });
+    render(<ReservationWorkspace />);
+    fireEvent.click(await screen.findByRole('button', { name: 'New reservation' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog).toHaveTextContent('No name, contact, prescription, clinical');
+    fireEvent.change(screen.getByLabelText('Tenant user ID'), {
+      target: { value: 'f63f50dd-49b0-4a77-bc04-f7d00db58dd5' },
+    });
+    fireEvent.change(screen.getByLabelText('Reservation quantity'), { target: { value: '2' } });
+    fireEvent.change(screen.getByLabelText('Reservation expiry'), {
+      target: { value: '2027-08-01T12:00' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm reservation' }));
+
+    await waitFor(() =>
+      expect(createProviderReservation).toHaveBeenCalledWith(providers[0].providerId, {
+        subjectUserId: 'f63f50dd-49b0-4a77-bc04-f7d00db58dd5',
+        expiresAt: new Date('2027-08-01T12:00').toISOString(),
+        items: [{ productId: validStockPage.data[0].productId, quantity: 2 }],
+        idempotencyKey: 'reservation-create-33333333-3333-4333-8333-333333333333',
+      }),
+    );
+    expect(await screen.findByRole('status')).toHaveTextContent('is Pending with 2 held unit');
+    expect(getProviderReservations).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps creation confirmation open on a stock conflict', async () => {
+    vi.mocked(createProviderReservation).mockRejectedValueOnce(
+      new ApiError('Insufficient eligible stock', 409),
+    );
+    render(<ReservationWorkspace />);
+    fireEvent.click(await screen.findByRole('button', { name: 'New reservation' }));
+    fireEvent.change(await screen.findByLabelText('Tenant user ID'), {
+      target: { value: 'f63f50dd-49b0-4a77-bc04-f7d00db58dd5' },
+    });
+    fireEvent.change(screen.getByLabelText('Reservation expiry'), {
+      target: { value: '2027-08-01T12:00' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm reservation' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Insufficient eligible stock');
+    expect(screen.getByRole('dialog')).toBeVisible();
   });
 
   it('keeps confirmation open on a bounded lifecycle conflict', async () => {

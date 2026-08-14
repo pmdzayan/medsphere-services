@@ -2,11 +2,11 @@
 
 **Status date:** 2026-08-14
 
-**Accepted source commit:** `bc26e2ad612d8a63be5f412928ba923e14b4e5a4`
+**Accepted source commit:** `3c92e5d31bfb461e2db50d912073e2d3bd9091fe`
 
 **Accepted stabilization baseline:** `4ea55a17e188410ddee45fa3ea6c016e22d6617a`
 
-**Current sprint:** G3.16 assigned-provider staff reservation creation acceptance
+**Current sprint:** G3.17 live staff reservation creation acceptance
 
 **Release state:** Not approved for production or real healthcare data
 
@@ -14,33 +14,14 @@
 
 ## Most recent accepted sprint
 
-### G3.15 — Live Completed Inventory Transfer
-
-**Status:** Accepted and squash-merged in PR #44 as `bc26e2a` after exact-head
-CI run `31764479220` passed all required gates.
-
-**Selection reason:** G3.8 accepted an atomic completed physical transfer, while
-the live stock workspace exposes the required source batch version and assigned
-provider choices. It can be connected without inventing shipment or transit
-state.
-
-**Boundary:** Record only an already completed transfer between two assigned
-providers, using the source batch version, an available quantity, a stable
-idempotency key, exact correlated receipt validation, explicit confirmation,
-and authoritative source refresh. Backend dual assignment, permission,
-destination listing, provenance, stock, version, transaction, idempotency, and
-audit remain authoritative. No shipment, transit, approval, reversal, patient,
-supplier, payment, or delivery behavior is added.
-
-**Implementation authority:** ADR-001 through ADR-012, accepted source
-`bc26e2a`, and `docs/sprints/G3.15-live-completed-inventory-transfer.md`.
-
-## Active acceptance candidate
-
 ### G3.16 — Assigned-Provider Staff Reservation Creation
 
-**Status:** Implemented from remote head `c82ff7d`; exact-head CI and CTO
-acceptance are required.
+**Status:** Accepted and squash-merged in PR #46 as `3c92e5d` after exact-head
+CI run `31767059794` passed all required gates.
+
+**Selection reason:** The accepted reservation aggregate and assigned-provider
+stock/lifecycle boundaries could expose staff creation without adding public or
+patient-self-service authority.
 
 **Boundary:** One permission-protected assigned-provider staff command creates a
 future reservation for an active user in the same tenant, allocates visible
@@ -49,8 +30,25 @@ bounded audit event atomically. Public/patient self-service, clinical content,
 prescriptions, delivery, payment, controlled medicine, substitution, partial
 allocation, notifications, and analytics remain excluded.
 
-**Implementation authority:** ADR-005 and
+**Implementation authority:** ADR-005, accepted source `3c92e5d`, and
 `docs/sprints/G3.16-assigned-provider-staff-reservation-creation.md`.
+
+## Active acceptance candidate
+
+### G3.17 — Live Staff Reservation Creation
+
+**Status:** Implemented from accepted source `3c92e5d`; exact-head CI and CTO
+acceptance are required.
+
+**Boundary:** One-product staff creation from the selected assigned provider and
+live visible stock, with an opaque active tenant-user UUID, bounded quantity,
+future expiry, stable idempotency, explicit confirmation, strict same-origin BFF
+and receipt validation, and authoritative refresh. No identity directory,
+patient data, clinical context, notes, payment, delivery, substitution,
+multi-product composition, or offline mutation is added.
+
+**Implementation authority:** accepted G3.16 and
+`docs/sprints/G3.17-live-staff-reservation-creation.md`.
 
 ## Earlier accepted sprint
 
