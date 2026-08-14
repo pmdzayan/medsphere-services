@@ -4,9 +4,9 @@ import {
   markOutboxDelivered,
   markOutboxFailed,
   retryDelayMs,
+  type Prisma,
   validateTenantDomainEvent,
 } from '@medsphere/database';
-import type { Prisma } from '@prisma/client';
 
 const tenantId = '11111111-1111-4111-8111-111111111111';
 const membershipId = '22222222-2222-4222-8222-222222222222';
