@@ -33,6 +33,8 @@ import {
   toReservationSearchParams,
   type ProviderReservationPage,
   type ReservationFilters,
+  type ReservationTransitionRequest,
+  type ReservationTransitionResponse,
 } from './reservation-contract';
 
 export class ApiError extends Error {
@@ -153,6 +155,23 @@ export async function getProviderReservations(
 ): Promise<ProviderReservationPage> {
   const search = toReservationSearchParams(filters);
   return requestJson<ProviderReservationPage>(`/api/inventory/reservations?${search.toString()}`);
+}
+
+export async function transitionProviderReservation(
+  providerId: string,
+  reservationId: string,
+  request: ReservationTransitionRequest,
+): Promise<ReservationTransitionResponse> {
+  return requestJson<ReservationTransitionResponse>(
+    `/api/inventory/providers/${encodeURIComponent(providerId)}/reservations/${encodeURIComponent(
+      reservationId,
+    )}/transitions`,
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(request),
+    },
+  );
 }
 
 export async function getPrivacyPreferences(): Promise<PrivacyPreferences> {

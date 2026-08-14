@@ -1,15 +1,22 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { MetricCard, SectionCard, StatusBadge } from '@/components/platform/dashboard-primitives';
 import { Icon } from '@/components/platform/icon';
-import { ApiError, getAssignedProviders, getProviderReservations } from '@/lib/api-client';
+import {
+  ApiError,
+  getAssignedProviders,
+  getProviderReservations,
+  transitionProviderReservation,
+} from '@/lib/api-client';
 import type { ProviderAccess } from '@/lib/inventory-contract';
 import {
   RESERVATION_STATUSES,
   type ProviderReservation,
   type ProviderReservationPage,
   type ReservationStatus,
+  type ReservationTransition,
+  type ReservationTransitionResponse,
 } from '@/lib/reservation-contract';
 
 const PAGE_SIZE = 25;
@@ -22,6 +29,12 @@ const statusTone: Record<ReservationStatus, 'emerald' | 'amber' | 'rose' | 'cyan
   EXPIRED: 'rose',
 };
 
+interface TransitionTarget {
+  reservation: ProviderReservation;
+  transition: ReservationTransition;
+  idempotencyKey: string;
+}
+
 export function ReservationWorkspace() {
   const [providers, setProviders] = useState<ProviderAccess[]>([]);
   const [providerId, setProviderId] = useState('');
@@ -31,6 +44,12 @@ export function ReservationWorkspace() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [providersLoading, setProvidersLoading] = useState(true);
   const [loading, setLoading] = useState(false);
+  const [transitionTarget, setTransitionTarget] = useState<TransitionTarget | null>(null);
+  const [transitionSubmitting, setTransitionSubmitting] = useState(false);
+  const [transitionError, setTransitionError] = useState<string | null>(null);
+  const [transitionReceipt, setTransitionReceipt] = useState<ReservationTransitionResponse | null>(
+    null,
+  );
   const [error, setError] = useState<{ message: string; status?: number } | null>(null);
 
   const loadProviders = useCallback(async () => {
@@ -86,6 +105,40 @@ export function ReservationWorkspace() {
 
   const metrics = useMemo(() => reservationMetrics(page?.data ?? []), [page]);
   const selected = page?.data.find((reservation) => reservation.id === selectedId) ?? null;
+
+  function openTransition(reservation: ProviderReservation, transition: ReservationTransition) {
+    setTransitionTarget({
+      reservation,
+      transition,
+      idempotencyKey: `reservation-${transition.toLowerCase()}-${crypto.randomUUID()}`,
+    });
+    setTransitionError(null);
+  }
+
+  async function submitTransition(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!transitionTarget || !providerId || transitionSubmitting) return;
+    setTransitionSubmitting(true);
+    setTransitionError(null);
+    try {
+      const receipt = await transitionProviderReservation(
+        providerId,
+        transitionTarget.reservation.id,
+        {
+          transition: transitionTarget.transition,
+          expectedVersion: transitionTarget.reservation.version,
+          idempotencyKey: transitionTarget.idempotencyKey,
+        },
+      );
+      setTransitionReceipt(receipt);
+      setTransitionTarget(null);
+      await loadReservations(providerId, status, offset);
+    } catch (mutationError) {
+      setTransitionError(publicError(mutationError, 'Unable to transition reservation.').message);
+    } finally {
+      setTransitionSubmitting(false);
+    }
+  }
 
   if (!providersLoading && error?.status === 403 && providers.length === 0) {
     return (
@@ -252,10 +305,79 @@ export function ReservationWorkspace() {
       </SectionCard>
 
       {selected ? (
-        <ReservationDetails reservation={selected} onClose={() => setSelectedId(null)} />
+        <ReservationDetails
+          reservation={selected}
+          onClose={() => setSelectedId(null)}
+          onTransition={openTransition}
+        />
+      ) : null}
+      {transitionReceipt ? (
+        <div
+          role="status"
+          className="rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm text-emerald-900"
+        >
+          Reservation is now {titleCase(transitionReceipt.status)} at version{' '}
+          {transitionReceipt.version}. {transitionReceipt.totalQuantity} unit(s) were processed by
+          the accepted lifecycle command.
+        </div>
+      ) : null}
+      {transitionTarget ? (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="transition-title"
+          className="fixed inset-0 z-50 grid place-items-center bg-[#0d211a]/55 p-4"
+        >
+          <form
+            onSubmit={(event) => void submitTransition(event)}
+            className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl"
+          >
+            <p className="text-xs font-extrabold uppercase tracking-[.16em] text-emerald-700">
+              Version-safe lifecycle command
+            </p>
+            <h2
+              id="transition-title"
+              className="mt-2 font-[var(--font-display)] text-2xl font-bold text-[#17352a]"
+            >
+              {transitionLabel(transitionTarget.transition)} reservation
+            </h2>
+            <p className="mt-2 text-sm leading-6 text-[#647870]">
+              {transitionWarning(transitionTarget.transition)} The backend will recheck provider
+              assignment, permission, state, expiry, version, stock, and idempotency before any
+              change is committed.
+            </p>
+            {transitionError ? (
+              <p
+                role="alert"
+                className="mt-4 rounded-xl bg-rose-50 px-3 py-2 text-sm text-rose-800"
+              >
+                {transitionError}
+              </p>
+            ) : null}
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                disabled={transitionSubmitting}
+                onClick={() => setTransitionTarget(null)}
+                className="rounded-xl border border-[#dce5e1] px-4 py-2.5 text-sm font-bold text-[#536a62] disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={transitionSubmitting}
+                className="rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-bold text-white disabled:cursor-wait disabled:opacity-50"
+              >
+                {transitionSubmitting
+                  ? 'Applying…'
+                  : `Confirm ${transitionLabel(transitionTarget.transition).toLowerCase()}`}
+              </button>
+            </div>
+          </form>
+        </div>
       ) : null}
       <p className="pb-2 text-center text-[11px] text-[#93a09c]">
-        Read-only live data · No reservation lifecycle action is available in this workspace
+        Live data · Provider assignment and lifecycle permission are rechecked for every command
       </p>
     </div>
   );
@@ -336,10 +458,13 @@ function ReservationTable({
 function ReservationDetails({
   reservation,
   onClose,
+  onTransition,
 }: {
   reservation: ProviderReservation;
   onClose: () => void;
+  onTransition: (reservation: ProviderReservation, transition: ReservationTransition) => void;
 }) {
+  const actions = transitionsFor(reservation.status);
   return (
     <SectionCard>
       <div className="flex items-start justify-between border-b border-[#edf1ef] px-5 py-5 sm:px-6">
@@ -385,6 +510,20 @@ function ReservationDetails({
           </div>
         ))}
       </div>
+      {actions.length ? (
+        <div className="flex flex-wrap justify-end gap-3 border-t border-[#edf1ef] px-5 py-4 sm:px-6">
+          {actions.map((transition) => (
+            <button
+              key={transition}
+              type="button"
+              onClick={() => onTransition(reservation, transition)}
+              className="rounded-xl border border-emerald-200 px-4 py-2.5 text-sm font-bold text-emerald-700"
+            >
+              {transitionLabel(transition)}
+            </button>
+          ))}
+        </div>
+      ) : null}
     </SectionCard>
   );
 }
@@ -500,4 +639,25 @@ function formatDate(value: string) {
     timeStyle: 'short',
     timeZone: 'UTC',
   }).format(new Date(value));
+}
+
+function transitionsFor(status: ReservationStatus): ReservationTransition[] {
+  if (status === 'PENDING') return ['CONFIRM', 'CANCEL'];
+  if (status === 'CONFIRMED') return ['READY', 'CANCEL'];
+  if (status === 'READY') return ['COMPLETE', 'CANCEL'];
+  return [];
+}
+
+function transitionLabel(transition: ReservationTransition): string {
+  return transition === 'READY' ? 'Mark ready' : titleCase(transition);
+}
+
+function transitionWarning(transition: ReservationTransition): string {
+  if (transition === 'COMPLETE') {
+    return 'Completion permanently consumes the held stock and cannot be reversed in V1.';
+  }
+  if (transition === 'CANCEL') {
+    return 'Cancellation releases every held allocation and cannot be reversed in V1.';
+  }
+  return `This moves the reservation to ${transition === 'CONFIRM' ? 'Confirmed' : 'Ready'}.`;
 }

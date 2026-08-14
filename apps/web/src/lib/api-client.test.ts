@@ -10,6 +10,7 @@ import {
   getPrivacyPreferences,
   getSupportedLanguages,
   register,
+  transitionProviderReservation,
   updatePreferredLanguage,
   updatePrivacyPreferences,
 } from './api-client';
@@ -172,6 +173,36 @@ describe('authenticated API client', () => {
     expect(fetchMock).toHaveBeenCalledWith(
       '/api/inventory/reservations?providerId=provider-id&status=READY&limit=25&offset=0',
       { cache: 'no-store' },
+    );
+  });
+
+  it('submits the exact reservation lifecycle command through the same-origin boundary', async () => {
+    const request = { transition: 'READY' as const, expectedVersion: 2, idempotencyKey: 'ready-1' };
+    const receipt = {
+      reservationId: 'f63f50dd-49b0-4a77-bc04-f7d00db58dd5',
+      status: 'READY',
+      version: 3,
+      totalQuantity: 2,
+      replayed: false,
+    };
+    const fetchMock = vi.fn().mockResolvedValue(Response.json(receipt));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(
+      transitionProviderReservation(
+        '7f51a0f3-3bd1-45d7-85f3-b8b725969df9',
+        receipt.reservationId,
+        request,
+      ),
+    ).resolves.toEqual(receipt);
+    expect(fetchMock).toHaveBeenCalledWith(
+      `/api/inventory/providers/7f51a0f3-3bd1-45d7-85f3-b8b725969df9/reservations/${receipt.reservationId}/transitions`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(request),
+        cache: 'no-store',
+      },
     );
   });
 
