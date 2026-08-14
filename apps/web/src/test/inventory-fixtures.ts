@@ -42,3 +42,29 @@ export const validStockPage = {
   limit: 25,
   offset: 0,
 } as const;
+
+export const validExpiryWorklistPage = {
+  data: [
+    {
+      inventoryId: validStockPage.data[0].inventoryId,
+      batchId: validStockPage.data[0].batches[0].id,
+      productId: validStockPage.data[0].productId,
+      name: validStockPage.data[0].name,
+      genericName: validStockPage.data[0].genericName,
+      brand: validStockPage.data[0].brand,
+      sku: validStockPage.data[0].sku,
+      isVisible: true,
+      batchNumber: validStockPage.data[0].batches[0].batchNumber,
+      expiryDate: '2026-08-20T00:00:00.000Z',
+      version: 4,
+      onHandQuantity: 20,
+      heldQuantity: 3,
+      availableQuantity: 17,
+    },
+  ],
+  total: 30,
+  limit: 25,
+  offset: 0,
+  asOf: '2026-08-14T00:00:00.000Z',
+  horizonEndsAt: '2026-09-13T00:00:00.000Z',
+} as const;

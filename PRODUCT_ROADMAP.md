@@ -56,7 +56,9 @@ Ordered sprints:
     squash-merged in PR #46 as `3c92e5d` after exact-head CI run `31767059794`
 24. G3.17 Live staff reservation creation — accepted and squash-merged in PR
     #47 as `9f733a7` after exact-head CI run `31767805254`
-25. G3.18 Assigned-provider expiry worklist — implemented; exact-head CI and CTO
+25. G3.18 Assigned-provider expiry worklist — accepted and squash-merged in PR
+    #48 as `7c0befb` after exact-head CI run `31768462051`
+26. G3.19 Live expiry worklist workspace — implemented; exact-head CI and CTO
     acceptance required
 
 **Completion gate:** Accepted ADRs; protected review flow; clean migrations; deny-by-default authentication; tenant-isolation tests; integrated audit trail; atomic stock/reservation behavior; mandatory lint/test/build passing.
