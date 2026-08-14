@@ -59,6 +59,9 @@ import { InventoryDamageService } from './inventory-damage.service';
 import { QuarantineBatchDto } from './dto/inventory-quarantine.dto';
 import { BatchQuarantineResponseDto } from './dto/inventory-quarantine-response.dto';
 import { InventoryQuarantineService } from './inventory-quarantine.service';
+import { CreateProviderReservationDto } from './dto/reservation-creation.dto';
+import { ProviderReservationCreationResponseDto } from './dto/reservation-creation-response.dto';
+import { ReservationCreationService } from './reservation-creation.service';
 
 @Controller('inventory')
 @ApiTags('Inventory')
@@ -74,7 +77,33 @@ export class InventoryController {
     private readonly inventoryTransfers: InventoryTransferService,
     private readonly inventoryDamage: InventoryDamageService,
     private readonly inventoryQuarantine: InventoryQuarantineService,
+    private readonly reservationCreation: ReservationCreationService,
   ) {}
+
+  @Post('providers/:providerId/reservations')
+  @HttpCode(HttpStatus.OK)
+  @Header('Cache-Control', 'private, no-store')
+  @RequirePermissions(PERMISSIONS.inventoryReservationsCreate)
+  @ApiOperation({ summary: 'Create an atomic staff reservation for an assigned provider' })
+  @ApiOkResponse({ type: ProviderReservationCreationResponseDto })
+  @ApiNotFoundResponse({ description: 'Assigned provider or reservation subject not found' })
+  @ApiConflictResponse({ description: 'Stock or idempotency conflict' })
+  createReservation(
+    @CurrentIdentity() identity: AuthenticatedIdentity,
+    @Param('providerId', new ParseUUIDPipe({ version: '4' })) providerId: string,
+    @Body() dto: CreateProviderReservationDto,
+    @Req() request: MetadataHttpRequest,
+  ) {
+    return this.reservationCreation.create({
+      actor: identity,
+      providerId,
+      subjectUserId: dto.subjectUserId,
+      expiresAt: new Date(dto.expiresAt),
+      items: dto.items,
+      idempotencyKey: dto.idempotencyKey,
+      request: extractRequestMetadata(request),
+    });
+  }
 
   @Post('providers/:providerId/batches/:batchId/quarantine')
   @HttpCode(HttpStatus.OK)

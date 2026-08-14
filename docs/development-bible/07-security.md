@@ -166,6 +166,13 @@ self-access, abuse controls, and tenant-scoped audit visibility. No header,
 zero UUID, system actor, or client-supplied tenant may be used as a temporary
 identity fallback.
 
+G3.16 authorizes only assigned staff with the dedicated
+`inventory.reservations.create` permission. The subject is an opaque user UUID
+validated against an active membership in the same tenant; no identity,
+clinical, prescription, contact, or free-text data is returned or audited.
+Provider authorization occurs before replay lookup, and the client cannot
+submit tenant, membership, or actor authority.
+
 ## G3.2 command boundary
 
 - Listing, receipt, and adjustment commands require both a dedicated

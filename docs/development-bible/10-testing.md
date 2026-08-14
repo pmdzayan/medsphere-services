@@ -197,3 +197,12 @@ and cancellation effects. Real PostgreSQL tests must prove atomic stock
 consumption, command/movement hash binding, durable audit attribution,
 unauthorized replay concealment, and one-winner expected-version concurrency.
 These infrastructure tests must execute with zero skips in exact-commit CI.
+
+## G3.16 required evidence
+
+G3.16 adds DTO and HTTP contract tests, deterministic FEFO unit tests,
+authorization-before-replay and optimistic-update service tests, and real
+PostgreSQL evidence for exact holds, single audit attribution, dedicated
+permission deployment, and idempotent replay. Pull-request CI must run the
+infrastructure suite with zero skips, deploy the forward permission migration,
+and verify the populated upgrade through G3.16.

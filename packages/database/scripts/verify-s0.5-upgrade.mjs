@@ -31,6 +31,7 @@ const upgradeMigrations = [
   '20260810140000_completed_damaged_stock_write_off',
   '20260810180000_physical_batch_expiry_reconciliation',
   '20260810200000_one_way_manual_batch_quarantine',
+  '20260814120000_staff_reservation_creation',
 ];
 const pnpmCommand = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm';
 
@@ -365,10 +366,11 @@ BEGIN
         'inventory.stock.damage',
         'inventory.batch.quarantine',
         'inventory.reservations.read',
+        'inventory.reservations.create',
         'inventory.reservations.manage'
       )
-  ) <> 11 THEN
-    RAISE EXCEPTION 'Gate 3 through G3.11 permissions were not assigned to the tenant administrator';
+  ) <> 12 THEN
+    RAISE EXCEPTION 'Gate 3 through G3.16 permissions were not assigned to the tenant administrator';
   END IF;
   IF NOT EXISTS (
     SELECT 1 FROM pg_constraint
@@ -527,4 +529,4 @@ ${batchRow({ id: batchOne, batchNumber: 'BATCH-001', quantity: 0, initial: 0 })}
   expectedFailure: 'S0.5 migration blocked: invalid legacy batch values',
 });
 
-process.stdout.write('S0.5 through G3.11 populated upgrade verification passed.\n');
+process.stdout.write('S0.5 through G3.16 populated upgrade verification passed.\n');
