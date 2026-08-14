@@ -2,9 +2,9 @@
 
 **Last updated:** 2026-08-14
 
-**Current sprint:** G3.14 implementation — live reservation lifecycle actions
+**Current sprint:** G3.15 implementation — live completed inventory transfer
 
-**Next feature work:** Verify and accept G3.14 live reservation lifecycle actions
+**Next feature work:** Verify and accept G3.15 live completed inventory transfer
 
 ## Mandatory startup sequence
 
@@ -162,9 +162,11 @@ See `docs/audits/2026-07-20-cto-baseline.md` for the accepted baseline.
     #41 as `85fdf53` after exact-head CI run `31762213509`
 24. G3.13 live damaged-stock write-off — accepted and squash-merged in PR #42
     as `636eb86` after exact-head CI run `31763244493`
-25. G3.14 live reservation lifecycle actions — implemented; exact-head CI and
-    CTO acceptance required
-26. Returns, safe creation, and later live mutations — blocked pending their
+25. G3.14 live reservation lifecycle actions — accepted and squash-merged in PR
+    #43 as `7feacbb` after exact-head CI run `31763879935`
+26. G3.15 live completed inventory transfer — implemented; exact-head CI and CTO
+    acceptance required
+27. Returns, safe creation, and later live mutations — blocked pending their
     own accepted contracts
 
 If ownership transfers, resume at the first pending checkpoint. Do not use
@@ -173,8 +175,8 @@ If ownership transfers, resume at the first pending checkpoint. Do not use
 
 ## Exact continuation point
 
-Verify G3.14 against `docs/sprints/G3.14-live-reservation-lifecycle-actions.md`
-from accepted baseline `636eb86`. Do not increase progress until exact-head CI
+Verify G3.15 against `docs/sprints/G3.15-live-completed-inventory-transfer.md`
+from accepted baseline `7feacbb`. Do not increase progress until exact-head CI
 and CTO acceptance pass. Quarantine release, reservation creation, returns,
 recall, analytics policy, patient exposure, and Gates 2 and 4–9 remain blocked
 until their recorded prerequisites are satisfied.

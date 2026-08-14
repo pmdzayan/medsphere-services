@@ -7,6 +7,7 @@ import {
   getProviderReservations,
   quarantineBatch,
   recordDamagedStock,
+  recordCompletedTransfer,
   getPrivacyPreferences,
   getSupportedLanguages,
   register,
@@ -153,6 +154,31 @@ describe('authenticated API client', () => {
     );
     expect(fetchMock).toHaveBeenCalledWith(
       `/api/inventory/providers/${receipt.providerId}/batches/${receipt.batchId}/damage`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(request),
+        cache: 'no-store',
+      },
+    );
+  });
+
+  it('submits the exact completed-transfer command through the same-origin boundary', async () => {
+    const request = {
+      destinationProviderId: '8b4d574f-48c6-4231-8851-e65edc9f9d42',
+      sourceBatchId: '73a97ec4-84f8-4a85-a493-b8d6feb84a27',
+      expectedSourceVersion: 4,
+      quantity: 2,
+      idempotencyKey: 'transfer-command-1',
+    };
+    const receipt = { transferId: '52f2d7a4-0948-49c4-a0a8-afbf88503a5c' };
+    const fetchMock = vi.fn().mockResolvedValue(Response.json(receipt));
+    vi.stubGlobal('fetch', fetchMock);
+    await expect(
+      recordCompletedTransfer('7f51a0f3-3bd1-45d7-85f3-b8b725969df9', request),
+    ).resolves.toEqual(receipt);
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/inventory/providers/7f51a0f3-3bd1-45d7-85f3-b8b725969df9/transfers',
       {
         method: 'POST',
         headers: { 'content-type': 'application/json' },

@@ -66,6 +66,35 @@ export interface DamagedStockResponse {
   replayed: boolean;
 }
 
+export interface CompletedTransferRequest {
+  destinationProviderId: string;
+  sourceBatchId: string;
+  expectedSourceVersion: number;
+  quantity: number;
+  idempotencyKey: string;
+  reason?: string;
+}
+
+export interface CompletedTransferResponse {
+  transferId: string;
+  productId: string;
+  sourceProviderId: string;
+  destinationProviderId: string;
+  sourceInventoryId: string;
+  destinationInventoryId: string;
+  sourceBatchId: string;
+  destinationBatchId: string;
+  sourceMovementId: string;
+  destinationMovementId: string;
+  quantity: number;
+  sourceOnHandAfter: number;
+  destinationOnHandAfter: number;
+  sourceBatchVersion: number;
+  destinationBatchVersion: number;
+  completedAt: string;
+  replayed: boolean;
+}
+
 export interface InventoryStockItem {
   inventoryId: string;
   productId: string;
@@ -208,6 +237,84 @@ export function isDamagedStockResponse(value: unknown): value is DamagedStockRes
     Number(receipt.onHandAfter) === Number(receipt.onHandBefore) - Number(receipt.quantity) &&
     isIntegerBetween(receipt.resultingBatchVersion, 1, 2_147_483_647) &&
     isIsoDateTime(receipt.occurredAt) &&
+    typeof receipt.replayed === 'boolean'
+  );
+}
+
+export function isCompletedTransferRequest(value: unknown): value is CompletedTransferRequest {
+  if (
+    !hasExactKeys(value, [
+      'destinationProviderId',
+      'sourceBatchId',
+      'expectedSourceVersion',
+      'quantity',
+      'idempotencyKey',
+    ]) &&
+    !hasExactKeys(value, [
+      'destinationProviderId',
+      'sourceBatchId',
+      'expectedSourceVersion',
+      'quantity',
+      'idempotencyKey',
+      'reason',
+    ])
+  ) {
+    return false;
+  }
+  const request = value as Partial<CompletedTransferRequest>;
+  return (
+    isCanonicalUuid(request.destinationProviderId) &&
+    isCanonicalUuid(request.sourceBatchId) &&
+    isIntegerBetween(request.expectedSourceVersion, 1, 2_147_483_647) &&
+    isIntegerBetween(request.quantity, 1, 2_147_483_647) &&
+    isTrimmedBoundedString(request.idempotencyKey, 1, 120) &&
+    (request.reason === undefined || isTrimmedBoundedString(request.reason, 1, 500))
+  );
+}
+
+export function isCompletedTransferResponse(value: unknown): value is CompletedTransferResponse {
+  if (
+    !hasExactKeys(value, [
+      'transferId',
+      'productId',
+      'sourceProviderId',
+      'destinationProviderId',
+      'sourceInventoryId',
+      'destinationInventoryId',
+      'sourceBatchId',
+      'destinationBatchId',
+      'sourceMovementId',
+      'destinationMovementId',
+      'quantity',
+      'sourceOnHandAfter',
+      'destinationOnHandAfter',
+      'sourceBatchVersion',
+      'destinationBatchVersion',
+      'completedAt',
+      'replayed',
+    ])
+  ) {
+    return false;
+  }
+  const receipt = value as Partial<CompletedTransferResponse>;
+  return (
+    isCanonicalUuid(receipt.transferId) &&
+    isCanonicalUuid(receipt.productId) &&
+    isCanonicalUuid(receipt.sourceProviderId) &&
+    isCanonicalUuid(receipt.destinationProviderId) &&
+    receipt.sourceProviderId !== receipt.destinationProviderId &&
+    isCanonicalUuid(receipt.sourceInventoryId) &&
+    isCanonicalUuid(receipt.destinationInventoryId) &&
+    isCanonicalUuid(receipt.sourceBatchId) &&
+    isCanonicalUuid(receipt.destinationBatchId) &&
+    isCanonicalUuid(receipt.sourceMovementId) &&
+    isCanonicalUuid(receipt.destinationMovementId) &&
+    isIntegerBetween(receipt.quantity, 1, 2_147_483_647) &&
+    isQuantity(receipt.sourceOnHandAfter) &&
+    isQuantity(receipt.destinationOnHandAfter) &&
+    isIntegerBetween(receipt.sourceBatchVersion, 1, 2_147_483_647) &&
+    isIntegerBetween(receipt.destinationBatchVersion, 1, 2_147_483_647) &&
+    isIsoDateTime(receipt.completedAt) &&
     typeof receipt.replayed === 'boolean'
   );
 }

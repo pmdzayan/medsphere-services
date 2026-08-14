@@ -8,11 +8,13 @@ import {
   getAssignedProviders,
   getProviderStock,
   quarantineBatch,
+  recordCompletedTransfer,
   recordDamagedStock,
 } from '@/lib/api-client';
 import type {
   BatchQuarantineReason,
   BatchQuarantineResponse,
+  CompletedTransferResponse,
   DamagedStockResponse,
   InventoryBatchStock,
   InventoryStockPage,
@@ -45,6 +47,12 @@ interface DamageTarget {
   idempotencyKey: string;
 }
 
+interface TransferTarget {
+  batch: InventoryBatchStock;
+  medicineName: string;
+  idempotencyKey: string;
+}
+
 export function InventoryWorkspace() {
   const [providers, setProviders] = useState<ProviderAccess[]>([]);
   const [providerId, setProviderId] = useState('');
@@ -66,6 +74,13 @@ export function InventoryWorkspace() {
   const [damageSubmitting, setDamageSubmitting] = useState(false);
   const [damageError, setDamageError] = useState<string | null>(null);
   const [damageReceipt, setDamageReceipt] = useState<DamagedStockResponse | null>(null);
+  const [transferTarget, setTransferTarget] = useState<TransferTarget | null>(null);
+  const [transferDestinationId, setTransferDestinationId] = useState('');
+  const [transferQuantity, setTransferQuantity] = useState('1');
+  const [transferReason, setTransferReason] = useState('');
+  const [transferSubmitting, setTransferSubmitting] = useState(false);
+  const [transferError, setTransferError] = useState<string | null>(null);
+  const [transferReceipt, setTransferReceipt] = useState<CompletedTransferResponse | null>(null);
   const [error, setError] = useState<{ message: string; status?: number } | null>(null);
 
   const loadProviders = useCallback(async () => {
@@ -199,6 +214,61 @@ export function InventoryWorkspace() {
       );
     } finally {
       setDamageSubmitting(false);
+    }
+  }
+
+  function openTransfer(batch: InventoryBatchStock, medicineName: string) {
+    setTransferTarget({
+      batch,
+      medicineName,
+      idempotencyKey: `completed-transfer-${crypto.randomUUID()}`,
+    });
+    setTransferDestinationId(
+      providers.find((provider) => provider.providerId !== providerId)?.providerId ?? '',
+    );
+    setTransferQuantity('1');
+    setTransferReason('');
+    setTransferError(null);
+  }
+
+  async function submitTransfer(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!transferTarget || !providerId || transferSubmitting) return;
+    const quantity = Number(transferQuantity);
+    const reason = transferReason.trim();
+    if (
+      !providers.some(
+        (provider) =>
+          provider.providerId === transferDestinationId && provider.providerId !== providerId,
+      ) ||
+      !Number.isSafeInteger(quantity) ||
+      quantity < 1 ||
+      quantity > transferTarget.batch.availableQuantity ||
+      reason.length > 500
+    ) {
+      setTransferError('Select another assigned provider and enter a valid available quantity.');
+      return;
+    }
+    setTransferSubmitting(true);
+    setTransferError(null);
+    try {
+      const receipt = await recordCompletedTransfer(providerId, {
+        destinationProviderId: transferDestinationId,
+        sourceBatchId: transferTarget.batch.id,
+        expectedSourceVersion: transferTarget.batch.version,
+        quantity,
+        idempotencyKey: transferTarget.idempotencyKey,
+        ...(reason ? { reason } : {}),
+      });
+      setTransferReceipt(receipt);
+      setTransferTarget(null);
+      await loadStock(providerId, query, offset);
+    } catch (mutationError) {
+      setTransferError(
+        toPublicError(mutationError, 'Unable to record the completed transfer.').message,
+      );
+    } finally {
+      setTransferSubmitting(false);
     }
   }
 
@@ -364,7 +434,12 @@ export function InventoryWorkspace() {
           />
         ) : null}
         {!error && page?.data.length ? (
-          <InventoryTable page={page} onQuarantine={openQuarantine} onDamage={openDamage} />
+          <InventoryTable
+            page={page}
+            onQuarantine={openQuarantine}
+            onDamage={openDamage}
+            onTransfer={providers.length > 1 ? openTransfer : undefined}
+          />
         ) : null}
 
         {!error && page && page.total > 0 ? (
@@ -413,6 +488,17 @@ export function InventoryWorkspace() {
         >
           Damaged stock recorded. {damageReceipt.quantity} unit(s) were removed from physical
           on-hand quantity: {damageReceipt.onHandBefore} → {damageReceipt.onHandAfter}.
+        </div>
+      ) : null}
+
+      {transferReceipt ? (
+        <div
+          role="status"
+          className="rounded-2xl border border-cyan-200 bg-cyan-50 px-5 py-4 text-sm text-cyan-900"
+        >
+          Completed transfer recorded for {transferReceipt.quantity} unit(s). Source on-hand is now{' '}
+          {transferReceipt.sourceOnHandAfter}; destination on-hand is{' '}
+          {transferReceipt.destinationOnHandAfter}.
         </div>
       ) : null}
 
@@ -580,6 +666,110 @@ export function InventoryWorkspace() {
         </div>
       ) : null}
 
+      {transferTarget ? (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="transfer-title"
+          className="fixed inset-0 z-50 grid place-items-center bg-[#0d211a]/55 p-4"
+        >
+          <form
+            onSubmit={(event) => void submitTransfer(event)}
+            noValidate
+            className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl"
+          >
+            <p className="text-xs font-extrabold uppercase tracking-[.16em] text-cyan-700">
+              Completed physical transfer
+            </p>
+            <h2
+              id="transfer-title"
+              className="mt-2 font-[var(--font-display)] text-2xl font-bold text-[#17352a]"
+            >
+              Record transfer of {transferTarget.medicineName}
+            </h2>
+            <p className="mt-2 text-sm leading-6 text-[#647870]">
+              Use this only after the stock has physically moved. The command atomically records
+              both provider balances; it does not create a shipment, transit, or approval workflow.
+            </p>
+            <div className="mt-5 grid gap-4">
+              <label>
+                <span className="mb-1.5 block text-xs font-bold text-[#38544b]">
+                  Destination provider
+                </span>
+                <select
+                  aria-label="Destination provider"
+                  value={transferDestinationId}
+                  onChange={(event) => setTransferDestinationId(event.target.value)}
+                  disabled={transferSubmitting}
+                  className="h-11 w-full rounded-xl border border-[#dce5e1] bg-white px-3 text-sm text-[#38544b]"
+                >
+                  {providers
+                    .filter((provider) => provider.providerId !== providerId)
+                    .map((provider) => (
+                      <option key={provider.providerId} value={provider.providerId}>
+                        {provider.businessName}
+                      </option>
+                    ))}
+                </select>
+              </label>
+              <label>
+                <span className="mb-1.5 block text-xs font-bold text-[#38544b]">Quantity</span>
+                <input
+                  aria-label="Transfer quantity"
+                  type="number"
+                  min="1"
+                  max={transferTarget.batch.availableQuantity}
+                  step="1"
+                  value={transferQuantity}
+                  onChange={(event) => setTransferQuantity(event.target.value)}
+                  disabled={transferSubmitting}
+                  className="h-11 w-full rounded-xl border border-[#dce5e1] px-3 text-sm text-[#38544b]"
+                />
+              </label>
+              <label>
+                <span className="mb-1.5 block text-xs font-bold text-[#38544b]">
+                  Optional operational reason
+                </span>
+                <textarea
+                  aria-label="Transfer reason"
+                  maxLength={500}
+                  value={transferReason}
+                  onChange={(event) => setTransferReason(event.target.value)}
+                  disabled={transferSubmitting}
+                  rows={3}
+                  className="w-full rounded-xl border border-[#dce5e1] px-3 py-2 text-sm text-[#38544b]"
+                />
+              </label>
+            </div>
+            {transferError ? (
+              <p
+                role="alert"
+                className="mt-4 rounded-xl bg-rose-50 px-3 py-2 text-sm text-rose-800"
+              >
+                {transferError}
+              </p>
+            ) : null}
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                disabled={transferSubmitting}
+                onClick={() => setTransferTarget(null)}
+                className="rounded-xl border border-[#dce5e1] px-4 py-2.5 text-sm font-bold text-[#536a62] disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={transferSubmitting}
+                className="rounded-xl bg-cyan-700 px-4 py-2.5 text-sm font-bold text-white disabled:cursor-wait disabled:opacity-50"
+              >
+                {transferSubmitting ? 'Recording…' : 'Confirm completed transfer'}
+              </button>
+            </div>
+          </form>
+        </div>
+      ) : null}
+
       <p className="pb-2 text-center text-[11px] text-[#93a09c]">
         Live data · Provider assignment and command permission are rechecked for every request
       </p>
@@ -591,10 +781,12 @@ function InventoryTable({
   page,
   onQuarantine,
   onDamage,
+  onTransfer,
 }: {
   page: InventoryStockPage;
   onQuarantine: (batch: InventoryBatchStock, medicineName: string) => void;
   onDamage: (batch: InventoryBatchStock, medicineName: string) => void;
+  onTransfer?: (batch: InventoryBatchStock, medicineName: string) => void;
 }) {
   return (
     <div className="overflow-x-auto">
@@ -662,14 +854,26 @@ function InventoryTable({
                               Quarantine batch
                             </button>
                             {batch.availableQuantity > 0 ? (
-                              <button
-                                type="button"
-                                onClick={() => onDamage(batch, item.name)}
-                                className="font-bold text-rose-700 hover:text-rose-800"
-                                aria-label={`Record damage for batch ${batch.batchNumber}`}
-                              >
-                                Record damage
-                              </button>
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => onDamage(batch, item.name)}
+                                  className="font-bold text-rose-700 hover:text-rose-800"
+                                  aria-label={`Record damage for batch ${batch.batchNumber}`}
+                                >
+                                  Record damage
+                                </button>
+                                {onTransfer ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => onTransfer(batch, item.name)}
+                                    className="font-bold text-cyan-700 hover:text-cyan-800"
+                                    aria-label={`Record completed transfer for batch ${batch.batchNumber}`}
+                                  >
+                                    Record transfer
+                                  </button>
+                                ) : null}
+                              </>
                             ) : null}
                           </span>
                         ) : null}
