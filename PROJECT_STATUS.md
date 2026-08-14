@@ -2,50 +2,49 @@
 
 **Status date:** 2026-08-14
 
-**Accepted source commit:** `85fdf53ce606e8490b9fb988613422efd5bd8f01`
+**Accepted source commit:** `636eb86530aa4bac7813f71f6d107252fba05d09`
 
 **Accepted stabilization baseline:** `4ea55a17e188410ddee45fa3ea6c016e22d6617a`
 
-**Current sprint:** G3.13 implementation — live damaged-stock write-off
+**Current sprint:** G3.14 implementation — live reservation lifecycle actions
 
 **Release state:** Not approved for production or real healthcare data
 
-**Full-roadmap engineering estimate:** 37% complete / 63% remaining
+**Full-roadmap engineering estimate:** 38% complete / 62% remaining
 
 ## Current sprint
 
-### G3.13 — Live Damaged-Stock Write-Off
+### G3.14 — Live Reservation Lifecycle Actions
 
 **Status:** Implemented locally; exact-head CI and CTO acceptance required.
-Overall V1 progress remains 37% until both gates pass.
+Overall V1 progress remains 38% until both gates pass.
 
-**Selection reason:** G3.9 already accepted an atomic, completed damaged-stock
-write-off and G3.12 exposed the required batch concurrency token. Connecting
-that existing boundary is dependency-ready; returns, recall, analytics, and
-patient exposure still require unaccepted prerequisites.
+**Selection reason:** G3.3 accepted assigned-provider staff lifecycle commands
+and G3.5 exposes the reservation version required for optimistic concurrency.
+The existing read-only workspace can therefore add exact staff actions without
+inventing patient identity, reservation creation, or new backend authority.
 
-**Boundary:** Proxy the exact same-origin completed damaged-stock command,
-validate conservation in its receipt, restrict quantity to currently available
-stock, require explicit physical-confirmation reason, and refresh live stock
-after success. Backend assignment, permission, state, expiry, version,
-transaction, idempotency, and audit remain authoritative. No disposal,
-approval, return, refund, recall, or patient behavior is added.
+**Boundary:** Proxy only `CONFIRM`, `READY`, `COMPLETE`, and `CANCEL`; use the
+read-model version and a stable idempotency key; validate exact receipts; require
+explicit confirmation; and refresh authoritative reservations after success.
+Backend assignment, permission, state, expiry, version, stock, transaction,
+idempotency, and audit remain authoritative. No `EXPIRE`, creation, patient,
+payment, delivery, or controlled-medicine behavior is added.
 
 **Implementation authority:** ADR-001 through ADR-012, accepted source
-`85fdf53`, and `docs/sprints/G3.13-live-damaged-stock-workspace.md`.
+`636eb86`, and `docs/sprints/G3.14-live-reservation-lifecycle-actions.md`.
 
 ## Most recent accepted sprint
 
-### G3.12 — Live Batch Quarantine Workspace
+### G3.13 — Live Damaged-Stock Write-Off
 
-**Status:** Accepted and squash-merged in PR #41 as `85fdf53` after exact-head
-CI run `31762213509` passed all required gates.
+**Status:** Accepted and squash-merged in PR #42 as `636eb86` after exact-head
+CI run `31763244493` passed all required gates.
 
-**Accepted boundary:** Positive batch concurrency token, exact same-origin BFF,
-strict request/receipt contracts, explicit one-way confirmation, stable
-idempotency, authoritative refresh, and bounded receipt evidence. Backend
-assignment and permission remained authoritative; no release, recall, disposal,
-return, or patient behavior was added.
+**Accepted boundary:** Exact same-origin completed damaged-stock command,
+conserving receipt validation, available-quantity bounds, explicit physical
+confirmation, stable idempotency, and authoritative stock refresh. No disposal,
+approval, return, refund, recall, or patient behavior was added.
 
 ## Earlier accepted sprint
 
@@ -115,17 +114,17 @@ V1 gap matrix, and
 
 ## CTO acceptance ledger
 
-| Area                        | Repository evidence                                                                            | CTO status                               |
-| --------------------------- | ---------------------------------------------------------------------------------------------- | ---------------------------------------- |
-| Planning and architecture   | ADR-001 and S0.1 governance merged in PR #1                                                    | Accepted baseline                        |
-| Monorepo/tooling foundation | PNPM, Turbo, TypeScript, NestJS, Prisma, shared packages, and quality gates exist              | Accepted stabilization foundation        |
-| Database reproducibility    | S0.2–S0.5, G3.1–G3.3, and corrected AG-02A accepted with clean and populated upgrade evidence  | Accepted through `9c38792`               |
-| Identity and tenant context | S0.3 authentication and trusted tenant context merged                                          | Accepted                                 |
-| Authorization and audit     | S0.4 tenant-safe RBAC and durable audit merged                                                 | Accepted                                 |
-| Inventory and reservation   | S0.5 and G3.1–G3.12 through one-way quarantine and its live assigned-provider workspace        | Broader operations remain incomplete     |
-| Frontend foundation         | Landing, login, shell, team/RBAC, audit, settings, onboarding, stock, and reservation reads    | Connected for accepted contracts         |
-| Pharmacy and inventory UI   | Assigned-provider stock, reservations, overview, and one-way quarantine use accepted contracts | Damage and broader mutations remain open |
-| Remaining healthcare scope  | Most domain deployables are health-only scaffolds or absent                                    | Not implemented                          |
+| Area                        | Repository evidence                                                                            | CTO status                                  |
+| --------------------------- | ---------------------------------------------------------------------------------------------- | ------------------------------------------- |
+| Planning and architecture   | ADR-001 and S0.1 governance merged in PR #1                                                    | Accepted baseline                           |
+| Monorepo/tooling foundation | PNPM, Turbo, TypeScript, NestJS, Prisma, shared packages, and quality gates exist              | Accepted stabilization foundation           |
+| Database reproducibility    | S0.2–S0.5, G3.1–G3.3, and corrected AG-02A accepted with clean and populated upgrade evidence  | Accepted through `9c38792`                  |
+| Identity and tenant context | S0.3 authentication and trusted tenant context merged                                          | Accepted                                    |
+| Authorization and audit     | S0.4 tenant-safe RBAC and durable audit merged                                                 | Accepted                                    |
+| Inventory and reservation   | S0.5 and G3.1–G3.13 through live quarantine and damaged-stock write-off                        | Broader operations remain incomplete        |
+| Frontend foundation         | Landing, login, shell, team/RBAC, audit, settings, onboarding, stock, and reservation reads    | Connected for accepted contracts            |
+| Pharmacy and inventory UI   | Assigned-provider stock, reservations, overview, quarantine, and damage use accepted contracts | Lifecycle and broader mutations remain open |
+| Remaining healthcare scope  | Most domain deployables are health-only scaffolds or absent                                    | Not implemented                             |
 
 ## Critical blockers
 
@@ -185,14 +184,16 @@ and [the Gates 1–20 verification](docs/audits/2026-08-01-gates-1-20-verificati
     PR #38 as `d364794` after exact-head CI run `31761072418`
 20. **G3.12 live batch quarantine workspace** — accepted and squash-merged in
     PR #41 as `85fdf53` after exact-head CI run `31762213509`
-21. Resume remaining Inventory and Compliance milestones in dependency order
+21. **G3.13 live damaged-stock workspace** — accepted and squash-merged in PR
+    #42 as `636eb86` after exact-head CI run `31763244493`
+22. Resume remaining Inventory and Compliance milestones in dependency order
 
 Only one recovery sprint may be active at a time. Exact boundaries may be refined through an ADR, but dependencies must not be skipped.
 
 ## Progress reporting rule
 
 Progress is measured by accepted milestone criteria, not by the number of files
-or endpoints present. The README's 37% full-roadmap estimate and 32% frontend
+or endpoints present. The README's 38% full-roadmap estimate and 32% frontend
 estimate are planning indicators, not acceptance or release claims. They may
 change only when repository evidence and milestone acceptance change. Preview
 screens, placeholder services, unmounted routes, and schema-only foundations do

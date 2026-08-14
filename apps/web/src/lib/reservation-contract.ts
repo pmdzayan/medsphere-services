@@ -11,6 +11,22 @@ export const RESERVATION_STATUSES = [
 
 export type ReservationStatus = (typeof RESERVATION_STATUSES)[number];
 export type ReservationAllocationStatus = 'HELD' | 'CONSUMED' | 'RELEASED';
+export const RESERVATION_TRANSITIONS = ['CONFIRM', 'READY', 'COMPLETE', 'CANCEL'] as const;
+export type ReservationTransition = (typeof RESERVATION_TRANSITIONS)[number];
+
+export interface ReservationTransitionRequest {
+  transition: ReservationTransition;
+  expectedVersion: number;
+  idempotencyKey: string;
+}
+
+export interface ReservationTransitionResponse {
+  reservationId: string;
+  status: 'CONFIRMED' | 'READY' | 'COMPLETED' | 'CANCELLED';
+  version: number;
+  totalQuantity: number;
+  replayed: boolean;
+}
 
 export interface ReservationAllocation {
   batchId: string;
@@ -72,6 +88,37 @@ export function toReservationSearchParams(filters: ReservationFilters): URLSearc
   if (filters.limit !== undefined) search.set('limit', String(filters.limit));
   if (filters.offset !== undefined) search.set('offset', String(filters.offset));
   return search;
+}
+
+export function isReservationTransitionRequest(
+  value: unknown,
+): value is ReservationTransitionRequest {
+  if (!hasExactKeys(value, ['transition', 'expectedVersion', 'idempotencyKey'])) return false;
+  const request = value as Partial<ReservationTransitionRequest>;
+  return (
+    RESERVATION_TRANSITIONS.includes(request.transition as ReservationTransition) &&
+    isIntegerBetween(request.expectedVersion, 1, 2_147_483_647) &&
+    typeof request.idempotencyKey === 'string' &&
+    request.idempotencyKey === request.idempotencyKey.trim() &&
+    request.idempotencyKey.length >= 1 &&
+    request.idempotencyKey.length <= 120
+  );
+}
+
+export function isReservationTransitionResponse(
+  value: unknown,
+): value is ReservationTransitionResponse {
+  if (!hasExactKeys(value, ['reservationId', 'status', 'version', 'totalQuantity', 'replayed'])) {
+    return false;
+  }
+  const receipt = value as Partial<ReservationTransitionResponse>;
+  return (
+    isCanonicalUuid(receipt.reservationId) &&
+    ['CONFIRMED', 'READY', 'COMPLETED', 'CANCELLED'].includes(String(receipt.status)) &&
+    isIntegerBetween(receipt.version, 1, 2_147_483_647) &&
+    isIntegerBetween(receipt.totalQuantity, 1, Number.MAX_SAFE_INTEGER) &&
+    typeof receipt.replayed === 'boolean'
+  );
 }
 
 function isProviderReservation(value: unknown): value is ProviderReservation {

@@ -2,9 +2,9 @@
 
 **Last updated:** 2026-08-14
 
-**Current sprint:** G3.13 implementation — live damaged-stock write-off
+**Current sprint:** G3.14 implementation — live reservation lifecycle actions
 
-**Next feature work:** Verify and accept the G3.13 live damaged-stock workspace
+**Next feature work:** Verify and accept G3.14 live reservation lifecycle actions
 
 ## Mandatory startup sequence
 
@@ -160,9 +160,11 @@ See `docs/audits/2026-07-20-cto-baseline.md` for the accepted baseline.
     #38 as `d364794` after exact-head CI run `31761072418`
 23. G3.12 live batch quarantine workspace — accepted and squash-merged in PR
     #41 as `85fdf53` after exact-head CI run `31762213509`
-24. G3.13 live damaged-stock write-off — implemented; exact-head CI and CTO
-    acceptance required
-25. Returns, safe creation, and later live mutations — blocked pending their
+24. G3.13 live damaged-stock write-off — accepted and squash-merged in PR #42
+    as `636eb86` after exact-head CI run `31763244493`
+25. G3.14 live reservation lifecycle actions — implemented; exact-head CI and
+    CTO acceptance required
+26. Returns, safe creation, and later live mutations — blocked pending their
     own accepted contracts
 
 If ownership transfers, resume at the first pending checkpoint. Do not use
@@ -171,11 +173,11 @@ If ownership transfers, resume at the first pending checkpoint. Do not use
 
 ## Exact continuation point
 
-Verify G3.13 against `docs/sprints/G3.13-live-damaged-stock-workspace.md` from
-accepted baseline `85fdf53`. Do not increase progress until exact-head CI and
-CTO acceptance pass. Quarantine release, reservation creation, returns, recall,
-analytics policy, patient exposure, and Gates 2 and 4–9 remain blocked until
-their recorded prerequisites are satisfied.
+Verify G3.14 against `docs/sprints/G3.14-live-reservation-lifecycle-actions.md`
+from accepted baseline `636eb86`. Do not increase progress until exact-head CI
+and CTO acceptance pass. Quarantine release, reservation creation, returns,
+recall, analytics policy, patient exposure, and Gates 2 and 4–9 remain blocked
+until their recorded prerequisites are satisfied.
 
 Cline may receive only a complete, bounded prompt for characterization tests or
 mechanical work whose contract is already fixed by ADR-005. Cline must not

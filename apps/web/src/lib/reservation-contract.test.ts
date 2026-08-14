@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { validReservationPage } from '@/test/reservation-fixtures';
-import { isProviderReservationPage } from './reservation-contract';
+import {
+  isProviderReservationPage,
+  isReservationTransitionRequest,
+  isReservationTransitionResponse,
+} from './reservation-contract';
 
 describe('reservation boundary contract', () => {
   it('accepts an exact internally consistent reservation page', () => {
@@ -43,5 +47,21 @@ describe('reservation boundary contract', () => {
       }),
     ).toBe(false);
     expect(isProviderReservationPage({ ...validReservationPage, total: 0 })).toBe(false);
+  });
+
+  it('accepts only exact lifecycle commands and receipts', () => {
+    const request = { transition: 'READY', expectedVersion: 2, idempotencyKey: 'ready-1' };
+    const receipt = {
+      reservationId: validReservationPage.data[0].id,
+      status: 'READY',
+      version: 3,
+      totalQuantity: 2,
+      replayed: false,
+    };
+    expect(isReservationTransitionRequest(request)).toBe(true);
+    expect(isReservationTransitionRequest({ ...request, transition: 'EXPIRE' })).toBe(false);
+    expect(isReservationTransitionRequest({ ...request, tenantId: 'leak' })).toBe(false);
+    expect(isReservationTransitionResponse(receipt)).toBe(true);
+    expect(isReservationTransitionResponse({ ...receipt, subjectUserId: 'leak' })).toBe(false);
   });
 });
