@@ -2,22 +2,22 @@
 
 **Status date:** 2026-08-14
 
-**Accepted source commit:** `7feacbb6b98addde021fef5ff2afb446fd870e2d`
+**Accepted source commit:** `bc26e2ad612d8a63be5f412928ba923e14b4e5a4`
 
 **Accepted stabilization baseline:** `4ea55a17e188410ddee45fa3ea6c016e22d6617a`
 
-**Current sprint:** G3.15 implementation — live completed inventory transfer
+**Current sprint:** Next dependency-ready sprint selection
 
 **Release state:** Not approved for production or real healthcare data
 
-**Full-roadmap engineering estimate:** 39% complete / 61% remaining
+**Full-roadmap engineering estimate:** 40% complete / 60% remaining
 
-## Current sprint
+## Most recent accepted sprint
 
 ### G3.15 — Live Completed Inventory Transfer
 
-**Status:** Implemented locally; exact-head CI and CTO acceptance required.
-Overall V1 progress remains 39% until both gates pass.
+**Status:** Accepted and squash-merged in PR #44 as `bc26e2a` after exact-head
+CI run `31764479220` passed all required gates.
 
 **Selection reason:** G3.8 accepted an atomic completed physical transfer, while
 the live stock workspace exposes the required source batch version and assigned
@@ -33,9 +33,9 @@ audit remain authoritative. No shipment, transit, approval, reversal, patient,
 supplier, payment, or delivery behavior is added.
 
 **Implementation authority:** ADR-001 through ADR-012, accepted source
-`7feacbb`, and `docs/sprints/G3.15-live-completed-inventory-transfer.md`.
+`bc26e2a`, and `docs/sprints/G3.15-live-completed-inventory-transfer.md`.
 
-## Most recent accepted sprint
+## Earlier accepted sprint
 
 ### G3.14 — Live Reservation Lifecycle Actions
 
@@ -189,14 +189,16 @@ and [the Gates 1–20 verification](docs/audits/2026-08-01-gates-1-20-verificati
     #42 as `636eb86` after exact-head CI run `31763244493`
 22. **G3.14 live reservation lifecycle actions** — accepted and squash-merged
     in PR #43 as `7feacbb` after exact-head CI run `31763879935`
-23. Resume remaining Inventory and Compliance milestones in dependency order
+23. **G3.15 live completed inventory transfer** — accepted and squash-merged in
+    PR #44 as `bc26e2a` after exact-head CI run `31764479220`
+24. Resume remaining Inventory and Compliance milestones in dependency order
 
 Only one recovery sprint may be active at a time. Exact boundaries may be refined through an ADR, but dependencies must not be skipped.
 
 ## Progress reporting rule
 
 Progress is measured by accepted milestone criteria, not by the number of files
-or endpoints present. The README's 39% full-roadmap estimate and 32% frontend
+or endpoints present. The README's 40% full-roadmap estimate and 32% frontend
 estimate are planning indicators, not acceptance or release claims. They may
 change only when repository evidence and milestone acceptance change. Preview
 screens, placeholder services, unmounted routes, and schema-only foundations do
