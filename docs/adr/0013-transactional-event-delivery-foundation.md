@@ -1,6 +1,6 @@
 # ADR-013: Transactional Event Delivery Foundation
 
-**Status:** Proposed
+**Status:** Accepted
 
 **Date:** 2026-08-14
 

@@ -62,8 +62,8 @@ Ordered sprints:
     as `8e5db0b` after exact-head CI run `31769276564`
 27. G3.20 Bounded quarantine investigation evidence — accepted and squash-merged
     in PR #50 as `bed136e` after exact-head CI run `31769816895`
-28. G3.21 Transactional event delivery foundation — implementation candidate;
-    exact-head PostgreSQL CI and CTO acceptance required
+28. G3.21 Transactional event delivery foundation — accepted and squash-merged
+    in PR #52 as `af48522` after exact-head CI run `31786107840`
 
 **Completion gate:** Accepted ADRs; protected review flow; clean migrations; deny-by-default authentication; tenant-isolation tests; integrated audit trail; atomic stock/reservation behavior; mandatory lint/test/build passing.
 
