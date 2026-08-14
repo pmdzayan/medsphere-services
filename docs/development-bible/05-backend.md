@@ -1,10 +1,10 @@
 # Volume 05 — Backend Bible: Identity, Authorization, Audit, and Inventory
 
-**Sprints:** Accepted through G3.21; G3.22 inventory event producers candidate
+**Sprints:** Accepted through G3.22; G3.23 notification delivery foundation candidate
 
-**Decisions:** ADR-003 through ADR-013; proposed ADR-014
+**Decisions:** ADR-003 through ADR-014; proposed ADR-015
 
-**Status:** G3.21 accepted; G3.22 exact-head CI and CTO acceptance required; not production-approved
+**Status:** G3.22 accepted; G3.23 exact-head CI and CTO acceptance required; not production-approved
 
 ## Purpose and boundary
 
@@ -101,6 +101,19 @@ PostgreSQL CI and review pass.
 - `InventoryQuarantineService`: assigned-provider, serializable one-way batch
   quarantine with authorization-before-replay, shared reservation release,
   immutable evidence, and atomic tenant-user/system audit.
+- `NotificationQueueService`: provider-neutral enqueue seam backed by the
+  tenant-scoped, idempotent delivery queue.
+- `NotificationWorkerService`: bounded leased claims, transient recipient
+  resolution, provider-adapter dispatch outside transactions, coded
+  retry/dead-letter outcomes, immutable attempt evidence, and safe observation.
+- `NotificationOperationsService`: trusted-operator, tenant-scoped,
+  metadata-only operational reads that omit recipients, variables, leases, and
+  provider content.
+
+The G3.23 module mounts no controller and starts no automatic worker. Its
+default recipient resolver and provider registry fail closed. A later accepted
+workflow must supply approved routing and provider bindings before any delivery
+can occur.
 
 Repositories own persistence queries; controllers do not access Prisma. Services own orchestration and security state transitions. DTOs own transport validation and normalization. The access identity is readonly and contains `userId`, `membershipId`, `tenantId`, `sessionId`, and the verified token ID.
 

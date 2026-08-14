@@ -2,10 +2,10 @@
 
 **Last updated:** 2026-08-14
 
-**Current sprint:** Next sprint selection pending after G3.22 acceptance
+**Current sprint:** G3.23 notification delivery foundation — candidate
 
-**Next feature work:** Select the dedicated Notification Delivery Foundation batch
-from accepted source `3e7a8c0`
+**Next feature work:** Complete the bounded five-unit G3.23 candidate from
+repository baseline `9925df9`
 
 ## Mandatory startup sequence
 
@@ -190,12 +190,13 @@ If ownership transfers, resume at the first pending checkpoint. Do not use
 
 ## Exact continuation point
 
-Select the dedicated Notification Delivery Foundation batch from accepted source
-`3e7a8c0`. Keep its provider-neutral contract, tenant-safe recipient/routing
-boundary, delivery worker and adapter abstraction, retry/dead-letter evidence,
-and operational security/observability boundary together. Do not mix Maps,
-FHIR, ABDM, quarantine release, public/patient reservation creation, returns,
-recall, or patient exposure into that batch.
+Complete G3.23 from repository baseline `9925df9` under proposed ADR-015. Keep
+its provider-neutral contract, opaque tenant-safe recipient/routing boundary,
+delivery worker and adapter abstraction, retry/dead-letter evidence, and
+operational security/observability boundary together. Do not add a real
+provider, contact lookup, live notification workflow, Maps, FHIR, ABDM,
+quarantine release, public/patient reservation creation, returns, recall, or
+patient exposure.
 
 Cline may receive only a complete, bounded prompt for characterization tests or
 mechanical work whose contract is already fixed by ADR-005. Cline must not

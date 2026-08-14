@@ -1,6 +1,6 @@
 # Volume 04 — Database Bible
 
-**Baseline:** Accepted through G3.20; G3.21 event-delivery persistence candidate
+**Baseline:** Accepted through G3.22; G3.23 notification-delivery persistence candidate
 
 **Engine:** PostgreSQL 16
 
@@ -12,7 +12,7 @@
 
 ## Acceptance boundary
 
-This volume documents the accepted database through G3.16. S0.5 established
+This volume documents the accepted database through G3.22. S0.5 established
 tenant-scoped batch quantity authority, an append-only
 stock ledger, typed medicine reservations, deterministic FEFO allocations, and
 idempotent command receipts. G3.1 added composite membership-provider access.
@@ -20,8 +20,11 @@ G3.2 added migration-owned permissions and constrained command hashes for the
 first accepted stock mutations. Later accepted sprints added reservation
 lifecycle, transfer, damage, physical-expiry, and quarantine evidence. G3.16
 adds a dedicated migration-owned staff-creation permission while reusing the
-accepted reservation tables and invariants. Consent, privacy, retention, and remaining
-product domains continue through dependency-ordered sprints.
+accepted reservation tables and invariants. G3.21 added the transactional
+outbox and inbox receipt, and G3.22 added atomic inventory producers without a
+schema change. G3.23 proposes a separate provider-neutral notification-delivery
+queue and append-only attempt evidence. Consent, privacy, retention, and
+remaining product domains continue through dependency-ordered sprints.
 
 No production or real healthcare data is approved.
 
@@ -44,6 +47,8 @@ No production or real healthcare data is approved.
 |    13 | `20260810180000_physical_batch_expiry_reconciliation`            | Physical expiry evidence and system audit                              |
 |    14 | `20260810200000_one_way_manual_batch_quarantine`                 | Terminal quarantine evidence, permission, and audit                    |
 |    15 | `20260814120000_staff_reservation_creation`                      | Assigned-provider staff reservation creation permission                |
+|    16 | `20260814180000_transactional_event_delivery_foundation`         | Tenant outbox, leased relay state, and inbox deduplication             |
+|    17 | `20260814220000_notification_delivery_foundation`                | Opaque-recipient notification queue and append-only attempt evidence   |
 
 Migration history is append-only under ADR-002. Applied migrations are never edited or deleted. Shared databases use `prisma migrate deploy`; `prisma db push` is prohibited.
 
@@ -61,25 +66,30 @@ pnpm db:verify
 
 ## Enum catalogue
 
-| Enum                    | Values                                                                                                                                           |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `UserStatus`            | `ACTIVE`, `INACTIVE`, `SUSPENDED`, `PENDING_VERIFICATION`                                                                                        |
-| `SessionStatus`         | `ACTIVE`, `ROTATED`, `EXPIRED`, `REVOKED`, `COMPROMISED`                                                                                         |
-| `MembershipStatus`      | `PENDING`, `ACTIVE`, `SUSPENDED`, `REVOKED`                                                                                                      |
-| `AuditActorType`        | `TENANT_USER`, `PLATFORM_USER`, `SYSTEM`                                                                                                         |
-| `AuditScope`            | `TENANT`, `PLATFORM`                                                                                                                             |
-| `AuditOutcome`          | `SUCCEEDED`, `DENIED`, `FAILED`                                                                                                                  |
-| `ProviderType`          | `PHARMACY`, `HOSPITAL`                                                                                                                           |
-| `VerificationStatus`    | `PENDING`, `UNDER_REVIEW`, `APPROVED`, `REJECTED`, `SUSPENDED`, `EXPIRED`                                                                        |
-| `ProductCategory`       | `MEDICINE`, `OTC`, `COSMETIC`, `AYURVEDIC`, `SUPPLEMENT`, `BABY_CARE`, `PERSONAL_CARE`, `MEDICAL_DEVICE`                                         |
-| `DosageForm`            | `TABLET`, `SYRUP`, `INJECTION`, `CREAM`, `OINTMENT`, `CAPSULE`, `DROPS`, `INHALER`, `SPRAY`, `LOTION`, `GEL`, `POWDER`, `SOLUTION`, `SUSPENSION` |
-| `RoleType`              | `SYSTEM`, `TENANT`                                                                                                                               |
-| `BatchStatus`           | `ACTIVE`, `EXPIRED`, `EXHAUSTED`, `QUARANTINED`                                                                                                  |
-| `BatchQuarantineReason` | `QUALITY_SUSPECT`, `TEMPERATURE_EXCURSION`, `PACKAGING_COMPROMISED`, `STORAGE_DEVIATION`                                                         |
-| `StockMovementType`     | `STOCK_IN`, `STOCK_OUT`, `ADJUSTMENT`, `TRANSFER_IN`, `TRANSFER_OUT`, `RETURN`, `RETURN_IN`, `RETURN_OUT`, `EXPIRED`, `DAMAGED`                  |
-| `MedicalRecordType`     | `PRESCRIPTION`, `LAB_REPORT`, `XRAY`, `MRI`, `CT_SCAN`, `VACCINATION`, `DISCHARGE_SUMMARY`, `INSURANCE`, `OTHER`                                 |
-| `ReservationType`       | `MEDICINE_PICKUP`, `HOSPITAL_APPOINTMENT`, `LAB_TEST`, `VACCINATION`                                                                             |
-| `ReservationStatus`     | `PENDING`, `CONFIRMED`, `READY`, `COMPLETED`, `CANCELLED`, `EXPIRED`                                                                             |
+| Enum                         | Values                                                                                                                                           |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `UserStatus`                 | `ACTIVE`, `INACTIVE`, `SUSPENDED`, `PENDING_VERIFICATION`                                                                                        |
+| `SessionStatus`              | `ACTIVE`, `ROTATED`, `EXPIRED`, `REVOKED`, `COMPROMISED`                                                                                         |
+| `MembershipStatus`           | `PENDING`, `ACTIVE`, `SUSPENDED`, `REVOKED`                                                                                                      |
+| `AuditActorType`             | `TENANT_USER`, `PLATFORM_USER`, `SYSTEM`                                                                                                         |
+| `AuditScope`                 | `TENANT`, `PLATFORM`                                                                                                                             |
+| `AuditOutcome`               | `SUCCEEDED`, `DENIED`, `FAILED`                                                                                                                  |
+| `ProviderType`               | `PHARMACY`, `HOSPITAL`                                                                                                                           |
+| `VerificationStatus`         | `PENDING`, `UNDER_REVIEW`, `APPROVED`, `REJECTED`, `SUSPENDED`, `EXPIRED`                                                                        |
+| `ProductCategory`            | `MEDICINE`, `OTC`, `COSMETIC`, `AYURVEDIC`, `SUPPLEMENT`, `BABY_CARE`, `PERSONAL_CARE`, `MEDICAL_DEVICE`                                         |
+| `DosageForm`                 | `TABLET`, `SYRUP`, `INJECTION`, `CREAM`, `OINTMENT`, `CAPSULE`, `DROPS`, `INHALER`, `SPRAY`, `LOTION`, `GEL`, `POWDER`, `SOLUTION`, `SUSPENSION` |
+| `RoleType`                   | `SYSTEM`, `TENANT`                                                                                                                               |
+| `BatchStatus`                | `ACTIVE`, `EXPIRED`, `EXHAUSTED`, `QUARANTINED`                                                                                                  |
+| `BatchQuarantineReason`      | `QUALITY_SUSPECT`, `TEMPERATURE_EXCURSION`, `PACKAGING_COMPROMISED`, `STORAGE_DEVIATION`                                                         |
+| `StockMovementType`          | `STOCK_IN`, `STOCK_OUT`, `ADJUSTMENT`, `TRANSFER_IN`, `TRANSFER_OUT`, `RETURN`, `RETURN_IN`, `RETURN_OUT`, `EXPIRED`, `DAMAGED`                  |
+| `MedicalRecordType`          | `PRESCRIPTION`, `LAB_REPORT`, `XRAY`, `MRI`, `CT_SCAN`, `VACCINATION`, `DISCHARGE_SUMMARY`, `INSURANCE`, `OTHER`                                 |
+| `ReservationType`            | `MEDICINE_PICKUP`, `HOSPITAL_APPOINTMENT`, `LAB_TEST`, `VACCINATION`                                                                             |
+| `ReservationStatus`          | `PENDING`, `CONFIRMED`, `READY`, `COMPLETED`, `CANCELLED`, `EXPIRED`                                                                             |
+| `OutboxEventStatus`          | `PENDING`, `PROCESSING`, `FAILED`, `DELIVERED`, `DEAD_LETTER`                                                                                    |
+| `NotificationChannel`        | `EMAIL`, `SMS`, `WHATSAPP`, `PUSH`                                                                                                               |
+| `NotificationRecipientType`  | `TENANT_MEMBERSHIP`, `TENANT_OPERATIONAL_ROUTE`                                                                                                  |
+| `NotificationDeliveryStatus` | `PENDING`, `PROCESSING`, `FAILED`, `DELIVERED`, `DEAD_LETTER`                                                                                    |
+| `NotificationAttemptOutcome` | `DELIVERED`, `FAILED`, `DEAD_LETTER`                                                                                                             |
 
 ## Provisional model ownership
 
@@ -93,6 +103,21 @@ pnpm db:verify
 | Audit and Policy           | `AuditEvent`                                                       | S0.4 accepted with PostgreSQL integration evidence |
 | Patient Records            | `MedicalRecord`                                                    | Blocked by authentication, consent, and privacy    |
 | Reservation and Fulfilment | `Reservation`                                                      | S0.5 replacement active under ADR-005              |
+| Event Delivery             | `OutboxEvent`, `EventInboxReceipt`                                 | G3.21 accepted under ADR-013                       |
+| Notification Delivery      | `NotificationDelivery`, `NotificationDeliveryAttempt`              | G3.23 candidate under proposed ADR-015             |
+
+### G3.23 notification-delivery candidate
+
+`NotificationDelivery` stores one tenant-scoped, idempotent delivery intent
+for an accepted source event, workflow, opaque recipient reference, and channel.
+Its template variables are bounded and privacy-validated. Plaintext contact
+destinations and rendered bodies are not persisted. Workers coordinate through
+bounded leases and a constrained retry/dead-letter state machine.
+
+`NotificationDeliveryAttempt` is append-only evidence for one claimed attempt.
+It stores only the attempt number, coded outcome, provider key, optional hashed
+provider reference, and occurrence time. Raw provider errors, provider payloads,
+credentials, destinations, variables, and message bodies are prohibited.
 
 Ownership is provisional until bounded-context and persistence-boundary work is accepted. Existing service folders do not establish ownership.
 
