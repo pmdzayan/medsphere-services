@@ -752,8 +752,7 @@ model StockMovement {
 
   actorType         AuditActorType
   actorMembershipId String?           @db.Uuid
-  actorUserId       String?           @db.Uuid
-  actorMembership   TenantMembership? @relation(fields: [actorMembershipId, actorUserId, tenantId], references: [id, userId, tenantId], onDelete: Restrict)
+  actorMembership   TenantMembership? @relation(fields: [actorMembershipId, tenantId], references: [id, tenantId], onDelete: Restrict)
 
   occurredAt DateTime @default(now())
   createdAt  DateTime @default(now())
@@ -846,7 +845,8 @@ model OutboxEvent {
   aggregateId       String            @db.VarChar(120)
   actorType         AuditActorType
   actorMembershipId String?           @db.Uuid
-  actorMembership   TenantMembership? @relation(fields: [actorMembershipId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  actorUserId       String?           @db.Uuid
+  actorMembership   TenantMembership? @relation(fields: [actorMembershipId, actorUserId, tenantId], references: [id, userId, tenantId], onDelete: Restrict)
   systemService     String?           @db.VarChar(80)
   correlationId     String?           @db.VarChar(120)
   causationId       String?           @db.VarChar(120)
