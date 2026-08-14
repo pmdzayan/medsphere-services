@@ -40,12 +40,12 @@ const providers: ProviderAccess[] = [
 ];
 
 const stockPage: InventoryStockPage = {
-  ...(structuredClone(validStockPage) as InventoryStockPage),
+  ...(structuredClone(validStockPage) as unknown as InventoryStockPage),
   total: 27,
   limit: 10,
 };
 const reservationPage: ProviderReservationPage = {
-  ...(structuredClone(validReservationPage) as ProviderReservationPage),
+  ...(structuredClone(validReservationPage) as unknown as ProviderReservationPage),
   total: 19,
   limit: 10,
 };

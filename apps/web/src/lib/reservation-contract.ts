@@ -28,6 +28,27 @@ export interface ReservationTransitionResponse {
   replayed: boolean;
 }
 
+export interface ReservationCreationItemRequest {
+  productId: string;
+  quantity: number;
+}
+
+export interface ReservationCreationRequest {
+  subjectUserId: string;
+  expiresAt: string;
+  items: ReservationCreationItemRequest[];
+  idempotencyKey: string;
+}
+
+export interface ReservationCreationResponse {
+  reservationId: string;
+  status: 'PENDING';
+  version: number;
+  itemCount: number;
+  totalQuantity: number;
+  replayed: boolean;
+}
+
 export interface ReservationAllocation {
   batchId: string;
   batchNumber: string;
@@ -121,6 +142,56 @@ export function isReservationTransitionResponse(
   );
 }
 
+export function isReservationCreationRequest(value: unknown): value is ReservationCreationRequest {
+  if (!hasExactKeys(value, ['subjectUserId', 'expiresAt', 'items', 'idempotencyKey'])) {
+    return false;
+  }
+  const request = value as Partial<ReservationCreationRequest>;
+  if (
+    !isCanonicalUuid(request.subjectUserId) ||
+    !isIsoDateTime(request.expiresAt) ||
+    !Array.isArray(request.items) ||
+    request.items.length < 1 ||
+    request.items.length > 20 ||
+    !request.items.every(isReservationCreationItem) ||
+    !isTrimmedBoundedString(request.idempotencyKey, 8, 120)
+  ) {
+    return false;
+  }
+  return new Set(request.items.map(({ productId }) => productId)).size === request.items.length;
+}
+
+export function isReservationCreationResponse(
+  value: unknown,
+  request?: ReservationCreationRequest,
+): value is ReservationCreationResponse {
+  if (
+    !hasExactKeys(value, [
+      'reservationId',
+      'status',
+      'version',
+      'itemCount',
+      'totalQuantity',
+      'replayed',
+    ])
+  ) {
+    return false;
+  }
+  const receipt = value as Partial<ReservationCreationResponse>;
+  const valid =
+    isCanonicalUuid(receipt.reservationId) &&
+    receipt.status === 'PENDING' &&
+    isIntegerBetween(receipt.version, 1, 2_147_483_647) &&
+    isIntegerBetween(receipt.itemCount, 1, 20) &&
+    isIntegerBetween(receipt.totalQuantity, 1, 2_147_483_647) &&
+    typeof receipt.replayed === 'boolean';
+  if (!valid || !request) return valid;
+  return (
+    receipt.itemCount === request.items.length &&
+    receipt.totalQuantity === sum(request.items, 'quantity')
+  );
+}
+
 function isProviderReservation(value: unknown): value is ProviderReservation {
   if (
     !hasExactKeys(value, [
@@ -181,6 +252,12 @@ function isReservationAllocation(value: unknown): value is ReservationAllocation
   );
 }
 
+function isReservationCreationItem(value: unknown): value is ReservationCreationItemRequest {
+  if (!hasExactKeys(value, ['productId', 'quantity'])) return false;
+  const item = value as Partial<ReservationCreationItemRequest>;
+  return isCanonicalUuid(item.productId) && isIntegerBetween(item.quantity, 1, 2_147_483_647);
+}
+
 function hasExactKeys(value: unknown, keys: readonly string[]): value is Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
   const actual = Object.keys(value).sort();
@@ -194,6 +271,19 @@ function isIntegerBetween(value: unknown, min: number, max: number): value is nu
 
 function isBoundedString(value: unknown, maxLength: number): value is string {
   return typeof value === 'string' && value.trim().length > 0 && value.length <= maxLength;
+}
+
+function isTrimmedBoundedString(
+  value: unknown,
+  minLength: number,
+  maxLength: number,
+): value is string {
+  return (
+    typeof value === 'string' &&
+    value === value.trim() &&
+    value.length >= minLength &&
+    value.length <= maxLength
+  );
 }
 
 function isIsoDateTime(value: unknown): value is string {

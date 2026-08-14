@@ -5,15 +5,22 @@ import { MetricCard, SectionCard, StatusBadge } from '@/components/platform/dash
 import { Icon } from '@/components/platform/icon';
 import {
   ApiError,
+  createProviderReservation,
   getAssignedProviders,
   getProviderReservations,
+  getProviderStock,
   transitionProviderReservation,
 } from '@/lib/api-client';
-import type { ProviderAccess } from '@/lib/inventory-contract';
+import {
+  isCanonicalUuid,
+  type InventoryStockItem,
+  type ProviderAccess,
+} from '@/lib/inventory-contract';
 import {
   RESERVATION_STATUSES,
   type ProviderReservation,
   type ProviderReservationPage,
+  type ReservationCreationResponse,
   type ReservationStatus,
   type ReservationTransition,
   type ReservationTransitionResponse,
@@ -35,6 +42,14 @@ interface TransitionTarget {
   idempotencyKey: string;
 }
 
+interface CreationDraft {
+  subjectUserId: string;
+  productId: string;
+  quantity: string;
+  expiresAt: string;
+  idempotencyKey: string;
+}
+
 export function ReservationWorkspace() {
   const [providers, setProviders] = useState<ProviderAccess[]>([]);
   const [providerId, setProviderId] = useState('');
@@ -50,6 +65,12 @@ export function ReservationWorkspace() {
   const [transitionReceipt, setTransitionReceipt] = useState<ReservationTransitionResponse | null>(
     null,
   );
+  const [creationDraft, setCreationDraft] = useState<CreationDraft | null>(null);
+  const [creationStock, setCreationStock] = useState<InventoryStockItem[]>([]);
+  const [creationLoading, setCreationLoading] = useState(false);
+  const [creationSubmitting, setCreationSubmitting] = useState(false);
+  const [creationError, setCreationError] = useState<string | null>(null);
+  const [creationReceipt, setCreationReceipt] = useState<ReservationCreationResponse | null>(null);
   const [error, setError] = useState<{ message: string; status?: number } | null>(null);
 
   const loadProviders = useCallback(async () => {
@@ -115,6 +136,74 @@ export function ReservationWorkspace() {
     setTransitionError(null);
   }
 
+  async function openCreation() {
+    if (!providerId || creationLoading) return;
+    setCreationLoading(true);
+    setCreationError(null);
+    try {
+      const stock = await getProviderStock({ providerId, limit: 100, offset: 0 });
+      const eligible = stock.data.filter(
+        (item) => item.isVisible && item.totalAvailableQuantity > 0,
+      );
+      setCreationStock(eligible);
+      setCreationDraft({
+        subjectUserId: '',
+        productId: eligible[0]?.productId ?? '',
+        quantity: '1',
+        expiresAt: defaultExpiryValue(),
+        idempotencyKey: `reservation-create-${crypto.randomUUID()}`,
+      });
+    } catch (loadError) {
+      setCreationError(publicError(loadError, 'Unable to load eligible stock.').message);
+    } finally {
+      setCreationLoading(false);
+    }
+  }
+
+  async function submitCreation(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!creationDraft || !providerId || creationSubmitting) return;
+    const selectedStock = creationStock.find(
+      ({ productId }) => productId === creationDraft.productId,
+    );
+    const quantity = Number(creationDraft.quantity);
+    const expiry = new Date(creationDraft.expiresAt);
+    if (!isCanonicalUuid(creationDraft.subjectUserId.trim())) {
+      setCreationError('Enter a valid active tenant user identifier.');
+      return;
+    }
+    if (
+      !selectedStock ||
+      !Number.isSafeInteger(quantity) ||
+      quantity < 1 ||
+      quantity > selectedStock.totalAvailableQuantity
+    ) {
+      setCreationError('Quantity must fit the currently visible available stock.');
+      return;
+    }
+    if (Number.isNaN(expiry.getTime()) || expiry.getTime() <= Date.now()) {
+      setCreationError('Choose a reservation expiry in the future.');
+      return;
+    }
+    setCreationSubmitting(true);
+    setCreationError(null);
+    try {
+      const receipt = await createProviderReservation(providerId, {
+        subjectUserId: creationDraft.subjectUserId.trim(),
+        expiresAt: expiry.toISOString(),
+        items: [{ productId: selectedStock.productId, quantity }],
+        idempotencyKey: creationDraft.idempotencyKey,
+      });
+      setCreationReceipt(receipt);
+      setCreationDraft(null);
+      await loadReservations(providerId, status, offset);
+    } catch (mutationError) {
+      setCreationError(publicError(mutationError, 'Unable to create reservation.').message);
+    } finally {
+      setCreationSubmitting(false);
+    }
+  }
+
   async function submitTransition(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!transitionTarget || !providerId || transitionSubmitting) return;
@@ -162,19 +251,29 @@ export function ReservationWorkspace() {
             Reservation workspace
           </h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-[#71817c]">
-            Read-only operational records. This view contains no patient, prescription, payment, or
-            delivery identity.
+            Operational records and bounded staff actions. This view contains no patient,
+            prescription, payment, or delivery identity.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => providerId && void loadReservations(providerId, status, offset)}
-          disabled={!providerId || loading}
-          className="inline-flex w-fit items-center gap-2 rounded-xl border border-[#d8e2de] bg-white px-4 py-2.5 text-sm font-bold text-[#436158] disabled:opacity-50"
-        >
-          <Icon name="refresh" className={`size-4 ${loading ? 'animate-spin' : ''}`} /> Refresh
-          reservations
-        </button>
+        <div className="flex flex-wrap gap-3">
+          <button
+            type="button"
+            onClick={() => void openCreation()}
+            disabled={!providerId || creationLoading}
+            className="inline-flex w-fit items-center gap-2 rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50"
+          >
+            {creationLoading ? 'Loading stock…' : 'New reservation'}
+          </button>
+          <button
+            type="button"
+            onClick={() => providerId && void loadReservations(providerId, status, offset)}
+            disabled={!providerId || loading}
+            className="inline-flex w-fit items-center gap-2 rounded-xl border border-[#d8e2de] bg-white px-4 py-2.5 text-sm font-bold text-[#436158] disabled:opacity-50"
+          >
+            <Icon name="refresh" className={`size-4 ${loading ? 'animate-spin' : ''}`} /> Refresh
+            reservations
+          </button>
+        </div>
       </header>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -220,6 +319,9 @@ export function ReservationWorkspace() {
               onChange={(event) => {
                 setProviderId(event.target.value);
                 setOffset(0);
+                setCreationDraft(null);
+                setCreationStock([]);
+                setCreationError(null);
               }}
               className="h-11 w-full rounded-xl border border-[#dce5e1] bg-white px-3 text-sm font-semibold text-[#38544b] disabled:opacity-60"
             >
@@ -319,6 +421,144 @@ export function ReservationWorkspace() {
           Reservation is now {titleCase(transitionReceipt.status)} at version{' '}
           {transitionReceipt.version}. {transitionReceipt.totalQuantity} unit(s) were processed by
           the accepted lifecycle command.
+        </div>
+      ) : null}
+      {creationReceipt ? (
+        <div
+          role="status"
+          className="rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm text-emerald-900"
+        >
+          Reservation {shortId(creationReceipt.reservationId)} is Pending with{' '}
+          {creationReceipt.totalQuantity} held unit(s). The provider list was refreshed from the
+          authoritative service.
+        </div>
+      ) : null}
+      {creationError && !creationDraft ? (
+        <p role="alert" className="rounded-xl bg-rose-50 px-4 py-3 text-sm text-rose-800">
+          {creationError}
+        </p>
+      ) : null}
+      {creationDraft ? (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="creation-title"
+          className="fixed inset-0 z-50 grid place-items-center bg-[#0d211a]/55 p-4"
+        >
+          <form
+            noValidate
+            onSubmit={(event) => void submitCreation(event)}
+            className="w-full max-w-xl rounded-3xl bg-white p-6 shadow-2xl"
+          >
+            <p className="text-xs font-extrabold uppercase tracking-[.16em] text-emerald-700">
+              Atomic FEFO hold
+            </p>
+            <h2
+              id="creation-title"
+              className="mt-2 font-[var(--font-display)] text-2xl font-bold text-[#17352a]"
+            >
+              Create staff reservation
+            </h2>
+            <p className="mt-2 text-sm leading-6 text-[#647870]">
+              Enter only the active tenant user UUID. No name, contact, prescription, clinical,
+              payment, or delivery data is collected here.
+            </p>
+            <div className="mt-5 grid gap-4 sm:grid-cols-2">
+              <label className="sm:col-span-2">
+                <span className="mb-1.5 block text-xs font-bold text-[#536a62]">
+                  Tenant user ID
+                </span>
+                <input
+                  aria-label="Tenant user ID"
+                  value={creationDraft.subjectUserId}
+                  onChange={(event) =>
+                    setCreationDraft(
+                      (current) => current && { ...current, subjectUserId: event.target.value },
+                    )
+                  }
+                  className="h-11 w-full rounded-xl border border-[#dce5e1] px-3 font-mono text-sm"
+                />
+              </label>
+              <label>
+                <span className="mb-1.5 block text-xs font-bold text-[#536a62]">Medicine</span>
+                <select
+                  aria-label="Reservation medicine"
+                  value={creationDraft.productId}
+                  onChange={(event) =>
+                    setCreationDraft(
+                      (current) =>
+                        current && { ...current, productId: event.target.value, quantity: '1' },
+                    )
+                  }
+                  className="h-11 w-full rounded-xl border border-[#dce5e1] bg-white px-3 text-sm"
+                >
+                  {creationStock.length === 0 ? <option value="">No eligible stock</option> : null}
+                  {creationStock.map((item) => (
+                    <option key={item.productId} value={item.productId}>
+                      {item.name} · {item.totalAvailableQuantity} available
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                <span className="mb-1.5 block text-xs font-bold text-[#536a62]">Quantity</span>
+                <input
+                  aria-label="Reservation quantity"
+                  inputMode="numeric"
+                  value={creationDraft.quantity}
+                  onChange={(event) =>
+                    setCreationDraft(
+                      (current) => current && { ...current, quantity: event.target.value },
+                    )
+                  }
+                  className="h-11 w-full rounded-xl border border-[#dce5e1] px-3 text-sm"
+                />
+              </label>
+              <label className="sm:col-span-2">
+                <span className="mb-1.5 block text-xs font-bold text-[#536a62]">Expires at</span>
+                <input
+                  aria-label="Reservation expiry"
+                  type="datetime-local"
+                  value={creationDraft.expiresAt}
+                  onChange={(event) =>
+                    setCreationDraft(
+                      (current) => current && { ...current, expiresAt: event.target.value },
+                    )
+                  }
+                  className="h-11 w-full rounded-xl border border-[#dce5e1] px-3 text-sm"
+                />
+              </label>
+            </div>
+            {creationError ? (
+              <p
+                role="alert"
+                className="mt-4 rounded-xl bg-rose-50 px-3 py-2 text-sm text-rose-800"
+              >
+                {creationError}
+              </p>
+            ) : null}
+            <p className="mt-4 text-xs leading-5 text-[#758780]">
+              The backend rechecks assignment, permission, tenant membership, expiry, stock, FEFO
+              order, concurrency, and idempotency before committing any hold.
+            </p>
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                disabled={creationSubmitting}
+                onClick={() => setCreationDraft(null)}
+                className="rounded-xl border border-[#dce5e1] px-4 py-2.5 text-sm font-bold text-[#536a62] disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={creationSubmitting || creationStock.length === 0}
+                className="rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-bold text-white disabled:cursor-wait disabled:opacity-50"
+              >
+                {creationSubmitting ? 'Creating…' : 'Confirm reservation'}
+              </button>
+            </div>
+          </form>
         </div>
       ) : null}
       {transitionTarget ? (
@@ -639,6 +879,13 @@ function formatDate(value: string) {
     timeStyle: 'short',
     timeZone: 'UTC',
   }).format(new Date(value));
+}
+
+function defaultExpiryValue(): string {
+  const date = new Date(Date.now() + 60 * 60 * 1000);
+  date.setSeconds(0, 0);
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
+  return local.toISOString().slice(0, 16);
 }
 
 function transitionsFor(status: ReservationStatus): ReservationTransition[] {

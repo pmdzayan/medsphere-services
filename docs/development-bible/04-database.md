@@ -1,7 +1,6 @@
 # Volume 04 — Database Bible
 
-**Baseline:** Accepted through G3.15; G3.16 implemented pending exact-head CI
-and CTO acceptance
+**Baseline:** Accepted through G3.16
 
 **Engine:** PostgreSQL 16
 
@@ -13,8 +12,8 @@ and CTO acceptance
 
 ## Acceptance boundary
 
-This volume documents the accepted database through G3.15 and the implemented
-G3.16 staff-reservation candidate. S0.5 established tenant-scoped batch quantity authority, an append-only
+This volume documents the accepted database through G3.16. S0.5 established
+tenant-scoped batch quantity authority, an append-only
 stock ledger, typed medicine reservations, deterministic FEFO allocations, and
 idempotent command receipts. G3.1 added composite membership-provider access.
 G3.2 added migration-owned permissions and constrained command hashes for the
