@@ -157,6 +157,32 @@ enum OutboxEventStatus {
   DEAD_LETTER
 }
 
+enum NotificationChannel {
+  EMAIL
+  SMS
+  WHATSAPP
+  PUSH
+}
+
+enum NotificationRecipientType {
+  TENANT_MEMBERSHIP
+  TENANT_OPERATIONAL_ROUTE
+}
+
+enum NotificationDeliveryStatus {
+  PENDING
+  PROCESSING
+  FAILED
+  DELIVERED
+  DEAD_LETTER
+}
+
+enum NotificationAttemptOutcome {
+  DELIVERED
+  FAILED
+  DEAD_LETTER
+}
+
 model Tenant {
   id String @id @default(uuid()) @db.Uuid
 
@@ -193,6 +219,8 @@ model Tenant {
   batchQuarantineRecords         BatchQuarantineRecord[]
   outboxEvents                   OutboxEvent[]
   eventInboxReceipts             EventInboxReceipt[]
+  notificationDeliveries         NotificationDelivery[]
+  notificationDeliveryAttempts   NotificationDeliveryAttempt[]
 
   @@index([slug])
 }
@@ -862,7 +890,8 @@ model OutboxEvent {
   lastErrorCode     String?           @db.VarChar(80)
   createdAt         DateTime          @default(now())
 
-  inboxReceipts EventInboxReceipt[]
+  inboxReceipts          EventInboxReceipt[]
+  notificationDeliveries NotificationDelivery[]
 
   @@unique([id, tenantId])
   @@index([status, availableAt, occurredAt, id])
@@ -883,6 +912,58 @@ model EventInboxReceipt {
 
   @@unique([consumerName, eventId])
   @@index([tenantId, processedAt(sort: Desc), id(sort: Desc)])
+}
+
+model NotificationDelivery {
+  id                   String                     @id @default(uuid()) @db.Uuid
+  tenantId             String                     @db.Uuid
+  tenant               Tenant                     @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  sourceEventId        String                     @db.Uuid
+  sourceEvent          OutboxEvent                @relation(fields: [sourceEventId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  workflowKey          String                     @db.VarChar(80)
+  recipientType        NotificationRecipientType
+  recipientReferenceId String                     @db.VarChar(120)
+  channel              NotificationChannel
+  templateKey          String                     @db.VarChar(120)
+  templateVersion      Int                        @default(1)
+  variables            Json
+  status               NotificationDeliveryStatus @default(PENDING)
+  attemptCount         Int                        @default(0)
+  availableAt          DateTime                   @default(now())
+  lockedAt             DateTime?
+  lockedUntil          DateTime?
+  lockToken            String?                    @db.VarChar(64)
+  deliveredAt          DateTime?
+  lastErrorCode        String?                    @db.VarChar(80)
+  createdAt            DateTime                   @default(now())
+
+  attempts NotificationDeliveryAttempt[]
+
+  @@unique([id, tenantId])
+  @@unique([tenantId, sourceEventId, workflowKey, recipientType, recipientReferenceId, channel])
+  @@index([status, availableAt, createdAt, id])
+  @@index([tenantId, createdAt(sort: Desc), id(sort: Desc)])
+  @@index([tenantId, status, createdAt(sort: Desc)])
+  @@index([tenantId, recipientType, recipientReferenceId, createdAt(sort: Desc)])
+}
+
+model NotificationDeliveryAttempt {
+  id                    String                     @id @default(uuid()) @db.Uuid
+  tenantId              String                     @db.Uuid
+  tenant                Tenant                     @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  deliveryId            String                     @db.Uuid
+  delivery              NotificationDelivery       @relation(fields: [deliveryId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  attemptNumber         Int
+  outcome               NotificationAttemptOutcome
+  providerKey           String                     @db.VarChar(80)
+  errorCode             String?                    @db.VarChar(80)
+  providerReferenceHash String?                    @db.VarChar(64)
+  occurredAt            DateTime
+  createdAt             DateTime                   @default(now())
+
+  @@unique([deliveryId, attemptNumber])
+  @@index([tenantId, occurredAt(sort: Desc), id(sort: Desc)])
+  @@index([tenantId, outcome, occurredAt(sort: Desc)])
 }
 
 enum MedicalRecordType {

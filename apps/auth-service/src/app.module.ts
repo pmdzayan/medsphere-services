@@ -11,6 +11,7 @@ import { AuthRateLimitModule } from './security/auth-rate-limit.module';
 import { AuthorizationModule } from './authorization/authorization.module';
 import { AuditModule } from './audit/audit.module';
 import { InventoryModule } from './inventory/inventory.module';
+import { NotificationModule } from './notifications/notification.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { InventoryModule } from './inventory/inventory.module';
     AuthorizationModule,
     AuditModule,
     InventoryModule,
+    NotificationModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },

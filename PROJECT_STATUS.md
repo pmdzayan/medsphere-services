@@ -6,11 +6,27 @@
 
 **Accepted stabilization baseline:** `4ea55a17e188410ddee45fa3ea6c016e22d6617a`
 
-**Current sprint:** Next sprint selection pending after G3.22 acceptance
+**Current sprint:** G3.23 notification delivery foundation — candidate
 
 **Release state:** Not approved for production or real healthcare data
 
 **Full-roadmap engineering estimate:** 40% complete / 60% remaining
+
+## Active candidate sprint
+
+### G3.23 — Notification Delivery Foundation
+
+**Status:** Five-unit candidate from repository baseline `9925df9`;
+implementation review, exact-head CI, and CTO acceptance are required.
+
+**Boundary:** Provider-neutral contracts, opaque tenant-safe recipient
+references, leased delivery, bounded retries/dead letters, append-only attempt
+evidence, safe observability, and metadata-only operational reads. No real
+provider, contact lookup, notification workflow, Maps, FHIR, ABDM, production
+approval, or real healthcare data is included.
+
+**Architecture review:** proposed ADR-015 and
+`docs/sprints/G3.23-notification-delivery-foundation.md`.
 
 ## Most recent accepted sprint
 
