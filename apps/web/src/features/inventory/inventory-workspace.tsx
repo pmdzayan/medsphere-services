@@ -3,12 +3,20 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { MetricCard, SectionCard, StatusBadge } from '@/components/platform/dashboard-primitives';
 import { Icon } from '@/components/platform/icon';
-import { ApiError, getAssignedProviders, getProviderStock } from '@/lib/api-client';
+import {
+  ApiError,
+  getAssignedProviders,
+  getProviderStock,
+  quarantineBatch,
+} from '@/lib/api-client';
 import type {
+  BatchQuarantineReason,
+  BatchQuarantineResponse,
   InventoryBatchStock,
   InventoryStockPage,
   ProviderAccess,
 } from '@/lib/inventory-contract';
+import { BATCH_QUARANTINE_REASONS } from '@/lib/inventory-contract';
 import {
   formatInventoryCurrency,
   formatInventoryDate,
@@ -16,6 +24,18 @@ import {
 } from './inventory-data';
 
 const PAGE_SIZE = 25;
+const QUARANTINE_REASON_LABELS: Record<BatchQuarantineReason, string> = {
+  QUALITY_SUSPECT: 'Quality concern',
+  TEMPERATURE_EXCURSION: 'Temperature excursion',
+  PACKAGING_COMPROMISED: 'Packaging compromised',
+  STORAGE_DEVIATION: 'Storage deviation',
+};
+
+interface QuarantineTarget {
+  batch: InventoryBatchStock;
+  medicineName: string;
+  idempotencyKey: string;
+}
 
 export function InventoryWorkspace() {
   const [providers, setProviders] = useState<ProviderAccess[]>([]);
@@ -26,6 +46,12 @@ export function InventoryWorkspace() {
   const [offset, setOffset] = useState(0);
   const [providersLoading, setProvidersLoading] = useState(true);
   const [stockLoading, setStockLoading] = useState(false);
+  const [quarantineTarget, setQuarantineTarget] = useState<QuarantineTarget | null>(null);
+  const [quarantineReason, setQuarantineReason] =
+    useState<BatchQuarantineReason>('QUALITY_SUSPECT');
+  const [quarantineSubmitting, setQuarantineSubmitting] = useState(false);
+  const [quarantineError, setQuarantineError] = useState<string | null>(null);
+  const [quarantineReceipt, setQuarantineReceipt] = useState<BatchQuarantineResponse | null>(null);
   const [error, setError] = useState<{ message: string; status?: number } | null>(null);
 
   const loadProviders = useCallback(async () => {
@@ -84,6 +110,37 @@ export function InventoryWorkspace() {
     setQuery(draftQuery.trim());
   }
 
+  function openQuarantine(batch: InventoryBatchStock, medicineName: string) {
+    setQuarantineTarget({
+      batch,
+      medicineName,
+      idempotencyKey: `batch-quarantine-${crypto.randomUUID()}`,
+    });
+    setQuarantineReason('QUALITY_SUSPECT');
+    setQuarantineError(null);
+  }
+
+  async function submitQuarantine(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!quarantineTarget || !providerId || quarantineSubmitting) return;
+    setQuarantineSubmitting(true);
+    setQuarantineError(null);
+    try {
+      const receipt = await quarantineBatch(providerId, quarantineTarget.batch.id, {
+        expectedVersion: quarantineTarget.batch.version,
+        idempotencyKey: quarantineTarget.idempotencyKey,
+        reasonCode: quarantineReason,
+      });
+      setQuarantineReceipt(receipt);
+      setQuarantineTarget(null);
+      await loadStock(providerId, query, offset);
+    } catch (mutationError) {
+      setQuarantineError(toPublicError(mutationError, 'Unable to quarantine this batch.').message);
+    } finally {
+      setQuarantineSubmitting(false);
+    }
+  }
+
   if (!providersLoading && error?.status === 403 && providers.length === 0) {
     return (
       <InventoryState
@@ -106,7 +163,7 @@ export function InventoryWorkspace() {
             Medicine inventory
           </h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-[#71817c]">
-            Read-only stock returned for providers currently assigned to your authenticated
+            Live stock and bounded batch-safety actions for providers assigned to your authenticated
             membership.
           </p>
         </div>
@@ -245,7 +302,9 @@ export function InventoryWorkspace() {
             }}
           />
         ) : null}
-        {!error && page?.data.length ? <InventoryTable page={page} /> : null}
+        {!error && page?.data.length ? (
+          <InventoryTable page={page} onQuarantine={openQuarantine} />
+        ) : null}
 
         {!error && page && page.total > 0 ? (
           <div className="flex items-center justify-between gap-3 border-t border-[#edf1ef] px-5 py-4 text-xs text-[#70827b] sm:px-6">
@@ -275,14 +334,105 @@ export function InventoryWorkspace() {
         ) : null}
       </SectionCard>
 
+      {quarantineReceipt ? (
+        <div
+          role="status"
+          className="rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm text-emerald-900"
+        >
+          Batch quarantined. Physical quantity remains {quarantineReceipt.onHandQuantity};{' '}
+          {quarantineReceipt.affectedReservationCount} reservation(s) were cancelled and{' '}
+          {quarantineReceipt.releasedUnitCount} held unit(s) were released.
+        </div>
+      ) : null}
+
+      {quarantineTarget ? (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="quarantine-title"
+          className="fixed inset-0 z-50 grid place-items-center bg-[#0d211a]/55 p-4"
+        >
+          <form
+            onSubmit={(event) => void submitQuarantine(event)}
+            className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl"
+          >
+            <p className="text-xs font-extrabold uppercase tracking-[.16em] text-amber-700">
+              One-way safety action
+            </p>
+            <h2
+              id="quarantine-title"
+              className="mt-2 font-[var(--font-display)] text-2xl font-bold text-[#17352a]"
+            >
+              Quarantine batch {quarantineTarget.batch.batchNumber}
+            </h2>
+            <p className="mt-2 text-sm leading-6 text-[#647870]">
+              {quarantineTarget.medicineName} will become unavailable. Active reservations holding
+              this batch will be cancelled and their holds released. Physical stock is not removed,
+              and this action cannot be reversed in V1.
+            </p>
+            <label className="mt-5 block">
+              <span className="mb-1.5 block text-xs font-bold text-[#38544b]">
+                Quarantine reason
+              </span>
+              <select
+                aria-label="Quarantine reason"
+                value={quarantineReason}
+                onChange={(event) =>
+                  setQuarantineReason(event.target.value as BatchQuarantineReason)
+                }
+                disabled={quarantineSubmitting}
+                className="h-11 w-full rounded-xl border border-[#dce5e1] bg-white px-3 text-sm font-semibold text-[#38544b]"
+              >
+                {BATCH_QUARANTINE_REASONS.map((reason) => (
+                  <option key={reason} value={reason}>
+                    {QUARANTINE_REASON_LABELS[reason]}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {quarantineError ? (
+              <p
+                role="alert"
+                className="mt-4 rounded-xl bg-rose-50 px-3 py-2 text-sm text-rose-800"
+              >
+                {quarantineError}
+              </p>
+            ) : null}
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                disabled={quarantineSubmitting}
+                onClick={() => setQuarantineTarget(null)}
+                className="rounded-xl border border-[#dce5e1] px-4 py-2.5 text-sm font-bold text-[#536a62] disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={quarantineSubmitting}
+                className="rounded-xl bg-amber-700 px-4 py-2.5 text-sm font-bold text-white disabled:cursor-wait disabled:opacity-50"
+              >
+                {quarantineSubmitting ? 'Quarantining…' : 'Confirm quarantine'}
+              </button>
+            </div>
+          </form>
+        </div>
+      ) : null}
+
       <p className="pb-2 text-center text-[11px] text-[#93a09c]">
-        Read-only live data · Access is rechecked by the inventory service for every request
+        Live data · Provider assignment and command permission are rechecked for every request
       </p>
     </div>
   );
 }
 
-function InventoryTable({ page }: { page: InventoryStockPage }) {
+function InventoryTable({
+  page,
+  onQuarantine,
+}: {
+  page: InventoryStockPage;
+  onQuarantine: (batch: InventoryBatchStock, medicineName: string) => void;
+}) {
   return (
     <div className="overflow-x-auto">
       <table className="w-full min-w-[1000px] border-collapse text-left">
@@ -338,6 +488,16 @@ function InventoryTable({ page }: { page: InventoryStockPage }) {
                           Expires {formatInventoryDate(batch.expiryDate)} ·{' '}
                           {batch.availableQuantity} available
                         </p>
+                        {batch.status === 'ACTIVE' ? (
+                          <button
+                            type="button"
+                            onClick={() => onQuarantine(batch, item.name)}
+                            className="mt-1.5 font-bold text-amber-700 hover:text-amber-800"
+                            aria-label={`Quarantine batch ${batch.batchNumber}`}
+                          >
+                            Quarantine batch
+                          </button>
+                        ) : null}
                       </div>
                     ))
                   ) : (

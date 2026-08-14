@@ -2,9 +2,9 @@
 
 **Last updated:** 2026-08-14
 
-**Current sprint:** G3.12 contract selection — next dependency-ready boundary
+**Current sprint:** G3.12 implementation — live batch quarantine workspace
 
-**Next feature work:** Select and contract the next dependency-ready inventory or compliance boundary
+**Next feature work:** Verify and accept the G3.12 live quarantine workspace
 
 ## Mandatory startup sequence
 
@@ -167,11 +167,11 @@ If ownership transfers, resume at the first pending checkpoint. Do not use
 
 ## Exact continuation point
 
-Select and contract the next dependency-ready boundary from the accepted
-`d364794` baseline. Quarantine release, reservation creation, returns, recall,
-analytics policy, patient exposure, and Gates 2 and 4–9 remain blocked until
-their recorded prerequisites are satisfied; do not infer readiness from schema
-or preview UI alone.
+Verify G3.12 against `docs/sprints/G3.12-live-batch-quarantine-workspace.md`
+from accepted baseline `0bfe951`. Do not increase progress until exact-head CI
+and CTO acceptance pass. Quarantine release, reservation creation, returns,
+recall, analytics policy, patient exposure, and Gates 2 and 4–9 remain blocked
+until their recorded prerequisites are satisfied.
 
 Cline may receive only a complete, bounded prompt for characterization tests or
 mechanical work whose contract is already fixed by ADR-005. Cline must not

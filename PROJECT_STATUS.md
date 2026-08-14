@@ -6,11 +6,33 @@
 
 **Accepted stabilization baseline:** `4ea55a17e188410ddee45fa3ea6c016e22d6617a`
 
-**Current sprint:** G3.12 contract selection — next dependency-ready boundary
+**Current sprint:** G3.12 implementation — live batch quarantine workspace
 
 **Release state:** Not approved for production or real healthcare data
 
 **Full-roadmap engineering estimate:** 36% complete / 64% remaining
+
+## Current sprint
+
+### G3.12 — Live Batch Quarantine Workspace
+
+**Status:** Implemented locally; exact-head CI and CTO acceptance required.
+Overall V1 progress remains 36% until both gates pass.
+
+**Selection reason:** G3.11 accepted the one-way quarantine command while
+deliberately excluding its mutation UI. Connecting that existing boundary is
+dependency-ready; release, recall, returns, analytics, and patient exposure
+still require policy or platform prerequisites that are not accepted.
+
+**Boundary:** Expose the batch version as a concurrency token, proxy the exact
+same-origin quarantine command, validate the immutable receipt, require an
+explicit one-way confirmation with an allowlisted reason, and refresh live
+stock after success. Backend assignment and permission checks remain
+authoritative. No release, recall, disposal, return, free text, or patient
+behavior is added.
+
+**Implementation authority:** ADR-001 through ADR-012, accepted source
+`0bfe951`, and `docs/sprints/G3.12-live-batch-quarantine-workspace.md`.
 
 ## Most recent accepted sprint
 

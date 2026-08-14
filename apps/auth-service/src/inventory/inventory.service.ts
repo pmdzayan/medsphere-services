@@ -29,6 +29,7 @@ export class InventoryService {
             manufacturingDate: batch.manufacturingDate,
             expiryDate: batch.expiryDate,
             status: batch.status,
+            version: batch.version,
             onHandQuantity: batch.onHandQuantity,
             heldQuantity: batch.heldQuantity,
             availableQuantity: eligible

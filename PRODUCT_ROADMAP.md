@@ -44,6 +44,8 @@ Ordered sprints:
     PR #35 as `ad2d15b` after exact-head CI run `31393057704`
 18. G3.11 One-way manual batch quarantine — accepted and squash-merged in PR
     #38 as `d364794` after exact-head CI run `31761072418`
+19. G3.12 Live assigned-provider batch quarantine workspace — implemented;
+    exact-head CI and CTO acceptance required
 
 **Completion gate:** Accepted ADRs; protected review flow; clean migrations; deny-by-default authentication; tenant-isolation tests; integrated audit trail; atomic stock/reservation behavior; mandatory lint/test/build passing.
 

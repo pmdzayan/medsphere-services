@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { validProviders, validStockPage } from '@/test/inventory-fixtures';
-import { isInventoryStockPage, isProviderAccessList } from './inventory-contract';
+import {
+  isBatchQuarantineRequest,
+  isBatchQuarantineResponse,
+  isInventoryStockPage,
+  isProviderAccessList,
+} from './inventory-contract';
 
 describe('inventory boundary contracts', () => {
   it('accepts exact assigned-provider and stock responses', () => {
@@ -83,5 +88,29 @@ describe('inventory boundary contracts', () => {
         ],
       }),
     ).toBe(false);
+  });
+
+  it('accepts only the exact bounded quarantine command and receipt', () => {
+    const request = {
+      expectedVersion: 4,
+      idempotencyKey: 'quarantine-command-1',
+      reasonCode: 'QUALITY_SUSPECT',
+    };
+    const receipt = {
+      batchId: validStockPage.data[0].batches[0].id,
+      status: 'QUARANTINED',
+      reasonCode: 'QUALITY_SUSPECT',
+      onHandQuantity: 20,
+      affectedReservationCount: 1,
+      releasedUnitCount: 3,
+      resultingBatchVersion: 5,
+      occurredAt: '2026-08-14T01:00:00.000Z',
+      replayed: false,
+    };
+    expect(isBatchQuarantineRequest(request)).toBe(true);
+    expect(isBatchQuarantineRequest({ ...request, reason: 'free text' })).toBe(false);
+    expect(isBatchQuarantineRequest({ ...request, expectedVersion: 0 })).toBe(false);
+    expect(isBatchQuarantineResponse(receipt)).toBe(true);
+    expect(isBatchQuarantineResponse({ ...receipt, tenantId: 'leak' })).toBe(false);
   });
 });
