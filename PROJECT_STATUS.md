@@ -2,22 +2,22 @@
 
 **Status date:** 2026-08-14
 
-**Accepted source commit:** `3e7a8c04d8bb7cf60dfc726ec1ec0879cf1ff5c2`
+**Accepted source commit:** `fcc6e46f6023fd5c565c50886eed23b89e0968e2`
 
 **Accepted stabilization baseline:** `4ea55a17e188410ddee45fa3ea6c016e22d6617a`
 
-**Current sprint:** G3.23 notification delivery foundation — candidate
+**Current sprint:** First bounded notification workflow selection pending
 
 **Release state:** Not approved for production or real healthcare data
 
 **Full-roadmap engineering estimate:** 40% complete / 60% remaining
 
-## Active candidate sprint
+## Most recent accepted sprint
 
 ### G3.23 — Notification Delivery Foundation
 
-**Status:** Five-unit candidate from repository baseline `9925df9`;
-implementation review, exact-head CI, and CTO acceptance are required.
+**Status:** Accepted and squash-merged in PR #56 as `fcc6e46` after exact-head
+CI run `31796185118` passed all required gates.
 
 **Boundary:** Provider-neutral contracts, opaque tenant-safe recipient
 references, leased delivery, bounded retries/dead letters, append-only attempt
@@ -25,10 +25,10 @@ evidence, safe observability, and metadata-only operational reads. No real
 provider, contact lookup, notification workflow, Maps, FHIR, ABDM, production
 approval, or real healthcare data is included.
 
-**Architecture review:** proposed ADR-015 and
+**Implementation authority:** accepted ADR-015, accepted source `fcc6e46`, and
 `docs/sprints/G3.23-notification-delivery-foundation.md`.
 
-## Most recent accepted sprint
+## Earlier accepted sprint
 
 ### G3.22 — Atomic Inventory Domain Event Producers
 

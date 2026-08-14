@@ -1,6 +1,6 @@
 # ADR-015: Provider-Neutral Notification Delivery Foundation
 
-**Status:** Proposed
+**Status:** Accepted
 
 **Date:** 2026-08-14
 
