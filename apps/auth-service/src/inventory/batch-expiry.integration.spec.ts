@@ -3,6 +3,7 @@ import { AuditWriter } from '../audit/audit-writer.service';
 import { isInfrastructureTestEnabled, requireEnv } from '../auth/testing/infrastructure-test-gate';
 import { PrismaService } from '../prisma/prisma.service';
 import { BatchExpiryService } from './batch-expiry.service';
+import { InventoryEventWriter } from './inventory-event-writer';
 
 const describeInfrastructure = isInfrastructureTestEnabled() ? describe : describe.skip;
 if (isInfrastructureTestEnabled()) requireEnv('DATABASE_URL');
@@ -19,7 +20,7 @@ describeInfrastructure('G3.10 PostgreSQL physical batch expiry integrity', () =>
   const tenantId = randomUUID();
   const userId = randomUUID();
   const providerId = randomUUID();
-  const service = new BatchExpiryService(prisma, new AuditWriter());
+  const service = new BatchExpiryService(prisma, new AuditWriter(), new InventoryEventWriter());
 
   beforeAll(async () => {
     await prisma.client.tenant.create({

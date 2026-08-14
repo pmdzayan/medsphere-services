@@ -20,8 +20,13 @@ function createHarness() {
     ),
   };
   const audit = { appendTenantUser: jest.fn() };
-  const service = new ReservationCreationService({ client } as never, audit as never);
-  return { audit, client, service, transaction };
+  const events = { appendTenantUser: jest.fn() };
+  const service = new ReservationCreationService(
+    { client } as never,
+    audit as never,
+    events as never,
+  );
+  return { audit, client, events, service, transaction };
 }
 
 const actor = { tenantId: 'tenant-1', membershipId: 'membership-1', userId: 'user-1' };
@@ -107,6 +112,15 @@ describe('ReservationCreationService', () => {
       expect.objectContaining({
         eventType: 'inventory.reservation.created',
         metadata: { itemCount: 1, totalQuantity: 7, expiresAt: command.expiresAt.toISOString() },
+      }),
+    );
+    expect(harness.events.appendTenantUser).toHaveBeenCalledWith(
+      harness.transaction,
+      actor,
+      expect.objectContaining({
+        eventType: 'inventory.reservation.created',
+        aggregateType: 'MedicineReservation',
+        payload: expect.objectContaining({ status: 'PENDING', totalQuantity: 7 }),
       }),
     );
     expect(result).toEqual(

@@ -15,12 +15,14 @@ import { InventoryQuarantineService } from './inventory-quarantine.service';
 import { ReservationRepository } from './reservation.repository';
 import { ReservationService } from './reservation.service';
 import { ReservationCreationService } from './reservation-creation.service';
+import { InventoryEventWriter } from './inventory-event-writer';
 
 @Module({
   imports: [PrismaModule, AuthorizationModule, AuditPersistenceModule],
   controllers: [InventoryController],
   providers: [
     InventoryRepository,
+    InventoryEventWriter,
     InventoryService,
     InventoryCommandService,
     InventoryTransferService,

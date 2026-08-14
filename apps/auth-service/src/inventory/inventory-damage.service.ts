@@ -14,6 +14,7 @@ import {
 import { AuditWriter } from '../audit/audit-writer.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { assertTrustedProviderAccess } from './inventory-access';
+import { InventoryEventWriter } from './inventory-event-writer';
 import type { DamagedStockResult, RecordDamagedStockCommand } from './inventory-damage.types';
 
 const DAMAGE_REFERENCE = 'inventory.stock.damage';
@@ -24,6 +25,7 @@ export class InventoryDamageService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditWriter,
+    private readonly events: InventoryEventWriter,
   ) {}
 
   async recordCompleted(
@@ -159,6 +161,7 @@ export class InventoryDamageService {
           outcome: 'SUCCEEDED',
           resourceType: 'Batch',
           resourceId: batch.id,
+          occurredAt,
           metadata: {
             productId: batch.productId,
             quantity: command.quantity,
@@ -166,6 +169,21 @@ export class InventoryDamageService {
             onHandAfter,
           },
           request: command.request,
+        });
+        await this.events.appendTenantUser(transaction, command.actor, {
+          eventType: 'inventory.stock.damaged',
+          aggregateType: 'Batch',
+          aggregateId: batch.id,
+          occurredAt,
+          payload: {
+            providerId: command.providerId,
+            inventoryId: batch.inventoryId,
+            productId: batch.productId,
+            quantity: command.quantity,
+            onHandBefore: batch.onHandQuantity,
+            onHandAfter,
+            version: resultingBatchVersion,
+          },
         });
 
         return {

@@ -48,11 +48,13 @@ function harness() {
     ),
   };
   const audit = { appendTenantUser: jest.fn(), appendTenantSystem: jest.fn() };
+  const events = { appendTenantUser: jest.fn(), appendTenantSystem: jest.fn() };
   return {
     transaction,
     client,
     audit,
-    service: new InventoryQuarantineService({ client } as never, audit as never),
+    events,
+    service: new InventoryQuarantineService({ client } as never, audit as never, events as never),
   };
 }
 

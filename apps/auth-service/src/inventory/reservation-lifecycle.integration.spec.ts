@@ -4,6 +4,7 @@ import { AuthenticatedIdentity } from '../auth/auth.types';
 import { isInfrastructureTestEnabled, requireEnv } from '../auth/testing/infrastructure-test-gate';
 import { PrismaService } from '../prisma/prisma.service';
 import { ReservationLifecycleService } from './reservation-lifecycle.service';
+import { InventoryEventWriter } from './inventory-event-writer';
 
 const describeReservationInfrastructure = isInfrastructureTestEnabled() ? describe : describe.skip;
 
@@ -11,7 +12,11 @@ if (isInfrastructureTestEnabled()) requireEnv('DATABASE_URL');
 
 describeReservationInfrastructure('G3.3 PostgreSQL reservation lifecycle integrity', () => {
   const prisma = new PrismaService();
-  const service = new ReservationLifecycleService(prisma, new AuditWriter());
+  const service = new ReservationLifecycleService(
+    prisma,
+    new AuditWriter(),
+    new InventoryEventWriter(),
+  );
   const tenantId = randomUUID();
   const userId = randomUUID();
   const unassignedUserId = randomUUID();

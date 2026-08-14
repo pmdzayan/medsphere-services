@@ -18,8 +18,13 @@ function createHarness() {
     ),
   };
   const audit = { appendTenantUser: jest.fn() };
-  const service = new ReservationLifecycleService({ client } as never, audit as never);
-  return { audit, client, service, transaction };
+  const events = { appendTenantUser: jest.fn() };
+  const service = new ReservationLifecycleService(
+    { client } as never,
+    audit as never,
+    events as never,
+  );
+  return { audit, client, events, service, transaction };
 }
 
 const actor = { tenantId: 'tenant-1', membershipId: 'membership-1', userId: 'user-1' };
@@ -114,6 +119,14 @@ describe('ReservationLifecycleService', () => {
           actorMembershipId: actor.membershipId,
           idempotencyKey: expect.stringMatching(/^reservation:[0-9a-f]{64}$/),
         }),
+      }),
+    );
+    expect(harness.events.appendTenantUser).toHaveBeenCalledWith(
+      harness.transaction,
+      actor,
+      expect.objectContaining({
+        eventType: 'inventory.reservation.completed',
+        payload: expect.objectContaining({ status: 'COMPLETED', totalQuantity: 4, version: 4 }),
       }),
     );
     expect(harness.audit.appendTenantUser).toHaveBeenCalledWith(

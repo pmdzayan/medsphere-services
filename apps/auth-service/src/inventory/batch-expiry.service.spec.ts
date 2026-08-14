@@ -69,7 +69,8 @@ function createHarness() {
     ),
   };
   const audit = { appendTenantSystem: jest.fn() };
-  const service = new BatchExpiryService({ client } as never, audit as never);
+  const events = { appendTenantSystem: jest.fn() };
+  const service = new BatchExpiryService({ client } as never, audit as never, events as never);
   transaction.batch.findMany.mockResolvedValueOnce([candidate]).mockResolvedValueOnce([]);
   transaction.batch.findFirst
     .mockResolvedValueOnce(dueBatch())
@@ -82,7 +83,7 @@ function createHarness() {
   transaction.medicineReservationCommand.create.mockResolvedValue({ id: 'command-1' });
   transaction.batch.updateMany.mockResolvedValue({ count: 1 });
   transaction.batchExpiryRecord.create.mockResolvedValue({ id: 'expiry-1' });
-  return { audit, client, service, transaction };
+  return { audit, client, events, service, transaction };
 }
 
 describe('BatchExpiryService', () => {
@@ -97,6 +98,16 @@ describe('BatchExpiryService', () => {
       affectedReservations: 1,
       releasedUnits: 4,
     });
+    expect(harness.events.appendTenantSystem).toHaveBeenCalledTimes(2);
+    expect(harness.events.appendTenantSystem).toHaveBeenLastCalledWith(
+      harness.transaction,
+      candidate.tenantId,
+      'batch-expiry-worker',
+      expect.objectContaining({
+        eventType: 'inventory.batch.expired',
+        payload: expect.objectContaining({ status: 'EXPIRED', affectedReservations: 1 }),
+      }),
+    );
     expect(harness.transaction.batch.updateMany).toHaveBeenLastCalledWith({
       where: expect.objectContaining({
         id: candidate.id,

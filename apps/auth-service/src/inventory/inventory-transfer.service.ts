@@ -14,6 +14,7 @@ import {
 import { AuditWriter } from '../audit/audit-writer.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { assertTrustedProviderAccess } from './inventory-access';
+import { InventoryEventWriter } from './inventory-event-writer';
 import type {
   CompletedTransferResult,
   RecordCompletedTransferCommand,
@@ -27,6 +28,7 @@ export class InventoryTransferService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditWriter,
+    private readonly events: InventoryEventWriter,
   ) {}
 
   async recordCompleted(
@@ -295,6 +297,7 @@ export class InventoryTransferService {
           outcome: 'SUCCEEDED',
           resourceType: 'InventoryTransfer',
           resourceId: transferId,
+          occurredAt: completedAt,
           metadata: {
             sourceProviderId: command.sourceProviderId,
             destinationProviderId: command.destinationProviderId,
@@ -302,6 +305,20 @@ export class InventoryTransferService {
             quantity: command.quantity,
           },
           request: command.request,
+        });
+        await this.events.appendTenantUser(tx, command.actor, {
+          eventType: 'inventory.stock.transferred',
+          aggregateType: 'InventoryTransfer',
+          aggregateId: transferId,
+          occurredAt: completedAt,
+          payload: {
+            sourceProviderId: command.sourceProviderId,
+            destinationProviderId: command.destinationProviderId,
+            productId: source.productId,
+            quantity: command.quantity,
+            sourceBatchId: source.id,
+            destinationBatchId,
+          },
         });
         return {
           transferId,
