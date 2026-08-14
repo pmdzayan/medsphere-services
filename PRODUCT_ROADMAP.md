@@ -42,8 +42,8 @@ Ordered sprints:
     #32 as `72fc92a` after exact-head CI run `31371305767`
 17. G3.10 Physical batch expiry reconciliation — accepted and squash-merged in
     PR #35 as `ad2d15b` after exact-head CI run `31393057704`
-18. G3.11 One-way manual batch quarantine — implemented; exact-commit CI and
-    CTO acceptance required
+18. G3.11 One-way manual batch quarantine — accepted and squash-merged in PR
+    #38 as `d364794` after exact-head CI run `31761072418`
 
 **Completion gate:** Accepted ADRs; protected review flow; clean migrations; deny-by-default authentication; tenant-isolation tests; integrated audit trail; atomic stock/reservation behavior; mandatory lint/test/build passing.
 

@@ -1,10 +1,10 @@
 # MedSphere AI Handoff
 
-**Last updated:** 2026-08-10
+**Last updated:** 2026-08-14
 
-**Current sprint:** G3.11 implementation — one-way manual batch quarantine
+**Current sprint:** G3.12 contract selection — next dependency-ready boundary
 
-**Next feature work:** Verify and accept the implemented ADR-012/G3.11 boundary
+**Next feature work:** Select and contract the next dependency-ready inventory or compliance boundary
 
 ## Mandatory startup sequence
 
@@ -86,11 +86,11 @@ The migration must be incremental:
   preserves on-hand quantity because expiry is not disposal, while expiring
   reservations that hold due batches. Corrected exact-head implementation CI
   run `31393057704` passed and PR #35 was squash-merged as `ad2d15b`.
-- G3.11 accepts only a one-way assigned-provider quarantine command. It must
+- G3.11 accepts only a one-way assigned-provider quarantine command. It
   preserve physical quantity, cancel every reservation holding the batch, and
   add no release, recall, disposal, return, notification, or mutation UI.
-  Implementation is complete locally; exact-commit CI and CTO acceptance are
-  required, and V1 remains 35%.
+  Exact-head CI run `31761072418` passed and PR #38 was accepted and
+  squash-merged as `d364794`; V1 is now estimated at 36%.
 - S0.5 now defines `Batch` as physical/held quantity authority, uses an
   append-only movement ledger, and stores typed reservation items and
   allocations. Its accepted production HTTP boundary and live frontend
@@ -156,8 +156,8 @@ See `docs/audits/2026-07-20-cto-baseline.md` for the accepted baseline.
     #32 as `72fc92a` after exact-head CI run `31371305767`
 21. G3.10 physical batch expiry reconciliation — accepted and squash-merged in
     PR #35 as `ad2d15b` after exact-head CI run `31393057704`
-22. G3.11 one-way manual batch quarantine — implemented; exact-commit CI and
-    CTO acceptance required
+22. G3.11 one-way manual batch quarantine — accepted and squash-merged in PR
+    #38 as `d364794` after exact-head CI run `31761072418`
 23. Returns, safe creation, and later live mutations — blocked pending their
     own accepted contracts
 
@@ -167,11 +167,11 @@ If ownership transfers, resume at the first pending checkpoint. Do not use
 
 ## Exact continuation point
 
-Verify the G3.11 implementation against ADR-012 and
-`docs/sprints/G3.11-one-way-manual-batch-quarantine.md`. Do not advance progress
-until exact-commit implementation CI and CTO acceptance. Quarantine
-release, reservation creation, returns, recall, analytics policy, patient
-exposure, and Gates 2 and 4–9 remain blocked by their recorded dependencies.
+Select and contract the next dependency-ready boundary from the accepted
+`d364794` baseline. Quarantine release, reservation creation, returns, recall,
+analytics policy, patient exposure, and Gates 2 and 4–9 remain blocked until
+their recorded prerequisites are satisfied; do not infer readiness from schema
+or preview UI alone.
 
 Cline may receive only a complete, bounded prompt for characterization tests or
 mechanical work whose contract is already fixed by ADR-005. Cline must not

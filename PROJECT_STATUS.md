@@ -1,23 +1,23 @@
 # MedSphere Project Status
 
-**Status date:** 2026-08-10
+**Status date:** 2026-08-14
 
-**Accepted source commit:** `ad2d15bc3eb2e803217b25faac0ddebfa89405a7`
+**Accepted source commit:** `d3647944c86ecd3a71323ddb8486fe1aa60c5403`
 
 **Accepted stabilization baseline:** `4ea55a17e188410ddee45fa3ea6c016e22d6617a`
 
-**Current sprint:** G3.11 implementation — one-way manual batch quarantine
+**Current sprint:** G3.12 contract selection — next dependency-ready boundary
 
 **Release state:** Not approved for production or real healthcare data
 
-**Full-roadmap engineering estimate:** 35% complete / 65% remaining
+**Full-roadmap engineering estimate:** 36% complete / 64% remaining
 
-## Current sprint
+## Most recent accepted sprint
 
 ### G3.11 — One-Way Manual Batch Quarantine
 
-**Status:** Implemented; exact-commit CI and CTO acceptance required. Overall
-V1 progress remains 35% until both gates pass.
+**Status:** Accepted and squash-merged in PR #38 as `d364794` after exact-head
+CI run `31761072418` passed all required gates.
 
 **Selection reason:** The accepted stock read already exposes expiry dates and
 batch states, so a separate visibility-only sprint would duplicate working
@@ -32,10 +32,10 @@ quantity, and record immutable evidence. Release, recall, disposal, return,
 notifications, free-text evidence, and mutation UI are excluded.
 
 **Implementation authority:** ADR-001 through ADR-012, accepted source
-`df71854`, and
+`d364794`, and
 `docs/sprints/G3.11-one-way-manual-batch-quarantine.md`.
 
-## Most recent accepted sprint
+## Previous accepted sprint
 
 ### G3.10 — Physical Batch Expiry Reconciliation
 
@@ -87,16 +87,15 @@ V1 gap matrix, and
 | Database reproducibility    | S0.2–S0.5, G3.1–G3.3, and corrected AG-02A accepted with clean and populated upgrade evidence | Accepted through `9c38792`            |
 | Identity and tenant context | S0.3 authentication and trusted tenant context merged                                         | Accepted                              |
 | Authorization and audit     | S0.4 tenant-safe RBAC and durable audit merged                                                | Accepted                              |
-| Inventory and reservation   | S0.5, G3.1–G3.10 through reservation and physical batch expiry, transfer, and damage          | Broader operations remain incomplete  |
+| Inventory and reservation   | S0.5 and G3.1–G3.11 through reservation, transfer, damage, expiry, and one-way quarantine     | Broader operations remain incomplete  |
 | Frontend foundation         | Landing, login, shell, team/RBAC, audit, settings, onboarding, stock, and reservation reads   | Connected for accepted contracts      |
 | Pharmacy and inventory UI   | Assigned-provider stock, reservations, and bounded live overview use accepted reads           | Connected for accepted read contracts |
 | Remaining healthcare scope  | Most domain deployables are health-only scaffolds or absent                                   | Not implemented                       |
 
 ## Critical blockers
 
-1. G3.11 quarantine implementation requires exact-commit CI and CTO acceptance.
-   Quarantine release, patient-safe creation, returns, and recall remain
-   unmounted pending their own accepted contracts and prerequisites.
+1. Quarantine release, patient-safe creation, returns, recall, and analytics
+   remain unmounted pending their own accepted contracts and prerequisites.
 2. Inventory mutation UIs remain unconnected; the accepted stock, reservation,
    and overview workspaces are deliberately read-only.
 3. Consent, privacy operations, verification, retention, legal hold, and the
@@ -147,8 +146,8 @@ and [the Gates 1–20 verification](docs/audits/2026-08-01-gates-1-20-verificati
     PR #32 as `72fc92a` after exact-head CI run `31371305767`
 18. **G3.10 physical batch expiry reconciliation** — accepted and squash-merged
     in PR #35 as `ad2d15b` after exact-head CI run `31393057704`
-19. **G3.11 one-way manual batch quarantine** — implemented; exact-commit CI
-    and CTO acceptance required
+19. **G3.11 one-way manual batch quarantine** — accepted and squash-merged in
+    PR #38 as `d364794` after exact-head CI run `31761072418`
 20. Resume remaining Inventory and Compliance milestones in dependency order
 
 Only one recovery sprint may be active at a time. Exact boundaries may be refined through an ADR, but dependencies must not be skipped.
@@ -156,7 +155,7 @@ Only one recovery sprint may be active at a time. Exact boundaries may be refine
 ## Progress reporting rule
 
 Progress is measured by accepted milestone criteria, not by the number of files
-or endpoints present. The README's 35% full-roadmap estimate and 32% frontend
+or endpoints present. The README's 36% full-roadmap estimate and 32% frontend
 estimate are planning indicators, not acceptance or release claims. They may
 change only when repository evidence and milestone acceptance change. Preview
 screens, placeholder services, unmounted routes, and schema-only foundations do
