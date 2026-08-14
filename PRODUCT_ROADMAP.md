@@ -66,8 +66,8 @@ Ordered sprints:
     in PR #52 as `af48522` after exact-head CI run `31786107840`
 29. G3.22 Atomic inventory domain event producers — accepted and squash-merged
     in PR #54 as `3e7a8c0` after exact-head CI run `31793020883`
-30. G3.23 Notification delivery foundation — active five-unit candidate from
-    repository baseline `9925df9`; exact-head CI and acceptance pending
+30. G3.23 Notification delivery foundation — accepted and squash-merged in PR
+    #56 as `fcc6e46` after exact-head CI run `31796185118`
 
 **Completion gate:** Accepted ADRs; protected review flow; clean migrations; deny-by-default authentication; tenant-isolation tests; integrated audit trail; atomic stock/reservation behavior; mandatory lint/test/build passing.
 

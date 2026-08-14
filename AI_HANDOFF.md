@@ -2,10 +2,10 @@
 
 **Last updated:** 2026-08-14
 
-**Current sprint:** G3.23 notification delivery foundation — candidate
+**Current sprint:** First bounded notification workflow selection pending
 
-**Next feature work:** Complete the bounded five-unit G3.23 candidate from
-repository baseline `9925df9`
+**Next feature work:** Select the first reservation/expiry notification workflow
+from accepted source `fcc6e46`
 
 ## Mandatory startup sequence
 
@@ -181,7 +181,9 @@ See `docs/audits/2026-07-20-cto-baseline.md` for the accepted baseline.
     in PR #52 as `af48522` after exact-head CI run `31786107840`
 33. G3.22 atomic inventory domain event producers — accepted and squash-merged
     in PR #54 as `3e7a8c0` after exact-head CI run `31793020883`
-34. Returns and later live mutations — blocked pending their own accepted
+34. G3.23 notification delivery foundation — accepted and squash-merged in PR
+    #56 as `fcc6e46` after exact-head CI run `31796185118`
+35. Returns and later live mutations — blocked pending their own accepted
     contracts
 
 If ownership transfers, resume at the first pending checkpoint. Do not use
@@ -190,13 +192,12 @@ If ownership transfers, resume at the first pending checkpoint. Do not use
 
 ## Exact continuation point
 
-Complete G3.23 from repository baseline `9925df9` under proposed ADR-015. Keep
-its provider-neutral contract, opaque tenant-safe recipient/routing boundary,
-delivery worker and adapter abstraction, retry/dead-letter evidence, and
-operational security/observability boundary together. Do not add a real
-provider, contact lookup, live notification workflow, Maps, FHIR, ABDM,
-quarantine release, public/patient reservation creation, returns, recall, or
-patient exposure.
+Select the first bounded notification workflow from accepted source `fcc6e46`
+under accepted ADR-015. Reservation/expiry is the preferred candidate and must
+consume accepted G3.22 events through the G3.23 queue rather than call a
+provider from an inventory transaction. Keep provider selection, Maps, FHIR,
+ABDM, quarantine release, public/patient reservation creation, returns, recall,
+and patient exposure out of that workflow.
 
 Cline may receive only a complete, bounded prompt for characterization tests or
 mechanical work whose contract is already fixed by ADR-005. Cline must not
