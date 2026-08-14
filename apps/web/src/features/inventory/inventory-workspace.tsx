@@ -135,9 +135,7 @@ export function InventoryWorkspace() {
       setQuarantineTarget(null);
       await loadStock(providerId, query, offset);
     } catch (mutationError) {
-      setQuarantineError(
-        toPublicError(mutationError, 'Unable to quarantine this batch.').message,
-      );
+      setQuarantineError(toPublicError(mutationError, 'Unable to quarantine this batch.').message);
     } finally {
       setQuarantineSubmitting(false);
     }
@@ -165,8 +163,8 @@ export function InventoryWorkspace() {
             Medicine inventory
           </h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-[#71817c]">
-            Live stock and bounded batch-safety actions for providers assigned to your
-            authenticated membership.
+            Live stock and bounded batch-safety actions for providers assigned to your authenticated
+            membership.
           </p>
         </div>
         <button
@@ -393,7 +391,10 @@ export function InventoryWorkspace() {
               </select>
             </label>
             {quarantineError ? (
-              <p role="alert" className="mt-4 rounded-xl bg-rose-50 px-3 py-2 text-sm text-rose-800">
+              <p
+                role="alert"
+                className="mt-4 rounded-xl bg-rose-50 px-3 py-2 text-sm text-rose-800"
+              >
                 {quarantineError}
               </p>
             ) : null}
