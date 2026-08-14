@@ -100,7 +100,7 @@ infrastructure('G3.24 PostgreSQL reservation notification consumer', () => {
     expect(receipts).toHaveLength(1);
     await expect(
       prisma.client.eventInboxReceipt.delete({ where: { id: receipts[0]!.id } }),
-    ).rejects.toThrow(/cannot be deleted/);
+    ).rejects.toThrow(/append-only/);
   });
 
   it('rolls back the inbox receipt when the authoritative reservation is unavailable', async () => {
