@@ -3,6 +3,8 @@ import { validProviders, validStockPage } from '@/test/inventory-fixtures';
 import {
   isBatchQuarantineRequest,
   isBatchQuarantineResponse,
+  isCompletedTransferRequest,
+  isCompletedTransferResponse,
   isDamagedStockRequest,
   isDamagedStockResponse,
   isInventoryStockPage,
@@ -143,5 +145,43 @@ describe('inventory boundary contracts', () => {
     expect(isDamagedStockResponse(receipt)).toBe(true);
     expect(isDamagedStockResponse({ ...receipt, onHandAfter: 19 })).toBe(false);
     expect(isDamagedStockResponse({ ...receipt, internal: true })).toBe(false);
+  });
+
+  it('accepts only exact completed-transfer commands and receipts', () => {
+    const request = {
+      destinationProviderId: '8b4d574f-48c6-4231-8851-e65edc9f9d42',
+      sourceBatchId: validStockPage.data[0].batches[0].id,
+      expectedSourceVersion: 4,
+      quantity: 2,
+      idempotencyKey: 'transfer-command-1',
+      reason: 'Stock already moved between assigned locations.',
+    };
+    const receipt = {
+      transferId: '52f2d7a4-0948-49c4-a0a8-afbf88503a5c',
+      productId: validStockPage.data[0].productId,
+      sourceProviderId: validProviders[0].providerId,
+      destinationProviderId: request.destinationProviderId,
+      sourceInventoryId: validStockPage.data[0].inventoryId,
+      destinationInventoryId: 'd63f50dd-49b0-4a77-bc04-f7d00db58dd5',
+      sourceBatchId: request.sourceBatchId,
+      destinationBatchId: 'c3a97ec4-84f8-4a85-a493-b8d6feb84a27',
+      sourceMovementId: 'a2f2d7a4-0948-49c4-a0a8-afbf88503a5c',
+      destinationMovementId: 'b2f2d7a4-0948-49c4-a0a8-afbf88503a5c',
+      quantity: 2,
+      sourceOnHandAfter: 18,
+      destinationOnHandAfter: 7,
+      sourceBatchVersion: 5,
+      destinationBatchVersion: 3,
+      completedAt: '2026-08-14T04:00:00.000Z',
+      replayed: false,
+    };
+    expect(isCompletedTransferRequest(request)).toBe(true);
+    expect(isCompletedTransferRequest({ ...request, destinationInventoryId: 'leak' })).toBe(false);
+    expect(isCompletedTransferRequest({ ...request, reason: ' ' })).toBe(false);
+    expect(isCompletedTransferResponse(receipt)).toBe(true);
+    expect(isCompletedTransferResponse({ ...receipt, tenantId: 'leak' })).toBe(false);
+    expect(
+      isCompletedTransferResponse({ ...receipt, destinationProviderId: receipt.sourceProviderId }),
+    ).toBe(false);
   });
 });

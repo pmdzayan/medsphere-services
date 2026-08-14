@@ -8,11 +8,11 @@ MedSphere is a planned multi-tenant healthcare ecosystem for patients, pharmacie
 
 **Status date:** 2026-08-14
 
-**Accepted evidence baseline:** `636eb86` (PR #42 squash merge)
+**Accepted evidence baseline:** `7feacbb` (PR #43 squash merge)
 
-**Current sprint:** G3.14 live reservation lifecycle actions implementation
+**Current sprint:** G3.15 live completed inventory transfer implementation
 
-**Full-roadmap estimate:** **38% complete / 62% remaining**
+**Full-roadmap estimate:** **39% complete / 61% remaining**
 
 This is an engineering progress estimate against the complete MedSphere roadmap,
 including stabilization, healthcare-domain workflows, frontend applications,
@@ -35,7 +35,7 @@ and Gates 2 and 4–20 are not complete.
 | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------: |
 | Architecture, governance, monorepo, and database baseline        | ADR process, PNPM/Turbo tooling, shared packages, forward migrations, drift checks, and CI gates exist                                                                          |                  85% |
 | Authentication, tenant context, RBAC, and durable audit          | S0.3 and S0.4 accepted; authenticated frontend, role administration, effective permissions, audit, policy-controlled onboarding, and personal privacy settings implemented      |                  85% |
-| Inventory ledger and medicine reservation integrity              | S0.5 and G3.1–G3.13 accepted through live quarantine and damaged-stock write-off; safe creation, returns, release/recall, analytics, and broader UI remain incomplete           |                  84% |
+| Inventory ledger and medicine reservation integrity              | S0.5 and G3.1–G3.14 accepted through live stock safety and reservation lifecycle actions; safe creation, returns, release/recall, and analytics remain incomplete               |                  86% |
 | Frontend                                                         | Landing, login, shell, team/RBAC, audit, assigned-provider stock, and reservation reads are connected; pharmacy dashboard and most healthcare modules remain previews or absent |                  38% |
 | Compliance beyond RBAC and audit                                 | Consent, privacy operations, verification, retention, legal hold, and policy enforcement remain incomplete                                                                      |                  10% |
 | Supplier, procurement, pharmacy, billing, and delivery workflows | Existing deployables are mostly health-only placeholders or unaccepted prototypes                                                                                               |                   5% |

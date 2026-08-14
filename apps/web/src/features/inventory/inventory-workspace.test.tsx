@@ -5,6 +5,7 @@ import {
   getAssignedProviders,
   getProviderStock,
   quarantineBatch,
+  recordCompletedTransfer,
   recordDamagedStock,
 } from '@/lib/api-client';
 import type { InventoryStockPage, ProviderAccess } from '@/lib/inventory-contract';
@@ -17,6 +18,7 @@ vi.mock('@/lib/api-client', async () => {
     getAssignedProviders: vi.fn(),
     getProviderStock: vi.fn(),
     quarantineBatch: vi.fn(),
+    recordCompletedTransfer: vi.fn(),
     recordDamagedStock: vi.fn(),
   };
 });
@@ -98,6 +100,25 @@ beforeEach(() => {
     onHandAfter: 18,
     resultingBatchVersion: 5,
     occurredAt: '2026-08-14T02:00:00.000Z',
+    replayed: false,
+  });
+  vi.mocked(recordCompletedTransfer).mockResolvedValue({
+    transferId: '52f2d7a4-0948-49c4-a0a8-afbf88503a5c',
+    productId: page.data[0].productId,
+    sourceProviderId: providers[0].providerId,
+    destinationProviderId: providers[1].providerId,
+    sourceInventoryId: page.data[0].inventoryId,
+    destinationInventoryId: 'd63f50dd-49b0-4a77-bc04-f7d00db58dd5',
+    sourceBatchId: page.data[0].batches[0].id,
+    destinationBatchId: 'c3a97ec4-84f8-4a85-a493-b8d6feb84a27',
+    sourceMovementId: 'a2f2d7a4-0948-49c4-a0a8-afbf88503a5c',
+    destinationMovementId: 'b2f2d7a4-0948-49c4-a0a8-afbf88503a5c',
+    quantity: 2,
+    sourceOnHandAfter: 18,
+    destinationOnHandAfter: 7,
+    sourceBatchVersion: 5,
+    destinationBatchVersion: 3,
+    completedAt: '2026-08-14T04:00:00.000Z',
     replayed: false,
   });
 });
@@ -229,6 +250,44 @@ describe('InventoryWorkspace live integration', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Confirm damaged stock' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('valid available quantity');
     expect(recordDamagedStock).not.toHaveBeenCalled();
+  });
+
+  it('records only a completed physical transfer and refreshes source stock', async () => {
+    vi.stubGlobal('crypto', { randomUUID: () => '44444444-4444-4444-8444-444444444444' });
+    render(<InventoryWorkspace />);
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Record completed transfer for batch BATCH-1' }),
+    );
+    expect(screen.getByRole('dialog')).toHaveTextContent('does not create a shipment');
+    fireEvent.change(screen.getByLabelText('Transfer quantity'), { target: { value: '2' } });
+    fireEvent.change(screen.getByLabelText('Transfer reason'), {
+      target: { value: ' Stock already moved between assigned locations. ' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm completed transfer' }));
+
+    await waitFor(() =>
+      expect(recordCompletedTransfer).toHaveBeenCalledWith(providers[0].providerId, {
+        destinationProviderId: providers[1].providerId,
+        sourceBatchId: page.data[0].batches[0].id,
+        expectedSourceVersion: 4,
+        quantity: 2,
+        idempotencyKey: 'completed-transfer-44444444-4444-4444-8444-444444444444',
+        reason: 'Stock already moved between assigned locations.',
+      }),
+    );
+    expect(await screen.findByText(/Source on-hand is now 18/)).toBeVisible();
+    expect(getProviderStock).toHaveBeenCalledTimes(2);
+  });
+
+  it('rejects a transfer above available stock before the API call', async () => {
+    render(<InventoryWorkspace />);
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Record completed transfer for batch BATCH-1' }),
+    );
+    fireEvent.change(screen.getByLabelText('Transfer quantity'), { target: { value: '18' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm completed transfer' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('valid available quantity');
+    expect(recordCompletedTransfer).not.toHaveBeenCalled();
   });
 
   it('shows assignment-empty and permission-restricted states', async () => {

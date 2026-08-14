@@ -15,6 +15,8 @@ import type {
 import {
   type BatchQuarantineRequest,
   type BatchQuarantineResponse,
+  type CompletedTransferRequest,
+  type CompletedTransferResponse,
   type DamagedStockRequest,
   type DamagedStockResponse,
   toInventoryStockSearchParams,
@@ -142,6 +144,20 @@ export async function recordDamagedStock(
     `/api/inventory/providers/${encodeURIComponent(providerId)}/batches/${encodeURIComponent(
       batchId,
     )}/damage`,
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(request),
+    },
+  );
+}
+
+export async function recordCompletedTransfer(
+  sourceProviderId: string,
+  request: CompletedTransferRequest,
+): Promise<CompletedTransferResponse> {
+  return requestJson<CompletedTransferResponse>(
+    `/api/inventory/providers/${encodeURIComponent(sourceProviderId)}/transfers`,
     {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
