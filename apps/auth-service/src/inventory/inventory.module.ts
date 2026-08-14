@@ -14,6 +14,7 @@ import { BatchExpiryService } from './batch-expiry.service';
 import { InventoryQuarantineService } from './inventory-quarantine.service';
 import { ReservationRepository } from './reservation.repository';
 import { ReservationService } from './reservation.service';
+import { ReservationCreationService } from './reservation-creation.service';
 
 @Module({
   imports: [PrismaModule, AuthorizationModule, AuditPersistenceModule],
@@ -26,6 +27,7 @@ import { ReservationService } from './reservation.service';
     InventoryDamageService,
     ReservationRepository,
     ReservationService,
+    ReservationCreationService,
     ReservationLifecycleService,
     ReservationExpiryService,
     BatchExpiryService,

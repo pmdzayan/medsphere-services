@@ -1,6 +1,6 @@
 # Volume 04 — Database Bible
 
-**Baseline:** Accepted through G3.10; G3.11 implemented pending exact-head CI
+**Baseline:** Accepted through G3.15; G3.16 implemented pending exact-head CI
 and CTO acceptance
 
 **Engine:** PostgreSQL 16
@@ -13,15 +13,15 @@ and CTO acceptance
 
 ## Acceptance boundary
 
-This volume documents the accepted database through G3.10 and the implemented
-G3.11 quarantine candidate. S0.5 established tenant-scoped batch quantity authority, an append-only
+This volume documents the accepted database through G3.15 and the implemented
+G3.16 staff-reservation candidate. S0.5 established tenant-scoped batch quantity authority, an append-only
 stock ledger, typed medicine reservations, deterministic FEFO allocations, and
 idempotent command receipts. G3.1 added composite membership-provider access.
 G3.2 added migration-owned permissions and constrained command hashes for the
 first accepted stock mutations. Later accepted sprints added reservation
-lifecycle, transfer, damage, and physical-expiry evidence. G3.11 adds a
-terminal quarantine state, permission, and immutable quarantine record. Consent,
-privacy, retention, and remaining
+lifecycle, transfer, damage, physical-expiry, and quarantine evidence. G3.16
+adds a dedicated migration-owned staff-creation permission while reusing the
+accepted reservation tables and invariants. Consent, privacy, retention, and remaining
 product domains continue through dependency-ordered sprints.
 
 No production or real healthcare data is approved.
@@ -44,6 +44,7 @@ No production or real healthcare data is approved.
 |    12 | `20260810140000_completed_damaged_stock_write_off`               | Damage write-off evidence and audit                                    |
 |    13 | `20260810180000_physical_batch_expiry_reconciliation`            | Physical expiry evidence and system audit                              |
 |    14 | `20260810200000_one_way_manual_batch_quarantine`                 | Terminal quarantine evidence, permission, and audit                    |
+|    15 | `20260814120000_staff_reservation_creation`                      | Assigned-provider staff reservation creation permission                |
 
 Migration history is append-only under ADR-002. Applied migrations are never edited or deleted. Shared databases use `prisma migrate deploy`; `prisma db push` is prohibited.
 

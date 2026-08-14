@@ -6,7 +6,7 @@
 
 **Accepted stabilization baseline:** `4ea55a17e188410ddee45fa3ea6c016e22d6617a`
 
-**Current sprint:** Next dependency-ready sprint selection
+**Current sprint:** G3.16 assigned-provider staff reservation creation acceptance
 
 **Release state:** Not approved for production or real healthcare data
 
@@ -34,6 +34,23 @@ supplier, payment, or delivery behavior is added.
 
 **Implementation authority:** ADR-001 through ADR-012, accepted source
 `bc26e2a`, and `docs/sprints/G3.15-live-completed-inventory-transfer.md`.
+
+## Active acceptance candidate
+
+### G3.16 — Assigned-Provider Staff Reservation Creation
+
+**Status:** Implemented from remote head `c82ff7d`; exact-head CI and CTO
+acceptance are required.
+
+**Boundary:** One permission-protected assigned-provider staff command creates a
+future reservation for an active user in the same tenant, allocates visible
+active unexpired batches in deterministic FEFO order, and records holds and a
+bounded audit event atomically. Public/patient self-service, clinical content,
+prescriptions, delivery, payment, controlled medicine, substitution, partial
+allocation, notifications, and analytics remain excluded.
+
+**Implementation authority:** ADR-005 and
+`docs/sprints/G3.16-assigned-provider-staff-reservation-creation.md`.
 
 ## Earlier accepted sprint
 

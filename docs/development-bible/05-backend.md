@@ -1,10 +1,10 @@
 # Volume 05 — Backend Bible: Identity, Authorization, Audit, and Inventory
 
-**Sprints:** Accepted through G3.10; G3.11 implemented pending acceptance
+**Sprints:** Accepted through G3.15; G3.16 implemented pending acceptance
 
 **Decisions:** ADR-003 through ADR-007
 
-**Status:** G3.11 implemented; exact-head CI and CTO acceptance required; not production-approved
+**Status:** G3.16 implemented; exact-head CI and CTO acceptance required; not production-approved
 
 ## Purpose and boundary
 
@@ -54,6 +54,7 @@ remain unmounted.
 | GET    | `/inventory/providers/:providerId/reservations`                            | Read permission + assignment       | Verified membership/provider relation        |
 | GET    | `/inventory/providers/:providerId/reservations/:reservationId`             | Read permission + assignment       | Verified membership/provider relation        |
 | POST   | `/inventory/providers/:providerId/reservations/:reservationId/transitions` | Manage permission + assignment     | Verified membership/provider relation        |
+| POST   | `/inventory/providers/:providerId/reservations`                            | Create permission + assignment     | Verified membership/provider relation        |
 | POST   | `/inventory/providers/:providerId/batches/:batchId/quarantine`             | Quarantine permission + assignment | Verified membership/provider relation        |
 
 No accepted endpoint takes an authoritative user, membership, tenant, or session ID from the request body, path, query, or custom header.
@@ -91,6 +92,9 @@ PostgreSQL CI and review pass.
   identity and free-text notes.
 - `ReservationLifecycleService`: serializable, versioned staff transitions with
   authorization-before-replay, exact hold/stock updates, and atomic audit.
+- `ReservationCreationService`: serializable assigned-provider staff creation
+  with authorization-before-replay, same-tenant subject checks, deterministic
+  FEFO holds, optimistic batch predicates, and atomic audit.
 - `BatchExpiryService`: bounded non-HTTP reconciliation using database time,
   stable due-batch selection, full reservation-release reuse, per-candidate
   serializable transactions, immutable expiry evidence, and tenant-system audit.

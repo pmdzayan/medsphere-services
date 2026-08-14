@@ -52,6 +52,8 @@ Ordered sprints:
     squash-merged in PR #43 as `7feacbb` after exact-head CI run `31763879935`
 22. G3.15 Live completed inventory transfer — accepted and squash-merged in PR
     #44 as `bc26e2a` after exact-head CI run `31764479220`
+23. G3.16 Assigned-provider staff reservation creation — implemented; exact-head
+    CI and CTO acceptance required
 
 **Completion gate:** Accepted ADRs; protected review flow; clean migrations; deny-by-default authentication; tenant-isolation tests; integrated audit trail; atomic stock/reservation behavior; mandatory lint/test/build passing.
 

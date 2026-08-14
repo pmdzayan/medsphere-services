@@ -166,8 +166,10 @@ See `docs/audits/2026-07-20-cto-baseline.md` for the accepted baseline.
     #43 as `7feacbb` after exact-head CI run `31763879935`
 26. G3.15 live completed inventory transfer — accepted and squash-merged in PR
     #44 as `bc26e2a` after exact-head CI run `31764479220`
-27. Returns, safe creation, and later live mutations — blocked pending their
-    own accepted contracts
+27. G3.16 assigned-provider staff reservation creation — implemented; exact-head
+    CI and CTO acceptance required
+28. Returns and later live mutations — blocked pending their own accepted
+    contracts
 
 If ownership transfers, resume at the first pending checkpoint. Do not use
 `cline/s0.4-rbac-audit` or
@@ -175,8 +177,8 @@ If ownership transfers, resume at the first pending checkpoint. Do not use
 
 ## Exact continuation point
 
-Select the next sprint from accepted source `bc26e2a` without skipping recorded
-dependencies. Quarantine release, reservation creation, returns, recall,
+Accept or correct G3.16 from remote head `c82ff7d` without skipping recorded
+dependencies. Quarantine release, public/patient reservation creation, returns, recall,
 analytics policy, patient exposure, and Gates 2 and 4–9 remain blocked until
 their recorded prerequisites are satisfied.
 
