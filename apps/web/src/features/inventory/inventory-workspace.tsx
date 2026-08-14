@@ -499,6 +499,7 @@ export function InventoryWorkspace() {
         >
           <form
             onSubmit={(event) => void submitDamage(event)}
+            noValidate
             className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl"
           >
             <p className="text-xs font-extrabold uppercase tracking-[.16em] text-rose-700">
