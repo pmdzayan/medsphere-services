@@ -110,7 +110,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE TRIGGER "OutboxEvent_reject_envelope_mutation"
+CREATE TRIGGER "OutboxEvent_00_reject_envelope_mutation"
 BEFORE UPDATE ON "OutboxEvent"
 FOR EACH ROW EXECUTE FUNCTION reject_outbox_envelope_mutation();
 
@@ -143,7 +143,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE TRIGGER "OutboxEvent_enforce_delivery_transition"
+CREATE TRIGGER "OutboxEvent_10_enforce_delivery_transition"
 BEFORE UPDATE ON "OutboxEvent"
 FOR EACH ROW EXECUTE FUNCTION enforce_outbox_delivery_transition();
 
