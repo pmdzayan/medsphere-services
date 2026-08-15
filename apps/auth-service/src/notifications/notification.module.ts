@@ -8,12 +8,12 @@ import {
 import {
   NoopNotificationDeliveryObserver,
   UnconfiguredNotificationProviderRegistry,
-  UnconfiguredNotificationRecipientResolver,
 } from './notification-defaults';
 import { NotificationOperationsService } from './notification-operations.service';
 import { NotificationQueueService } from './notification-queue.service';
 import { NotificationWorkerService } from './notification-worker.service';
 import { ReservationNotificationConsumerService } from './reservation-notification-consumer.service';
+import { ReservationRecipientResolverService } from './reservation-recipient-resolver.service';
 
 @Module({
   imports: [PrismaModule],
@@ -22,12 +22,12 @@ import { ReservationNotificationConsumerService } from './reservation-notificati
     NotificationWorkerService,
     NotificationOperationsService,
     ReservationNotificationConsumerService,
-    UnconfiguredNotificationRecipientResolver,
+    ReservationRecipientResolverService,
     UnconfiguredNotificationProviderRegistry,
     NoopNotificationDeliveryObserver,
     {
       provide: NOTIFICATION_RECIPIENT_RESOLVER,
-      useExisting: UnconfiguredNotificationRecipientResolver,
+      useExisting: ReservationRecipientResolverService,
     },
     {
       provide: NOTIFICATION_PROVIDER_REGISTRY,
