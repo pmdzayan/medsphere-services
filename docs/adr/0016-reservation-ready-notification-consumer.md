@@ -1,12 +1,16 @@
 # ADR-016: Reservation-Ready Notification Consumer
 
-**Status:** Proposed
+**Status:** Accepted
 
 **Date:** 2026-08-14
 
 **Decision owners:** MedSphere Project Owner and CTO
 
 **Depends on:** ADR-003, ADR-004, ADR-005, ADR-008, ADR-013, ADR-014, and ADR-015
+
+**Acceptance evidence:** PR #58 squash-merged as
+`95949887b6ace793f0c33156a2dceec0c4ff1916` after exact-head GitHub Actions
+run `31817168998` passed all required gates.
 
 ## Context
 
