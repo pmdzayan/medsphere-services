@@ -1,5 +1,8 @@
 import { Injectable } from '@nestjs/common';
-import type { NotificationChannel, NotificationRecipientType } from '@medsphere/database';
+import type {
+  NotificationChannel,
+  NotificationRecipientType,
+} from '@medsphere/database';
 import { PrismaService } from '../prisma/prisma.service';
 import type { NotificationRecipientResolver } from './notification.contracts';
 import { NotificationDeliveryFailure } from './notification.errors';
@@ -17,7 +20,9 @@ interface ReservationRecipientResolutionInput {
 }
 
 @Injectable()
-export class ReservationRecipientResolverService implements NotificationRecipientResolver {
+export class ReservationRecipientResolverService
+  implements NotificationRecipientResolver
+{
   constructor(private readonly prisma: PrismaService) {}
 
   async resolve(
