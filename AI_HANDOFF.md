@@ -1,11 +1,11 @@
 # MedSphere AI Handoff
 
-**Last updated:** 2026-08-14
+**Last updated:** 2026-08-15
 
-**Current sprint:** G3.24 reservation-ready notification consumer in review
+**Current sprint:** G3.25 reservation recipient resolution boundary not started
 
-**Next feature work:** Complete G3.24 review, exact-head CI, merge, and acceptance
-before starting recipient resolution
+**Next feature work:** Implement the bounded G3.25 reservation recipient
+resolution boundary from accepted G3.24 source `9594988`
 
 ## Mandatory startup sequence
 
@@ -92,6 +92,13 @@ The migration must be incremental:
   add no release, recall, disposal, return, notification, or mutation UI.
   Exact-head CI run `31761072418` passed and PR #38 was accepted and
   squash-merged as `d364794`; V1 is now estimated at 36%.
+- G3.24 consumes only `inventory.reservation.ready` version 1, reloads the
+  authoritative event and reservation inside the accepted G3.21 inbox
+  transaction, and enqueues one bounded G3.23 intent using only an opaque
+  same-tenant membership reference. Exact-head CI run `31817168998` passed and
+  PR #58 was accepted and squash-merged as `9594988`. No destination
+  resolution, message composition, real provider, external call, production
+  delivery, or real-healthcare-data approval is included.
 - S0.5 now defines `Batch` as physical/held quantity authority, uses an
   append-only movement ledger, and stores typed reservation items and
   allocations. Its accepted production HTTP boundary and live frontend
@@ -183,7 +190,9 @@ See `docs/audits/2026-07-20-cto-baseline.md` for the accepted baseline.
     in PR #54 as `3e7a8c0` after exact-head CI run `31793020883`
 34. G3.23 notification delivery foundation — accepted and squash-merged in PR
     #56 as `fcc6e46` after exact-head CI run `31796185118`
-35. Returns and later live mutations — blocked pending their own accepted
+35. G3.24 reservation-ready notification consumer — accepted and squash-merged
+    in PR #58 as `9594988` after exact-head CI run `31817168998`
+36. Returns and later live mutations — blocked pending their own accepted
     contracts
 
 If ownership transfers, resume at the first pending checkpoint. Do not use
@@ -192,12 +201,14 @@ If ownership transfers, resume at the first pending checkpoint. Do not use
 
 ## Exact continuation point
 
-Complete G3.24 from accepted base `2fbe336`. It selects only
-`inventory.reservation.ready` version 1 and must pass implementation review,
-exact-head CI, merge, and acceptance synchronization before G3.25 recipient
-resolution starts. Keep provider selection, generalized composition, Maps,
-FHIR, ABDM, quarantine release, public/patient reservation creation, returns,
-recall, and patient exposure out of G3.24.
+Start G3.25 Reservation Recipient Resolution Boundary from accepted source
+`95949887b6ace793f0c33156a2dceec0c4ff1916` under accepted ADR-016 and the
+G3.23 provider-neutral notification contracts. Resolve only opaque recipient
+references through authoritative same-tenant state, fail closed for missing,
+stale, disabled, or unauthorized membership, keep contact data out of domain
+events and privacy-sensitive logs, and do not activate a real provider. Keep
+composition, Maps, FHIR, ABDM, quarantine release, public/patient reservation
+creation, returns, recall, and patient exposure out of G3.25.
 
 Cline may receive only a complete, bounded prompt for characterization tests or
 mechanical work whose contract is already fixed by ADR-005. Cline must not
