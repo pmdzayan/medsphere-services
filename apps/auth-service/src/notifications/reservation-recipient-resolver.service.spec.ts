@@ -62,7 +62,9 @@ describe('G3.25 ReservationRecipientResolverService', () => {
 
   it('conceals missing and cross-tenant references as unavailable', async () => {
     findFirst.mockResolvedValue(null);
-    await expect(service.resolve(input)).rejects.toMatchObject({ code: 'RECIPIENT_UNAVAILABLE' });
+    await expect(service.resolve(input)).rejects.toMatchObject({
+      code: 'RECIPIENT_UNAVAILABLE',
+    });
   });
 
   it.each([
