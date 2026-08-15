@@ -1,5 +1,8 @@
 import { randomUUID } from 'node:crypto';
-import { isInfrastructureTestEnabled, requireEnv } from '../auth/testing/infrastructure-test-gate';
+import {
+  isInfrastructureTestEnabled,
+  requireEnv,
+} from '../auth/testing/infrastructure-test-gate';
 import { PrismaService } from '../prisma/prisma.service';
 import { ReservationRecipientResolverService } from './reservation-recipient-resolver.service';
 
@@ -35,7 +38,9 @@ infrastructure('G3.25 PostgreSQL reservation recipient resolution', () => {
 
   it('resolves the active same-tenant recipient deterministically under concurrency without writes', async () => {
     const recipient = await createRecipient();
-    const before = await prisma.client.notificationDelivery.count({ where: { tenantId } });
+    const before = await prisma.client.notificationDelivery.count({
+      where: { tenantId },
+    });
 
     const results = await Promise.all(
       Array.from({ length: 8 }, () =>
@@ -48,7 +53,9 @@ infrastructure('G3.25 PostgreSQL reservation recipient resolution', () => {
       ),
     );
 
-    expect(results).toEqual(Array.from({ length: 8 }, () => ({ destinationToken: recipient.email })));
+    expect(results).toEqual(
+      Array.from({ length: 8 }, () => ({ destinationToken: recipient.email })),
+    );
     await expect(
       prisma.client.notificationDelivery.count({ where: { tenantId } }),
     ).resolves.toBe(before);
@@ -116,14 +123,16 @@ infrastructure('G3.25 PostgreSQL reservation recipient resolution', () => {
     ).rejects.toMatchObject({ code: 'RECIPIENT_DISABLED' });
   });
 
-  async function createRecipient(options: {
-    tenantId?: string;
-    membershipStatus?: MembershipState;
-    endedAt?: Date;
-    membershipDeletedAt?: Date;
-    userStatus?: UserState;
-    userDeletedAt?: Date;
-  } = {}) {
+  async function createRecipient(
+    options: {
+      tenantId?: string;
+      membershipStatus?: MembershipState;
+      endedAt?: Date;
+      membershipDeletedAt?: Date;
+      userStatus?: UserState;
+      userDeletedAt?: Date;
+    } = {},
+  ) {
     const recipientTenantId = options.tenantId ?? tenantId;
     const userId = randomUUID();
     const membershipId = randomUUID();
