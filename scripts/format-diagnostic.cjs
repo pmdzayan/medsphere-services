@@ -1,4 +1,7 @@
 const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+const { spawnSync } = require('node:child_process');
 const prettier = require('prettier');
 
 const files = [
@@ -10,6 +13,10 @@ const files = [
   'docs/adr/README.md',
   'docs/sprints/G3.25-reservation-recipient-resolution-boundary.md',
 ];
+
+function escapeWorkflowCommand(value) {
+  return value.replaceAll('%', '%25').replaceAll('\r', '%0D').replaceAll('\n', '%0A');
+}
 
 (async () => {
   let different = false;
@@ -25,8 +32,11 @@ const files = [
     });
     if (formatted !== input) {
       different = true;
-      const payload = Buffer.from(formatted, 'utf8').toString('base64');
-      console.log(`::error file=${file},line=1::PRETTIER_BASE64:${payload}`);
+      const temporary = path.join(os.tmpdir(), `formatted-${path.basename(file)}`);
+      fs.writeFileSync(temporary, formatted, 'utf8');
+      const result = spawnSync('diff', ['-u', file, temporary], { encoding: 'utf8' });
+      const diff = result.stdout || `Prettier differs for ${file}`;
+      console.log(`::error file=${file},line=1::${escapeWorkflowCommand(diff)}`);
     }
   }
   process.exitCode = different ? 1 : 0;
