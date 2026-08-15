@@ -1,8 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import {
-  isInfrastructureTestEnabled,
-  requireEnv,
-} from '../auth/testing/infrastructure-test-gate';
+import { isInfrastructureTestEnabled, requireEnv } from '../auth/testing/infrastructure-test-gate';
 import { PrismaService } from '../prisma/prisma.service';
 import { ReservationRecipientResolverService } from './reservation-recipient-resolver.service';
 
@@ -38,9 +35,7 @@ infrastructure('G3.25 PostgreSQL reservation recipient resolution', () => {
 
   it('resolves the active same-tenant recipient deterministically under concurrency without writes', async () => {
     const recipient = await createRecipient();
-    const before = await prisma.client.notificationDelivery.count({
-      where: { tenantId },
-    });
+    const before = await prisma.client.notificationDelivery.count({ where: { tenantId } });
 
     const results = await Promise.all(
       Array.from({ length: 8 }, () =>
