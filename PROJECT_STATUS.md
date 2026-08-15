@@ -1,18 +1,50 @@
 # MedSphere Project Status
 
-**Status date:** 2026-08-14
+**Status date:** 2026-08-15
 
-**Accepted source commit:** `fcc6e46f6023fd5c565c50886eed23b89e0968e2`
+**Accepted source commit:** `95949887b6ace793f0c33156a2dceec0c4ff1916`
 
 **Accepted stabilization baseline:** `4ea55a17e188410ddee45fa3ea6c016e22d6617a`
 
-**Current sprint:** G3.24 reservation-ready notification consumer in review
+**Current sprint:** G3.25 reservation recipient resolution boundary not started
 
 **Release state:** Not approved for production or real healthcare data
 
 **Full-roadmap engineering estimate:** 40% complete / 60% remaining
 
 ## Most recent accepted sprint
+
+### G3.24 — Reservation-Ready Notification Consumer
+
+**Status:** Accepted and squash-merged in PR #58 as `9594988` after exact-head
+CI run `31817168998` passed all required gates.
+
+**Boundary:** Exact `inventory.reservation.ready` version-1 validation,
+authoritative event and reservation reload inside the accepted G3.21 inbox
+transaction, and one opaque-membership G3.23 queue intent. No destination
+resolution, generalized composition, provider activation, external call,
+production approval, or real healthcare data is included.
+
+**Implementation authority:** accepted ADR-016, accepted source `9594988`, and
+`docs/sprints/G3.24-reservation-ready-notification-consumer.md`.
+
+## Active sprint
+
+### G3.25 — Reservation Recipient Resolution Boundary
+
+**Status:** Not started
+
+**Boundary:** Resolve only accepted opaque tenant-membership recipient
+references through authoritative same-tenant state; fail closed for missing,
+stale, disabled, or unauthorized membership; keep contact data out of domain
+events and privacy-sensitive logs. No generalized composition, provider
+activation, external call, Maps, FHIR, ABDM, or production claim is included.
+
+**Implementation authority:** accepted ADR-015, accepted ADR-016, accepted
+source `9594988`, and the bounded G3.25 sprint contract to be created before
+implementation.
+
+## Earlier accepted sprint
 
 ### G3.23 — Notification Delivery Foundation
 
@@ -27,21 +59,6 @@ approval, or real healthcare data is included.
 
 **Implementation authority:** accepted ADR-015, accepted source `fcc6e46`, and
 `docs/sprints/G3.23-notification-delivery-foundation.md`.
-
-## Active sprint
-
-### G3.24 — Reservation-Ready Notification Consumer
-
-**Status:** Implementation in review; not accepted
-
-**Boundary:** Exact `inventory.reservation.ready` version-1 validation,
-authoritative event and reservation reload, G3.21 inbox deduplication, and one
-opaque-membership G3.23 queue intent. No destination resolution, generalized
-composition, provider activation, external call, or production claim is
-included.
-
-**Implementation authority:** proposed ADR-016 and
-`docs/sprints/G3.24-reservation-ready-notification-consumer.md`.
 
 ## Earlier accepted sprint
 
@@ -251,7 +268,14 @@ and [the Gates 1–20 verification](docs/audits/2026-08-01-gates-1-20-verificati
 24. **G3.16–G3.20 inventory operations and evidence** — accepted through PR #50
 25. **G3.21 transactional event delivery foundation** — accepted and
     squash-merged in PR #52 as `af48522` after exact-head CI run `31786107840`
-26. Resume producer wiring, Inventory, and Compliance milestones in dependency order
+26. **G3.22 atomic inventory domain event producers** — accepted and
+    squash-merged in PR #54 as `3e7a8c0` after exact-head CI run `31793020883`
+27. **G3.23 notification delivery foundation** — accepted and squash-merged in
+    PR #56 as `fcc6e46` after exact-head CI run `31796185118`
+28. **G3.24 reservation-ready notification consumer** — accepted and
+    squash-merged in PR #58 as `9594988` after exact-head CI run `31817168998`
+29. **G3.25 reservation recipient resolution boundary** — next permitted sprint;
+    not started
 
 Only one recovery sprint may be active at a time. Exact boundaries may be refined through an ADR, but dependencies must not be skipped.
 
