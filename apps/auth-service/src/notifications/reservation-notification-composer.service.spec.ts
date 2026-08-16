@@ -68,10 +68,7 @@ describe('G3.26 ReservationNotificationComposerService', () => {
     [{ status: 'READY', email: 'recipient@example.test' }],
     [{ status: 'READY', medicineName: 'private' }],
   ])('rejects unexpected or sensitive variables: %p', (variables) => {
-    expectCode(
-      () => service.compose({ ...input, variables }),
-      'TEMPLATE_VARIABLES_INVALID',
-    );
+    expectCode(() => service.compose({ ...input, variables }), 'TEMPLATE_VARIABLES_INVALID');
   });
 
   it('does not echo rejected private or free-text values through failures', () => {
