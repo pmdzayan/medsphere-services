@@ -44,7 +44,9 @@ describe('G3.26 ReservationNotificationComposerService', () => {
   });
 
   it('defaults locale explicitly and rejects unapproved locales', () => {
-    expect(service.compose(input).locale).toBe(RESERVATION_READY_DEFAULT_LOCALE);
+    expect(service.compose(input).locale).toBe(
+      RESERVATION_READY_DEFAULT_LOCALE,
+    );
     expectCode(
       () => service.compose({ ...input, locale: 'fr' }),
       'TEMPLATE_LOCALE_UNSUPPORTED',
@@ -77,24 +79,27 @@ describe('G3.26 ReservationNotificationComposerService', () => {
     );
   });
 
-  it('does not echo rejected private or free-text values through failures', () => {
-    const privateValue = 'do-not-leak-this-value';
-    let error: unknown;
-    try {
-      service.compose({
-        ...input,
-        variables: { status: 'READY', message: privateValue },
+  it(
+    'does not echo rejected private or free-text values through failures',
+    () => {
+      const privateValue = 'do-not-leak-this-value';
+      let error: unknown;
+      try {
+        service.compose({
+          ...input,
+          variables: { status: 'READY', message: privateValue },
+        });
+      } catch (caught) {
+        error = caught;
+      }
+      expect(error).toMatchObject({
+        code: 'TEMPLATE_VARIABLES_INVALID',
+        providerKey: 'composition',
       });
-    } catch (caught) {
-      error = caught;
-    }
-    expect(error).toMatchObject({
-      code: 'TEMPLATE_VARIABLES_INVALID',
-      providerKey: 'composition',
-    });
-    expect(String(error)).not.toContain(privateValue);
-    expect(JSON.stringify(error)).not.toContain(privateValue);
-  });
+      expect(String(error)).not.toContain(privateValue);
+      expect(JSON.stringify(error)).not.toContain(privateValue);
+    },
+  );
 });
 
 function expectCode(action: () => unknown, code: string): void {
