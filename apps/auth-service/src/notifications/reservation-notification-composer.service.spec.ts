@@ -81,7 +81,10 @@ describe('G3.26 ReservationNotificationComposerService', () => {
     const privateValue = 'do-not-leak-this-value';
     let error: unknown;
     try {
-      service.compose({ ...input, variables: { status: 'READY', message: privateValue } });
+      service.compose({
+        ...input,
+        variables: { status: 'READY', message: privateValue },
+      });
     } catch (caught) {
       error = caught;
     }
