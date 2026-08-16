@@ -78,16 +78,7 @@ jobs:
         run: pnpm db:verify-upgrade
 
       - name: Check formatting
-        shell: bash
-        run: |
-          if pnpm format:check; then
-            exit 0
-          fi
-          pnpm format
-          while IFS= read -r file; do
-            echo "::error file=${file}::Prettier formatting mismatch"
-          done < <(git diff --name-only)
-          exit 1
+        run: pnpm format:check
 
       - name: Lint
         run: pnpm lint
