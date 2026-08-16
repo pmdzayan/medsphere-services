@@ -45,18 +45,15 @@ describe('G3.26 ReservationNotificationComposerService', () => {
 
   it('defaults locale explicitly and rejects unapproved locales', () => {
     expect(service.compose(input).locale).toBe(RESERVATION_READY_DEFAULT_LOCALE);
-    expect(() => service.compose({ ...input, locale: 'fr' })).toThrow(
-      expect.objectContaining({ code: 'TEMPLATE_LOCALE_UNSUPPORTED' }),
-    );
+    expectCode(() => service.compose({ ...input, locale: 'fr' }), 'TEMPLATE_LOCALE_UNSUPPORTED');
   });
 
   it('rejects unsupported template identifiers and versions', () => {
-    expect(() => service.compose({ ...input, templateKey: 'anything-else' })).toThrow(
-      expect.objectContaining({ code: 'TEMPLATE_KEY_UNSUPPORTED' }),
+    expectCode(
+      () => service.compose({ ...input, templateKey: 'anything-else' }),
+      'TEMPLATE_KEY_UNSUPPORTED',
     );
-    expect(() => service.compose({ ...input, templateVersion: 2 })).toThrow(
-      expect.objectContaining({ code: 'TEMPLATE_VERSION_UNSUPPORTED' }),
-    );
+    expectCode(() => service.compose({ ...input, templateVersion: 2 }), 'TEMPLATE_VERSION_UNSUPPORTED');
   });
 
   it.each([
@@ -68,9 +65,7 @@ describe('G3.26 ReservationNotificationComposerService', () => {
     [{ status: 'READY', email: 'recipient@example.test' }],
     [{ status: 'READY', medicineName: 'private' }],
   ])('rejects unexpected or sensitive variables: %p', (variables) => {
-    expect(() => service.compose({ ...input, variables })).toThrow(
-      expect.objectContaining({ code: 'TEMPLATE_VARIABLES_INVALID' }),
-    );
+    expectCode(() => service.compose({ ...input, variables }), 'TEMPLATE_VARIABLES_INVALID');
   });
 
   it('does not echo rejected private or free-text values through failures', () => {
@@ -86,3 +81,13 @@ describe('G3.26 ReservationNotificationComposerService', () => {
     expect(JSON.stringify(error)).not.toContain(privateValue);
   });
 });
+
+function expectCode(action: () => unknown, code: string): void {
+  let error: unknown;
+  try {
+    action();
+  } catch (caught) {
+    error = caught;
+  }
+  expect(error).toMatchObject({ code, providerKey: 'composition' });
+}
