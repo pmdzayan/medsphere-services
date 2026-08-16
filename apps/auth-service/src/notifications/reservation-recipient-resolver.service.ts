@@ -4,8 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import type { NotificationRecipientResolver } from './notification.contracts';
 import { NotificationDeliveryFailure } from './notification.errors';
 
-const UUID_PATTERN =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const EMAIL_DESTINATION_PATTERN = /^[^\s@]+@[^\s@]+$/;
 const RESOLUTION_PROVIDER_KEY = 'recipient-resolution';
 
