@@ -34,3 +34,4 @@ Every ADR includes decision, reason/context, alternatives, consequences, impleme
 | [ADR-015](0015-provider-neutral-notification-delivery-foundation.md) | Provider-neutral notification delivery        | Accepted | 2026-08-14 |
 | [ADR-016](0016-reservation-ready-notification-consumer.md)           | Reservation-ready notification consumer       | Accepted | 2026-08-14 |
 | [ADR-017](0017-reservation-notification-recipient-resolution.md)     | Reservation notification recipient resolution | Accepted | 2026-08-15 |
+| [ADR-018](0018-reservation-notification-composition.md)              | Reservation notification composition          | Proposed | 2026-08-16 |
