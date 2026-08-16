@@ -1,12 +1,17 @@
 # ADR-017: Reservation Notification Recipient Resolution
 
-**Status:** Proposed
+**Status:** Accepted
 
 **Date:** 2026-08-15
 
 **Decision owners:** MedSphere Project Owner and CTO
 
 **Depends on:** ADR-003, ADR-004, ADR-015, and ADR-016
+
+**Acceptance evidence:** PR #60 squash-merged as
+`85088deec31a76b1a2187982d53dd97acdb11db6` after exact-head GitHub Actions
+run `31952514969` passed all required gates on reviewed head
+`ec3c5be6312d0c9fbdae3b09419ccd692aa12888`.
 
 ## Context
 

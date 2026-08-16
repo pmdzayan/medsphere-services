@@ -70,6 +70,8 @@ Ordered sprints:
     #56 as `fcc6e46` after exact-head CI run `31796185118`
 31. G3.24 Reservation-ready notification consumer — accepted and squash-merged
     in PR #58 as `9594988` after exact-head CI run `31817168998`
+32. G3.25 Reservation recipient resolution boundary — accepted and squash-merged
+    in PR #60 as `85088de` after exact-head CI run `31952514969`
 
 **Completion gate:** Accepted ADRs; protected review flow; clean migrations; deny-by-default authentication; tenant-isolation tests; integrated audit trail; atomic stock/reservation behavior; mandatory lint/test/build passing.
 
