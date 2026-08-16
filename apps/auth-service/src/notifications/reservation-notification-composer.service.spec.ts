@@ -45,7 +45,10 @@ describe('G3.26 ReservationNotificationComposerService', () => {
 
   it('defaults locale explicitly and rejects unapproved locales', () => {
     expect(service.compose(input).locale).toBe(RESERVATION_READY_DEFAULT_LOCALE);
-    expectCode(() => service.compose({ ...input, locale: 'fr' }), 'TEMPLATE_LOCALE_UNSUPPORTED');
+    expectCode(
+      () => service.compose({ ...input, locale: 'fr' }),
+      'TEMPLATE_LOCALE_UNSUPPORTED',
+    );
   });
 
   it('rejects unsupported template identifiers and versions', () => {
@@ -53,7 +56,10 @@ describe('G3.26 ReservationNotificationComposerService', () => {
       () => service.compose({ ...input, templateKey: 'anything-else' }),
       'TEMPLATE_KEY_UNSUPPORTED',
     );
-    expectCode(() => service.compose({ ...input, templateVersion: 2 }), 'TEMPLATE_VERSION_UNSUPPORTED');
+    expectCode(
+      () => service.compose({ ...input, templateVersion: 2 }),
+      'TEMPLATE_VERSION_UNSUPPORTED',
+    );
   });
 
   it.each([
@@ -65,7 +71,10 @@ describe('G3.26 ReservationNotificationComposerService', () => {
     [{ status: 'READY', email: 'recipient@example.test' }],
     [{ status: 'READY', medicineName: 'private' }],
   ])('rejects unexpected or sensitive variables: %p', (variables) => {
-    expectCode(() => service.compose({ ...input, variables }), 'TEMPLATE_VARIABLES_INVALID');
+    expectCode(
+      () => service.compose({ ...input, variables }),
+      'TEMPLATE_VARIABLES_INVALID',
+    );
   });
 
   it('does not echo rejected private or free-text values through failures', () => {
@@ -76,7 +85,10 @@ describe('G3.26 ReservationNotificationComposerService', () => {
     } catch (caught) {
       error = caught;
     }
-    expect(error).toMatchObject({ code: 'TEMPLATE_VARIABLES_INVALID', providerKey: 'composition' });
+    expect(error).toMatchObject({
+      code: 'TEMPLATE_VARIABLES_INVALID',
+      providerKey: 'composition',
+    });
     expect(String(error)).not.toContain(privateValue);
     expect(JSON.stringify(error)).not.toContain(privateValue);
   });
