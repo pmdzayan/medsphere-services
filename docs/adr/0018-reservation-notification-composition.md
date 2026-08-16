@@ -10,33 +10,49 @@
 
 ## Context
 
-G3.24 creates one bounded reservation-ready notification intent and G3.25 resolves its opaque tenant-membership recipient at delivery time. The next boundary must define deterministic, privacy-minimal notification composition before any end-to-end workflow or real provider can be considered.
+G3.24 creates one bounded reservation-ready notification intent and G3.25
+resolves its opaque tenant-membership recipient at delivery time. The next
+boundary must define deterministic, privacy-minimal notification composition
+before any end-to-end workflow or real provider can be considered.
 
 ## Decision
 
 - G3.26 supports only template key `reservation-ready`, version `1`.
 - The only accepted variable is `status` with the exact value `READY`.
 - Arbitrary free text and unexpected variables fail closed.
-- The initial locale is explicit `en`; unsupported locales fail closed. The contract leaves a locale boundary without creating a localization platform.
-- Composition produces a channel-neutral subject/body pair plus bounded metadata.
-- Content is intentionally operational and generic. It includes no medicine name, patient name, contact data, prescription, diagnosis, clinical detail, provider detail, or reservation detail.
+- The initial locale is explicit `en`; unsupported locales fail closed. The
+  contract leaves a locale boundary without creating a localization platform.
+- Composition produces a channel-neutral subject/body pair plus bounded
+  metadata.
+- Content is intentionally operational and generic. It includes no medicine
+  name, patient name, contact data, prescription, diagnosis, clinical detail,
+  provider detail, or reservation detail.
 - Composition failures are coded and must not echo rejected values.
-- No real provider is activated and G3.26 does not wire the full event-to-delivery workflow.
+- No real provider is activated and G3.26 does not wire the full event-to-delivery
+  workflow.
 
 ## Reason
 
-A narrow deterministic contract prevents queued variables from becoming an arbitrary message channel and keeps the first notification workflow privacy-minimal. Explicit template identity, version, locale, and variable allowlisting also make future changes reviewable and replay-safe.
+A narrow deterministic contract prevents queued variables from becoming an
+arbitrary message channel and keeps the first notification workflow
+privacy-minimal. Explicit template identity, version, locale, and variable
+allowlisting also make future changes reviewable and replay-safe.
 
 ## Alternatives
 
-- **General-purpose template engine:** rejected because it expands scope and creates an unnecessary content-injection surface.
-- **Free-text message body in the queue:** rejected because durable arbitrary text can leak private or clinical information.
-- **Include medicine or patient details:** rejected because the first workflow does not require them.
-- **Implement multiple locales now:** rejected because localization policy and translations require separate acceptance.
+- **General-purpose template engine:** rejected because it expands scope and
+  creates an unnecessary content-injection surface.
+- **Free-text message body in the queue:** rejected because durable arbitrary
+  text can leak private or clinical information.
+- **Include medicine or patient details:** rejected because the first workflow
+  does not require them.
+- **Implement multiple locales now:** rejected because localization policy and
+  translations require separate acceptance.
 
 ## Consequences
 
-- G3.27 may wire this composer into the provider-neutral worker only after G3.26 acceptance.
+- G3.27 may wire this composer into the provider-neutral worker only after G3.26
+  acceptance.
 - Any new variable, locale, template, or content class requires review.
 - The first message is intentionally generic.
 
@@ -52,4 +68,5 @@ A narrow deterministic contract prevents queued variables from becoming an arbit
 
 ## Review triggers
 
-Review this ADR before adding another template, variable, locale, content class, clinical field, provider-specific content, or dynamic free text.
+Review this ADR before adding another template, variable, locale, content class,
+clinical field, provider-specific content, or dynamic free text.
