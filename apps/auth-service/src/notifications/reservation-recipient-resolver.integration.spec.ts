@@ -51,9 +51,9 @@ infrastructure('G3.25 PostgreSQL reservation recipient resolution', () => {
     expect(results).toEqual(
       Array.from({ length: 8 }, () => ({ destinationToken: recipient.email })),
     );
-    await expect(
-      prisma.client.notificationDelivery.count({ where: { tenantId } }),
-    ).resolves.toBe(before);
+    await expect(prisma.client.notificationDelivery.count({ where: { tenantId } })).resolves.toBe(
+      before,
+    );
   });
 
   it('conceals cross-tenant and missing membership references as unavailable', async () => {
