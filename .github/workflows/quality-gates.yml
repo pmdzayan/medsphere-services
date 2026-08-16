@@ -78,21 +78,7 @@ jobs:
         run: pnpm db:verify-upgrade
 
       - name: Check formatting
-        shell: bash
-        run: |
-          if pnpm format:check; then
-            exit 0
-          fi
-          pnpm format
-          git diff --unified=0 -- \
-            apps/auth-service/src/notifications/reservation-notification-composer.service.ts \
-            apps/auth-service/src/notifications/reservation-notification-composer.service.spec.ts \
-            > /tmp/prettier.diff
-          while IFS= read -r line; do
-            escaped="${line//'%'/'%25'}"
-            echo "::notice file=apps/auth-service/src/notifications/reservation-notification-composer.service.ts::${escaped}"
-          done < /tmp/prettier.diff
-          exit 1
+        run: pnpm format:check
 
       - name: Lint
         run: pnpm lint
