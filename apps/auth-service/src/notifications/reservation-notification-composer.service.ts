@@ -26,9 +26,7 @@ export interface NotificationComposedContent {
 
 @Injectable()
 export class ReservationNotificationComposerService {
-  compose(
-    input: ReservationNotificationCompositionInput,
-  ): NotificationComposedContent {
+  compose(input: ReservationNotificationCompositionInput): NotificationComposedContent {
     if (input.templateKey !== RESERVATION_READY_TEMPLATE_KEY) {
       throw failure('TEMPLATE_KEY_UNSUPPORTED');
     }
