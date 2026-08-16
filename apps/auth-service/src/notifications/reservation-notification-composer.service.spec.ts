@@ -45,10 +45,7 @@ describe('G3.26 ReservationNotificationComposerService', () => {
 
   it('defaults locale explicitly and rejects unapproved locales', () => {
     expect(service.compose(input).locale).toBe(RESERVATION_READY_DEFAULT_LOCALE);
-    expectCode(
-      () => service.compose({ ...input, locale: 'fr' }),
-      'TEMPLATE_LOCALE_UNSUPPORTED',
-    );
+    expectCode(() => service.compose({ ...input, locale: 'fr' }), 'TEMPLATE_LOCALE_UNSUPPORTED');
   });
 
   it('rejects unsupported template identifiers and versions', () => {
