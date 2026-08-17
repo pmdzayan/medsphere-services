@@ -33,28 +33,31 @@ describe('G3.29 notification provider activation contract', () => {
     expect(() => registry.forChannel('EMAIL')).toThrow('Notification delivery failed');
   });
 
-  it('parses and validates the explicit startup configuration without resolving secret values', () => {
-    expect(
-      parseProviderActivationEnvironment({
-        NOTIFICATION_EMAIL_PROVIDER_ENABLED: 'true',
-        NOTIFICATION_EMAIL_PROVIDER_KEY: 'test-email-provider',
-        NOTIFICATION_EMAIL_PROVIDER_CREDENTIAL_REFERENCE: 'TEST_EMAIL_PROVIDER_TOKEN',
-        NOTIFICATION_EMAIL_PROVIDER_TIMEOUT_MS: '2000',
-      }),
-    ).toEqual({
-      enabled: true,
-      channel: 'EMAIL',
-      providerKey: 'test-email-provider',
-      credentialReference: 'TEST_EMAIL_PROVIDER_TOKEN',
-      timeoutMs: 2_000,
-    });
-    expect(() =>
-      parseProviderActivationEnvironment({ NOTIFICATION_EMAIL_PROVIDER_ENABLED: 'yes' }),
-    ).toThrow('Notification delivery failed');
-    expect(() =>
-      parseProviderActivationEnvironment({ NOTIFICATION_EMAIL_PROVIDER_TIMEOUT_MS: '2s' }),
-    ).toThrow('Notification delivery failed');
-  });
+  it(
+    'parses and validates the explicit startup configuration without resolving secret values',
+    () => {
+      expect(
+        parseProviderActivationEnvironment({
+          NOTIFICATION_EMAIL_PROVIDER_ENABLED: 'true',
+          NOTIFICATION_EMAIL_PROVIDER_KEY: 'test-email-provider',
+          NOTIFICATION_EMAIL_PROVIDER_CREDENTIAL_REFERENCE: 'TEST_EMAIL_PROVIDER_TOKEN',
+          NOTIFICATION_EMAIL_PROVIDER_TIMEOUT_MS: '2000',
+        }),
+      ).toEqual({
+        enabled: true,
+        channel: 'EMAIL',
+        providerKey: 'test-email-provider',
+        credentialReference: 'TEST_EMAIL_PROVIDER_TOKEN',
+        timeoutMs: 2_000,
+      });
+      expect(() =>
+        parseProviderActivationEnvironment({ NOTIFICATION_EMAIL_PROVIDER_ENABLED: 'yes' }),
+      ).toThrow('Notification delivery failed');
+      expect(() =>
+        parseProviderActivationEnvironment({ NOTIFICATION_EMAIL_PROVIDER_TIMEOUT_MS: '2s' }),
+      ).toThrow('Notification delivery failed');
+    },
+  );
 
   it('fails closed for unsupported channels without falling back', () => {
     expect(() =>
