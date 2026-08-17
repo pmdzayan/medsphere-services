@@ -64,8 +64,8 @@ jobs:
       - name: Prepare database
         run: pnpm db:verify
 
-      - name: Type-check auth tests
-        run: pnpm --filter @medsphere/auth-service exec tsc -p tsconfig.spec.json --noEmit
+      - name: Build workspace dependencies
+        run: pnpm build
 
       - name: Run G3.28 failing test only
         run: pnpm --filter @medsphere/auth-service exec jest src/notifications/notification-operations.integration.spec.ts --runInBand
