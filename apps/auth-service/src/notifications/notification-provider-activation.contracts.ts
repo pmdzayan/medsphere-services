@@ -16,11 +16,7 @@ const SECRET_REFERENCE_PATTERN = /^[A-Z][A-Z0-9_]{2,127}$/;
 
 export type NotificationProviderAcknowledgement = 'ACCEPTED' | 'REJECTED' | 'UNKNOWN';
 export type NotificationProviderFailureClass = 'TRANSIENT' | 'TERMINAL';
-export type NotificationProviderReadinessState =
-  | 'DISABLED'
-  | 'READY'
-  | 'DEGRADED'
-  | 'UNAVAILABLE';
+export type NotificationProviderReadinessState = 'DISABLED' | 'READY' | 'DEGRADED' | 'UNAVAILABLE';
 
 export interface NotificationProviderActivationDeclaration {
   readonly enabled: boolean;
