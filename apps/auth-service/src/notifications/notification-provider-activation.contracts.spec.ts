@@ -1,26 +1,59 @@
-import type { NotificationProviderAdapter } from './notification.contracts';
 import {
+  type ActivatedNotificationProviderAdapter,
   ContractNotificationProviderRegistry,
   FIRST_SUPPORTED_NOTIFICATION_CHANNEL,
   NotificationProviderContractFailure,
+  parseProviderActivationEnvironment,
   providerSafeConfigView,
   validateProviderActivation,
 } from './notification-provider-activation.contracts';
 
-const adapter: NotificationProviderAdapter = {
+const adapter: ActivatedNotificationProviderAdapter = {
   providerKey: 'test-email-provider',
-  deliver: jest.fn().mockResolvedValue({ providerReference: 'volatile-provider-reference' }),
+  channel: 'EMAIL',
+  deliver: jest.fn().mockResolvedValue({
+    acknowledgement: 'ACCEPTED',
+    providerReference: 'volatile-provider-reference',
+  }),
 };
 
 describe('G3.29 notification provider activation contract', () => {
   it('selects EMAIL as the first supported channel and remains disabled by default', () => {
     expect(FIRST_SUPPORTED_NOTIFICATION_CHANNEL).toBe('EMAIL');
+    expect(parseProviderActivationEnvironment({})).toEqual({
+      enabled: false,
+      channel: 'EMAIL',
+      timeoutMs: 5_000,
+    });
     const registry = new ContractNotificationProviderRegistry({
       enabled: false,
       channel: 'EMAIL',
     });
     expect(registry.health('EMAIL')).toEqual({ state: 'DISABLED', channel: 'EMAIL' });
     expect(() => registry.forChannel('EMAIL')).toThrow('Notification delivery failed');
+  });
+
+  it('parses and validates the explicit startup configuration without resolving secret values', () => {
+    expect(
+      parseProviderActivationEnvironment({
+        NOTIFICATION_EMAIL_PROVIDER_ENABLED: 'true',
+        NOTIFICATION_EMAIL_PROVIDER_KEY: 'test-email-provider',
+        NOTIFICATION_EMAIL_PROVIDER_CREDENTIAL_REFERENCE: 'TEST_EMAIL_PROVIDER_TOKEN',
+        NOTIFICATION_EMAIL_PROVIDER_TIMEOUT_MS: '2000',
+      }),
+    ).toEqual({
+      enabled: true,
+      channel: 'EMAIL',
+      providerKey: 'test-email-provider',
+      credentialReference: 'TEST_EMAIL_PROVIDER_TOKEN',
+      timeoutMs: 2_000,
+    });
+    expect(() =>
+      parseProviderActivationEnvironment({ NOTIFICATION_EMAIL_PROVIDER_ENABLED: 'yes' }),
+    ).toThrow('Notification delivery failed');
+    expect(() =>
+      parseProviderActivationEnvironment({ NOTIFICATION_EMAIL_PROVIDER_TIMEOUT_MS: '2s' }),
+    ).toThrow('Notification delivery failed');
   });
 
   it('fails closed for unsupported channels without falling back', () => {
@@ -110,10 +143,11 @@ describe('G3.29 notification provider activation contract', () => {
     expect(() => registry.forChannel('SMS')).toThrow('Notification delivery failed');
   });
 
-  it('does not silently substitute an adapter with a mismatched provider key', () => {
-    const wrongAdapter: NotificationProviderAdapter = {
+  it('does not silently substitute an adapter with a mismatched provider key or channel', () => {
+    const wrongAdapter: ActivatedNotificationProviderAdapter = {
       providerKey: 'wrong-provider',
-      deliver: jest.fn().mockResolvedValue({}),
+      channel: 'EMAIL',
+      deliver: jest.fn().mockResolvedValue({ acknowledgement: 'ACCEPTED' }),
     };
     const registry = new ContractNotificationProviderRegistry(
       {
