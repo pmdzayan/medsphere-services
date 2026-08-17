@@ -1,0 +1,51 @@
+name: G3.28 Prettier Oracle
+
+on:
+  push:
+    branches:
+      - agent/g3-28-prettier-oracle
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install PNPM
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+          run_install: false
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.12.0
+          cache: pnpm
+
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Format only G3.28 files
+        run: >-
+          pnpm exec prettier --write
+          apps/auth-service/src/notifications/notification-operations.integration.spec.ts
+          apps/auth-service/src/notifications/notification-operations.service.spec.ts
+          apps/auth-service/src/notifications/notification-operations.service.ts
+
+      - name: Commit exact formatter output
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add --
+          apps/auth-service/src/notifications/notification-operations.integration.spec.ts
+          apps/auth-service/src/notifications/notification-operations.service.spec.ts
+          apps/auth-service/src/notifications/notification-operations.service.ts
+          git diff --cached --quiet && exit 0
+          git commit -m "style(g3.28): exact prettier oracle output"
+          git push
