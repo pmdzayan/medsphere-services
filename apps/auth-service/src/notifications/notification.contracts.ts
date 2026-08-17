@@ -5,15 +5,9 @@ import type {
 } from '@medsphere/database';
 import type { NotificationComposedContent } from './reservation-notification-composer.service';
 
-export const NOTIFICATION_RECIPIENT_RESOLVER = Symbol(
-  'NOTIFICATION_RECIPIENT_RESOLVER',
-);
-export const NOTIFICATION_PROVIDER_REGISTRY = Symbol(
-  'NOTIFICATION_PROVIDER_REGISTRY',
-);
-export const NOTIFICATION_DELIVERY_OBSERVER = Symbol(
-  'NOTIFICATION_DELIVERY_OBSERVER',
-);
+export const NOTIFICATION_RECIPIENT_RESOLVER = Symbol('NOTIFICATION_RECIPIENT_RESOLVER');
+export const NOTIFICATION_PROVIDER_REGISTRY = Symbol('NOTIFICATION_PROVIDER_REGISTRY');
+export const NOTIFICATION_DELIVERY_OBSERVER = Symbol('NOTIFICATION_DELIVERY_OBSERVER');
 
 export interface NotificationRecipientResolver {
   resolve(input: {

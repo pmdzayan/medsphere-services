@@ -6,49 +6,42 @@ const tenantId = randomUUID();
 const destinationToken = 'transient-destination-token';
 
 describe('NotificationWorkerService', () => {
-  it(
-    'resolves, composes, and sends a stable idempotency key without leaking destination data',
-    async () => {
-      const delivery = claimed();
-      const providerDeliver = jest
-        .fn()
-        .mockResolvedValue({ providerReference: 'provider-message-1' });
-      const observer = { record: jest.fn() };
-      const service = worker(delivery, providerDeliver, observer);
-      await expect(
-        service.run({ limit: 10, leaseMs: 30_000, now: new Date() }),
-      ).resolves.toEqual({
-        claimed: 1,
-        delivered: 1,
-        failed: 0,
-        deadLettered: 0,
-      });
-      expect(providerDeliver).toHaveBeenCalledWith(
-        expect.objectContaining({
-          deliveryId: delivery.deliveryId,
-          idempotencyKey: delivery.deliveryId,
-          destinationToken,
+  it('resolves, composes, and sends a stable idempotency key without leaking destination data', async () => {
+    const delivery = claimed();
+    const providerDeliver = jest
+      .fn()
+      .mockResolvedValue({ providerReference: 'provider-message-1' });
+    const observer = { record: jest.fn() };
+    const service = worker(delivery, providerDeliver, observer);
+    await expect(service.run({ limit: 10, leaseMs: 30_000, now: new Date() })).resolves.toEqual({
+      claimed: 1,
+      delivered: 1,
+      failed: 0,
+      deadLettered: 0,
+    });
+    expect(providerDeliver).toHaveBeenCalledWith(
+      expect.objectContaining({
+        deliveryId: delivery.deliveryId,
+        idempotencyKey: delivery.deliveryId,
+        destinationToken,
+        templateKey: 'reservation-ready',
+        templateVersion: 1,
+        variables: { status: 'READY' },
+        composedContent: {
           templateKey: 'reservation-ready',
           templateVersion: 1,
-          variables: { status: 'READY' },
-          composedContent: {
-            templateKey: 'reservation-ready',
-            templateVersion: 1,
-            locale: 'en',
-            subject: 'Your reservation is ready',
-            body: 'Your reserved item is ready for collection.',
-            metadata: {
-              workflowKey: 'reservation-ready-membership-v1',
-              contentClass: 'OPERATIONAL',
-            },
+          locale: 'en',
+          subject: 'Your reservation is ready',
+          body: 'Your reserved item is ready for collection.',
+          metadata: {
+            workflowKey: 'reservation-ready-membership-v1',
+            contentClass: 'OPERATIONAL',
           },
-        }),
-      );
-      expect(observer.record).toHaveBeenCalledWith(
-        expect.not.objectContaining({ destinationToken }),
-      );
-    },
-  );
+        },
+      }),
+    );
+    expect(observer.record).toHaveBeenCalledWith(expect.not.objectContaining({ destinationToken }));
+  });
 
   it('fails closed before provider delivery when queued composition is unsupported', async () => {
     const delivery = claimed();

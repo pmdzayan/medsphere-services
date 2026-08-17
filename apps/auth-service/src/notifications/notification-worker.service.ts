@@ -43,8 +43,7 @@ export class NotificationWorkerService {
     private readonly providers: NotificationProviderRegistry,
     @Inject(NOTIFICATION_DELIVERY_OBSERVER)
     private readonly observer: NotificationDeliveryObserver,
-    private readonly composer: ReservationNotificationComposerService =
-      new ReservationNotificationComposerService(),
+    private readonly composer: ReservationNotificationComposerService = new ReservationNotificationComposerService(),
   ) {}
 
   async run(config: NotificationWorkerConfig): Promise<NotificationWorkerSummary> {
@@ -143,19 +142,13 @@ function safeFailure(error: unknown, providerKey: string): NotificationDeliveryF
 
 function assertDestinationToken(value: string): void {
   if (typeof value !== 'string' || value.length < 1 || value.length > 512) {
-    throw new NotificationDeliveryFailure(
-      'RECIPIENT_DESTINATION_INVALID',
-      'unresolved',
-    );
+    throw new NotificationDeliveryFailure('RECIPIENT_DESTINATION_INVALID', 'unresolved');
   }
 }
 
 function assertProviderKey(value: string): void {
   if (!/^[a-z0-9][a-z0-9._-]{0,79}$/.test(value)) {
-    throw new NotificationDeliveryFailure(
-      'PROVIDER_CONFIGURATION_INVALID',
-      'unconfigured',
-    );
+    throw new NotificationDeliveryFailure('PROVIDER_CONFIGURATION_INVALID', 'unconfigured');
   }
 }
 
