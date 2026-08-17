@@ -69,3 +69,6 @@ jobs:
 
       - name: Run G3.28 failing test only
         run: pnpm --filter @medsphere/auth-service exec jest src/notifications/notification-operations.integration.spec.ts --runInBand
+
+      - name: Run full auth-service PostgreSQL/Redis-backed suite
+        run: pnpm --filter @medsphere/auth-service test
