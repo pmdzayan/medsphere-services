@@ -1,0 +1,71 @@
+name: G3.28 Targeted Preflight
+
+on:
+  push:
+    branches:
+      - scratch/g3-28-failed-fixture-isolation
+
+permissions:
+  contents: read
+
+jobs:
+  targeted:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      DATABASE_URL: postgresql://medsphere_ci:medsphere_ci@localhost:5432/medsphere_ci?schema=public
+      REDIS_CLUSTER_URL: redis://localhost:6379
+      RUN_AUTH_INFRASTRUCTURE_TESTS: 'true'
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: medsphere_ci
+          POSTGRES_PASSWORD: medsphere_ci
+          POSTGRES_DB: medsphere_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U medsphere_ci -d medsphere_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install PNPM
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+          run_install: false
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.12.0
+          cache: pnpm
+
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Prepare database
+        run: pnpm db:verify
+
+      - name: Type-check auth tests
+        run: pnpm --filter @medsphere/auth-service exec tsc -p tsconfig.spec.json --noEmit
+
+      - name: Run G3.28 failing test only
+        run: pnpm --filter @medsphere/auth-service exec jest src/notifications/notification-operations.integration.spec.ts --runInBand
