@@ -1,5 +1,8 @@
 import { randomUUID } from 'node:crypto';
-import { isInfrastructureTestEnabled, requireEnv } from '../auth/testing/infrastructure-test-gate';
+import {
+  isInfrastructureTestEnabled,
+  requireEnv,
+} from '../auth/testing/infrastructure-test-gate';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationOperationsService } from './notification-operations.service';
 
@@ -22,7 +25,12 @@ infrastructure('G3.28 reservation notification operational acceptance', () => {
   beforeAll(async () => {
     await createTenantActor(tenantOneId, userOneId, membershipOneId, 'one');
     await createTenantActor(tenantTwoId, userTwoId, membershipTwoId, 'two');
-    deliveryOneId = await createDelivery(tenantOneId, membershipOneId, correlationOne, 'FAILED');
+    deliveryOneId = await createDelivery(
+      tenantOneId,
+      membershipOneId,
+      correlationOne,
+      'FAILED',
+    );
     await createDelivery(tenantTwoId, membershipTwoId, correlationTwo, 'DEAD_LETTER');
   });
 
@@ -63,7 +71,11 @@ infrastructure('G3.28 reservation notification operational acceptance', () => {
     ).rejects.toThrow('Notification operational access denied');
 
     await expect(
-      service.summary({ tenantId: tenantOneId, membershipId: membershipOneId, userId: userOneId }),
+      service.summary({
+        tenantId: tenantOneId,
+        membershipId: membershipOneId,
+        userId: userOneId,
+      }),
     ).resolves.toEqual({
       tenantId: tenantOneId,
       counts: { PENDING: 0, PROCESSING: 0, FAILED: 1, DELIVERED: 0, DEAD_LETTER: 0 },

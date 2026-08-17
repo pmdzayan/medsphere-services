@@ -11,7 +11,11 @@ describe('NotificationOperationsService', () => {
         notificationDelivery: { findMany },
       },
     } as never);
-    const actor = { tenantId: randomUUID(), membershipId: randomUUID(), userId: randomUUID() };
+    const actor = {
+      tenantId: randomUUID(),
+      membershipId: randomUUID(),
+      userId: randomUUID(),
+    };
 
     await service.list(actor, { limit: 20, status: 'FAILED' });
 
@@ -34,7 +38,11 @@ describe('NotificationOperationsService', () => {
           sourceEventId: true,
           sourceEvent: { select: { correlationId: true } },
           attempts: expect.objectContaining({
-            select: expect.objectContaining({ outcome: true, errorCode: true, occurredAt: true }),
+            select: expect.objectContaining({
+              outcome: true,
+              errorCode: true,
+              occurredAt: true,
+            }),
           }),
         }),
       }),
@@ -77,7 +85,11 @@ describe('NotificationOperationsService', () => {
         notificationDelivery: { count },
       },
     } as never);
-    const actor = { tenantId: randomUUID(), membershipId: randomUUID(), userId: randomUUID() };
+    const actor = {
+      tenantId: randomUUID(),
+      membershipId: randomUUID(),
+      userId: randomUUID(),
+    };
 
     await expect(service.summary(actor)).resolves.toEqual({
       tenantId: actor.tenantId,
@@ -91,7 +103,9 @@ describe('NotificationOperationsService', () => {
 
   it('reports PostgreSQL readiness and propagates dependency failure', async () => {
     const queryRaw = jest.fn().mockResolvedValueOnce([{ '?column?': 1 }]);
-    const service = new NotificationOperationsService({ client: { $queryRaw: queryRaw } } as never);
+    const service = new NotificationOperationsService({
+      client: { $queryRaw: queryRaw },
+    } as never);
     await expect(service.readiness()).resolves.toEqual({ ready: true, dependency: 'postgresql' });
 
     const failing = new NotificationOperationsService({
