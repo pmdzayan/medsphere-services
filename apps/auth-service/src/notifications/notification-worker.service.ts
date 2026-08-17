@@ -17,6 +17,7 @@ import {
   type NotificationRecipientResolver,
 } from './notification.contracts';
 import { NotificationDeliveryFailure } from './notification.errors';
+import { ReservationNotificationComposerService } from './reservation-notification-composer.service';
 
 export interface NotificationWorkerConfig {
   readonly limit: number;
@@ -42,6 +43,8 @@ export class NotificationWorkerService {
     private readonly providers: NotificationProviderRegistry,
     @Inject(NOTIFICATION_DELIVERY_OBSERVER)
     private readonly observer: NotificationDeliveryObserver,
+    private readonly composer: ReservationNotificationComposerService =
+      new ReservationNotificationComposerService(),
   ) {}
 
   async run(config: NotificationWorkerConfig): Promise<NotificationWorkerSummary> {
@@ -78,6 +81,14 @@ export class NotificationWorkerService {
         channel: delivery.channel,
       });
       assertDestinationToken(recipient.destinationToken);
+
+      const variables = asVariables(delivery.variables);
+      const composedContent = this.composer.compose({
+        templateKey: delivery.templateKey,
+        templateVersion: delivery.templateVersion,
+        variables,
+      });
+
       const provider = this.providers.forChannel(delivery.channel);
       providerKey = provider.providerKey;
       assertProviderKey(providerKey);
@@ -89,7 +100,8 @@ export class NotificationWorkerService {
         destinationToken: recipient.destinationToken,
         templateKey: delivery.templateKey,
         templateVersion: delivery.templateVersion,
-        variables: asVariables(delivery.variables),
+        variables,
+        composedContent,
       });
       providerReference = result.providerReference;
     } catch (error) {
