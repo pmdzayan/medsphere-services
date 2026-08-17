@@ -42,10 +42,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add --
-          apps/auth-service/src/notifications/notification-operations.integration.spec.ts
-          apps/auth-service/src/notifications/notification-operations.service.spec.ts
-          apps/auth-service/src/notifications/notification-operations.service.ts
+          git add -- apps/auth-service/src/notifications/notification-operations.integration.spec.ts apps/auth-service/src/notifications/notification-operations.service.spec.ts apps/auth-service/src/notifications/notification-operations.service.ts
           git diff --cached --quiet && exit 0
           git commit -m "style(g3.28): exact prettier oracle output"
           git push
