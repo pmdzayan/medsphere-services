@@ -15,7 +15,9 @@ describe('NotificationWorkerService', () => {
         .mockResolvedValue({ providerReference: 'provider-message-1' });
       const observer = { record: jest.fn() };
       const service = worker(delivery, providerDeliver, observer);
-      await expect(service.run({ limit: 10, leaseMs: 30_000, now: new Date() })).resolves.toEqual({
+      await expect(
+        service.run({ limit: 10, leaseMs: 30_000, now: new Date() }),
+      ).resolves.toEqual({
         claimed: 1,
         delivered: 1,
         failed: 0,
