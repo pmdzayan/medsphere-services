@@ -1,8 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import {
-  isInfrastructureTestEnabled,
-  requireEnv,
-} from '../auth/testing/infrastructure-test-gate';
+import { isInfrastructureTestEnabled, requireEnv } from '../auth/testing/infrastructure-test-gate';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationOperationsService } from './notification-operations.service';
 
@@ -25,12 +22,7 @@ infrastructure('G3.28 reservation notification operational acceptance', () => {
   beforeAll(async () => {
     await createTenantActor(tenantOneId, userOneId, membershipOneId, 'one');
     await createTenantActor(tenantTwoId, userTwoId, membershipTwoId, 'two');
-    deliveryOneId = await createDelivery(
-      tenantOneId,
-      membershipOneId,
-      correlationOne,
-      'FAILED',
-    );
+    deliveryOneId = await createDelivery(tenantOneId, membershipOneId, correlationOne, 'FAILED');
     await createDelivery(tenantTwoId, membershipTwoId, correlationTwo, 'DEAD_LETTER');
   });
 
@@ -64,10 +56,7 @@ infrastructure('G3.28 reservation notification operational acceptance', () => {
 
   it('fails closed for a cross-tenant membership and keeps metrics tenant-scoped', async () => {
     await expect(
-      service.list(
-        { tenantId: tenantOneId, membershipId: membershipTwoId, userId: userTwoId },
-        {},
-      ),
+      service.list({ tenantId: tenantOneId, membershipId: membershipTwoId, userId: userTwoId }, {}),
     ).rejects.toThrow('Notification operational access denied');
 
     await expect(
