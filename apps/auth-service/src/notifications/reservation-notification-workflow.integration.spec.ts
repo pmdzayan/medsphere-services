@@ -25,7 +25,11 @@ infrastructure('G3.27 end-to-end queued reservation notification workflow', () =
 
   beforeAll(async () => {
     await prisma.client.tenant.create({
-      data: { id: tenantId, name: 'G3.27 notification tenant', slug: `g327-${tenantId}` },
+      data: {
+        id: tenantId,
+        name: 'G3.27 notification tenant',
+        slug: `g327-${tenantId}`,
+      },
     });
     await prisma.client.user.create({
       data: {
@@ -83,7 +87,9 @@ infrastructure('G3.27 end-to-end queued reservation notification workflow', () =
         ]),
       );
 
-      const deliver = jest.fn().mockResolvedValue({ providerReference: 'g327-provider-reference' });
+      const deliver = jest
+        .fn()
+        .mockResolvedValue({ providerReference: 'g327-provider-reference' });
       const worker = buildWorker(deliver);
       const now = new Date(Date.now() + 5_000);
       const results = await Promise.all([
@@ -114,7 +120,10 @@ infrastructure('G3.27 end-to-end queued reservation notification workflow', () =
       });
       expect(stored.status).toBe('DELIVERED');
       expect(stored.attempts).toHaveLength(1);
-      expect(stored.attempts[0]).toMatchObject({ outcome: 'DELIVERED', attemptNumber: 1 });
+      expect(stored.attempts[0]).toMatchObject({
+        outcome: 'DELIVERED',
+        attemptNumber: 1,
+      });
     },
   );
 
@@ -152,7 +161,10 @@ infrastructure('G3.27 end-to-end queued reservation notification workflow', () =
     });
     expect(stored.status).toBe('DELIVERED');
     expect(stored.attempts).toHaveLength(2);
-    expect(stored.attempts.map((attempt) => attempt.outcome)).toEqual(['FAILED', 'DELIVERED']);
+    expect(stored.attempts.map((attempt) => attempt.outcome)).toEqual([
+      'FAILED',
+      'DELIVERED',
+    ]);
     expect(stored.attempts.map((attempt) => attempt.attemptNumber)).toEqual([1, 2]);
   });
 
@@ -196,7 +208,12 @@ infrastructure('G3.27 end-to-end queued reservation notification workflow', () =
       aggregateType: 'MedicineReservation',
       aggregateId: reservationId,
       occurredAt: readyAt.toISOString(),
-      actor: { actorType: 'TENANT_USER', tenantId, membershipId, userId: subjectUserId },
+      actor: {
+        actorType: 'TENANT_USER',
+        tenantId,
+        membershipId,
+        userId: subjectUserId,
+      },
       payload: {
         providerId,
         previousStatus: 'CONFIRMED',
