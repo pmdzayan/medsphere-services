@@ -12,6 +12,7 @@ import {
 import { NotificationOperationsService } from './notification-operations.service';
 import { NotificationQueueService } from './notification-queue.service';
 import { NotificationWorkerService } from './notification-worker.service';
+import { ReservationNotificationComposerService } from './reservation-notification-composer.service';
 import { ReservationNotificationConsumerService } from './reservation-notification-consumer.service';
 import { ReservationRecipientResolverService } from './reservation-recipient-resolver.service';
 
@@ -22,6 +23,7 @@ import { ReservationRecipientResolverService } from './reservation-recipient-res
     NotificationWorkerService,
     NotificationOperationsService,
     ReservationNotificationConsumerService,
+    ReservationNotificationComposerService,
     ReservationRecipientResolverService,
     UnconfiguredNotificationProviderRegistry,
     NoopNotificationDeliveryObserver,
