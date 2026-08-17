@@ -138,6 +138,7 @@ infrastructure('G3.28 reservation notification operational acceptance', () => {
         templateVersion: 1,
         variables: { status: 'READY' },
         status,
+        availableAt: status === 'FAILED' ? new Date(Date.now() + 60 * 60 * 1000) : new Date(),
         attemptCount: 1,
         lastErrorCode: 'PROVIDER_UNAVAILABLE',
       },
