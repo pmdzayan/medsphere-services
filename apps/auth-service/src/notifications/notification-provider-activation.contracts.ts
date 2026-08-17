@@ -1,6 +1,7 @@
 import type { NotificationChannel } from '@medsphere/database';
 import type {
   NotificationProviderAdapter,
+  NotificationProviderDeliveryInput,
   NotificationProviderRegistry,
 } from './notification.contracts';
 import { NotificationDeliveryFailure } from './notification.errors';
@@ -51,6 +52,11 @@ export interface NotificationProviderResult {
   readonly providerReference?: string;
 }
 
+export interface ActivatedNotificationProviderAdapter extends NotificationProviderAdapter {
+  readonly channel: NotificationChannel;
+  deliver(input: NotificationProviderDeliveryInput): Promise<NotificationProviderResult>;
+}
+
 export interface NotificationProviderHealth {
   readonly state: NotificationProviderReadinessState;
   readonly providerKey?: string;
@@ -69,6 +75,28 @@ export class NotificationProviderContractFailure extends NotificationDeliveryFai
   }
 }
 
+export function parseProviderActivationEnvironment(
+  environment: Readonly<Record<string, string | undefined>>,
+): ValidatedNotificationProviderActivation {
+  const enabledValue = environment.NOTIFICATION_EMAIL_PROVIDER_ENABLED;
+  if (enabledValue !== undefined && enabledValue !== 'true' && enabledValue !== 'false') {
+    throw configurationFailure('PROVIDER_ENABLED_INVALID');
+  }
+
+  const timeoutValue = environment.NOTIFICATION_EMAIL_PROVIDER_TIMEOUT_MS;
+  if (timeoutValue !== undefined && !/^\d+$/.test(timeoutValue)) {
+    throw configurationFailure('PROVIDER_TIMEOUT_INVALID');
+  }
+
+  return validateProviderActivation({
+    enabled: enabledValue === 'true',
+    channel: FIRST_SUPPORTED_NOTIFICATION_CHANNEL,
+    providerKey: environment.NOTIFICATION_EMAIL_PROVIDER_KEY,
+    credentialReference: environment.NOTIFICATION_EMAIL_PROVIDER_CREDENTIAL_REFERENCE,
+    timeoutMs: timeoutValue === undefined ? undefined : Number(timeoutValue),
+  });
+}
+
 export function validateProviderActivation(
   declaration: NotificationProviderActivationDeclaration,
 ): ValidatedNotificationProviderActivation {
@@ -77,7 +105,11 @@ export function validateProviderActivation(
   }
 
   const timeoutMs = declaration.timeoutMs ?? DEFAULT_PROVIDER_TIMEOUT_MS;
-  if (!Number.isInteger(timeoutMs) || timeoutMs < MIN_PROVIDER_TIMEOUT_MS || timeoutMs > MAX_PROVIDER_TIMEOUT_MS) {
+  if (
+    !Number.isInteger(timeoutMs) ||
+    timeoutMs < MIN_PROVIDER_TIMEOUT_MS ||
+    timeoutMs > MAX_PROVIDER_TIMEOUT_MS
+  ) {
     throw configurationFailure('PROVIDER_TIMEOUT_INVALID');
   }
 
@@ -124,11 +156,11 @@ export function providerSafeConfigView(
 
 export class ContractNotificationProviderRegistry implements NotificationProviderRegistry {
   private readonly activation: ValidatedNotificationProviderActivation;
-  private readonly adapter?: NotificationProviderAdapter;
+  private readonly adapter?: ActivatedNotificationProviderAdapter;
 
   constructor(
     declaration: NotificationProviderActivationDeclaration,
-    adapter?: NotificationProviderAdapter,
+    adapter?: ActivatedNotificationProviderAdapter,
   ) {
     this.activation = validateProviderActivation(declaration);
     this.adapter = adapter;
@@ -142,7 +174,11 @@ export class ContractNotificationProviderRegistry implements NotificationProvide
         'TRANSIENT',
       );
     }
-    if (!this.adapter || this.adapter.providerKey !== this.activation.providerKey) {
+    if (
+      !this.adapter ||
+      this.adapter.providerKey !== this.activation.providerKey ||
+      this.adapter.channel !== channel
+    ) {
       throw new NotificationProviderContractFailure(
         'PROVIDER_CONFIGURATION_INVALID',
         this.activation.providerKey ?? 'unconfigured',
@@ -156,7 +192,11 @@ export class ContractNotificationProviderRegistry implements NotificationProvide
     if (channel !== this.activation.channel || !this.activation.enabled) {
       return { state: 'DISABLED', channel };
     }
-    if (!this.adapter || this.adapter.providerKey !== this.activation.providerKey) {
+    if (
+      !this.adapter ||
+      this.adapter.providerKey !== this.activation.providerKey ||
+      this.adapter.channel !== channel
+    ) {
       return {
         state: 'UNAVAILABLE',
         providerKey: this.activation.providerKey,
