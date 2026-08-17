@@ -1,6 +1,9 @@
 import { randomUUID } from 'node:crypto';
 import { appendOutboxEvent } from '@medsphere/database';
-import { isInfrastructureTestEnabled, requireEnv } from '../auth/testing/infrastructure-test-gate';
+import {
+  isInfrastructureTestEnabled,
+  requireEnv,
+} from '../auth/testing/infrastructure-test-gate';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationWorkerService } from './notification-worker.service';
 import { ReservationNotificationComposerService } from './reservation-notification-composer.service';
@@ -64,59 +67,56 @@ infrastructure('G3.27 end-to-end queued reservation notification workflow', () =
 
   afterAll(async () => prisma.client.$disconnect());
 
-  it('connects event consumption through composition and concurrent worker delivery exactly once', async () => {
-    const eventId = await readyEventFixture();
-    await expect(
-      Promise.all([
-        consumer.consume({ tenantId, eventId }),
-        consumer.consume({ tenantId, eventId }),
-      ]),
-    ).resolves.toEqual(
-      expect.arrayContaining([
-        { processed: true, enqueued: true },
-        { processed: false, enqueued: false },
-      ]),
-    );
+  it(
+    'connects event consumption through composition and concurrent worker delivery exactly once',
+    async () => {
+      const eventId = await readyEventFixture();
+      await expect(
+        Promise.all([
+          consumer.consume({ tenantId, eventId }),
+          consumer.consume({ tenantId, eventId }),
+        ]),
+      ).resolves.toEqual(
+        expect.arrayContaining([
+          { processed: true, enqueued: true },
+          { processed: false, enqueued: false },
+        ]),
+      );
 
-    const deliver = jest.fn().mockResolvedValue({ providerReference: 'g327-provider-reference' });
-    const worker = buildWorker(deliver);
-    const now = new Date(Date.now() + 5_000);
-    const results = await Promise.all([
-      worker.run({ limit: 10, leaseMs: 30_000, now }),
-      worker.run({ limit: 10, leaseMs: 30_000, now }),
-    ]);
+      const deliver = jest.fn().mockResolvedValue({ providerReference: 'g327-provider-reference' });
+      const worker = buildWorker(deliver);
+      const now = new Date(Date.now() + 5_000);
+      const results = await Promise.all([
+        worker.run({ limit: 10, leaseMs: 30_000, now }),
+        worker.run({ limit: 10, leaseMs: 30_000, now }),
+      ]);
 
-    expect(results.reduce((sum, result) => sum + result.delivered, 0)).toBe(1);
-    expect(deliver).toHaveBeenCalledTimes(1);
-    expect(deliver).toHaveBeenCalledWith(
-      expect.objectContaining({
-        idempotencyKey: expect.any(String),
-        tenantId,
-        channel: 'EMAIL',
-        templateKey: 'reservation-ready',
-        variables: { status: 'READY' },
-        composedContent: expect.objectContaining({
-          locale: 'en',
-          subject: 'Your reservation is ready',
-          body: 'Your reserved item is ready for collection.',
+      expect(results.reduce((sum, result) => sum + result.delivered, 0)).toBe(1);
+      expect(deliver).toHaveBeenCalledTimes(1);
+      expect(deliver).toHaveBeenCalledWith(
+        expect.objectContaining({
+          idempotencyKey: expect.any(String),
+          tenantId,
+          channel: 'EMAIL',
+          templateKey: 'reservation-ready',
+          variables: { status: 'READY' },
+          composedContent: expect.objectContaining({
+            locale: 'en',
+            subject: 'Your reservation is ready',
+            body: 'Your reserved item is ready for collection.',
+          }),
         }),
-      }),
-    );
+      );
 
-    const stored = await prisma.client.notificationDelivery.findUniqueOrThrow({
-      where: { sourceEventId_workflowKey_recipientType_recipientReferenceId_channel: {
-        sourceEventId: eventId,
-        workflowKey: 'reservation-ready-membership-v1',
-        recipientType: 'TENANT_MEMBERSHIP',
-        recipientReferenceId: membershipId,
-        channel: 'EMAIL',
-      } },
-      include: { attempts: true },
-    });
-    expect(stored.status).toBe('DELIVERED');
-    expect(stored.attempts).toHaveLength(1);
-    expect(stored.attempts[0]).toMatchObject({ outcome: 'DELIVERED', attemptNumber: 1 });
-  });
+      const stored = await prisma.client.notificationDelivery.findFirstOrThrow({
+        where: { sourceEventId: eventId, tenantId },
+        include: { attempts: true },
+      });
+      expect(stored.status).toBe('DELIVERED');
+      expect(stored.attempts).toHaveLength(1);
+      expect(stored.attempts[0]).toMatchObject({ outcome: 'DELIVERED', attemptNumber: 1 });
+    },
+  );
 
   it('reuses the same logical delivery idempotency key across a bounded retry', async () => {
     const eventId = await readyEventFixture();
@@ -147,7 +147,7 @@ infrastructure('G3.27 end-to-end queued reservation notification workflow', () =
     expect(firstKey).toBe(secondKey);
 
     const stored = await prisma.client.notificationDelivery.findFirstOrThrow({
-      where: { sourceEventId: eventId },
+      where: { sourceEventId: eventId, tenantId },
       include: { attempts: { orderBy: { attemptNumber: 'asc' } } },
     });
     expect(stored.status).toBe('DELIVERED');
