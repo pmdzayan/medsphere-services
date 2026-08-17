@@ -1,6 +1,6 @@
 # ADR-020 — Reservation Notification Operational Acceptance
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-08-17
 - Scope: G3.28 reservation notification operational acceptance
 
@@ -17,6 +17,10 @@ G3.27 established the first bounded queued reservation notification workflow. Op
 5. Readiness proves PostgreSQL reachability and fails closed by propagating dependency failure.
 6. Structured operational logs contain identifiers/status/limits only and never recipient/contact/message payloads.
 7. No real provider, production deployment, or real-healthcare-data approval is implied by this acceptance boundary.
+
+## Acceptance evidence
+
+G3.28 implementation was merged in PR #64 as `bc460bb1b41be54c459947c47e9a025e034f9807` after exact-head GitHub Actions run `32013438865` passed dependency audit, clean migration/drift verification, populated upgrade safety, formatting, lint, PostgreSQL/Redis-backed tests, and build. Final CTO review confirmed the security, privacy, authorization, tenant-isolation, and test-integrity boundaries before merge.
 
 ## Consequences
 
