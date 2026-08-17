@@ -6,7 +6,7 @@ const tenantId = randomUUID();
 const destinationToken = 'transient-destination-token';
 
 describe('NotificationWorkerService', () => {
-  it('resolves the destination transiently and sends a stable idempotency key', async () => {
+  it('resolves, composes, and sends a stable idempotency key without leaking destination data', async () => {
     const delivery = claimed();
     const providerDeliver = jest
       .fn()
@@ -24,9 +24,41 @@ describe('NotificationWorkerService', () => {
         deliveryId: delivery.deliveryId,
         idempotencyKey: delivery.deliveryId,
         destinationToken,
+        templateKey: 'reservation-ready',
+        templateVersion: 1,
+        variables: { status: 'READY' },
+        composedContent: {
+          templateKey: 'reservation-ready',
+          templateVersion: 1,
+          locale: 'en',
+          subject: 'Your reservation is ready',
+          body: 'Your reserved item is ready for collection.',
+          metadata: {
+            workflowKey: 'reservation-ready-membership-v1',
+            contentClass: 'OPERATIONAL',
+          },
+        },
       }),
     );
     expect(observer.record).toHaveBeenCalledWith(expect.not.objectContaining({ destinationToken }));
+  });
+
+  it('fails closed before provider delivery when queued composition is unsupported', async () => {
+    const delivery = claimed();
+    const providerDeliver = jest.fn();
+    const observer = { record: jest.fn() };
+    const service = worker(
+      { ...delivery, templateKey: 'unsupported-template' },
+      providerDeliver,
+      observer,
+    );
+    await expect(
+      service.run({ limit: 10, leaseMs: 30_000, maximumAttempts: 1, now: new Date() }),
+    ).resolves.toMatchObject({ claimed: 1, deadLettered: 1 });
+    expect(providerDeliver).not.toHaveBeenCalled();
+    expect(observer.record).toHaveBeenCalledWith(
+      expect.objectContaining({ errorCode: 'TEMPLATE_KEY_UNSUPPORTED', outcome: 'DEAD_LETTER' }),
+    );
   });
 
   it('converts raw provider errors into coded evidence without exposing the exception', async () => {
@@ -130,11 +162,11 @@ function claimed(attemptCount = 1) {
     deliveryId: randomUUID(),
     tenantId,
     sourceEventId: randomUUID(),
-    workflowKey: 'test-workflow',
+    workflowKey: 'reservation-ready-membership-v1',
     recipientType: 'TENANT_MEMBERSHIP' as const,
     recipientReferenceId: randomUUID(),
     channel: 'EMAIL' as const,
-    templateKey: 'test-template',
+    templateKey: 'reservation-ready',
     templateVersion: 1,
     variables: { status: 'READY' },
     attemptCount,
