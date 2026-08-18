@@ -18,7 +18,7 @@ const config: Config = {
   collectCoverageFrom: ['**/*.(t|j)s'],
   coverageDirectory: '../coverage',
   testEnvironment: 'node',
-  maxWorkers: process.env.RUN_AUTH_INFRASTRUCTURE_TESTS === 'true' ? 1 : undefined,
+  ...(process.env.RUN_AUTH_INFRASTRUCTURE_TESTS === 'true' ? { maxWorkers: 1 } : {}),
   moduleNameMapper: {
     '^@medsphere/(.*)$': '<rootDir>/../../../packages/$1/src',
   },
