@@ -1,6 +1,6 @@
 # ADR-021 — Notification Provider Activation Contract
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-08-17
 - Scope: G3.29 notification provider activation contract
 
@@ -32,6 +32,10 @@ The next safe step is to define the activation contract that any future real pro
 `notification-provider-activation.contracts.ts` contains the bounded activation declaration, timeout limits, safe configuration view, typed acknowledgement/failure/readiness models, and an exact-match fail-closed registry for contract validation. The production Nest binding is intentionally unchanged in G3.29, so no external provider is activated.
 
 The companion threat/failure model is `docs/security/G3.29-notification-provider-threat-failure-model.md`.
+
+## Acceptance evidence
+
+G3.29 implementation was merged in PR #66 as `ba7e27824298c93d97b24fc0024402143ddad7eb` after exact-head GitHub Actions run `32130334053` passed dependency audit, clean migration/drift verification, populated upgrade safety, formatting, lint, PostgreSQL/Redis-backed tests, and build. Final CTO review confirmed the architecture, security, privacy, fail-closed provider activation, tenant-authority, secret-handling, and test-integrity boundaries before merge.
 
 ## Consequences
 
