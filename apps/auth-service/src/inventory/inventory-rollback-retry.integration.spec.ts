@@ -148,11 +148,7 @@ infrastructure('Post-audit CG-CONC-02 rollback then same-key retry integrity', (
       }
     }
 
-    const failingService = new InventoryDamageService(
-      prisma,
-      new AuditWriter(),
-      new FailingInventoryEventWriter(),
-    );
+    const failingService = new InventoryDamageService(prisma, new AuditWriter(), new FailingInventoryEventWriter());
 
     await expect(failingService.recordCompleted(command)).rejects.toThrow(
       'CG-CONC-02 forced outbox failure',
