@@ -1,7 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import { NotFoundException } from '@nestjs/common';
 import { AuditWriter } from '../audit/audit-writer.service';
-import { isInfrastructureTestEnabled, requireEnv } from '../auth/testing/infrastructure-test-gate';
+import {
+  isInfrastructureTestEnabled,
+  requireEnv,
+} from '../auth/testing/infrastructure-test-gate';
 import { PrismaService } from '../prisma/prisma.service';
 import { InventoryEventWriter } from './inventory-event-writer';
 import { InventoryQuarantineService } from './inventory-quarantine.service';
