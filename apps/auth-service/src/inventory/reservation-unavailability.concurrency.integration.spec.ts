@@ -157,36 +157,43 @@ infrastructure('Post-audit CG-CONC-01 reservation vs unavailable-stock concurren
     expect(rejected).toHaveLength(1);
     expect(rejected[0]).toMatchObject({ reason: expect.any(ConflictException) });
 
-    const [batch, persistedReservations, allocations, quarantineRecords, audits, outboxEvents, movements] =
-      await Promise.all([
-        prisma.client.batch.findUniqueOrThrow({ where: { id: batchId } }),
-        prisma.client.medicineReservation.findMany({
-          where: { tenantId, idempotencyKey: reservationKey },
-          select: { id: true, status: true, version: true },
-        }),
-        prisma.client.medicineReservationAllocation.findMany({
-          where: { tenantId, batchId },
-          select: { reservationId: true, batchId: true, quantity: true, status: true },
-        }),
-        prisma.client.batchQuarantineRecord.findMany({
-          where: { tenantId, idempotencyKey: quarantineKey },
-        }),
-        prisma.client.auditEvent.findMany({
-          where: {
-            tenantId,
-            eventType: { in: ['inventory.reservation.created', 'inventory.batch.quarantined'] },
-          },
-          select: { eventType: true, resourceId: true },
-        }),
-        prisma.client.outboxEvent.findMany({
-          where: {
-            tenantId,
-            eventType: { in: ['inventory.reservation.created', 'inventory.batch.quarantined'] },
-          },
-          select: { eventType: true, aggregateId: true },
-        }),
-        prisma.client.stockMovement.count({ where: { batchId } }),
-      ]);
+    const [
+      batch,
+      persistedReservations,
+      allocations,
+      quarantineRecords,
+      audits,
+      outboxEvents,
+      movements,
+    ] = await Promise.all([
+      prisma.client.batch.findUniqueOrThrow({ where: { id: batchId } }),
+      prisma.client.medicineReservation.findMany({
+        where: { tenantId, idempotencyKey: reservationKey },
+        select: { id: true, status: true, version: true },
+      }),
+      prisma.client.medicineReservationAllocation.findMany({
+        where: { tenantId, batchId },
+        select: { reservationId: true, batchId: true, quantity: true, status: true },
+      }),
+      prisma.client.batchQuarantineRecord.findMany({
+        where: { tenantId, idempotencyKey: quarantineKey },
+      }),
+      prisma.client.auditEvent.findMany({
+        where: {
+          tenantId,
+          eventType: { in: ['inventory.reservation.created', 'inventory.batch.quarantined'] },
+        },
+        select: { eventType: true, resourceId: true },
+      }),
+      prisma.client.outboxEvent.findMany({
+        where: {
+          tenantId,
+          eventType: { in: ['inventory.reservation.created', 'inventory.batch.quarantined'] },
+        },
+        select: { eventType: true, aggregateId: true },
+      }),
+      prisma.client.stockMovement.count({ where: { batchId } }),
+    ]);
 
     expect(batch.onHandQuantity).toBe(5);
     expect(batch.heldQuantity).toBeLessThanOrEqual(batch.onHandQuantity);
@@ -206,10 +213,16 @@ infrastructure('Post-audit CG-CONC-01 reservation vs unavailable-stock concurren
       });
       expect(quarantineRecords).toHaveLength(0);
       expect(audits).toEqual([
-        { eventType: 'inventory.reservation.created', resourceId: reservationResult.value.reservationId },
+        {
+          eventType: 'inventory.reservation.created',
+          resourceId: reservationResult.value.reservationId,
+        },
       ]);
       expect(outboxEvents).toEqual([
-        { eventType: 'inventory.reservation.created', aggregateId: reservationResult.value.reservationId },
+        {
+          eventType: 'inventory.reservation.created',
+          aggregateId: reservationResult.value.reservationId,
+        },
       ]);
       return;
     }
