@@ -6,7 +6,21 @@
 
 **Accepted stabilization baseline:** `4ea55a17e188410ddee45fa3ea6c016e22d6617a`
 
-**Current sprint:** G3.25 reservation recipient resolution boundary not started
+**Current sprint:** Post-Audit Stabilization Batch 1 — Task 2 (authorization /
+tenant-isolation release coverage) is the next permitted task; not started.
+Governance reconciliation is a prerequisite to Task 2 implementation. G3.25
+through G3.29 are
+accepted and merged; Batch 1 Task 1 (release/coverage hardening for
+reservation and rollback concurrency) is accepted and merged as PR #70,
+head `924b2bd1d33e58f317b1ed3e0372d48eb45f74e1`, merge commit
+`706586910579aa01b7c24b1c16cd16f72099477b`, exact-head CI run `32264518571`
+(run #253, conclusion: success). Task 1 added PostgreSQL/Redis-backed
+coverage for concurrent reservation creation, reservation-vs-unavailable-stock
+concurrency, transactional rollback, and same-key retry/idempotency
+integrity, with no production-code semantic changes. Explicit cross-tenant
+concurrency attacks were not exercised by Task 1's tests; this is recorded as
+an accepted residual coverage observation, not a reproduced defect, and is
+in scope for Task 2.
 
 **Release state:** Not approved for production or real healthcare data
 
@@ -14,25 +28,65 @@
 
 ## Most recent accepted sprint
 
-### G3.24 — Reservation-Ready Notification Consumer
+### G3.29 — Notification Provider Activation Contract
 
-**Status:** Accepted and squash-merged in PR #58 as `9594988` after exact-head
-CI run `31817168998` passed all required gates.
+**Status:** Accepted and squash-merged in PR #66 as
+`ba7e27824298c93d97b24fc0024402143ddad7eb` after exact-head CI run
+`32130334053` passed dependency audit, clean migration/drift verification,
+populated upgrade safety, formatting, lint, PostgreSQL/Redis-backed tests,
+and build. ADR-021 is accepted. No real provider, external delivery,
+production approval, or real-healthcare-data approval is implied.
 
-**Boundary:** Exact `inventory.reservation.ready` version-1 validation,
-authoritative event and reservation reload inside the accepted G3.21 inbox
-transaction, and one opaque-membership G3.23 queue intent. No destination
-resolution, generalized composition, provider activation, external call,
-production approval, or real healthcare data is included.
+**Implementation authority:** accepted ADR-021, accepted source
+`ba7e27824298c93d97b24fc0024402143ddad7eb`, and
+`docs/sprints/G3.29-notification-provider-activation-contract.md`.
 
-**Implementation authority:** accepted ADR-016, accepted source `9594988`, and
-`docs/sprints/G3.24-reservation-ready-notification-consumer.md`.
+**Note:** G3.25 through G3.28 are also accepted and merged (see individual
+sprint docs under `docs/sprints/`; two of those sprint docs — G3.26 and
+G3.27 — still read "Implementation in progress" at the time of this update
+and were not rewritten here, since that is outside the bounded scope of this
+governance reconciliation. This is flagged as a known residual documentation
+drift, not corrected in this pass).
+
+## Most recently accepted batch work
+
+### Post-Audit Stabilization Batch 1 — Task 1 (Release/Coverage Hardening)
+
+**Status:** Accepted and merged in PR #70, head
+`924b2bd1d33e58f317b1ed3e0372d48eb45f74e1`, merge commit
+`706586910579aa01b7c24b1c16cd16f72099477b`, after exact-head GitHub Actions
+run `32264518571` (run #253) passed dependency audit, clean migration/drift
+verification, populated upgrade safety, formatting, lint, PostgreSQL/Redis-
+backed tests, and build. No production-code semantic changes were made.
+
+**Boundary:** Added PostgreSQL/Redis-backed integration coverage for
+concurrent reservation creation, reservation-vs-unavailable-stock
+concurrency, transactional rollback, and same-key retry/idempotency
+integrity. Explicit cross-tenant concurrency attacks were not exercised;
+this is an accepted residual coverage observation, not a reproduced defect,
+and is in scope for Batch 1 Task 2.
 
 ## Active sprint
 
+### Post-Audit Stabilization Batch 1 — Task 2 (Authorization / Tenant-Isolation Release Coverage)
+
+**Status:** Next permitted task; not started. This governance reconciliation
+is a prerequisite to Task 2 implementation. Objective is closing remaining
+high-risk authorization and tenant-isolation coverage gaps
+(provider-authority revocation, role/permission revocation, alternate-route
+authorization bypass, and explicit cross-tenant PostgreSQL-backed isolation
+evidence) without changing correct production behavior unless a reproduced
+defect requires it. Tasks 3-5 of the batch (last-administrator concurrency,
+audit integrity, and batch release acceptance) are scoped but not started.
+
+## Earlier accepted sprint
+
 ### G3.25 — Reservation Recipient Resolution Boundary
 
-**Status:** Not started
+**Status:** Accepted. Repository baseline `fd8953b149ee71f901ef8b72fbb1638f421830d9`
+(see `docs/sprints/G3.25-reservation-recipient-resolution-boundary.md`; that
+sprint doc does not record a PR/CI run number as of this reconciliation pass,
+so no further CI claim is made here).
 
 **Boundary:** Resolve only accepted opaque tenant-membership recipient
 references through authoritative same-tenant state; fail closed for missing,
@@ -40,9 +94,8 @@ stale, disabled, or unauthorized membership; keep contact data out of domain
 events and privacy-sensitive logs. No generalized composition, provider
 activation, external call, Maps, FHIR, ABDM, or production claim is included.
 
-**Implementation authority:** accepted ADR-015, accepted ADR-016, accepted
-source `9594988`, and the bounded G3.25 sprint contract to be created before
-implementation.
+**Implementation authority:** accepted ADR-015, accepted ADR-016, and
+`docs/sprints/G3.25-reservation-recipient-resolution-boundary.md`.
 
 ## Earlier accepted sprint
 
