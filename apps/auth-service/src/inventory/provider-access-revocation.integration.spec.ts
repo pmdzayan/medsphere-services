@@ -1,7 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import { NotFoundException } from '@nestjs/common';
 import { AuditWriter } from '../audit/audit-writer.service';
-import { isInfrastructureTestEnabled, requireEnv } from '../auth/testing/infrastructure-test-gate';
+import {
+  isInfrastructureTestEnabled,
+  requireEnv,
+} from '../auth/testing/infrastructure-test-gate';
 import { PrismaService } from '../prisma/prisma.service';
 import { InventoryEventWriter } from './inventory-event-writer';
 import { ReservationCreationService } from './reservation-creation.service';
@@ -26,7 +29,11 @@ infrastructure('Post-audit Task 2 immediate provider-access revocation', () => {
 
   beforeAll(async () => {
     await prisma.client.tenant.create({
-      data: { id: tenantId, name: 'Task2-PAR tenant', slug: `task2-par-${tenantId}` },
+      data: {
+        id: tenantId,
+        name: 'Task2-PAR tenant',
+        slug: `task2-par-${tenantId}`,
+      },
     });
     await prisma.client.user.createMany({
       data: [actorUserId, subjectUserId].map((id, index) => ({
@@ -39,7 +46,13 @@ infrastructure('Post-audit Task 2 immediate provider-access revocation', () => {
     });
     await prisma.client.tenantMembership.createMany({
       data: [
-        { id: membershipId, tenantId, userId: actorUserId, status: 'ACTIVE', joinedAt: new Date() },
+        {
+          id: membershipId,
+          tenantId,
+          userId: actorUserId,
+          status: 'ACTIVE',
+          joinedAt: new Date(),
+        },
         {
           id: randomUUID(),
           tenantId,
