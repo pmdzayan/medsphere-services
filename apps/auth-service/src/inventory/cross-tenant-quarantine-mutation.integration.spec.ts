@@ -135,84 +135,87 @@ infrastructure('Post-audit Task 2 cross-tenant actor-driven mutation rejection',
 
   afterAll(async () => prisma.client.$disconnect());
 
-  it('rejects a tenant B actor quarantining a tenant A batch via tenant A opaque IDs, tenant-safe', async () => {
-    const productId = randomUUID();
-    const inventoryId = randomUUID();
-    const batchId = randomUUID();
+  it(
+    'rejects a tenant B actor quarantining a tenant A batch via tenant A opaque IDs, tenant-safe',
+    async () => {
+      const productId = randomUUID();
+      const inventoryId = randomUUID();
+      const batchId = randomUUID();
 
-    await prisma.client.product.create({
-      data: {
-        id: productId,
-        name: 'Task2-XT Medicine',
-        brand: 'Fixture Brand',
-        category: 'MEDICINE',
-        manufacturer: 'Fixture Manufacturer',
-        dosageForm: 'TABLET',
-        strength: '10 mg',
-      },
-    });
-    await prisma.client.inventory.create({
-      data: {
-        id: inventoryId,
-        tenantId: tenantAId,
-        providerId: tenantAProviderId,
-        productId,
-        sellingPrice: '120.00',
-        mrp: '135.00',
-        discountPercentage: '0.00',
-        taxPercentage: '0.00',
-        minimumStockLevel: 1,
-      },
-    });
-    await prisma.client.batch.create({
-      data: {
-        id: batchId,
-        tenantId: tenantAId,
-        inventoryId,
-        providerId: tenantAProviderId,
-        productId,
-        batchNumber: `TASK2-XT-${batchId}`,
-        expiryDate: new Date(Date.now() + 86_400_000),
-        receivedQuantity: 5,
+      await prisma.client.product.create({
+        data: {
+          id: productId,
+          name: 'Task2-XT Medicine',
+          brand: 'Fixture Brand',
+          category: 'MEDICINE',
+          manufacturer: 'Fixture Manufacturer',
+          dosageForm: 'TABLET',
+          strength: '10 mg',
+        },
+      });
+      await prisma.client.inventory.create({
+        data: {
+          id: inventoryId,
+          tenantId: tenantAId,
+          providerId: tenantAProviderId,
+          productId,
+          sellingPrice: '120.00',
+          mrp: '135.00',
+          discountPercentage: '0.00',
+          taxPercentage: '0.00',
+          minimumStockLevel: 1,
+        },
+      });
+      await prisma.client.batch.create({
+        data: {
+          id: batchId,
+          tenantId: tenantAId,
+          inventoryId,
+          providerId: tenantAProviderId,
+          productId,
+          batchNumber: `TASK2-XT-${batchId}`,
+          expiryDate: new Date(Date.now() + 86_400_000),
+          receivedQuantity: 5,
+          onHandQuantity: 5,
+          heldQuantity: 0,
+          purchasePrice: '100.00',
+          sellingPrice: '120.00',
+        },
+      });
+
+      // Tenant B's authenticated actor attempts to quarantine tenant A's real batch,
+      // reusing tenant A's real opaque providerId and batchId. No tenant-B fixture
+      // is fabricated to "match" tenant A's IDs — these are tenant A's actual records.
+      await expect(
+        service.quarantine({
+          actor: tenantBActor,
+          providerId: tenantAProviderId,
+          batchId,
+          expectedVersion: 1,
+          idempotencyKey: `task2-xt-${randomUUID()}`,
+          reasonCode: 'QUALITY_SUSPECT',
+        }),
+      ).rejects.toBeInstanceOf(NotFoundException);
+
+      const [batch, quarantineRecords, audits] = await Promise.all([
+        prisma.client.batch.findUniqueOrThrow({ where: { id: batchId } }),
+        prisma.client.batchQuarantineRecord.findMany({ where: { batchId } }),
+        prisma.client.auditEvent.findMany({
+          where: { tenantId: tenantAId, resourceId: batchId },
+        }),
+      ]);
+
+      // Tenant A's batch is completely unaffected, and the rejection produced no
+      // audit trail attributing an event to tenant A's resource from tenant B's
+      // actor — the failure did not leak existence or detail into tenant A's data.
+      expect(batch).toMatchObject({
+        status: 'ACTIVE',
         onHandQuantity: 5,
         heldQuantity: 0,
-        purchasePrice: '100.00',
-        sellingPrice: '120.00',
-      },
-    });
-
-    // Tenant B's authenticated actor attempts to quarantine tenant A's real batch,
-    // reusing tenant A's real opaque providerId and batchId. No tenant-B fixture
-    // is fabricated to "match" tenant A's IDs — these are tenant A's actual records.
-    await expect(
-      service.quarantine({
-        actor: tenantBActor,
-        providerId: tenantAProviderId,
-        batchId,
-        expectedVersion: 1,
-        idempotencyKey: `task2-xt-${randomUUID()}`,
-        reasonCode: 'QUALITY_SUSPECT',
-      }),
-    ).rejects.toBeInstanceOf(NotFoundException);
-
-    const [batch, quarantineRecords, audits] = await Promise.all([
-      prisma.client.batch.findUniqueOrThrow({ where: { id: batchId } }),
-      prisma.client.batchQuarantineRecord.findMany({ where: { batchId } }),
-      prisma.client.auditEvent.findMany({
-        where: { tenantId: tenantAId, resourceId: batchId },
-      }),
-    ]);
-
-    // Tenant A's batch is completely unaffected, and the rejection produced no
-    // audit trail attributing an event to tenant A's resource from tenant B's
-    // actor — the failure did not leak existence or detail into tenant A's data.
-    expect(batch).toMatchObject({
-      status: 'ACTIVE',
-      onHandQuantity: 5,
-      heldQuantity: 0,
-      version: 1,
-    });
-    expect(quarantineRecords).toHaveLength(0);
-    expect(audits).toHaveLength(0);
-  });
+        version: 1,
+      });
+      expect(quarantineRecords).toHaveLength(0);
+      expect(audits).toHaveLength(0);
+    },
+  );
 });
