@@ -1,11 +1,31 @@
 # MedSphere AI Handoff
 
-**Last updated:** 2026-08-15
+**Last updated:** 2026-08-19
 
-**Current sprint:** G3.25 reservation recipient resolution boundary not started
+**Current sprint:** Post-Audit Stabilization Batch 1 — Task 2 (authorization /
+tenant-isolation release coverage) is the next permitted task; not started.
+Governance reconciliation is a prerequisite to Task 2 implementation.
 
-**Next feature work:** Implement the bounded G3.25 reservation recipient
-resolution boundary from accepted G3.24 source `9594988`
+G3.25 through G3.29 are accepted and merged. Post-Audit Stabilization Batch 1
+Task 1 (release/coverage hardening) is accepted and merged: PR #70, head
+`924b2bd1d33e58f317b1ed3e0372d48eb45f74e1`, merge commit
+`706586910579aa01b7c24b1c16cd16f72099477b`, exact-head CI run `32264518571`
+(run #253, success). Task 1 added PostgreSQL/Redis-backed coverage for
+concurrent reservation creation, reservation-vs-unavailable-stock
+concurrency, transactional rollback, and same-key retry/idempotency
+integrity; no production-code semantic changes. Explicit cross-tenant
+concurrency attacks were not exercised — recorded as an accepted residual
+coverage observation, not a reproduced defect, and are the focus of Task 2.
+
+**Next feature work:** Batch 1 Task 2 — close authorization and
+tenant-isolation coverage gaps (provider-authority revocation,
+role/permission revocation, alternate-route authorization bypass, and
+explicit cross-tenant PostgreSQL-backed isolation evidence). Task 2 has not
+started; this governance reconciliation is its prerequisite. Task 2 must
+itself be merged and formally accepted before Task 3 (last-administrator
+concurrency) begins. The G3.25 reservation-recipient-resolution boundary itself is
+accepted (see `PROJECT_STATUS.md` and
+`docs/sprints/G3.25-reservation-recipient-resolution-boundary.md`).
 
 ## Mandatory startup sequence
 
