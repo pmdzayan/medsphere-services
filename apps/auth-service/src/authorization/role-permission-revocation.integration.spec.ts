@@ -1,7 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import { AuditWriter } from '../audit/audit-writer.service';
 import { AuthenticatedIdentity } from '../auth/auth.types';
-import { isInfrastructureTestEnabled, requireEnv } from '../auth/testing/infrastructure-test-gate';
+import {
+  isInfrastructureTestEnabled,
+  requireEnv,
+} from '../auth/testing/infrastructure-test-gate';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthorizationRepository } from './authorization.repository';
 import { AuthorizationService } from './authorization.service';
@@ -25,7 +28,11 @@ infrastructure('Post-audit Task 2 immediate role/permission revocation', () => {
 
   beforeAll(async () => {
     await prisma.client.tenant.create({
-      data: { id: tenantId, name: 'Task2-RPR tenant', slug: `task2-rpr-${tenantId}` },
+      data: {
+        id: tenantId,
+        name: 'Task2-RPR tenant',
+        slug: `task2-rpr-${tenantId}`,
+      },
     });
     await prisma.client.user.create({
       data: {
@@ -37,7 +44,13 @@ infrastructure('Post-audit Task 2 immediate role/permission revocation', () => {
       },
     });
     await prisma.client.tenantMembership.create({
-      data: { id: membershipId, tenantId, userId, status: 'ACTIVE', joinedAt: new Date() },
+      data: {
+        id: membershipId,
+        tenantId,
+        userId,
+        status: 'ACTIVE',
+        joinedAt: new Date(),
+      },
     });
   });
 
@@ -53,10 +66,20 @@ infrastructure('Post-audit Task 2 immediate role/permission revocation', () => {
       });
 
       await prisma.client.role.create({
-        data: { id: roleId, tenantId, name: `Task2-RPR role ${roleId}`, type: 'TENANT' },
+        data: {
+          id: roleId,
+          tenantId,
+          name: `Task2-RPR role ${roleId}`,
+          type: 'TENANT',
+        },
       });
       await prisma.client.rolePermission.create({
-        data: { id: randomUUID(), tenantId, roleId, permissionId: permission.id },
+        data: {
+          id: randomUUID(),
+          tenantId,
+          roleId,
+          permissionId: permission.id,
+        },
       });
       await prisma.client.membershipRole.create({
         data: { id: membershipRoleId, tenantId, membershipId, roleId },
@@ -91,10 +114,20 @@ infrastructure('Post-audit Task 2 immediate role/permission revocation', () => {
       });
 
       await prisma.client.role.create({
-        data: { id: roleId, tenantId, name: `Task2-RPR mapping role ${roleId}`, type: 'TENANT' },
+        data: {
+          id: roleId,
+          tenantId,
+          name: `Task2-RPR mapping role ${roleId}`,
+          type: 'TENANT',
+        },
       });
       await prisma.client.rolePermission.create({
-        data: { id: rolePermissionId, tenantId, roleId, permissionId: permission.id },
+        data: {
+          id: rolePermissionId,
+          tenantId,
+          roleId,
+          permissionId: permission.id,
+        },
       });
       await prisma.client.membershipRole.create({
         data: { id: membershipRoleId, tenantId, membershipId, roleId },
@@ -102,7 +135,9 @@ infrastructure('Post-audit Task 2 immediate role/permission revocation', () => {
 
       // Step 1: the role still exists and still carries the permission mapping.
       await expect(
-        authorizationService.hasAllPermissions(identity, [PERMISSIONS.inventoryReservationsRead]),
+        authorizationService.hasAllPermissions(identity, [
+          PERMISSIONS.inventoryReservationsRead,
+        ]),
       ).resolves.toBe(true);
 
       // Step 2: only the permission mapping is removed — the role assignment itself
@@ -111,7 +146,9 @@ infrastructure('Post-audit Task 2 immediate role/permission revocation', () => {
 
       // Step 3: same session, immediate retry, no new token.
       await expect(
-        authorizationService.hasAllPermissions(identity, [PERMISSIONS.inventoryReservationsRead]),
+        authorizationService.hasAllPermissions(identity, [
+          PERMISSIONS.inventoryReservationsRead,
+        ]),
       ).resolves.toBe(false);
     },
   );
