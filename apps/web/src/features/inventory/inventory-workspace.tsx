@@ -88,6 +88,28 @@ export function InventoryWorkspace() {
   const [transferReceipt, setTransferReceipt] = useState<CompletedTransferResponse | null>(null);
   const [error, setError] = useState<{ message: string; status?: number } | null>(null);
 
+  // Escape dismisses whichever confirmation dialog is open, unless a
+  // submission is in flight (an in-progress mutation should not be
+  // silently abandoned by an accidental key press).
+  useEffect(() => {
+    if (!quarantineTarget && !damageTarget && !transferTarget) return;
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key !== 'Escape') return;
+      if (quarantineTarget && !quarantineSubmitting) setQuarantineTarget(null);
+      else if (damageTarget && !damageSubmitting) setDamageTarget(null);
+      else if (transferTarget && !transferSubmitting) setTransferTarget(null);
+    }
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [
+    quarantineTarget,
+    quarantineSubmitting,
+    damageTarget,
+    damageSubmitting,
+    transferTarget,
+    transferSubmitting,
+  ]);
+
   const loadProviders = useCallback(async () => {
     setProvidersLoading(true);
     setError(null);

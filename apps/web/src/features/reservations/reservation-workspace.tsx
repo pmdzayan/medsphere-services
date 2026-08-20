@@ -73,6 +73,20 @@ export function ReservationWorkspace() {
   const [creationReceipt, setCreationReceipt] = useState<ReservationCreationResponse | null>(null);
   const [error, setError] = useState<{ message: string; status?: number } | null>(null);
 
+  // Escape dismisses whichever dialog is open, unless a submission is in
+  // flight (an in-progress mutation should not be silently abandoned by
+  // an accidental key press).
+  useEffect(() => {
+    if (!creationDraft && !transitionTarget) return;
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key !== 'Escape') return;
+      if (creationDraft && !creationSubmitting) setCreationDraft(null);
+      else if (transitionTarget && !transitionSubmitting) setTransitionTarget(null);
+    }
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [creationDraft, creationSubmitting, transitionTarget, transitionSubmitting]);
+
   const loadProviders = useCallback(async () => {
     setProvidersLoading(true);
     setError(null);

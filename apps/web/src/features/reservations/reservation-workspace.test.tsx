@@ -157,6 +157,17 @@ describe('ReservationWorkspace live integration', () => {
     expect(screen.getByRole('dialog')).toBeVisible();
   });
 
+  it('dismisses the reservation creation dialog on Escape', async () => {
+    render(<ReservationWorkspace />);
+    fireEvent.click(await screen.findByRole('button', { name: 'New reservation' }));
+    expect(await screen.findByRole('dialog')).toBeVisible();
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(createProviderReservation).not.toHaveBeenCalled();
+  });
+
   it('keeps confirmation open on a bounded lifecycle conflict', async () => {
     vi.mocked(transitionProviderReservation).mockRejectedValueOnce(
       new ApiError('Medicine reservation version conflict', 409),

@@ -36,6 +36,16 @@ describe('RegistrationForm interactions', () => {
     expect(register).not.toHaveBeenCalled();
   });
 
+  it('announces field-level validation errors to assistive technology', () => {
+    render(<RegistrationForm />);
+
+    fill('Work email', 'invalid');
+    fireEvent.click(screen.getByRole('button', { name: 'Request organization access' }));
+
+    const alerts = screen.getAllByRole('alert');
+    expect(alerts.some((el) => el.textContent === 'Enter a valid email address.')).toBe(true);
+  });
+
   it('normalizes and submits the accepted registration request', async () => {
     render(<RegistrationForm />);
 

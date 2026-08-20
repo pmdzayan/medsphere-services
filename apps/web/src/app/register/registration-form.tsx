@@ -224,7 +224,7 @@ function Field({
         </span>
       ) : null}
       {error ? (
-        <span id={`${id}-error`} className="mt-2 block text-xs text-red-700">
+        <span id={`${id}-error`} className="mt-2 block text-xs text-red-700" role="alert">
           {error}
         </span>
       ) : null}

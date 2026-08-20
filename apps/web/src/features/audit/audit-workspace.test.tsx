@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError, getAuditEvents } from '@/lib/api-client';
 import { type AuditEvent } from '@/lib/audit-contract';
@@ -45,7 +45,7 @@ describe('AuditWorkspace interactions', () => {
     render(<AuditWorkspace />);
 
     fireEvent.click(
-      await screen.findByRole('button', {
+      within(await screen.findByRole('table')).getByRole('button', {
         name: /View Authorization · Permission · Denied details/i,
       }),
     );
@@ -78,11 +78,16 @@ describe('AuditWorkspace interactions', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: 'Load older evidence' }));
 
+    const table = await screen.findByRole('table');
     expect(
-      await screen.findByRole('button', { name: /View Authorization · Role · Created details/i }),
+      await within(table).findByRole('button', {
+        name: /View Authorization · Role · Created details/i,
+      }),
     ).toBeVisible();
     expect(
-      screen.getAllByRole('button', { name: /View Authorization · Permission · Denied details/i }),
+      within(table).getAllByRole('button', {
+        name: /View Authorization · Permission · Denied details/i,
+      }),
     ).toHaveLength(1);
     expect(getAuditEvents).toHaveBeenLastCalledWith({ limit: 25, cursor: roleEvent.id });
   });
