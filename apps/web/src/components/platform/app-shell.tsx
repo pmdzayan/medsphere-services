@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { SessionProfile } from '@/lib/session-profile';
 import { PlatformBrand } from './brand';
 import { Icon, type IconName } from './icon';
@@ -29,8 +29,53 @@ export function AppShell({
   const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
+  const mobileNavCloseRef = useRef<HTMLButtonElement>(null);
+  const mobileNavTriggerRef = useRef<HTMLButtonElement>(null);
+  const accountMenuRef = useRef<HTMLDivElement>(null);
+  const accountMenuTriggerRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => setMobileNavigationOpen(false), [pathname]);
+
+  // Move focus into the drawer when it opens, and back to the button that
+  // opened it when it closes -- but only if it was actually opened first;
+  // otherwise this would steal focus to the trigger on initial mount.
+  const mobileNavWasOpenRef = useRef(false);
+  useEffect(() => {
+    if (mobileNavigationOpen) {
+      mobileNavCloseRef.current?.focus();
+      mobileNavWasOpenRef.current = true;
+    } else if (mobileNavWasOpenRef.current) {
+      mobileNavTriggerRef.current?.focus();
+      mobileNavWasOpenRef.current = false;
+    }
+  }, [mobileNavigationOpen]);
+
+  // Escape dismisses whichever overlay is open; the drawer is prioritised
+  // since it's modal (aria-modal="true").
+  useEffect(() => {
+    if (!mobileNavigationOpen && !accountMenuOpen) return;
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key !== 'Escape') return;
+      if (mobileNavigationOpen) setMobileNavigationOpen(false);
+      else if (accountMenuOpen) setAccountMenuOpen(false);
+    }
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [mobileNavigationOpen, accountMenuOpen]);
+
+  // The account menu is a non-modal popover: clicking anywhere outside it
+  // (not just pressing Escape) is expected to close it.
+  useEffect(() => {
+    if (!accountMenuOpen) return;
+    function handlePointerDown(event: PointerEvent) {
+      const target = event.target as Node;
+      if (accountMenuRef.current?.contains(target)) return;
+      if (accountMenuTriggerRef.current?.contains(target)) return;
+      setAccountMenuOpen(false);
+    }
+    document.addEventListener('pointerdown', handlePointerDown);
+    return () => document.removeEventListener('pointerdown', handlePointerDown);
+  }, [accountMenuOpen]);
 
   return (
     <div className="min-h-screen bg-[#f3f6f3] text-[#12231e]">
@@ -62,6 +107,7 @@ export function AppShell({
             <div className="flex items-center justify-between px-2">
               <PlatformBrand />
               <button
+                ref={mobileNavCloseRef}
                 type="button"
                 onClick={() => setMobileNavigationOpen(false)}
                 className="grid size-10 place-items-center rounded-xl border border-white/10 bg-white/[.06] text-white/70"
@@ -81,6 +127,7 @@ export function AppShell({
         <header className="sticky top-0 z-30 border-b border-[#102c24]/[.07] bg-[#f3f6f3]/90 backdrop-blur-xl">
           <div className="flex h-[4.75rem] items-center gap-3 px-4 sm:px-6 lg:px-8">
             <button
+              ref={mobileNavTriggerRef}
               type="button"
               className="grid size-10 shrink-0 place-items-center rounded-xl border border-[#102c24]/10 bg-white text-[#21433a] shadow-sm lg:hidden"
               onClick={() => setMobileNavigationOpen(true)}
@@ -107,8 +154,9 @@ export function AppShell({
                 <span className="size-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_#10b981]" />
                 Secure session
               </span>
-              <div className="relative">
+              <div className="relative" ref={accountMenuRef}>
                 <button
+                  ref={accountMenuTriggerRef}
                   type="button"
                   className="flex items-center gap-3 rounded-2xl border border-[#102c24]/10 bg-white py-1.5 pl-1.5 pr-2 shadow-sm transition hover:border-emerald-500/25"
                   aria-label="Open account menu"
@@ -161,7 +209,7 @@ export function AppShell({
         </header>
 
         <main id="main-content" className="px-4 pb-24 pt-6 sm:px-6 sm:pt-8 lg:px-8 lg:pb-10">
-          {children}
+          <div className="mx-auto max-w-[1600px]">{children}</div>
         </main>
       </div>
 
@@ -169,7 +217,7 @@ export function AppShell({
         className="fixed inset-x-3 bottom-3 z-30 flex h-[4.25rem] items-center justify-around rounded-[1.35rem] border border-white/10 bg-[#071713]/95 px-2 text-white shadow-[0_22px_60px_-20px_rgba(2,20,15,.75)] backdrop-blur-xl lg:hidden"
         aria-label="Mobile navigation"
       >
-        {[...primaryNavigation, ...organizationNavigation]
+        {primaryNavigation
           .filter((item) => item.available !== false)
           .map((item) => {
             const active = isActivePath(pathname, item.href);
@@ -184,6 +232,16 @@ export function AppShell({
               </Link>
             );
           })}
+        <button
+          type="button"
+          onClick={() => setMobileNavigationOpen(true)}
+          aria-expanded={mobileNavigationOpen}
+          aria-label="More navigation, team, and settings"
+          className="flex min-w-14 flex-col items-center gap-1 rounded-xl px-2 py-2 text-[9px] font-semibold text-white/45 transition"
+        >
+          <Icon name="menu" className="size-[19px]" />
+          More
+        </button>
       </nav>
     </div>
   );
