@@ -8,7 +8,11 @@ import {
   recordCompletedTransfer,
   recordDamagedStock,
 } from '@/lib/api-client';
-import type { InventoryStockPage, ProviderAccess } from '@/lib/inventory-contract';
+import type {
+  BatchQuarantineResponse,
+  InventoryStockPage,
+  ProviderAccess,
+} from '@/lib/inventory-contract';
 import { InventoryWorkspace } from './inventory-workspace';
 
 vi.mock('@/lib/api-client', async () => {
@@ -228,6 +232,45 @@ describe('InventoryWorkspace live integration', () => {
     expect(screen.getByRole('dialog')).toBeVisible();
   });
 
+  it('dismisses the quarantine confirmation dialog on Escape', async () => {
+    render(<InventoryWorkspace />);
+    fireEvent.click(
+      within(await findTable()).getByRole('button', { name: 'Quarantine batch BATCH-1' }),
+    );
+    expect(screen.getByRole('dialog')).toBeVisible();
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(quarantineBatch).not.toHaveBeenCalled();
+  });
+
+  it('does not dismiss the quarantine dialog on Escape while the submission is in flight', async () => {
+    const pendingQuarantine = deferred<BatchQuarantineResponse>();
+    vi.mocked(quarantineBatch).mockReturnValueOnce(pendingQuarantine.promise);
+    render(<InventoryWorkspace />);
+    fireEvent.click(
+      within(await findTable()).getByRole('button', { name: 'Quarantine batch BATCH-1' }),
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm quarantine' }));
+    expect(await screen.findByText('Quarantining…')).toBeVisible();
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.getByRole('dialog')).toBeVisible();
+
+    pendingQuarantine.resolve({
+      batchId: page.data[0].batches[0].id,
+      status: 'QUARANTINED',
+      reasonCode: 'TEMPERATURE_EXCURSION',
+      onHandQuantity: 20,
+      affectedReservationCount: 1,
+      releasedUnitCount: 3,
+      resultingBatchVersion: 5,
+      occurredAt: '2026-08-14T01:00:00.000Z',
+      replayed: false,
+    });
+  });
+
   it('records only a confirmed available damaged quantity and refreshes live stock', async () => {
     vi.stubGlobal('crypto', { randomUUID: () => '22222222-2222-4222-8222-222222222222' });
     render(<InventoryWorkspace />);
@@ -382,4 +425,12 @@ function metric(label: string) {
     .find((element) => element !== null);
   expect(card).not.toBeNull();
   return card!;
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((fulfil) => {
+    resolve = fulfil;
+  });
+  return { promise, resolve };
 }

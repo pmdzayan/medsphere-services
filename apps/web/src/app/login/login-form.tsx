@@ -106,7 +106,7 @@ function Field({
         className="w-full rounded-xl border border-[#10201c]/[.11] bg-[#fbfaf5] px-4 py-3.5 text-sm text-[#10201c] shadow-[0_1px_0_rgba(255,255,255,.8)_inset] transition placeholder:text-[#9aa49f] hover:border-[#10201c]/25 focus:border-emerald-600 focus:bg-white"
       />
       {error ? (
-        <span id={`${id}-error`} className="mt-2 block text-xs text-red-700">
+        <span id={`${id}-error`} className="mt-2 block text-xs text-red-700" role="alert">
           {error}
         </span>
       ) : null}

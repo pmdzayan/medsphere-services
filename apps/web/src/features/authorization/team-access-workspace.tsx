@@ -335,83 +335,144 @@ function RoleTable({
   canDelete: boolean;
 }) {
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full min-w-[820px] border-collapse text-left">
-        <thead>
-          <tr className="border-b border-[#edf1ef] bg-[#fbfcfb] text-[10px] font-extrabold uppercase tracking-[.13em] text-[#8a9994]">
-            <th className="px-6 py-3.5" scope="col">
-              Role
-            </th>
-            <th className="px-4 py-3.5" scope="col">
-              Type
-            </th>
-            <th className="px-4 py-3.5" scope="col">
-              Permissions
-            </th>
-            <th className="px-4 py-3.5" scope="col">
-              Assignments
-            </th>
-            <th className="px-6 py-3.5" scope="col">
-              <span className="sr-only">Actions</span>
-            </th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-[#edf1ef]">
-          {roles.map((role) => (
-            <tr key={role.id} className="transition-colors hover:bg-[#fbfdfc]">
-              <td className="px-6 py-4">
+    <>
+      {/* Desktop/tablet: full table. Below lg, a stacked card list takes
+          over instead of forcing horizontal scroll -- same convention
+          established in Task 4. */}
+      <div className="hidden overflow-x-auto lg:block">
+        <table className="w-full min-w-[820px] border-collapse text-left">
+          <thead>
+            <tr className="border-b border-[#edf1ef] bg-[#fbfcfb] text-[10px] font-extrabold uppercase tracking-[.13em] text-[#8a9994]">
+              <th className="px-6 py-3.5" scope="col">
+                Role
+              </th>
+              <th className="px-4 py-3.5" scope="col">
+                Type
+              </th>
+              <th className="px-4 py-3.5" scope="col">
+                Permissions
+              </th>
+              <th className="px-4 py-3.5" scope="col">
+                Assignments
+              </th>
+              <th className="px-6 py-3.5" scope="col">
+                <span className="sr-only">Actions</span>
+              </th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-[#edf1ef]">
+            {roles.map((role) => (
+              <tr key={role.id} className="transition-colors hover:bg-[#fbfdfc]">
+                <td className="px-6 py-4">
+                  <p className="text-sm font-bold text-[#1b372d]">{formatRoleName(role.name)}</p>
+                  <p className="mt-1 max-w-md text-xs text-[#85938f]">
+                    {role.description ?? 'No description provided.'}
+                  </p>
+                </td>
+                <td className="px-4 py-4">
+                  <StatusBadge tone={role.type === 'SYSTEM' ? 'cyan' : 'emerald'}>
+                    {role.type === 'SYSTEM' ? 'System' : 'Custom'}
+                  </StatusBadge>
+                </td>
+                <td className="px-4 py-4">
+                  <PermissionChips role={role} />
+                </td>
+                <td className="px-4 py-4 text-sm font-bold text-[#405a52]">
+                  {role.assignmentCount}
+                </td>
+                <td className="px-6 py-4 text-right">
+                  <RoleAction
+                    role={role}
+                    onEdit={onEdit}
+                    canUpdate={canUpdate}
+                    canDelete={canDelete}
+                  />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <ul className="divide-y divide-[#edf1ef] lg:hidden">
+        {roles.map((role) => (
+          <li key={role.id} className="p-4 sm:p-5">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
                 <p className="text-sm font-bold text-[#1b372d]">{formatRoleName(role.name)}</p>
-                <p className="mt-1 max-w-md text-xs text-[#85938f]">
+                <p className="mt-1 text-xs text-[#85938f]">
                   {role.description ?? 'No description provided.'}
                 </p>
-              </td>
-              <td className="px-4 py-4">
-                <StatusBadge tone={role.type === 'SYSTEM' ? 'cyan' : 'emerald'}>
-                  {role.type === 'SYSTEM' ? 'System' : 'Custom'}
-                </StatusBadge>
-              </td>
-              <td className="px-4 py-4">
-                <div className="flex max-w-sm flex-wrap gap-1.5">
-                  {role.permissionKeys.slice(0, 2).map((permission) => (
-                    <span
-                      key={permission}
-                      className="rounded-lg bg-[#f0f5f3] px-2 py-1 font-mono text-[9px] font-semibold text-[#4d685e]"
-                    >
-                      {shortPermission(permission)}
-                    </span>
-                  ))}
-                  {role.permissionKeys.length > 2 ? (
-                    <span className="rounded-lg bg-[#edf7f3] px-2 py-1 text-[9px] font-black text-emerald-700">
-                      +{role.permissionKeys.length - 2}
-                    </span>
-                  ) : null}
-                  {role.permissionKeys.length === 0 ? (
-                    <span className="text-xs text-[#98a49f]">None</span>
-                  ) : null}
-                </div>
-              </td>
-              <td className="px-4 py-4 text-sm font-bold text-[#405a52]">{role.assignmentCount}</td>
-              <td className="px-6 py-4 text-right">
-                {role.type === 'TENANT' && (canUpdate || canDelete) ? (
-                  <button
-                    type="button"
-                    onClick={() => onEdit(role)}
-                    className="rounded-xl border border-[#dbe4e0] bg-white px-3 py-2 text-[10px] font-bold text-emerald-800 hover:bg-emerald-50"
-                  >
-                    Manage · v{role.version}
-                  </button>
-                ) : role.type === 'TENANT' ? (
-                  <span className="text-[10px] font-semibold text-[#93a09c]">Read only</span>
-                ) : (
-                  <span className="text-[10px] font-semibold text-[#93a09c]">Protected</span>
-                )}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+              </div>
+              <StatusBadge tone={role.type === 'SYSTEM' ? 'cyan' : 'emerald'}>
+                {role.type === 'SYSTEM' ? 'System' : 'Custom'}
+              </StatusBadge>
+            </div>
+            <div className="mt-3">
+              <PermissionChips role={role} />
+            </div>
+            <div className="mt-3 flex items-center justify-between gap-3">
+              <span className="text-xs font-bold text-[#405a52]">
+                {role.assignmentCount} assignment{role.assignmentCount === 1 ? '' : 's'}
+              </span>
+              <RoleAction role={role} onEdit={onEdit} canUpdate={canUpdate} canDelete={canDelete} />
+            </div>
+          </li>
+        ))}
+      </ul>
+    </>
+  );
+}
+
+function PermissionChips({ role }: { role: Role }) {
+  return (
+    <div className="flex max-w-sm flex-wrap gap-1.5">
+      {role.permissionKeys.slice(0, 2).map((permission) => (
+        <span
+          key={permission}
+          className="rounded-lg bg-[#f0f5f3] px-2 py-1 font-mono text-[9px] font-semibold text-[#4d685e]"
+        >
+          {shortPermission(permission)}
+        </span>
+      ))}
+      {role.permissionKeys.length > 2 ? (
+        <span className="rounded-lg bg-[#edf7f3] px-2 py-1 text-[9px] font-black text-emerald-700">
+          +{role.permissionKeys.length - 2}
+        </span>
+      ) : null}
+      {role.permissionKeys.length === 0 ? (
+        <span className="text-xs text-[#98a49f]">None</span>
+      ) : null}
     </div>
   );
+}
+
+function RoleAction({
+  role,
+  onEdit,
+  canUpdate,
+  canDelete,
+}: {
+  role: Role;
+  onEdit: (role: Role) => void;
+  canUpdate: boolean;
+  canDelete: boolean;
+}) {
+  if (role.type === 'TENANT' && (canUpdate || canDelete)) {
+    return (
+      <button
+        type="button"
+        onClick={() => onEdit(role)}
+        className="rounded-xl border border-[#dbe4e0] bg-white px-3 py-2 text-[10px] font-bold text-emerald-800 hover:bg-emerald-50"
+      >
+        Manage · v{role.version}
+      </button>
+    );
+  }
+  if (role.type === 'TENANT') {
+    return <span className="text-[10px] font-semibold text-[#93a09c]">Read only</span>;
+  }
+  return <span className="text-[10px] font-semibold text-[#93a09c]">Protected</span>;
 }
 
 function AccessUnavailable({ message }: { message: string }) {

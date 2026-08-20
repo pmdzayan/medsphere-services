@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   getAuthorizationCatalogue,
@@ -67,7 +67,7 @@ describe('TeamAccessWorkspace permission-aware interactions', () => {
 
     render(<TeamAccessWorkspace />);
 
-    expect(await screen.findByText(/Pharmacy manager/i)).toBeInTheDocument();
+    expect((await screen.findAllByText(/Pharmacy manager/i))[0]).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Create custom role' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Manage/ })).not.toBeInTheDocument();
     expect(screen.queryByText('Team role assignments')).not.toBeInTheDocument();
@@ -90,7 +90,9 @@ describe('TeamAccessWorkspace permission-aware interactions', () => {
     expect(screen.getByRole('heading', { name: 'Create custom role' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Close role form' }));
 
-    fireEvent.click(screen.getByRole('button', { name: /Manage/ }));
+    fireEvent.click(
+      within(await screen.findByRole('table')).getByRole('button', { name: /Manage/ }),
+    );
     expect(screen.getByRole('button', { name: 'Delete role' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Save changes' })).not.toBeInTheDocument();
     expect(screen.getByLabelText('Role name')).toBeDisabled();

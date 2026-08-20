@@ -556,77 +556,145 @@ function PanelHeader({
 
 function StockTable({ items }: { items: InventoryStockItem[] }) {
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full min-w-[720px] border-collapse text-left">
-        <thead>
-          <tr className="border-b border-[#edf1ef] bg-[#fbfcfb] text-[10px] font-extrabold uppercase tracking-[.13em] text-[#8a9994]">
-            <th className="px-5 py-3.5 sm:px-6">Product</th>
-            <th className="px-4 py-3.5">Batches</th>
-            <th className="px-4 py-3.5">On hand</th>
-            <th className="px-4 py-3.5">Held</th>
-            <th className="px-5 py-3.5 sm:px-6">Available</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-[#edf1ef]">
-          {items.map((item) => (
-            <tr key={item.inventoryId}>
-              <td className="px-5 py-4 sm:px-6">
-                <p className="text-sm font-bold text-[#1b372d]">{item.name}</p>
-                <p className="mt-1 text-xs text-[#85938f]">
-                  {item.brand}
-                  {item.sku ? ` · ${item.sku}` : ''}
-                </p>
-              </td>
-              <td className="px-4 py-4 text-sm text-[#405a52]">{item.batches.length}</td>
-              <td className="px-4 py-4 text-sm text-[#405a52]">{item.totalOnHandQuantity}</td>
-              <td className="px-4 py-4 text-sm text-[#405a52]">{item.totalHeldQuantity}</td>
-              <td className="px-5 py-4 text-sm font-bold text-emerald-700 sm:px-6">
-                {item.totalAvailableQuantity}
-              </td>
+    <>
+      <div className="hidden overflow-x-auto lg:block">
+        <table className="w-full min-w-[720px] border-collapse text-left">
+          <thead>
+            <tr className="border-b border-[#edf1ef] bg-[#fbfcfb] text-[10px] font-extrabold uppercase tracking-[.13em] text-[#8a9994]">
+              <th className="px-5 py-3.5 sm:px-6">Product</th>
+              <th className="px-4 py-3.5">Batches</th>
+              <th className="px-4 py-3.5">On hand</th>
+              <th className="px-4 py-3.5">Held</th>
+              <th className="px-5 py-3.5 sm:px-6">Available</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+          </thead>
+          <tbody className="divide-y divide-[#edf1ef]">
+            {items.map((item) => (
+              <tr key={item.inventoryId}>
+                <td className="px-5 py-4 sm:px-6">
+                  <p className="text-sm font-bold text-[#1b372d]">{item.name}</p>
+                  <p className="mt-1 text-xs text-[#85938f]">
+                    {item.brand}
+                    {item.sku ? ` · ${item.sku}` : ''}
+                  </p>
+                </td>
+                <td className="px-4 py-4 text-sm text-[#405a52]">{item.batches.length}</td>
+                <td className="px-4 py-4 text-sm text-[#405a52]">{item.totalOnHandQuantity}</td>
+                <td className="px-4 py-4 text-sm text-[#405a52]">{item.totalHeldQuantity}</td>
+                <td className="px-5 py-4 text-sm font-bold text-emerald-700 sm:px-6">
+                  {item.totalAvailableQuantity}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <ul className="divide-y divide-[#edf1ef] lg:hidden">
+        {items.map((item) => (
+          <li key={item.inventoryId} className="p-4 sm:p-5">
+            <p className="text-sm font-bold text-[#1b372d]">{item.name}</p>
+            <p className="mt-1 text-xs text-[#85938f]">
+              {item.brand}
+              {item.sku ? ` · ${item.sku}` : ''}
+            </p>
+            <dl className="mt-3 grid grid-cols-2 gap-2 rounded-xl bg-[#fbfcfb] p-3 text-center sm:grid-cols-4">
+              <div>
+                <dt className="text-[10px] font-bold uppercase tracking-wide text-[#899792]">
+                  {item.batches.length === 1 ? 'Batch' : 'Batches'}
+                </dt>
+                <dd className="mt-0.5 text-sm font-bold text-[#28453b]">{item.batches.length}</dd>
+              </div>
+              <div>
+                <dt className="text-[10px] font-bold uppercase tracking-wide text-[#899792]">
+                  On hand
+                </dt>
+                <dd className="mt-0.5 text-sm font-bold text-[#28453b]">
+                  {item.totalOnHandQuantity}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-[10px] font-bold uppercase tracking-wide text-[#899792]">
+                  Held
+                </dt>
+                <dd className="mt-0.5 text-sm font-bold text-[#28453b]">
+                  {item.totalHeldQuantity}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-[10px] font-bold uppercase tracking-wide text-[#899792]">
+                  Available
+                </dt>
+                <dd className="mt-0.5 text-sm font-bold text-emerald-700">
+                  {item.totalAvailableQuantity}
+                </dd>
+              </div>
+            </dl>
+          </li>
+        ))}
+      </ul>
+    </>
   );
 }
 
 function ReservationTable({ reservations }: { reservations: ProviderReservation[] }) {
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full min-w-[720px] border-collapse text-left">
-        <thead>
-          <tr className="border-b border-[#edf1ef] bg-[#fbfcfb] text-[10px] font-extrabold uppercase tracking-[.13em] text-[#8a9994]">
-            <th className="px-5 py-3.5 sm:px-6">Reservation</th>
-            <th className="px-4 py-3.5">Status</th>
-            <th className="px-4 py-3.5">Products</th>
-            <th className="px-4 py-3.5">Units</th>
-            <th className="px-5 py-3.5 sm:px-6">Created</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-[#edf1ef]">
-          {reservations.map((reservation) => (
-            <tr key={reservation.id}>
-              <td className="px-5 py-4 font-mono text-xs font-semibold text-[#38544b] sm:px-6">
-                {shortId(reservation.id)}
-              </td>
-              <td className="px-4 py-4">
-                <StatusBadge tone={statusTone[reservation.status]}>
-                  {titleCase(reservation.status)}
-                </StatusBadge>
-              </td>
-              <td className="px-4 py-4 text-sm text-[#405a52]">{reservation.items.length}</td>
-              <td className="px-4 py-4 text-sm font-bold text-[#405a52]">
-                {reservation.totalQuantity}
-              </td>
-              <td className="px-5 py-4 text-sm text-[#60736c] sm:px-6">
-                {formatInventoryDate(reservation.createdAt)}
-              </td>
+    <>
+      <div className="hidden overflow-x-auto lg:block">
+        <table className="w-full min-w-[720px] border-collapse text-left">
+          <thead>
+            <tr className="border-b border-[#edf1ef] bg-[#fbfcfb] text-[10px] font-extrabold uppercase tracking-[.13em] text-[#8a9994]">
+              <th className="px-5 py-3.5 sm:px-6">Reservation</th>
+              <th className="px-4 py-3.5">Status</th>
+              <th className="px-4 py-3.5">Products</th>
+              <th className="px-4 py-3.5">Units</th>
+              <th className="px-5 py-3.5 sm:px-6">Created</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+          </thead>
+          <tbody className="divide-y divide-[#edf1ef]">
+            {reservations.map((reservation) => (
+              <tr key={reservation.id}>
+                <td className="px-5 py-4 font-mono text-xs font-semibold text-[#38544b] sm:px-6">
+                  {shortId(reservation.id)}
+                </td>
+                <td className="px-4 py-4">
+                  <StatusBadge tone={statusTone[reservation.status]}>
+                    {titleCase(reservation.status)}
+                  </StatusBadge>
+                </td>
+                <td className="px-4 py-4 text-sm text-[#405a52]">{reservation.items.length}</td>
+                <td className="px-4 py-4 text-sm font-bold text-[#405a52]">
+                  {reservation.totalQuantity}
+                </td>
+                <td className="px-5 py-4 text-sm text-[#60736c] sm:px-6">
+                  {formatInventoryDate(reservation.createdAt)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <ul className="divide-y divide-[#edf1ef] lg:hidden">
+        {reservations.map((reservation) => (
+          <li key={reservation.id} className="p-4 sm:p-5">
+            <div className="flex items-start justify-between gap-3">
+              <p className="font-mono text-xs font-semibold text-[#38544b]">
+                {shortId(reservation.id)}
+              </p>
+              <StatusBadge tone={statusTone[reservation.status]}>
+                {titleCase(reservation.status)}
+              </StatusBadge>
+            </div>
+            <p className="mt-2 text-xs text-[#536a62]">
+              {reservation.items.length} product{reservation.items.length === 1 ? '' : 's'} ·{' '}
+              {reservation.totalQuantity} units · Created{' '}
+              {formatInventoryDate(reservation.createdAt)}
+            </p>
+          </li>
+        ))}
+      </ul>
+    </>
   );
 }
 

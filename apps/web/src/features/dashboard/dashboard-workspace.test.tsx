@@ -102,7 +102,7 @@ describe('DashboardWorkspace live operations overview', () => {
         .getAllByRole('status')
         .some((element) => element.textContent?.includes('Checking assigned providers')),
     ).toBe(true);
-    expect(await screen.findByText('Metformin 500 mg')).toBeVisible();
+    expect((await screen.findAllByText('Metformin 500 mg'))[0]).toBeVisible();
     expect(getProviderStock).toHaveBeenCalledWith({
       providerId: providers[0].providerId,
       limit: 10,
@@ -127,7 +127,7 @@ describe('DashboardWorkspace live operations overview', () => {
 
   it('renders accepted current-page calculations, rows, exact result counts, and links', async () => {
     render(<DashboardWorkspace />);
-    expect(await screen.findByText('Metformin 500 mg')).toBeVisible();
+    expect((await screen.findAllByText('Metformin 500 mg'))[0]).toBeVisible();
 
     expect(metric('Products')).toHaveTextContent('1');
     expect(metric('Batches')).toHaveTextContent('1');
@@ -141,7 +141,7 @@ describe('DashboardWorkspace live operations overview', () => {
     expect(screen.getAllByText('Current page')).toHaveLength(9);
     expect(screen.getByText('27 exact results')).toBeVisible();
     expect(screen.getByText('19 exact results')).toBeVisible();
-    expect(screen.getByText('F63F50DD')).toBeVisible();
+    expect(screen.getAllByText('F63F50DD')[0]).toBeVisible();
     expect(screen.getByRole('link', { name: 'Open Inventory' })).toHaveAttribute(
       'href',
       '/inventory',
@@ -150,6 +150,33 @@ describe('DashboardWorkspace live operations overview', () => {
       'href',
       '/reservations',
     );
+  });
+
+  it('shows the same batch count on the mobile stock card as the desktop table, from one fetch', async () => {
+    render(<DashboardWorkspace />);
+    await screen.findAllByText('Metformin 500 mg');
+    const stockSection = screen.getByText('Stock records').closest('section');
+    if (!stockSection) throw new Error('Stock records section not found');
+    const scope = within(stockSection as HTMLElement);
+
+    const table = scope.getByRole('table');
+    const expectedBatchCount = String(stockPage.data[0].batches.length);
+    const desktopBatchCell = within(table)
+      .getAllByRole('row')
+      .find((row) => within(row).queryByText('Metformin 500 mg'));
+    if (!desktopBatchCell) throw new Error('Desktop stock row not found');
+    expect(within(desktopBatchCell).getByText(expectedBatchCount)).toBeVisible();
+
+    const mobileList = stockSection.querySelector('ul');
+    if (!mobileList) throw new Error('Mobile stock list not found');
+    const mobileScope = within(mobileList);
+    expect(mobileScope.getByText('Metformin 500 mg')).toBeVisible();
+    expect(mobileScope.getByText(expectedBatchCount)).toBeVisible();
+    expect(
+      mobileScope.getByText(stockPage.data[0].batches.length === 1 ? 'Batch' : 'Batches'),
+    ).toBeVisible();
+
+    expect(getProviderStock).toHaveBeenCalledTimes(1);
   });
 
   it('shows independent loading states without presenting unloaded metrics as zero', async () => {
@@ -165,7 +192,7 @@ describe('DashboardWorkspace live operations overview', () => {
 
   it('changes provider and replaces both datasets with new bounded requests', async () => {
     render(<DashboardWorkspace />);
-    await screen.findByText('Metformin 500 mg');
+    await screen.findAllByText('Metformin 500 mg');
     fireEvent.change(screen.getByLabelText('Assigned provider'), {
       target: { value: providers[1].providerId },
     });
@@ -205,12 +232,12 @@ describe('DashboardWorkspace live operations overview', () => {
     fireEvent.change(screen.getByLabelText('Assigned provider'), {
       target: { value: providers[1].providerId },
     });
-    expect(await screen.findByText('City Aspirin')).toBeVisible();
+    expect((await screen.findAllByText('City Aspirin'))[0]).toBeVisible();
 
     oldStock.resolve(stockPage);
     oldReservations.resolve(reservationPage);
     await waitFor(() => expect(screen.queryByText('Metformin 500 mg')).not.toBeInTheDocument());
-    expect(screen.getByText('City Aspirin')).toBeVisible();
+    expect(screen.getAllByText('City Aspirin')[0]).toBeVisible();
   });
 
   it('handles an empty assignment and retries provider loading after unauthenticated failure', async () => {
@@ -232,7 +259,7 @@ describe('DashboardWorkspace live operations overview', () => {
       await screen.findByRole('heading', { name: 'Your session must be verified' }),
     ).toBeVisible();
     fireEvent.click(screen.getByRole('button', { name: 'Retry provider access' }));
-    expect(await screen.findByText('Metformin 500 mg')).toBeVisible();
+    expect((await screen.findAllByText('Metformin 500 mg'))[0]).toBeVisible();
     expect(getAssignedProviders).toHaveBeenCalledTimes(2);
   });
 
@@ -259,9 +286,9 @@ describe('DashboardWorkspace live operations overview', () => {
     render(<DashboardWorkspace />);
 
     expect(await screen.findByText('Stock response was invalid.')).toBeVisible();
-    expect(screen.getByText('F63F50DD')).toBeVisible();
+    expect(screen.getAllByText('F63F50DD')[0]).toBeVisible();
     fireEvent.click(screen.getAllByRole('button', { name: 'Retry stock' }).at(-1)!);
-    expect(await screen.findByText('Metformin 500 mg')).toBeVisible();
+    expect((await screen.findAllByText('Metformin 500 mg'))[0]).toBeVisible();
     expect(getProviderStock).toHaveBeenCalledTimes(2);
     expect(getProviderReservations).toHaveBeenCalledTimes(1);
   });
@@ -273,9 +300,9 @@ describe('DashboardWorkspace live operations overview', () => {
     render(<DashboardWorkspace />);
 
     expect(await screen.findByText('Reservation response was invalid.')).toBeVisible();
-    expect(screen.getByText('Metformin 500 mg')).toBeVisible();
+    expect(screen.getAllByText('Metformin 500 mg')[0]).toBeVisible();
     fireEvent.click(screen.getAllByRole('button', { name: 'Retry reservations' }).at(-1)!);
-    expect(await screen.findByText('F63F50DD')).toBeVisible();
+    expect((await screen.findAllByText('F63F50DD'))[0]).toBeVisible();
     expect(getProviderReservations).toHaveBeenCalledTimes(2);
     expect(getProviderStock).toHaveBeenCalledTimes(1);
   });
@@ -297,7 +324,7 @@ describe('DashboardWorkspace live operations overview', () => {
 
   it('contains no fabricated analytics, patient identity, or mutation controls', async () => {
     render(<DashboardWorkspace />);
-    await screen.findByText('Metformin 500 mg');
+    await screen.findAllByText('Metformin 500 mg');
     await screen.findByText(/batches? expiring within/);
     const prohibited =
       /inventory value|stock health|low stock|reorder|critical|expiry risk|days of cover|pickup time|payment status|delivery status|goods receipt|fulfilment/i;
@@ -312,7 +339,7 @@ describe('DashboardWorkspace live operations overview', () => {
 
   it('renders real expiry-worklist data in the attention card, not a fabricated count', async () => {
     render(<DashboardWorkspace />);
-    await screen.findByText('Metformin 500 mg');
+    await screen.findAllByText('Metformin 500 mg');
 
     expect(getProviderExpiryWorklist).toHaveBeenCalledWith({
       providerId: providers[0].providerId,
@@ -337,7 +364,7 @@ describe('DashboardWorkspace live operations overview', () => {
     });
 
     render(<DashboardWorkspace />);
-    await screen.findByText('Metformin 500 mg');
+    await screen.findAllByText('Metformin 500 mg');
 
     expect(await screen.findByText('All clear')).toBeVisible();
     expect(
@@ -350,7 +377,7 @@ describe('DashboardWorkspace live operations overview', () => {
       .mockRejectedValueOnce(new ApiError('Expiry worklist response was invalid.', 502))
       .mockResolvedValueOnce(expiryPage);
     render(<DashboardWorkspace />);
-    await screen.findByText('Metformin 500 mg');
+    await screen.findAllByText('Metformin 500 mg');
 
     expect(await screen.findByText('Expiry worklist response was invalid.')).toBeVisible();
     const attentionSection = screen.getByText('Needs attention').closest('section')!;
