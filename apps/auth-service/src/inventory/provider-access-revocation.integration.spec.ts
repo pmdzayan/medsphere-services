@@ -160,11 +160,19 @@ infrastructure('Post-audit Task 2 immediate provider-access revocation', () => {
       }),
     ).rejects.toBeInstanceOf(NotFoundException);
 
-    const [batch, reservationsAfterRevocation] = await Promise.all([
+    const [batch, reservationsAfterRevocation, auditEventsAfterRevocation] = await Promise.all([
       prisma.client.batch.findUniqueOrThrow({ where: { id: batchId } }),
       prisma.client.medicineReservation.findMany({
         where: { tenantId, providerId },
         select: { id: true },
+      }),
+      prisma.client.auditEvent.findMany({
+        where: {
+          tenantId,
+          actorMembershipId: membershipId,
+          eventType: 'inventory.reservation.created',
+        },
+        orderBy: { occurredAt: 'asc' },
       }),
     ]);
 
@@ -173,5 +181,14 @@ infrastructure('Post-audit Task 2 immediate provider-access revocation', () => {
     expect(reservationsAfterRevocation).toHaveLength(1);
     expect(batch.onHandQuantity).toBe(10);
     expect(batch.heldQuantity).toBe(1);
+
+    // Audit integrity: the denied post-revocation attempt must not leave
+    // misleading success evidence. Exactly one SUCCEEDED evidence record
+    // exists (the pre-revocation reservation) and none for the denied
+    // retry -- authorization is lost before the transaction reaches the
+    // audit write, so no DENIED/FAILED record for this event type is
+    // expected here either.
+    expect(auditEventsAfterRevocation).toHaveLength(1);
+    expect(auditEventsAfterRevocation[0]).toMatchObject({ outcome: 'SUCCEEDED', tenantId });
   });
 });
