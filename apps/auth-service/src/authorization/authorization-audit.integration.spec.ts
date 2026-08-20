@@ -474,8 +474,82 @@ describeAuthorizationInfra('S0.4 PostgreSQL authorization and durable-audit inte
       authorizationService.removeAssignment(identityA2, membershipA2Id, administratorAId),
     ]);
 
-    expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
-    expect(results.filter((result) => result.status === 'rejected')).toHaveLength(1);
+    const fulfilled = results.filter(
+      (result): result is PromiseFulfilledResult<void> => result.status === 'fulfilled',
+    );
+    const rejected = results.filter(
+      (result): result is PromiseRejectedResult => result.status === 'rejected',
+    );
+    expect(fulfilled).toHaveLength(1);
+    expect(rejected).toHaveLength(1);
+
+    // Fail-closed error contract: the safe, established message only --
+    // no internal SQL/constraint detail, no sensitive tenant data.
+    expect((rejected[0].reason as Error).message).toBe(
+      'The last active tenant administrator cannot be removed',
+    );
+
+    await expect(
+      prisma.client.membershipRole.count({
+        where: {
+          tenantId: tenantAId,
+          roleId: administratorAId,
+          membership: { status: 'ACTIVE', deletedAt: null },
+        },
+      }),
+    ).resolves.toBe(1);
+
+    // Audit integrity: exactly one accurate SUCCEEDED record for the
+    // winning removal, correctly scoped to actor/tenant/resource -- and
+    // no audit event at all for the losing attempt, since it is rejected
+    // before the transaction ever reaches the audit write. A rejected
+    // last-admin mutation must never produce a misleading success record,
+    // and it must not produce a contradictory one either.
+    const removalEvents = await prisma.client.auditEvent.findMany({
+      where: {
+        tenantId: tenantAId,
+        eventType: 'authorization.assignment.removed',
+        resourceId: `${membershipAId}:${administratorAId}`,
+      },
+    });
+    const removalEventsOther = await prisma.client.auditEvent.findMany({
+      where: {
+        tenantId: tenantAId,
+        eventType: 'authorization.assignment.removed',
+        resourceId: `${membershipA2Id}:${administratorAId}`,
+      },
+    });
+    const allRemovalEvents = [...removalEvents, ...removalEventsOther];
+    expect(allRemovalEvents).toHaveLength(1);
+    const [winningEvent] = allRemovalEvents;
+    expect(winningEvent.outcome).toBe('SUCCEEDED');
+    expect(winningEvent.tenantId).toBe(tenantAId);
+    expect([membershipAId, membershipA2Id]).toContain(winningEvent.actorMembershipId);
+    expect(
+      winningEvent.resourceId === `${membershipAId}:${administratorAId}` ||
+        winningEvent.resourceId === `${membershipA2Id}:${administratorAId}`,
+    ).toBe(true);
+
+    // A subsequent client-level retry against the now-sole remaining
+    // administrator must also fail closed -- proving the invariant holds
+    // beyond the internal SERIALIZABLE retry already exercised by the
+    // race above, not just within it. The retry is performed by whichever
+    // identity's own membership is the surviving administrator -- not
+    // unconditionally identityA -- so a rejection can only be attributed
+    // to the last-admin invariant guard itself, never to the caller's own
+    // authority having been removed by the race.
+    const remainingMembershipId =
+      winningEvent.resourceId === `${membershipAId}:${administratorAId}`
+        ? membershipA2Id
+        : membershipAId;
+    const remainingIdentity = remainingMembershipId === membershipAId ? identityA : identityA2;
+    await expect(
+      authorizationService.removeAssignment(
+        remainingIdentity,
+        remainingMembershipId,
+        administratorAId,
+      ),
+    ).rejects.toThrow('The last active tenant administrator cannot be removed');
     await expect(
       prisma.client.membershipRole.count({
         where: {
