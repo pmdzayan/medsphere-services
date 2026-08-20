@@ -6,21 +6,18 @@
 
 **Accepted stabilization baseline:** `4ea55a17e188410ddee45fa3ea6c016e22d6617a`
 
-**Current sprint:** Post-Audit Stabilization Batch 1 — Task 2 (authorization /
-tenant-isolation release coverage) is the next permitted task; not started.
-Governance reconciliation is a prerequisite to Task 2 implementation. G3.25
-through G3.29 are
-accepted and merged; Batch 1 Task 1 (release/coverage hardening for
-reservation and rollback concurrency) is accepted and merged as PR #70,
-head `924b2bd1d33e58f317b1ed3e0372d48eb45f74e1`, merge commit
-`706586910579aa01b7c24b1c16cd16f72099477b`, exact-head CI run `32264518571`
-(run #253, conclusion: success). Task 1 added PostgreSQL/Redis-backed
-coverage for concurrent reservation creation, reservation-vs-unavailable-stock
-concurrency, transactional rollback, and same-key retry/idempotency
-integrity, with no production-code semantic changes. Explicit cross-tenant
-concurrency attacks were not exercised by Task 1's tests; this is recorded as
-an accepted residual coverage observation, not a reproduced defect, and is
-in scope for Task 2.
+**Current sprint:** Post-Audit Stabilization Batch 1 — 4/5 tasks formally
+accepted (Task 1: release/coverage hardening, PR #70; Task 2: authorization/
+tenant-isolation coverage, PR #72; Task 3: last-tenant-administrator
+concurrency, PR #79; Task 4: audit integrity hardening, PR #81). Task 5
+(batch release acceptance) is a release-acceptance candidate awaiting CTO
+review, exact-head GitHub CI, merge, and formal governance acceptance — see
+`docs/sprints/post-audit-batch1-task5-release-acceptance.md` for the full
+evidence record. No production-code semantic changes were made across any
+task in this batch; all are coverage-only, evidenced by PostgreSQL/
+Redis-backed integration tests. If Task 5 is accepted, this batch becomes
+5/5 complete; that is not yet the case. This is not production approval
+and does not authorize real healthcare data.
 
 **Release state:** Not approved for production or real healthcare data
 
@@ -50,34 +47,37 @@ drift, not corrected in this pass).
 
 ## Most recently accepted batch work
 
-### Post-Audit Stabilization Batch 1 — Task 1 (Release/Coverage Hardening)
+### Post-Audit Stabilization Batch 1 — 4/5 Accepted, Task 5 Pending
 
-**Status:** Accepted and merged in PR #70, head
-`924b2bd1d33e58f317b1ed3e0372d48eb45f74e1`, merge commit
-`706586910579aa01b7c24b1c16cd16f72099477b`, after exact-head GitHub Actions
-run `32264518571` (run #253) passed dependency audit, clean migration/drift
-verification, populated upgrade safety, formatting, lint, PostgreSQL/Redis-
-backed tests, and build. No production-code semantic changes were made.
+**Status:** Tasks 1–4 formally accepted with no production-code semantic
+changes; every accepted task is coverage-only, evidenced by PostgreSQL/
+Redis-backed integration tests. Task 5 is a release-acceptance candidate,
+not yet accepted.
 
-**Boundary:** Added PostgreSQL/Redis-backed integration coverage for
-concurrent reservation creation, reservation-vs-unavailable-stock
-concurrency, transactional rollback, and same-key retry/idempotency
-integrity. Explicit cross-tenant concurrency attacks were not exercised;
-this is an accepted residual coverage observation, not a reproduced defect,
-and is in scope for Batch 1 Task 2.
+- Task 1 (Release/Coverage Hardening): PR #70, head
+  `924b2bd1d33e58f317b1ed3e0372d48eb45f74e1`, exact-head CI `32264518571`.
+  Added PostgreSQL/Redis-backed coverage for concurrent reservation
+  creation, reservation-vs-unavailable-stock concurrency, transactional
+  rollback, and same-key retry/idempotency integrity.
+- Task 2 (Authorization / Tenant-Isolation Coverage): PR #72, head
+  `ea90ade7b729a3f6c8ea44a93e70e37374508e7d`, exact-head CI `32343569579`.
+- Task 3 (Last-Tenant-Administrator Concurrency): PR #79, head
+  `ebc9531d125c27e8a49231cb7b6109d79886602f`, exact-head CI `32381320499`.
+- Task 4 (Audit Integrity Hardening): PR #81, head
+  `9339552c69f5b8300b1189e0ee95cb29207bc6e5`, exact-head CI `32400041740`.
+- Task 5 (Batch Release Acceptance): **release-acceptance candidate,
+  awaiting CTO review, exact-head GitHub CI, merge, and formal governance
+  acceptance.** Its own findings (a final cross-task review confirming
+  Tasks 1-4 leave the accepted backend state coherent, safe, and testable)
+  are recorded in
+  `docs/sprints/post-audit-batch1-task5-release-acceptance.md`, along with
+  a final architecture/security/privacy review and remaining coverage
+  gaps. If Task 5 is accepted, Batch 1 becomes 5/5 complete; that has not
+  yet occurred.
 
-## Active sprint
-
-### Post-Audit Stabilization Batch 1 — Task 2 (Authorization / Tenant-Isolation Release Coverage)
-
-**Status:** Next permitted task; not started. This governance reconciliation
-is a prerequisite to Task 2 implementation. Objective is closing remaining
-high-risk authorization and tenant-isolation coverage gaps
-(provider-authority revocation, role/permission revocation, alternate-route
-authorization bypass, and explicit cross-tenant PostgreSQL-backed isolation
-evidence) without changing correct production behavior unless a reproduced
-defect requires it. Tasks 3-5 of the batch (last-administrator concurrency,
-audit integrity, and batch release acceptance) are scoped but not started.
+If Task 5 is formally accepted, this will close Post-Audit Stabilization
+Batch 1. It is not production approval and does not authorize real
+healthcare data.
 
 ## Earlier accepted sprint
 
