@@ -20,8 +20,10 @@ infrastructure('Post-audit Task 2 immediate role/permission revocation', () => {
   const tenantId = randomUUID();
   const userId = randomUUID();
   const membershipId = randomUUID();
+  const sessionId = randomUUID();
+  const tokenId = randomUUID();
 
-  const identity: AuthenticatedIdentity = { tenantId, userId, membershipId };
+  const identity: AuthenticatedIdentity = { tenantId, userId, membershipId, sessionId, tokenId };
 
   beforeAll(async () => {
     await prisma.client.tenant.create({
