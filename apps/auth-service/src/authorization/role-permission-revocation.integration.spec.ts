@@ -1,10 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { AuditWriter } from '../audit/audit-writer.service';
 import { AuthenticatedIdentity } from '../auth/auth.types';
-import {
-  isInfrastructureTestEnabled,
-  requireEnv,
-} from '../auth/testing/infrastructure-test-gate';
+import { isInfrastructureTestEnabled, requireEnv } from '../auth/testing/infrastructure-test-gate';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthorizationRepository } from './authorization.repository';
 import { AuthorizationService } from './authorization.service';
