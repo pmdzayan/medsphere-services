@@ -33,7 +33,11 @@ import {
   type ProviderReservationPage,
   type ReservationStatus,
 } from '@/lib/reservation-contract';
-import { formatInventoryDate, loadedInventoryMetrics } from '../inventory/inventory-data';
+import {
+  daysUntilExpiry,
+  formatInventoryDate,
+  loadedInventoryMetrics,
+} from '../inventory/inventory-data';
 
 const PAGE_SIZE = 10;
 const EXPIRY_HORIZON_DAYS = 30;
@@ -692,7 +696,7 @@ function AttentionCard({
   }
 
   const nearest = worklist.data[0];
-  const daysUntil = nearest ? daysUntilDate(nearest.expiryDate) : null;
+  const daysUntil = nearest ? daysUntilExpiry(nearest.expiryDate) : null;
   const urgent = daysUntil !== null && daysUntil <= 7;
 
   return (
@@ -713,7 +717,7 @@ function AttentionCard({
       </div>
       <ul className="mt-4 space-y-2">
         {worklist.data.slice(0, 3).map((item) => {
-          const itemDays = daysUntilDate(item.expiryDate);
+          const itemDays = daysUntilExpiry(item.expiryDate);
           return (
             <li
               key={`${item.inventoryId}-${item.batchId}`}
@@ -896,24 +900,6 @@ function errorTitle(error: PublicError, fallback: string): string {
 
 function titleCase(value: string): string {
   return value.charAt(0) + value.slice(1).toLowerCase();
-}
-
-function daysUntilDate(isoDate: string): number | null {
-  const target = new Date(isoDate);
-  if (Number.isNaN(target.getTime())) return null;
-  // Calendar-day difference in UTC, matching the same UTC-date convention
-  // formatInventoryDate already uses for these dates -- not a raw
-  // millisecond subtraction from Date.now(), which would let the
-  // displayed "Xd" shift depending on the viewer's current hour or
-  // timezone rather than the calendar date itself.
-  const now = new Date();
-  const startOfTargetUtc = Date.UTC(
-    target.getUTCFullYear(),
-    target.getUTCMonth(),
-    target.getUTCDate(),
-  );
-  const startOfTodayUtc = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
-  return Math.round((startOfTargetUtc - startOfTodayUtc) / (24 * 60 * 60 * 1000));
 }
 
 function formatAuditEventType(eventType: string): string {
