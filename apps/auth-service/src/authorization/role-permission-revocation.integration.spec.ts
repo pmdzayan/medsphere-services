@@ -56,100 +56,90 @@ infrastructure('Post-audit Task 2 immediate role/permission revocation', () => {
 
   afterAll(async () => prisma.client.$disconnect());
 
-  it(
-    'denies the same authenticated session immediately after its role assignment is removed',
-    async () => {
-      const roleId = randomUUID();
-      const membershipRoleId = randomUUID();
-      const permission = await prisma.client.permission.findUniqueOrThrow({
-        where: { name: PERMISSIONS.inventoryStockRead },
-      });
+  it('denies the same authenticated session immediately after its role assignment is removed', async () => {
+    const roleId = randomUUID();
+    const membershipRoleId = randomUUID();
+    const permission = await prisma.client.permission.findUniqueOrThrow({
+      where: { name: PERMISSIONS.inventoryStockRead },
+    });
 
-      await prisma.client.role.create({
-        data: {
-          id: roleId,
-          tenantId,
-          name: `Task2-RPR role ${roleId}`,
-          type: 'TENANT',
-        },
-      });
-      await prisma.client.rolePermission.create({
-        data: {
-          id: randomUUID(),
-          tenantId,
-          roleId,
-          permissionId: permission.id,
-        },
-      });
-      await prisma.client.membershipRole.create({
-        data: { id: membershipRoleId, tenantId, membershipId, roleId },
-      });
+    await prisma.client.role.create({
+      data: {
+        id: roleId,
+        tenantId,
+        name: `Task2-RPR role ${roleId}`,
+        type: 'TENANT',
+      },
+    });
+    await prisma.client.rolePermission.create({
+      data: {
+        id: randomUUID(),
+        tenantId,
+        roleId,
+        permissionId: permission.id,
+      },
+    });
+    await prisma.client.membershipRole.create({
+      data: { id: membershipRoleId, tenantId, membershipId, roleId },
+    });
 
-      // Step 1: the actor's session genuinely has the permission; the check succeeds.
-      await expect(
-        authorizationService.hasAllPermissions(identity, [PERMISSIONS.inventoryStockRead]),
-      ).resolves.toBe(true);
+    // Step 1: the actor's session genuinely has the permission; the check succeeds.
+    await expect(
+      authorizationService.hasAllPermissions(identity, [PERMISSIONS.inventoryStockRead]),
+    ).resolves.toBe(true);
 
-      // Step 2: an administrator removes the role assignment through authoritative
-      // PostgreSQL state. The `identity` object above is never mutated — the same
-      // object a live session would carry is reused verbatim below.
-      await prisma.client.membershipRole.delete({ where: { id: membershipRoleId } });
+    // Step 2: an administrator removes the role assignment through authoritative
+    // PostgreSQL state. The `identity` object above is never mutated — the same
+    // object a live session would carry is reused verbatim below.
+    await prisma.client.membershipRole.delete({ where: { id: membershipRoleId } });
 
-      // Step 3: the identical, still-authenticated actor immediately retries. No new
-      // login or token refresh occurs.
-      await expect(
-        authorizationService.hasAllPermissions(identity, [PERMISSIONS.inventoryStockRead]),
-      ).resolves.toBe(false);
-    },
-  );
+    // Step 3: the identical, still-authenticated actor immediately retries. No new
+    // login or token refresh occurs.
+    await expect(
+      authorizationService.hasAllPermissions(identity, [PERMISSIONS.inventoryStockRead]),
+    ).resolves.toBe(false);
+  });
 
-  it(
-    'denies the same authenticated session immediately after its permission mapping is removed',
-    async () => {
-      const roleId = randomUUID();
-      const membershipRoleId = randomUUID();
-      const rolePermissionId = randomUUID();
-      const permission = await prisma.client.permission.findUniqueOrThrow({
-        where: { name: PERMISSIONS.inventoryReservationsRead },
-      });
+  it('denies the same authenticated session immediately after its permission mapping is removed', async () => {
+    const roleId = randomUUID();
+    const membershipRoleId = randomUUID();
+    const rolePermissionId = randomUUID();
+    const permission = await prisma.client.permission.findUniqueOrThrow({
+      where: { name: PERMISSIONS.inventoryReservationsRead },
+    });
 
-      await prisma.client.role.create({
-        data: {
-          id: roleId,
-          tenantId,
-          name: `Task2-RPR mapping role ${roleId}`,
-          type: 'TENANT',
-        },
-      });
-      await prisma.client.rolePermission.create({
-        data: {
-          id: rolePermissionId,
-          tenantId,
-          roleId,
-          permissionId: permission.id,
-        },
-      });
-      await prisma.client.membershipRole.create({
-        data: { id: membershipRoleId, tenantId, membershipId, roleId },
-      });
+    await prisma.client.role.create({
+      data: {
+        id: roleId,
+        tenantId,
+        name: `Task2-RPR mapping role ${roleId}`,
+        type: 'TENANT',
+      },
+    });
+    await prisma.client.rolePermission.create({
+      data: {
+        id: rolePermissionId,
+        tenantId,
+        roleId,
+        permissionId: permission.id,
+      },
+    });
+    await prisma.client.membershipRole.create({
+      data: { id: membershipRoleId, tenantId, membershipId, roleId },
+    });
 
-      // Step 1: the role still exists and still carries the permission mapping.
-      await expect(
-        authorizationService.hasAllPermissions(identity, [
-          PERMISSIONS.inventoryReservationsRead,
-        ]),
-      ).resolves.toBe(true);
+    // Step 1: the role still exists and still carries the permission mapping.
+    await expect(
+      authorizationService.hasAllPermissions(identity, [PERMISSIONS.inventoryReservationsRead]),
+    ).resolves.toBe(true);
 
-      // Step 2: only the permission mapping is removed — the role assignment itself
-      // is left in place, isolating this from the role-removal scenario above.
-      await prisma.client.rolePermission.delete({ where: { id: rolePermissionId } });
+    // Step 2: only the permission mapping is removed — the role assignment itself
+    // is left in place, isolating this from the role-removal scenario above.
+    await prisma.client.rolePermission.delete({ where: { id: rolePermissionId } });
 
-      // Step 3: same session, immediate retry, no new token.
-      await expect(
-        authorizationService.hasAllPermissions(identity, [
-          PERMISSIONS.inventoryReservationsRead,
-        ]),
-      ).resolves.toBe(false);
-    },
-  );
+    // Step 3: same session, immediate retry, no new token.
+    await expect(
+      authorizationService.hasAllPermissions(identity, [PERMISSIONS.inventoryReservationsRead]),
+    ).resolves.toBe(false);
+  });
 });
