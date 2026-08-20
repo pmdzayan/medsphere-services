@@ -5,12 +5,24 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { MetricCard, SectionCard, StatusBadge } from '@/components/platform/dashboard-primitives';
 import { Icon } from '@/components/platform/icon';
 import {
+  Badge,
+  Button,
+  Card,
+  EmptyState,
+  Skeleton,
+  StatusIndicator,
+} from '@/components/platform/primitives';
+import {
   ApiError,
   getAssignedProviders,
+  getAuditEvents,
+  getProviderExpiryWorklist,
   getProviderReservations,
   getProviderStock,
 } from '@/lib/api-client';
+import type { AuditEvent } from '@/lib/audit-contract';
 import type {
+  InventoryExpiryWorklistPage,
   InventoryStockItem,
   InventoryStockPage,
   ProviderAccess,
@@ -24,6 +36,8 @@ import {
 import { formatInventoryDate, loadedInventoryMetrics } from '../inventory/inventory-data';
 
 const PAGE_SIZE = 10;
+const EXPIRY_HORIZON_DAYS = 30;
+const RECENT_ACTIVITY_LIMIT = 5;
 
 type PublicError = { message: string; status?: number };
 
@@ -47,9 +61,17 @@ export function DashboardWorkspace() {
   const [reservations, setReservations] = useState<ProviderReservationPage | null>(null);
   const [reservationsLoading, setReservationsLoading] = useState(false);
   const [reservationsError, setReservationsError] = useState<PublicError | null>(null);
+  const [expiryWorklist, setExpiryWorklist] = useState<InventoryExpiryWorklistPage | null>(null);
+  const [expiryLoading, setExpiryLoading] = useState(false);
+  const [expiryError, setExpiryError] = useState<PublicError | null>(null);
+  const [recentActivity, setRecentActivity] = useState<AuditEvent[] | null>(null);
+  const [recentActivityLoading, setRecentActivityLoading] = useState(true);
+  const [recentActivityError, setRecentActivityError] = useState<PublicError | null>(null);
   const providerRequest = useRef(0);
   const stockRequest = useRef(0);
   const reservationRequest = useRef(0);
+  const expiryRequest = useRef(0);
+  const recentActivityRequest = useRef(0);
 
   const loadProviders = useCallback(async () => {
     const request = ++providerRequest.current;
@@ -116,39 +138,92 @@ export function DashboardWorkspace() {
     }
   }, []);
 
+  const loadExpiryWorklist = useCallback(async (selectedProvider: string) => {
+    const request = ++expiryRequest.current;
+    setExpiryLoading(true);
+    setExpiryError(null);
+    setExpiryWorklist(null);
+    try {
+      const page = await getProviderExpiryWorklist({
+        providerId: selectedProvider,
+        horizonDays: EXPIRY_HORIZON_DAYS,
+        limit: 5,
+        offset: 0,
+      });
+      if (request === expiryRequest.current) setExpiryWorklist(page);
+    } catch (error) {
+      if (request === expiryRequest.current) {
+        setExpiryError(toPublicError(error, 'Unable to load the expiry worklist.'));
+      }
+    } finally {
+      if (request === expiryRequest.current) setExpiryLoading(false);
+    }
+  }, []);
+
+  const loadRecentActivity = useCallback(async () => {
+    const request = ++recentActivityRequest.current;
+    setRecentActivityLoading(true);
+    setRecentActivityError(null);
+    try {
+      const page = await getAuditEvents({ limit: RECENT_ACTIVITY_LIMIT });
+      if (request === recentActivityRequest.current) setRecentActivity(page.data);
+    } catch (error) {
+      if (request === recentActivityRequest.current) {
+        setRecentActivity(null);
+        // A 403 here means this membership lacks audit-read permission -- that
+        // is an honest, expected outcome, not an error worth alarming over.
+        const publicError = toPublicError(error, 'Unable to load recent activity.');
+        setRecentActivityError(publicError);
+      }
+    } finally {
+      if (request === recentActivityRequest.current) setRecentActivityLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     void loadProviders();
+    void loadRecentActivity();
     return () => {
       providerRequest.current += 1;
+      recentActivityRequest.current += 1;
     };
-  }, [loadProviders]);
+  }, [loadProviders, loadRecentActivity]);
   useEffect(() => {
     if (!providerId) {
       stockRequest.current += 1;
       reservationRequest.current += 1;
+      expiryRequest.current += 1;
       setStock(null);
       setReservations(null);
+      setExpiryWorklist(null);
       setStockError(null);
       setReservationsError(null);
+      setExpiryError(null);
       setStockLoading(false);
       setReservationsLoading(false);
+      setExpiryLoading(false);
       return;
     }
     void loadStock(providerId);
     void loadReservations(providerId);
+    void loadExpiryWorklist(providerId);
     return () => {
       stockRequest.current += 1;
       reservationRequest.current += 1;
+      expiryRequest.current += 1;
     };
-  }, [loadReservations, loadStock, providerId]);
+  }, [loadExpiryWorklist, loadReservations, loadStock, providerId]);
 
   const selectProvider = (nextProviderId: string) => {
     stockRequest.current += 1;
     reservationRequest.current += 1;
+    expiryRequest.current += 1;
     setStock(null);
     setReservations(null);
+    setExpiryWorklist(null);
     setStockError(null);
     setReservationsError(null);
+    setExpiryError(null);
     setProviderId(nextProviderId);
   };
 
@@ -164,7 +239,7 @@ export function DashboardWorkspace() {
       <header className="flex flex-col justify-between gap-5 lg:flex-row lg:items-end">
         <div>
           <p className="text-xs font-extrabold uppercase tracking-[.18em] text-emerald-700">
-            Live assigned-provider operations
+            Assigned-provider operations
           </p>
           <h1 className="mt-3 font-[var(--font-display)] text-3xl font-bold tracking-[-.045em] text-[#10271f] sm:text-[2.45rem]">
             Operations overview
@@ -232,6 +307,25 @@ export function DashboardWorkspace() {
           />
         ) : null}
       </SectionCard>
+
+      <section aria-labelledby="attention-title" className="space-y-3">
+        <SectionTitle id="attention-title">Needs attention</SectionTitle>
+        <div className="grid gap-3 lg:grid-cols-[1.4fr_1fr]">
+          <AttentionCard
+            providerSelected={Boolean(providerId)}
+            loading={expiryLoading}
+            error={expiryError}
+            worklist={expiryWorklist}
+            onRetry={() => void loadExpiryWorklist(providerId)}
+          />
+          <RecentActivityCard
+            loading={recentActivityLoading}
+            error={recentActivityError}
+            events={recentActivity}
+            onRetry={() => void loadRecentActivity()}
+          />
+        </div>
+      </section>
 
       {providerId ? (
         <>
@@ -532,6 +626,206 @@ function ReservationTable({ reservations }: { reservations: ProviderReservation[
   );
 }
 
+function AttentionCard({
+  providerSelected,
+  loading,
+  error,
+  worklist,
+  onRetry,
+}: {
+  providerSelected: boolean;
+  loading: boolean;
+  error: PublicError | null;
+  worklist: InventoryExpiryWorklistPage | null;
+  onRetry: () => void;
+}) {
+  if (!providerSelected) {
+    return (
+      <Card>
+        <EmptyState
+          title="Select a provider"
+          description="Expiry alerts appear once an assigned provider is chosen above."
+        />
+      </Card>
+    );
+  }
+
+  if (loading) {
+    return (
+      <Card>
+        <div className="space-y-3">
+          <Skeleton className="h-5 w-40" />
+          <Skeleton className="h-4 w-full" />
+          <Skeleton className="h-4 w-5/6" />
+        </div>
+      </Card>
+    );
+  }
+
+  if (error) {
+    return (
+      <Card>
+        <EmptyState
+          title={errorTitle(error, 'Expiry alerts are unavailable')}
+          description={error.message}
+          action={
+            <Button variant="secondary" onClick={onRetry}>
+              Retry
+            </Button>
+          }
+        />
+      </Card>
+    );
+  }
+
+  if (!worklist || worklist.total === 0) {
+    return (
+      <Card className="border-emerald-600/20 bg-emerald-50/40">
+        <div className="flex items-start gap-3">
+          <StatusIndicator tone="positive" label="All clear" />
+        </div>
+        <p className="mt-2 text-sm text-canvas-700">
+          No batches for this provider expire within the next {EXPIRY_HORIZON_DAYS} days.
+        </p>
+      </Card>
+    );
+  }
+
+  const nearest = worklist.data[0];
+  const daysUntil = nearest ? daysUntilDate(nearest.expiryDate) : null;
+  const urgent = daysUntil !== null && daysUntil <= 7;
+
+  return (
+    <Card
+      className={urgent ? 'border-rose-600/25 bg-rose-50/50' : 'border-amber-600/25 bg-amber-50/40'}
+    >
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <StatusIndicator
+          tone={urgent ? 'critical' : 'warning'}
+          label={`${worklist.total} batch${worklist.total === 1 ? '' : 'es'} expiring within ${EXPIRY_HORIZON_DAYS} days`}
+        />
+        <Link
+          href="/inventory/expiry"
+          className="text-xs font-bold text-emerald-700 hover:underline"
+        >
+          View expiry worklist →
+        </Link>
+      </div>
+      <ul className="mt-4 space-y-2">
+        {worklist.data.slice(0, 3).map((item) => {
+          const itemDays = daysUntilDate(item.expiryDate);
+          return (
+            <li
+              key={`${item.inventoryId}-${item.batchId}`}
+              className="flex items-center justify-between gap-3 rounded-xl bg-white/70 px-3 py-2"
+            >
+              <div className="min-w-0">
+                <p className="truncate text-sm font-bold text-ink-900">{item.name}</p>
+                <p className="truncate text-xs text-canvas-600">
+                  Batch {item.batchNumber} · {formatInventoryDate(item.expiryDate)}
+                </p>
+              </div>
+              <Badge tone={itemDays !== null && itemDays <= 7 ? 'rose' : 'amber'}>
+                {itemDays !== null && itemDays >= 0 ? `${itemDays}d` : 'Overdue'}
+              </Badge>
+            </li>
+          );
+        })}
+      </ul>
+    </Card>
+  );
+}
+
+function RecentActivityCard({
+  loading,
+  error,
+  events,
+  onRetry,
+}: {
+  loading: boolean;
+  error: PublicError | null;
+  events: AuditEvent[] | null;
+  onRetry: () => void;
+}) {
+  if (loading) {
+    return (
+      <Card>
+        <div className="space-y-3">
+          <Skeleton className="h-5 w-32" />
+          <Skeleton className="h-4 w-full" />
+          <Skeleton className="h-4 w-full" />
+        </div>
+      </Card>
+    );
+  }
+
+  if (error) {
+    const permissionRestricted = error.status === 403;
+    return (
+      <Card>
+        <EmptyState
+          title={
+            permissionRestricted
+              ? 'Recent activity requires audit access'
+              : errorTitle(error, 'Recent activity is unavailable')
+          }
+          description={permissionRestricted ? undefined : error.message}
+          action={
+            permissionRestricted ? undefined : (
+              <Button variant="secondary" onClick={onRetry}>
+                Retry
+              </Button>
+            )
+          }
+        />
+      </Card>
+    );
+  }
+
+  if (!events || events.length === 0) {
+    return (
+      <Card>
+        <EmptyState
+          title="No recent activity"
+          description="Accepted audit events for this tenant will appear here."
+        />
+      </Card>
+    );
+  }
+
+  return (
+    <Card padded={false}>
+      <div className="border-b border-[#edf1ef] px-5 py-4">
+        <h3 className="text-sm font-extrabold uppercase tracking-[.13em] text-[#38544b]">
+          Recent activity
+        </h3>
+      </div>
+      <ul className="divide-y divide-[#edf1ef]">
+        {events.map((event) => (
+          <li key={event.id} className="flex items-center justify-between gap-3 px-5 py-3">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold text-ink-900">
+                {formatAuditEventType(event.eventType)}
+              </p>
+              <p className="mt-0.5 text-xs text-canvas-600">
+                {formatInventoryDate(event.occurredAt)}
+              </p>
+            </div>
+            <Badge tone={event.outcome === 'SUCCEEDED' ? 'emerald' : 'rose'}>
+              {titleCase(event.outcome)}
+            </Badge>
+          </li>
+        ))}
+      </ul>
+      <div className="px-5 py-3">
+        <Link href="/audit" className="text-xs font-bold text-emerald-700 hover:underline">
+          View audit trail →
+        </Link>
+      </div>
+    </Card>
+  );
+}
+
 function LoadingState({ label }: { label: string }) {
   return (
     <div
@@ -602,6 +896,32 @@ function errorTitle(error: PublicError, fallback: string): string {
 
 function titleCase(value: string): string {
   return value.charAt(0) + value.slice(1).toLowerCase();
+}
+
+function daysUntilDate(isoDate: string): number | null {
+  const target = new Date(isoDate);
+  if (Number.isNaN(target.getTime())) return null;
+  // Calendar-day difference in UTC, matching the same UTC-date convention
+  // formatInventoryDate already uses for these dates -- not a raw
+  // millisecond subtraction from Date.now(), which would let the
+  // displayed "Xd" shift depending on the viewer's current hour or
+  // timezone rather than the calendar date itself.
+  const now = new Date();
+  const startOfTargetUtc = Date.UTC(
+    target.getUTCFullYear(),
+    target.getUTCMonth(),
+    target.getUTCDate(),
+  );
+  const startOfTodayUtc = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  return Math.round((startOfTargetUtc - startOfTodayUtc) / (24 * 60 * 60 * 1000));
+}
+
+function formatAuditEventType(eventType: string): string {
+  return eventType
+    .toLowerCase()
+    .split(/[._]/)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
 }
 
 function shortId(value: string): string {

@@ -1,14 +1,21 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   ApiError,
   getAssignedProviders,
+  getAuditEvents,
+  getProviderExpiryWorklist,
   getProviderReservations,
   getProviderStock,
 } from '@/lib/api-client';
-import type { InventoryStockPage, ProviderAccess } from '@/lib/inventory-contract';
+import type { AuditEvent } from '@/lib/audit-contract';
+import type {
+  InventoryExpiryWorklistPage,
+  InventoryStockPage,
+  ProviderAccess,
+} from '@/lib/inventory-contract';
 import type { ProviderReservationPage } from '@/lib/reservation-contract';
-import { validStockPage } from '@/test/inventory-fixtures';
+import { validExpiryWorklistPage, validStockPage } from '@/test/inventory-fixtures';
 import { validReservationPage } from '@/test/reservation-fixtures';
 import { DashboardWorkspace } from './dashboard-workspace';
 
@@ -19,6 +26,8 @@ vi.mock('@/lib/api-client', async () => {
     getAssignedProviders: vi.fn(),
     getProviderStock: vi.fn(),
     getProviderReservations: vi.fn(),
+    getProviderExpiryWorklist: vi.fn(),
+    getAuditEvents: vi.fn(),
   };
 });
 
@@ -49,12 +58,37 @@ const reservationPage: ProviderReservationPage = {
   total: 19,
   limit: 10,
 };
+const expiryPage: InventoryExpiryWorklistPage = {
+  ...(structuredClone(validExpiryWorklistPage) as unknown as InventoryExpiryWorklistPage),
+  data: [
+    {
+      ...(structuredClone(
+        validExpiryWorklistPage.data[0],
+      ) as InventoryExpiryWorklistPage['data'][number]),
+      name: 'Amoxicillin 250 mg',
+    },
+  ],
+};
+
+const auditEvent: AuditEvent = {
+  id: 'f63f50dd-49b0-4a77-bc04-f7d00db58dd5',
+  eventType: 'authorization.role.created',
+  outcome: 'SUCCEEDED',
+  actorMembershipId: 'fcb65cb7-9071-40eb-ab52-878978d9031c',
+  resourceType: 'Role',
+  resourceId: 'role-pharmacy-manager',
+  requestId: 'request-1',
+  metadata: {},
+  occurredAt: '2026-08-19T12:00:00.000Z',
+};
 
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(getAssignedProviders).mockResolvedValue(providers);
   vi.mocked(getProviderStock).mockResolvedValue(stockPage);
   vi.mocked(getProviderReservations).mockResolvedValue(reservationPage);
+  vi.mocked(getProviderExpiryWorklist).mockResolvedValue(expiryPage);
+  vi.mocked(getAuditEvents).mockResolvedValue({ data: [auditEvent], nextCursor: null });
 });
 
 afterEach(() => cleanup());
@@ -63,7 +97,11 @@ describe('DashboardWorkspace live operations overview', () => {
   it('loads each accepted boundary independently with exact bounded requests', async () => {
     render(<DashboardWorkspace />);
 
-    expect(screen.getByRole('status')).toHaveTextContent('Checking assigned providers');
+    expect(
+      screen
+        .getAllByRole('status')
+        .some((element) => element.textContent?.includes('Checking assigned providers')),
+    ).toBe(true);
     expect(await screen.findByText('Metformin 500 mg')).toBeVisible();
     expect(getProviderStock).toHaveBeenCalledWith({
       providerId: providers[0].providerId,
@@ -257,11 +295,12 @@ describe('DashboardWorkspace live operations overview', () => {
     expect(metric('Reservations')).toHaveTextContent('0');
   });
 
-  it('contains no fabricated analytics, patient identity, activity, or mutation controls', async () => {
+  it('contains no fabricated analytics, patient identity, or mutation controls', async () => {
     render(<DashboardWorkspace />);
     await screen.findByText('Metformin 500 mg');
+    await screen.findByText(/batches? expiring within/);
     const prohibited =
-      /inventory value|stock health|low stock|reorder|critical|expiry risk|days of cover|recent activity|pickup time|payment status|delivery status|goods receipt|fulfilment/i;
+      /inventory value|stock health|low stock|reorder|critical|expiry risk|days of cover|pickup time|payment status|delivery status|goods receipt|fulfilment/i;
     expect(document.body.textContent).not.toMatch(prohibited);
     expect(document.body.textContent).not.toMatch(/Rohan Kumar|Farah Malik|Aditya Nair/i);
     expect(
@@ -269,6 +308,134 @@ describe('DashboardWorkspace live operations overview', () => {
         name: /receive|adjust|create|transition|transfer|return|damage|confirm|complete|cancel/i,
       }),
     ).not.toBeInTheDocument();
+  });
+
+  it('renders real expiry-worklist data in the attention card, not a fabricated count', async () => {
+    render(<DashboardWorkspace />);
+    await screen.findByText('Metformin 500 mg');
+
+    expect(getProviderExpiryWorklist).toHaveBeenCalledWith({
+      providerId: providers[0].providerId,
+      horizonDays: 30,
+      limit: 5,
+      offset: 0,
+    });
+    expect(
+      await screen.findByText(`${expiryPage.total} batches expiring within 30 days`),
+    ).toBeVisible();
+    expect(screen.getByRole('link', { name: /View expiry worklist/ })).toHaveAttribute(
+      'href',
+      '/inventory/expiry',
+    );
+  });
+
+  it('shows a calm all-clear attention state when nothing is expiring soon', async () => {
+    vi.mocked(getProviderExpiryWorklist).mockResolvedValue({
+      ...expiryPage,
+      data: [],
+      total: 0,
+    });
+
+    render(<DashboardWorkspace />);
+    await screen.findByText('Metformin 500 mg');
+
+    expect(await screen.findByText('All clear')).toBeVisible();
+    expect(
+      screen.getByText(/No batches for this provider expire within the next 30 days/),
+    ).toBeVisible();
+  });
+
+  it('shows an attention-card error state and can retry independently', async () => {
+    vi.mocked(getProviderExpiryWorklist)
+      .mockRejectedValueOnce(new ApiError('Expiry worklist response was invalid.', 502))
+      .mockResolvedValueOnce(expiryPage);
+    render(<DashboardWorkspace />);
+    await screen.findByText('Metformin 500 mg');
+
+    expect(await screen.findByText('Expiry worklist response was invalid.')).toBeVisible();
+    const attentionSection = screen.getByText('Needs attention').closest('section')!;
+    fireEvent.click(within(attentionSection).getByRole('button', { name: 'Retry' }));
+    expect(
+      await screen.findByText(`${expiryPage.total} batches expiring within 30 days`),
+    ).toBeVisible();
+  });
+
+  it('renders real recent-activity data from the audit contract', async () => {
+    render(<DashboardWorkspace />);
+    expect(getAuditEvents).toHaveBeenCalledWith({ limit: 5 });
+    expect(await screen.findByText('Authorization Role Created')).toBeVisible();
+    expect(screen.getByText('Succeeded')).toBeVisible();
+    expect(screen.getByRole('link', { name: /View audit trail/ })).toHaveAttribute(
+      'href',
+      '/audit',
+    );
+  });
+
+  it('shows a permission-restricted message for recent activity without alarming error copy', async () => {
+    vi.mocked(getAuditEvents).mockRejectedValue(new ApiError('Permission denied', 403));
+    render(<DashboardWorkspace />);
+    expect(await screen.findByText('Recent activity requires audit access')).toBeVisible();
+  });
+
+  it('shows an empty state when there is no recent activity, not a fabricated feed', async () => {
+    vi.mocked(getAuditEvents).mockResolvedValue({ data: [], nextCursor: null });
+    render(<DashboardWorkspace />);
+    expect(await screen.findByText('No recent activity')).toBeVisible();
+  });
+});
+
+describe('Attention card expiry urgency (calendar-day boundaries)', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  function expiryFixtureWithDate(expiryDate: string): InventoryExpiryWorklistPage {
+    return {
+      ...expiryPage,
+      total: 1,
+      data: [{ ...expiryPage.data[0], expiryDate }],
+    };
+  }
+
+  it('shows 0d when the batch expires today, regardless of current time-of-day', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date('2026-08-20T21:45:00.000Z'));
+    vi.mocked(getProviderExpiryWorklist).mockResolvedValue(
+      expiryFixtureWithDate('2026-08-20T03:00:00.000Z'),
+    );
+
+    render(<DashboardWorkspace />);
+    expect(await screen.findByText('0d')).toBeVisible();
+  });
+
+  it('shows 1d when the batch expires tomorrow', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date('2026-08-20T23:30:00.000Z'));
+    vi.mocked(getProviderExpiryWorklist).mockResolvedValue(
+      expiryFixtureWithDate('2026-08-21T00:15:00.000Z'),
+    );
+
+    render(<DashboardWorkspace />);
+    expect(await screen.findByText('1d')).toBeVisible();
+  });
+
+  it('treats exactly 7 calendar days out as urgent, and 8 days out as not urgent', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date('2026-08-20T00:05:00.000Z'));
+    vi.mocked(getProviderExpiryWorklist).mockResolvedValue(
+      expiryFixtureWithDate('2026-08-27T23:55:00.000Z'),
+    );
+
+    const { unmount } = render(<DashboardWorkspace />);
+    expect(await screen.findByText('7d')).toHaveClass('bg-rose-50');
+    unmount();
+
+    vi.mocked(getProviderExpiryWorklist).mockResolvedValue(
+      expiryFixtureWithDate('2026-08-28T00:05:00.000Z'),
+    );
+
+    render(<DashboardWorkspace />);
+    expect(await screen.findByText('8d')).toHaveClass('bg-amber-50');
   });
 });
 
