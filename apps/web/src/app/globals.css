@@ -4,9 +4,11 @@
 
 :root {
   color-scheme: light;
+  /* Kept in sync with the emerald/cyan/champagne/canvas/ink scales in
+     tailwind.config.ts -- this is the same palette, not a second one. */
   --obsidian: #07110f;
   --forest: #0b2f28;
-  --emerald: #17c692;
+  --emerald: #10b981;
   --cyan: #43d3e5;
   --champagne: #d7b56d;
   --ivory: #f7f6f0;
@@ -92,4 +94,20 @@ input {
   .soft-float {
     animation: none;
   }
+}
+
+/* Restrained glass surface -- used sparingly (navigation chrome, overlays),
+   never as the default card treatment. See Task 1 design direction. */
+.glass-surface {
+  background: rgba(255, 255, 255, 0.66);
+  backdrop-filter: blur(16px) saturate(140%);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+  border: 1px solid rgba(16, 32, 28, 0.08);
+}
+
+.glass-surface-dark {
+  background: rgba(7, 17, 15, 0.72);
+  backdrop-filter: blur(16px) saturate(140%);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
 }
