@@ -633,65 +633,108 @@ function ReservationTable({
   onSelect: (reservation: ProviderReservation) => void;
 }) {
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full min-w-[850px] border-collapse text-left">
-        <thead>
-          <tr className="border-b border-[#edf1ef] bg-[#fbfcfb] text-[10px] font-extrabold uppercase tracking-[.13em] text-[#8a9994]">
-            <th className="px-6 py-3.5">Reservation</th>
-            <th className="px-4 py-3.5">Status</th>
-            <th className="px-4 py-3.5">Created</th>
-            <th className="px-4 py-3.5">Expires</th>
-            <th className="px-4 py-3.5">Quantity</th>
-            <th className="px-6 py-3.5">
-              <span className="sr-only">Details</span>
-            </th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-[#edf1ef]">
-          {reservations.map((reservation) => (
-            <tr
-              key={reservation.id}
-              className={selectedId === reservation.id ? 'bg-emerald-50/50' : 'hover:bg-[#fbfdfc]'}
-            >
-              <td className="px-6 py-4">
+    <>
+      {/* Desktop/tablet: full table. Below lg, a stacked card list takes over
+          instead of forcing horizontal scroll across 6 columns. */}
+      <div className="hidden overflow-x-auto lg:block">
+        <table className="w-full min-w-[850px] border-collapse text-left">
+          <thead>
+            <tr className="border-b border-[#edf1ef] bg-[#fbfcfb] text-[10px] font-extrabold uppercase tracking-[.13em] text-[#8a9994]">
+              <th className="px-6 py-3.5">Reservation</th>
+              <th className="px-4 py-3.5">Status</th>
+              <th className="px-4 py-3.5">Created</th>
+              <th className="px-4 py-3.5">Expires</th>
+              <th className="px-4 py-3.5">Quantity</th>
+              <th className="px-6 py-3.5">
+                <span className="sr-only">Details</span>
+              </th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-[#edf1ef]">
+            {reservations.map((reservation) => (
+              <tr
+                key={reservation.id}
+                className={
+                  selectedId === reservation.id ? 'bg-emerald-50/50' : 'hover:bg-[#fbfdfc]'
+                }
+              >
+                <td className="px-6 py-4">
+                  <p className="font-mono text-xs font-semibold text-[#38544b]">
+                    {shortId(reservation.id)}
+                  </p>
+                  <p className="mt-1 text-[11px] text-[#899792]">
+                    Version {reservation.version} · {reservation.items.length} product
+                    {reservation.items.length === 1 ? '' : 's'}
+                  </p>
+                </td>
+                <td className="px-4 py-4">
+                  <StatusBadge tone={statusTone[reservation.status]}>
+                    {titleCase(reservation.status)}
+                  </StatusBadge>
+                </td>
+                <td className="px-4 py-4 text-xs text-[#536a62]">
+                  {formatDate(reservation.createdAt)}
+                </td>
+                <td className="px-4 py-4 text-xs text-[#536a62]">
+                  {formatDate(reservation.expiresAt)}
+                </td>
+                <td className="px-4 py-4 text-sm font-bold text-[#28453b]">
+                  {reservation.totalQuantity}
+                </td>
+                <td className="px-6 py-4 text-right">
+                  <button
+                    type="button"
+                    aria-expanded={selectedId === reservation.id}
+                    aria-label={`View reservation ${shortId(reservation.id)} details`}
+                    onClick={() => onSelect(reservation)}
+                    className="rounded-lg border border-[#dce5e1] px-3 py-2 text-xs font-bold text-emerald-700"
+                  >
+                    Details
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <ul className="divide-y divide-[#edf1ef] lg:hidden">
+        {reservations.map((reservation) => (
+          <li
+            key={reservation.id}
+            className={`p-4 sm:p-5 ${selectedId === reservation.id ? 'bg-emerald-50/50' : ''}`}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
                 <p className="font-mono text-xs font-semibold text-[#38544b]">
                   {shortId(reservation.id)}
                 </p>
                 <p className="mt-1 text-[11px] text-[#899792]">
-                  Version {reservation.version} · {reservation.items.length} product
-                  {reservation.items.length === 1 ? '' : 's'}
+                  {reservation.items.length} product{reservation.items.length === 1 ? '' : 's'} ·{' '}
+                  {reservation.totalQuantity} units
                 </p>
-              </td>
-              <td className="px-4 py-4">
-                <StatusBadge tone={statusTone[reservation.status]}>
-                  {titleCase(reservation.status)}
-                </StatusBadge>
-              </td>
-              <td className="px-4 py-4 text-xs text-[#536a62]">
-                {formatDate(reservation.createdAt)}
-              </td>
-              <td className="px-4 py-4 text-xs text-[#536a62]">
-                {formatDate(reservation.expiresAt)}
-              </td>
-              <td className="px-4 py-4 text-sm font-bold text-[#28453b]">
-                {reservation.totalQuantity}
-              </td>
-              <td className="px-6 py-4 text-right">
-                <button
-                  type="button"
-                  aria-expanded={selectedId === reservation.id}
-                  aria-label={`View reservation ${shortId(reservation.id)} details`}
-                  onClick={() => onSelect(reservation)}
-                  className="rounded-lg border border-[#dce5e1] px-3 py-2 text-xs font-bold text-emerald-700"
-                >
-                  Details
-                </button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+              </div>
+              <StatusBadge tone={statusTone[reservation.status]}>
+                {titleCase(reservation.status)}
+              </StatusBadge>
+            </div>
+            <p className="mt-3 text-xs text-[#536a62]">
+              Created {formatDate(reservation.createdAt)} · Expires{' '}
+              {formatDate(reservation.expiresAt)}
+            </p>
+            <button
+              type="button"
+              aria-expanded={selectedId === reservation.id}
+              aria-label={`View reservation ${shortId(reservation.id)} details`}
+              onClick={() => onSelect(reservation)}
+              className="mt-3 w-full rounded-lg border border-[#dce5e1] px-3 py-2.5 text-xs font-bold text-emerald-700"
+            >
+              View details
+            </button>
+          </li>
+        ))}
+      </ul>
+    </>
   );
 }
 

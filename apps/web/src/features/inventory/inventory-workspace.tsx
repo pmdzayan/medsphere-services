@@ -18,11 +18,15 @@ import type {
   CompletedTransferResponse,
   DamagedStockResponse,
   InventoryBatchStock,
+  InventoryStockItem,
   InventoryStockPage,
   ProviderAccess,
 } from '@/lib/inventory-contract';
 import { BATCH_QUARANTINE_REASONS } from '@/lib/inventory-contract';
 import {
+  daysUntilExpiry,
+  expiryUrgency,
+  expiryUrgencyLabel,
   formatInventoryCurrency,
   formatInventoryDate,
   loadedInventoryMetrics,
@@ -798,110 +802,204 @@ function InventoryTable({
   onTransfer?: (batch: InventoryBatchStock, medicineName: string) => void;
 }) {
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full min-w-[1000px] border-collapse text-left">
-        <thead>
-          <tr className="border-b border-[#edf1ef] bg-[#fbfcfb] text-[10px] font-extrabold uppercase tracking-[.13em] text-[#8a9994]">
-            <th className="px-6 py-3.5">Medicine</th>
-            <th className="px-4 py-3.5">Pricing</th>
-            <th className="px-4 py-3.5">Stock totals</th>
-            <th className="px-4 py-3.5">Batches</th>
-            <th className="px-6 py-3.5">Visibility</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-[#edf1ef]">
-          {page.data.map((item) => (
-            <tr key={item.inventoryId} className="align-top hover:bg-[#fbfdfc]">
-              <td className="px-6 py-4">
+    <>
+      {/* Desktop/tablet: full table. Below lg, a stacked card list takes over
+          instead of forcing horizontal scroll across a dense 5-column table
+          with per-batch action buttons -- scrolling sideways to find the
+          quarantine/damage/transfer buttons is not workable on a phone. */}
+      <div className="hidden overflow-x-auto lg:block">
+        <table className="w-full min-w-[1000px] border-collapse text-left">
+          <thead>
+            <tr className="border-b border-[#edf1ef] bg-[#fbfcfb] text-[10px] font-extrabold uppercase tracking-[.13em] text-[#8a9994]">
+              <th className="px-6 py-3.5">Medicine</th>
+              <th className="px-4 py-3.5">Pricing</th>
+              <th className="px-4 py-3.5">Stock totals</th>
+              <th className="px-4 py-3.5">Batches</th>
+              <th className="px-6 py-3.5">Visibility</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-[#edf1ef]">
+            {page.data.map((item) => (
+              <tr key={item.inventoryId} className="align-top hover:bg-[#fbfdfc]">
+                <td className="px-6 py-4">
+                  <p className="text-sm font-bold text-[#1b372d]">{item.name}</p>
+                  <p className="mt-1 text-xs text-[#758780]">
+                    {item.genericName ?? 'Generic name unavailable'} · {item.brand}
+                  </p>
+                  <p className="mt-1 font-mono text-[11px] text-[#8a9893]">
+                    SKU {item.sku ?? 'not assigned'}
+                  </p>
+                </td>
+                <td className="px-4 py-4 text-xs text-[#536a62]">
+                  <p>
+                    <strong>Selling:</strong> {formatInventoryCurrency(item.sellingPrice)}
+                  </p>
+                  <p className="mt-1">
+                    <strong>MRP:</strong> {formatInventoryCurrency(item.mrp)}
+                  </p>
+                </td>
+                <td className="px-4 py-4 text-xs text-[#536a62]">
+                  <p>
+                    <strong>{item.totalAvailableQuantity}</strong> available
+                  </p>
+                  <p className="mt-1">
+                    {item.totalOnHandQuantity} on hand · {item.totalHeldQuantity} held
+                  </p>
+                </td>
+                <td className="px-4 py-4">
+                  <BatchList
+                    item={item}
+                    onQuarantine={onQuarantine}
+                    onDamage={onDamage}
+                    onTransfer={onTransfer}
+                  />
+                </td>
+                <td className="px-6 py-4">
+                  <StatusBadge tone={item.isVisible ? 'emerald' : 'amber'}>
+                    {item.isVisible ? 'Visible' : 'Hidden'}
+                  </StatusBadge>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <ul className="divide-y divide-[#edf1ef] lg:hidden">
+        {page.data.map((item) => (
+          <li key={item.inventoryId} className="p-4 sm:p-5">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
                 <p className="text-sm font-bold text-[#1b372d]">{item.name}</p>
                 <p className="mt-1 text-xs text-[#758780]">
                   {item.genericName ?? 'Generic name unavailable'} · {item.brand}
                 </p>
-                <p className="mt-1 font-mono text-[11px] text-[#8a9893]">
-                  SKU {item.sku ?? 'not assigned'}
-                </p>
-              </td>
-              <td className="px-4 py-4 text-xs text-[#536a62]">
-                <p>
-                  <strong>Selling:</strong> {formatInventoryCurrency(item.sellingPrice)}
-                </p>
-                <p className="mt-1">
-                  <strong>MRP:</strong> {formatInventoryCurrency(item.mrp)}
-                </p>
-              </td>
-              <td className="px-4 py-4 text-xs text-[#536a62]">
-                <p>
-                  <strong>{item.totalAvailableQuantity}</strong> available
-                </p>
-                <p className="mt-1">
-                  {item.totalOnHandQuantity} on hand · {item.totalHeldQuantity} held
-                </p>
-              </td>
-              <td className="px-4 py-4">
-                <div className="space-y-2">
-                  {item.batches.length ? (
-                    item.batches.map((batch) => (
-                      <div key={batch.id} className="text-xs text-[#536a62]">
-                        <p className="flex flex-wrap items-center gap-2">
-                          <span className="font-mono font-semibold">{batch.batchNumber}</span>
-                          <StatusBadge tone={batchStatusTone(batch.status)}>
-                            {batch.status === 'QUARANTINED' ? 'Quarantined' : batch.status}
-                          </StatusBadge>
-                        </p>
-                        <p className="mt-0.5 text-[#899792]">
-                          Expires {formatInventoryDate(batch.expiryDate)} ·{' '}
-                          {batch.availableQuantity} available
-                        </p>
-                        {batch.status === 'ACTIVE' ? (
-                          <span className="mt-1.5 flex flex-wrap gap-3">
-                            <button
-                              type="button"
-                              onClick={() => onQuarantine(batch, item.name)}
-                              className="font-bold text-amber-700 hover:text-amber-800"
-                              aria-label={`Quarantine batch ${batch.batchNumber}`}
-                            >
-                              Quarantine batch
-                            </button>
-                            {batch.availableQuantity > 0 ? (
-                              <>
-                                <button
-                                  type="button"
-                                  onClick={() => onDamage(batch, item.name)}
-                                  className="font-bold text-rose-700 hover:text-rose-800"
-                                  aria-label={`Record damage for batch ${batch.batchNumber}`}
-                                >
-                                  Record damage
-                                </button>
-                                {onTransfer ? (
-                                  <button
-                                    type="button"
-                                    onClick={() => onTransfer(batch, item.name)}
-                                    className="font-bold text-cyan-700 hover:text-cyan-800"
-                                    aria-label={`Record completed transfer for batch ${batch.batchNumber}`}
-                                  >
-                                    Record transfer
-                                  </button>
-                                ) : null}
-                              </>
-                            ) : null}
-                          </span>
-                        ) : null}
-                      </div>
-                    ))
-                  ) : (
-                    <span className="text-xs text-[#899792]">No batches</span>
-                  )}
-                </div>
-              </td>
-              <td className="px-6 py-4">
-                <StatusBadge tone={item.isVisible ? 'emerald' : 'amber'}>
-                  {item.isVisible ? 'Visible' : 'Hidden'}
+              </div>
+              <StatusBadge tone={item.isVisible ? 'emerald' : 'amber'}>
+                {item.isVisible ? 'Visible' : 'Hidden'}
+              </StatusBadge>
+            </div>
+            <dl className="mt-3 grid grid-cols-3 gap-2 rounded-xl bg-[#fbfcfb] p-3 text-center">
+              <div>
+                <dt className="text-[10px] font-bold uppercase tracking-wide text-[#899792]">
+                  On hand
+                </dt>
+                <dd className="mt-0.5 text-sm font-bold text-[#28453b]">
+                  {item.totalOnHandQuantity}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-[10px] font-bold uppercase tracking-wide text-[#899792]">
+                  Held
+                </dt>
+                <dd className="mt-0.5 text-sm font-bold text-[#28453b]">
+                  {item.totalHeldQuantity}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-[10px] font-bold uppercase tracking-wide text-[#899792]">
+                  Available
+                </dt>
+                <dd className="mt-0.5 text-sm font-bold text-emerald-700">
+                  {item.totalAvailableQuantity}
+                </dd>
+              </div>
+            </dl>
+            <p className="mt-2 text-xs text-[#536a62]">
+              Selling {formatInventoryCurrency(item.sellingPrice)} · MRP{' '}
+              {formatInventoryCurrency(item.mrp)}
+            </p>
+            <div className="mt-3">
+              <BatchList
+                item={item}
+                onQuarantine={onQuarantine}
+                onDamage={onDamage}
+                onTransfer={onTransfer}
+              />
+            </div>
+          </li>
+        ))}
+      </ul>
+    </>
+  );
+}
+
+function BatchList({
+  item,
+  onQuarantine,
+  onDamage,
+  onTransfer,
+}: {
+  item: InventoryStockItem;
+  onQuarantine: (batch: InventoryBatchStock, medicineName: string) => void;
+  onDamage: (batch: InventoryBatchStock, medicineName: string) => void;
+  onTransfer?: (batch: InventoryBatchStock, medicineName: string) => void;
+}) {
+  if (!item.batches.length) {
+    return <span className="text-xs text-[#899792]">No batches</span>;
+  }
+  return (
+    <div className="space-y-2">
+      {item.batches.map((batch) => {
+        const daysUntil = batch.status === 'ACTIVE' ? daysUntilExpiry(batch.expiryDate) : null;
+        const urgency = expiryUrgency(daysUntil);
+        // Only surface a chip for batches that actually need attention
+        // (overdue or within the urgent window) -- a distant, healthy
+        // expiry date doesn't need a badge cluttering every row.
+        const showUrgencyChip = urgency === 'overdue' || urgency === 'urgent';
+        return (
+          <div key={batch.id} className="text-xs text-[#536a62]">
+            <p className="flex flex-wrap items-center gap-2">
+              <span className="font-mono font-semibold">{batch.batchNumber}</span>
+              <StatusBadge tone={batchStatusTone(batch.status)}>
+                {batch.status === 'QUARANTINED' ? 'Quarantined' : batch.status}
+              </StatusBadge>
+              {showUrgencyChip ? (
+                <StatusBadge tone={urgency === 'overdue' ? 'rose' : 'amber'}>
+                  {expiryUrgencyLabel(daysUntil)}
                 </StatusBadge>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+              ) : null}
+            </p>
+            <p className="mt-0.5 text-[#899792]">
+              Expires {formatInventoryDate(batch.expiryDate)} · {batch.availableQuantity} available
+            </p>
+            {batch.status === 'ACTIVE' ? (
+              <span className="mt-1.5 flex flex-wrap gap-3">
+                <button
+                  type="button"
+                  onClick={() => onQuarantine(batch, item.name)}
+                  className="font-bold text-amber-700 hover:text-amber-800"
+                  aria-label={`Quarantine batch ${batch.batchNumber}`}
+                >
+                  Quarantine batch
+                </button>
+                {batch.availableQuantity > 0 ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => onDamage(batch, item.name)}
+                      className="font-bold text-rose-700 hover:text-rose-800"
+                      aria-label={`Record damage for batch ${batch.batchNumber}`}
+                    >
+                      Record damage
+                    </button>
+                    {onTransfer ? (
+                      <button
+                        type="button"
+                        onClick={() => onTransfer(batch, item.name)}
+                        className="font-bold text-cyan-700 hover:text-cyan-800"
+                        aria-label={`Record completed transfer for batch ${batch.batchNumber}`}
+                      >
+                        Record transfer
+                      </button>
+                    ) : null}
+                  </>
+                ) : null}
+              </span>
+            ) : null}
+          </div>
+        );
+      })}
     </div>
   );
 }
