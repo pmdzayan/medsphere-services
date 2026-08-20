@@ -6,6 +6,7 @@ import { MetricCard, SectionCard, StatusBadge } from '@/components/platform/dash
 import { Icon } from '@/components/platform/icon';
 import { ApiError, getAssignedProviders, getProviderExpiryWorklist } from '@/lib/api-client';
 import type { InventoryExpiryWorklistPage, ProviderAccess } from '@/lib/inventory-contract';
+import { daysUntilExpiry, expiryUrgencyLabel } from './inventory-data';
 
 const PAGE_SIZE = 25;
 const HORIZONS = [7, 30, 60, 90] as const;
@@ -236,7 +237,7 @@ export function ExpiryWorklistWorkspace() {
         ) : null}
         {!providersLoading && !error && page && page.data.length > 0 ? (
           <>
-            <div className="overflow-x-auto">
+            <div className="hidden overflow-x-auto lg:block">
               <table className="min-w-full text-left text-sm">
                 <thead className="bg-[#f8faf9] text-[10px] font-extrabold uppercase tracking-[.13em] text-[#74847e]">
                   <tr>
@@ -260,7 +261,16 @@ export function ExpiryWorklistWorkspace() {
                         </p>
                       </td>
                       <td className="px-5 py-4 font-semibold text-[#456158]">{item.batchNumber}</td>
-                      <td className="px-5 py-4 text-[#456158]">{formatDate(item.expiryDate)}</td>
+                      <td className="px-5 py-4 text-[#456158]">
+                        <p>{formatDate(item.expiryDate)}</p>
+                        <p
+                          className={`mt-0.5 text-[11px] font-bold ${expiryLabelTone(
+                            daysUntilExpiry(item.expiryDate),
+                          )}`}
+                        >
+                          {expiryUrgencyLabel(daysUntilExpiry(item.expiryDate))}
+                        </p>
+                      </td>
                       <td className="px-5 py-4 font-bold text-[#24483d]">{item.onHandQuantity}</td>
                       <td className="px-5 py-4 text-[#735f30]">{item.heldQuantity}</td>
                       <td className="px-5 py-4 font-bold text-emerald-700">
@@ -276,6 +286,62 @@ export function ExpiryWorklistWorkspace() {
                 </tbody>
               </table>
             </div>
+
+            <ul className="divide-y divide-[#edf1ef] lg:hidden">
+              {page.data.map((item) => (
+                <li key={item.batchId} className="p-4 sm:p-5">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="font-bold text-[#24483d]">{item.name}</p>
+                      <p className="mt-1 text-xs text-[#7a8984]">
+                        {item.genericName ?? item.brand}
+                        {item.sku ? ` · ${item.sku}` : ''}
+                      </p>
+                    </div>
+                    <StatusBadge tone={item.isVisible ? 'emerald' : 'slate'}>
+                      {item.isVisible ? 'Visible' : 'Hidden'}
+                    </StatusBadge>
+                  </div>
+                  <p className="mt-2 text-xs text-[#456158]">
+                    Batch <span className="font-semibold">{item.batchNumber}</span> · Expires{' '}
+                    {formatDate(item.expiryDate)}
+                  </p>
+                  <p
+                    className={`mt-1 text-[11px] font-bold ${expiryLabelTone(
+                      daysUntilExpiry(item.expiryDate),
+                    )}`}
+                  >
+                    {expiryUrgencyLabel(daysUntilExpiry(item.expiryDate))}
+                  </p>
+                  <dl className="mt-3 grid grid-cols-3 gap-2 rounded-xl bg-[#f8faf9] p-3 text-center">
+                    <div>
+                      <dt className="text-[10px] font-bold uppercase tracking-wide text-[#8a9994]">
+                        Physical
+                      </dt>
+                      <dd className="mt-0.5 text-sm font-bold text-[#24483d]">
+                        {item.onHandQuantity}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-[10px] font-bold uppercase tracking-wide text-[#8a9994]">
+                        Held
+                      </dt>
+                      <dd className="mt-0.5 text-sm font-bold text-[#735f30]">
+                        {item.heldQuantity}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-[10px] font-bold uppercase tracking-wide text-[#8a9994]">
+                        Available
+                      </dt>
+                      <dd className="mt-0.5 text-sm font-bold text-emerald-700">
+                        {item.availableQuantity}
+                      </dd>
+                    </div>
+                  </dl>
+                </li>
+              ))}
+            </ul>
             <div className="flex flex-col gap-3 border-t border-[#edf1ef] px-5 py-4 text-xs text-[#74847e] sm:flex-row sm:items-center sm:justify-between">
               <span>
                 Observed {formatDateTime(page.asOf)} · through {formatDateTime(page.horizonEndsAt)}{' '}
@@ -348,6 +414,13 @@ function formatDate(value: string) {
   return new Intl.DateTimeFormat('en-IN', { dateStyle: 'medium', timeZone: 'UTC' }).format(
     new Date(value),
   );
+}
+
+function expiryLabelTone(daysUntil: number | null): string {
+  if (daysUntil === null) return 'text-[#8a9994]';
+  if (daysUntil < 0) return 'text-rose-700';
+  if (daysUntil <= 7) return 'text-amber-700';
+  return 'text-[#8a9994]';
 }
 function formatDateTime(value: string) {
   return new Intl.DateTimeFormat('en-IN', {
