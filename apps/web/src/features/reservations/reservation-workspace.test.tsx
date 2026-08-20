@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   ApiError,
@@ -74,7 +74,11 @@ afterEach(() => {
 describe('ReservationWorkspace live integration', () => {
   it('renders accepted live fields and expands details without patient claims', async () => {
     render(<ReservationWorkspace />);
-    fireEvent.click(await screen.findByRole('button', { name: /View reservation .* details/ }));
+    fireEvent.click(
+      within(await screen.findByRole('table')).getByRole('button', {
+        name: /View reservation .* details/,
+      }),
+    );
     expect(await screen.findByText('Metformin 500 mg')).toBeVisible();
     expect(screen.getByText(/BATCH-1 · 2 · Held/)).toBeVisible();
     expect(screen.queryByText(/Rohan Kumar|Farah Malik|Aditya Nair/i)).not.toBeInTheDocument();
@@ -85,7 +89,11 @@ describe('ReservationWorkspace live integration', () => {
   it('confirms a version-safe lifecycle action and refreshes reservations', async () => {
     vi.stubGlobal('crypto', { randomUUID: () => '33333333-3333-4333-8333-333333333333' });
     render(<ReservationWorkspace />);
-    fireEvent.click(await screen.findByRole('button', { name: /View reservation .* details/ }));
+    fireEvent.click(
+      within(await screen.findByRole('table')).getByRole('button', {
+        name: /View reservation .* details/,
+      }),
+    );
     fireEvent.click(screen.getByRole('button', { name: 'Mark ready' }));
     expect(screen.getByRole('dialog')).toHaveTextContent('recheck provider assignment');
     fireEvent.click(screen.getByRole('button', { name: 'Confirm mark ready' }));
@@ -154,7 +162,11 @@ describe('ReservationWorkspace live integration', () => {
       new ApiError('Medicine reservation version conflict', 409),
     );
     render(<ReservationWorkspace />);
-    fireEvent.click(await screen.findByRole('button', { name: /View reservation .* details/ }));
+    fireEvent.click(
+      within(await screen.findByRole('table')).getByRole('button', {
+        name: /View reservation .* details/,
+      }),
+    );
     fireEvent.click(screen.getByRole('button', { name: 'Mark ready' }));
     fireEvent.click(screen.getByRole('button', { name: 'Confirm mark ready' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('version conflict');
@@ -197,6 +209,19 @@ describe('ReservationWorkspace live integration', () => {
         offset: 25,
       }),
     );
+  });
+
+  it('renders both the desktop table and a mobile card list from the same data', async () => {
+    render(<ReservationWorkspace />);
+    const table = await screen.findByRole('table');
+    await within(table).findByText(/Version/);
+    const detailButtons = screen.getAllByRole('button', {
+      name: /View reservation .* details/,
+    });
+    // One instance in the desktop table row, one in the mobile card --
+    // both from the single fetched page, not a second request.
+    expect(detailButtons.length).toBeGreaterThanOrEqual(2);
+    expect(getProviderReservations).toHaveBeenCalledTimes(1);
   });
 
   it('shows empty-assignment and permission-restricted states', async () => {
