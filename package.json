@@ -20,6 +20,11 @@
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev",
+    "dev:keys": "node scripts/generate-dev-keys.js",
+    "dev:infra": "bash scripts/dev-network-setup.sh && docker compose --env-file .env -f compose/docker-compose.database.yml up -d",
+    "dev:infra:down": "docker compose --env-file .env -f compose/docker-compose.database.yml down",
+    "dev:app": "turbo run dev --filter=@medsphere/auth-service --filter=@medsphere/web",
+    "dev:check": "node scripts/dev-check.js",
     "test": "pnpm test:architecture && turbo run test --concurrency=1",
     "test:architecture": "node --test scripts/architecture-boundary-check.spec.js && node scripts/architecture-boundary-check.js",
     "test:cov": "turbo run test:cov --concurrency=1",
