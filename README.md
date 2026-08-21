@@ -1,136 +1,131 @@
 # MedSphere
 
-MedSphere is a planned multi-tenant healthcare ecosystem for patients, pharmacies, suppliers, hospitals, doctors, laboratories, and administrators.
+MedSphere is a multi-tenant healthcare visibility and medicine-operations platform being developed for patients, pharmacies, hospitals, suppliers, and authorized healthcare staff.
 
-> **Current status: stabilization prototype.** This repository is not approved for production deployment or for real patient, prescription, identity, or medicine-inventory data. See [PROJECT_STATUS.md](PROJECT_STATUS.md) before making changes.
+> **Release state: NOT approved for production or real healthcare data.** Development, testing, and demonstrations must use synthetic data only. Repository progress, successful CI, or completed features do not by themselves establish regulatory compliance or production approval.
 
-## Verified project progress
+## V1 objective
 
-**Status date:** 2026-08-14
+Version 1 focuses on a safe, testable path from medicine inventory to availability, reservation, and pharmacy operations while maintaining strict tenant, authorization, privacy, and audit boundaries.
 
-**Accepted evidence baseline:** `af48522` (PR #52 squash merge)
+The supported V1 runtime is currently:
 
-**Current sprint:** Next sprint selection pending after G3.21 acceptance
+- `apps/auth-service` — supported backend runtime
+- `apps/web` — supported frontend runtime
+- PostgreSQL 16 — authoritative relational data store
+- Redis 7 — supported runtime infrastructure
 
-**Full-roadmap estimate:** **40% complete / 60% remaining**
+Other application scaffolds in the monorepo are not automatically accepted V1 product capabilities.
 
-This is an engineering progress estimate against the complete MedSphere roadmap,
-including stabilization, healthcare-domain workflows, frontend applications,
-production operations, and planned Gates 10–20. It is not a release-readiness,
-regulatory-compliance, or legal-approval percentage. Placeholder services, Prisma
-models without accepted workflows, preview data, and unmounted routes do not count
-as completed modules.
+## Current engineering status
 
-The estimate is weighted by roadmap scope rather than averaged from the table
-below. Most of the product value sits in healthcare workflows that have not yet
-been built, so a strong foundation does not make the overall platform nearly
-finished.
+**Status date:** 2026-08-21
 
-The evidence-based [Gates 1–20 verification](docs/audits/2026-08-01-gates-1-20-verification.md)
-rejects the claim that the full roadmap is complete: Gate 1 is an accepted
-foundation, Gate 3 has accepted backend foundations but is not complete/live,
-and Gates 2 and 4–20 are not complete.
+The repository has advanced substantially beyond the older August 14 progress snapshot. Post-Audit Stabilization Batch 1 is complete, and Batch 2 Tasks 1–4 have been merged. Batch 2 Task 5 is the current runtime-verification and full V1 smoke-test candidate.
 
-| Area                                                             | Verified state                                                                                                                                                                         | Estimated completion |
-| ---------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------: |
-| Architecture, governance, monorepo, and database baseline        | ADR process, PNPM/Turbo tooling, shared packages, forward migrations, drift checks, and CI gates exist                                                                                 |                  85% |
-| Authentication, tenant context, RBAC, and durable audit          | S0.3 and S0.4 accepted; authenticated frontend, role administration, effective permissions, audit, policy-controlled onboarding, and personal privacy settings implemented             |                  85% |
-| Inventory ledger and medicine reservation integrity              | S0.5 and G3.1–G3.15 accepted through live stock safety, reservation lifecycle, and completed transfer actions; safe creation, returns, release/recall, and analytics remain incomplete |                  88% |
-| Frontend                                                         | Landing, login, shell, team/RBAC, audit, assigned-provider stock, and reservation reads are connected; pharmacy dashboard and most healthcare modules remain previews or absent        |                  38% |
-| Compliance beyond RBAC and audit                                 | Consent, privacy operations, verification, retention, legal hold, and policy enforcement remain incomplete                                                                             |                  10% |
-| Supplier, procurement, pharmacy, billing, and delivery workflows | Existing deployables are mostly health-only placeholders or unaccepted prototypes                                                                                                      |                   5% |
-| Hospital, doctor, laboratory, patient, and clinical journeys     | Some schema foundations exist, but accepted end-to-end application workflows are not implemented                                                                                       |                   2% |
-| Production operations and release readiness                      | Pull-request quality gates and a deployment freeze exist; deployment, observability, backup/restore, disaster recovery, performance evidence, and operational acceptance remain        |                  10% |
-| Gates 10–20 and AI/network expansion                             | Planned but not implemented as accepted product capabilities                                                                                                                           |                   0% |
+Current planning estimate: **approximately 73% of the launch-targeted V1 engineering scope is complete, with approximately 27% remaining.** This is a working engineering estimate, not a regulatory, security-certification, or release-approval percentage. The estimate must continue to be revised from accepted repository evidence rather than file count or prototype screens.
 
-### Substantially completed and verified foundations
+### Recently completed work
 
-- S0.1 architecture and repository governance.
-- S0.2 reproducible PostgreSQL migration baseline.
-- S0.3 authentication, trusted tenant context, refresh rotation, replay
-  protection, and rate limiting.
-- S0.4 tenant-safe authorization and append-only durable audit.
-- S0.5 inventory-ledger and medicine-reservation integrity accepted through
-  PR #10, including its migration and domain tests. Operational HTTP exposure
-  remains a sequence of separately reviewed sprints.
-- Premium frontend foundation: public landing page, login, authenticated and
-  responsive application shell, and pharmacy operations visual language.
-- Connected frontend administration: team membership, role lifecycle, role
-  assignment, effective-permission behavior, and tenant audit evidence.
-- Frontend Tasks 11–12 add personal privacy settings and policy-controlled
-  onboarding without claiming that the wider compliance milestone is complete.
-- PR #10 passed its final quality workflow at commit `3003625` in
-  [run 30741672770](https://github.com/pmdzayan/medsphere-services/actions/runs/30741672770)
-  and was squash-merged as `410368c`.
-- G3.1 passed run `30743115664` and was squash-merged in PR #11 as `77689b5`,
-  accepting migration-backed provider assignments and the first
-  permission-protected stock read contract.
-- G3.2 listing configuration, batch receipt, and stock adjustment commands were
-  accepted and squash-merged in PR #12 as `3249f8a`.
-- G3.3 provider reservation reads and transitions were accepted and
-  squash-merged in PR #13 as `d84dee0`.
-- AG-01 application boundaries and corrected AG-02A session credential
-  integrity were accepted in PRs #15 and #16 as `ba172f1` and `9c38792`.
-- G3.4 replaced fabricated inventory rows with strict same-origin
-  assigned-provider and stock reads, exact response validation, and live
-  read-only workspace states; PR #18 merged as `7b2eb78` after run
-  `31278555022` passed.
-- G3.6 replaced fabricated dashboard claims with bounded read-only composition
-  of accepted stock and reservation reads; PR #23 merged as `63707b8` after run
-  `31305222063` passed.
+- Post-Audit Stabilization Batch 1 — 5/5 accepted.
+- Frontend operational hardening and responsive inventory/reservation workflows.
+- Batch 2 Task 1 — stock-transfer authorization and cross-tenant coverage.
+- Batch 2 Task 2 — privacy-minimized public medicine search with safe staff-assisted reservation handoff.
+- Batch 2 Task 3 — provider-neutral SMTP/email notification activation while preserving delivery privacy boundaries.
+- Batch 2 Task 4 — reproducible supported V1 localhost bootstrap with PostgreSQL and Redis.
+- Batch 2 Task 5 — deterministic runtime and full V1 smoke verification is the active acceptance candidate. Normal exact-head PR quality gates have passed; dedicated live-smoke evidence remains part of its acceptance boundary.
 
-### Remaining work
+## Product definition and engineering authority
 
-1. **Expose remaining bounded inventory mutations:** define separate transfer,
-   return, damage, expiry, and reservation contracts with atomic audit; connect
-   frontend previews only after each backend contract is accepted.
-2. **Complete inventory operations:** expiry management, transfers, damaged
-   stock, returns, recalls/quarantine, operational analytics, and production
-   worker behavior where accepted by dedicated sprints.
-3. **Complete reservation operations:** staff reservation creation, lifecycle,
-   expiry processing, fulfilment UI, and later patient-safe exposure. Delivery
-   and payment must remain separate bounded sprints.
-4. **Finish the compliance foundation:** consent management, provider
-   verification, privacy center, retention, legal hold, and policy engine.
-5. **Build supplier and procurement:** supplier profiles, verification,
-   purchase orders, approval, goods receipt, batch capture, and procurement
-   dashboards.
-6. **Build complete pharmacy workflows:** catalog operations, dispensing,
-   sales, invoices, reports, staff operations, and analytics.
-7. **Build hospital, doctor, laboratory, and patient journeys:** departments,
-   beds, schedules, appointments, encounters, SOAP notes, prescriptions,
-   orders, samples, reports, consent-aware records, and role-specific
-   dashboards.
-8. **Build platform services:** billing and insurance, notifications,
-   documents and signatures, workflow approvals, reporting, exports, feature
-   flags, settings, and analytics. The current billing and notification apps
-   are health-only scaffolds, not finished services.
-9. **Finish cross-cutting frontend quality:** live API integration for every
-   accepted module, accessibility verification, dark mode, PWA/offline rules,
-   responsive device testing, and browser end-to-end coverage.
-10. **Implement planned Gates 10–20:** universal inventory migration, medicine
-    marketplace, hospital discovery, live healthcare availability,
-    appointments and queues, laboratory information system, radiology/PACS,
-    governed clinical decision support, patient mobile app, analytics, and the
-    national healthcare network.
-11. **Earn production release approval:** secure deployment environments,
-    secrets management, observability, alerting, backups, restore tests,
-    disaster recovery, performance/load testing, penetration testing,
-    operational runbooks, and compliance-control review.
+MedSphere is not developed from a single AI prompt. Product and implementation decisions are governed through repository evidence and explicit documents covering:
 
-The percentage must be revised only when repository evidence and milestone
-acceptance change. Adding files, models, disabled navigation, or preview screens
-does not by itself increase completion.
+1. product vision, users, problems, and V1 scope;
+2. architecture and bounded-module responsibilities;
+3. database and migration rules;
+4. authentication, authorization, tenant isolation, and audit;
+5. privacy and data-minimization boundaries;
+6. testing, failure handling, recovery, and release gates;
+7. DevOps, runtime configuration, and operational readiness;
+8. ADRs and sprint-specific acceptance evidence.
+
+Every developer and AI implementation agent must follow the repository's accepted requirements and may not independently redefine completion criteria.
+
+## Security and privacy
+
+Security and privacy are first-class V1 architecture requirements, not post-launch additions.
+
+### Implemented and tested security foundations
+
+- trusted authentication and tenant context;
+- RBAC and permission enforcement;
+- provider-access authorization;
+- immediate authority revocation through authoritative authorization reads;
+- cross-tenant access rejection;
+- alternate-route authorization coverage;
+- last-tenant-administrator protection, including concurrency evidence;
+- append-only durable audit evidence for privileged operations;
+- actor, tenant, resource, and correlation attribution in audit records;
+- transactional rollback when required audit persistence fails;
+- reservation and inventory concurrency/idempotency protections;
+- dependency, formatting, lint, TypeScript, migration/drift, upgrade-safety, PostgreSQL/Redis, and build gates in CI.
+
+### Implemented privacy boundaries
+
+- public medicine search exposes only coarse, intentionally minimized availability information;
+- public responses do not expose batch IDs, inventory IDs, purchase cost, staff/member IDs, contact payloads, or exact internal stock details;
+- tenant-scoped healthcare operations reject unauthorized cross-tenant actors;
+- notification architecture uses bounded recipient/routing references rather than copying unnecessary contact data through domain events;
+- observability for notification delivery is designed around metadata rather than healthcare/contact payloads;
+- real healthcare data remains prohibited until production and compliance acceptance explicitly authorize it.
+
+### What we do NOT claim
+
+The repository must not currently be described as production-certified, HIPAA-compliant, DPDP-compliant, ABDM-compliant, or otherwise legally/regulatorily certified merely because technical controls exist. Final compliance mapping, deployment controls, operational evidence, security testing, privacy review, and release acceptance remain separate launch gates.
+
+## Reliability and failure handling
+
+MedSphere uses evidence-driven failure handling rather than hiding failing tests or weakening safety checks.
+
+Current foundations include:
+
+- transactional mutation boundaries;
+- rollback evidence for failed privileged operations;
+- idempotency and same-key retry protection;
+- bounded notification retries and dead-letter handling;
+- PostgreSQL-backed concurrency tests for critical invariants;
+- reproducible migration and populated-upgrade checks;
+- exact-head CI before acceptance;
+- a dedicated runtime/live-smoke verification path for the supported V1 stack.
+
+A failing gate blocks acceptance. Tests must not be deleted, skipped, mocked away, or weakened merely to obtain a green build.
+
+## Remaining V1 launch work
+
+The remaining work is concentrated less on basic scaffolding and more on proving the integrated product can be operated safely. Major remaining areas include:
+
+- complete Batch 2 Task 5 live runtime/smoke verification;
+- close any defects discovered by end-to-end runtime testing;
+- production environment and deployment hardening;
+- secrets and configuration management;
+- observability, alerting, and operational dashboards;
+- backup, restore, and disaster-recovery evidence;
+- performance/load and reliability testing;
+- final security and privacy verification;
+- browser/end-to-end user-journey acceptance;
+- launch runbooks and operational ownership;
+- final governance and release acceptance.
+
+The working planning estimate is roughly **20–25 major tasks remaining**, subject to change when runtime verification exposes new evidence. No task count overrides the acceptance gates.
 
 ## Version 1 architecture
 
-MedSphere Version 1 is being consolidated into a **modular monolith** with explicit bounded modules and future service-extraction seams. The current repository still contains multiple service applications that share one database; they are migration inputs, not the approved target architecture.
+MedSphere V1 is being consolidated around a **modular-monolith** architecture with explicit bounded modules and future service-extraction seams. Existing additional service applications in the repository are migration inputs/prototypes unless separately accepted.
 
-The architecture, database-baseline, and authentication decisions are recorded in [ADR-001](docs/adr/0001-modular-monolith-for-version-1.md), [ADR-002](docs/adr/0002-append-only-reproducible-database-baseline.md), and [ADR-003](docs/adr/0003-trusted-authentication-and-tenant-context.md).
+Core architectural decisions are recorded under [`docs/adr/`](docs/adr/) and the Development Bible under [`docs/development-bible/`](docs/development-bible/).
 
 ## Required reading
 
-Every developer and AI agent must read these documents in order:
+Every developer and AI agent must read these documents before making changes:
 
 1. [PROJECT_RULES.md](PROJECT_RULES.md)
 2. [PROJECT_STATUS.md](PROJECT_STATUS.md)
@@ -139,52 +134,48 @@ Every developer and AI agent must read these documents in order:
 5. [MedSphere Development Bible](docs/development-bible/README.md)
 6. [Architecture Decision Records](docs/adr/README.md)
 
-If documentation conflicts, `PROJECT_STATUS.md` and accepted ADRs describe the current implementation authority. Product milestones remain ordered by `PRODUCT_ROADMAP.md`.
+Accepted ADRs, merged implementation evidence, exact-head CI, and sprint acceptance records are the engineering authority. If a summary document is stale, it must not override newer accepted repository evidence.
 
 ## Repository layout
 
 ```text
-apps/                       Existing NestJS deployable applications
+apps/                       Application runtimes and prototype services
 packages/                   Shared TypeScript packages and Prisma schema
 docs/adr/                   Architecture Decision Records
 docs/audits/                Evidence-based engineering audits
 docs/development-bible/     Living engineering handbook
+docs/sprints/               Sprint and acceptance evidence
 compose/                    Local orchestration
 ```
 
-The layout above reflects the repository today. It will change incrementally as the modular-monolith migration is designed, tested, and approved.
-
 ## Local development
 
-For the complete clean-machine bootstrap path (infrastructure, dev-only key
-generation, backend/frontend startup, localhost URLs, health verification,
-and common failure cases), see
-[the Local Development Bible](docs/development-bible/11-devops.md). Short
-version:
+For the complete clean-machine bootstrap path, see [the Local Development Bible](docs/development-bible/11-devops.md).
 
 ```bash
 pnpm install --frozen-lockfile
-cp .env.example .env && pnpm dev:keys   # paste the generated keys into .env
-pnpm dev:infra                          # PostgreSQL + Redis
+cp .env.example .env
+pnpm dev:keys
+pnpm dev:infra
 pnpm db:verify
-pnpm dev:app                            # auth-service (3000) + web (3001)
-pnpm dev:check                          # smoke check
+pnpm dev:app
+pnpm dev:check
 ```
 
-Only `apps/auth-service` and `apps/web` are the supported V1 backend and
-frontend. The other NestJS applications under `apps/` are unaccepted
-prototype scaffolds; do not run the root `pnpm dev` command expecting only
-the supported stack, since it starts every app in the monorepo.
+`pnpm dev:app` runs the supported V1 backend and frontend. Do not treat every application under `apps/` as an accepted V1 service.
+
+Never commit real secrets or real healthcare data.
 
 ## Local quality checks
 
 Requirements:
 
-- Node.js `^20.19.0` or `>=22.12.0` (matches `engines.node` in the root `package.json`; Node 20.11 no longer satisfies this)
+- Node.js `^20.19.0` or `>=22.12.0`
 - PNPM 9.15.0
-- A local `.env` created from `.env.example`; never commit real secrets
+- local `.env` created from `.env.example`
+- PostgreSQL 16 and Redis 7 for applicable infrastructure-backed verification
 
-Start the local PostgreSQL 16 and Redis 7 infrastructure and verify the full migration chain:
+Run the supported infrastructure and migration verification:
 
 ```bash
 pnpm dev:infra
@@ -192,21 +183,7 @@ pnpm db:verify
 pnpm db:verify-upgrade
 ```
 
-`pnpm dev:infra` creates the required external Docker networks (idempotent)
-and starts both PostgreSQL and Redis via
-`compose/docker-compose.database.yml`; see
-[the Local Development Bible](docs/development-bible/11-devops.md) for the
-complete bootstrap path including backend/frontend startup.
-
-`db:verify` validates the Prisma schema, deploys every migration, checks migration status, and fails if the deployed database drifts from the declared schema. Never use `prisma db push` on a shared database.
-
-`db:verify-upgrade` is an infrastructure-only S0.4 gate. It creates isolated
-temporary PostgreSQL databases, proves conversion of a populated valid S0.3
-authorization state, proves that five unsafe legacy-data categories fail
-closed, and removes every temporary database. Never run it against a database
-account that cannot safely create and remove isolated test databases.
-
-Run the same mandatory gates used in pull requests:
+Run mandatory repository quality gates:
 
 ```bash
 pnpm install --frozen-lockfile
@@ -216,8 +193,12 @@ pnpm test
 pnpm build
 ```
 
-No sprint is complete unless every applicable command passes and the implementation has been reviewed for duplication, architecture, validation, performance, security, tenant isolation, audit behavior, and test quality.
+Applicable PostgreSQL/Redis-backed integration suites and exact-head GitHub CI must also pass before a sprint requiring them can be accepted.
 
-## Contribution rule
+## Contribution and acceptance rule
 
-Do not commit directly to the protected default branch. Use one sprint branch, one focused pull request, and the checklist in the pull-request template. Production delivery remains intentionally disabled until the production-release milestone is accepted.
+Do not commit feature work directly to the protected default branch. Use one bounded task/sprint branch and one focused pull request.
+
+A task is not complete merely because code exists. Applicable acceptance requires repository analysis, baseline evidence, implementation, targeted tests, infrastructure-backed tests where required, formatting/lint/type/build gates, exact-head CI, architecture/security/privacy review, merge, and governance evidence.
+
+Production delivery and real healthcare data remain disabled until explicit production-release acceptance is completed.
