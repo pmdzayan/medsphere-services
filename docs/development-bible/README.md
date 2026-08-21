@@ -8,23 +8,23 @@
 
 The Development Bible is the long-term engineering source of truth. It describes the intended and accepted product; `PROJECT_STATUS.md` records what the repository has actually completed.
 
-| Volume | Subject              | Current authoritative source                                    | Status               |
-| -----: | -------------------- | --------------------------------------------------------------- | -------------------- |
-|     01 | Vision and Business  | This index and `PRODUCT_ROADMAP.md`                             | Foundation draft     |
-|     02 | Product Requirements | Roadmap module scopes; detailed PRDs pending                    | Incremental          |
-|     03 | System Architecture  | ADR-001 and architecture section below                          | Active redesign      |
-|     04 | Database             | [Database Bible](04-database.md), Prisma schema, and migrations | S0.5 redesign active |
-|     05 | Backend              | [Identity, Authorization, and Audit Bible](05-backend.md)       | S0.4 accepted        |
-|     06 | Frontend             | Frontend specification pending repository adoption              | Planned              |
-|     07 | Security             | [Identity, Authorization, and Audit Security](07-security.md)   | S0.4 accepted        |
-|     08 | Compliance           | Control mapping pending qualified review                        | Planned              |
-|     09 | AI Version 2         | `PRODUCT_ROADMAP.md`; detailed AI Bible deferred                | Planned              |
-|     10 | Testing              | [Testing Bible](10-testing.md) and `PROJECT_RULES.md`           | Active               |
-|     11 | DevOps               | Current Docker/Compose/Actions plus future runbooks             | Not production-ready |
-|     12 | Roadmap              | `PRODUCT_ROADMAP.md` and `PROJECT_STATUS.md`                    | Active               |
-|     13 | Standards            | `PROJECT_RULES.md`                                              | Active               |
-|     14 | AI Workflow          | `AI_HANDOFF.md`                                                 | Active               |
-|     15 | Future Ideas         | Future integrations in the roadmap; dedicated register pending  | Incremental          |
+| Volume | Subject              | Current authoritative source                                                                    | Status                                         |
+| -----: | -------------------- | ----------------------------------------------------------------------------------------------- | ---------------------------------------------- |
+|     01 | Vision and Business  | This index and `PRODUCT_ROADMAP.md`                                                             | Foundation draft                               |
+|     02 | Product Requirements | Roadmap module scopes; detailed PRDs pending                                                    | Incremental                                    |
+|     03 | System Architecture  | ADR-001 and architecture section below                                                          | Active redesign                                |
+|     04 | Database             | [Database Bible](04-database.md), Prisma schema, and migrations                                 | S0.5 redesign active                           |
+|     05 | Backend              | [Identity, Authorization, and Audit Bible](05-backend.md)                                       | S0.4 accepted                                  |
+|     06 | Frontend             | Frontend specification pending repository adoption                                              | Planned                                        |
+|     07 | Security             | [Identity, Authorization, and Audit Security](07-security.md)                                   | S0.4 accepted                                  |
+|     08 | Compliance           | Control mapping pending qualified review                                                        | Planned                                        |
+|     09 | AI Version 2         | `PRODUCT_ROADMAP.md`; detailed AI Bible deferred                                                | Planned                                        |
+|     10 | Testing              | [Testing Bible](10-testing.md) and `PROJECT_RULES.md`                                           | Active                                         |
+|     11 | DevOps               | [Local Development Bible](11-devops.md) plus current Docker/Compose/Actions and future runbooks | Local bootstrap accepted; production not-ready |
+|     12 | Roadmap              | `PRODUCT_ROADMAP.md` and `PROJECT_STATUS.md`                                                    | Active                                         |
+|     13 | Standards            | `PROJECT_RULES.md`                                                                              | Active                                         |
+|     14 | AI Workflow          | `AI_HANDOFF.md`                                                                                 | Active                                         |
+|     15 | Future Ideas         | Future integrations in the roadmap; dedicated register pending                                  | Incremental                                    |
 
 ## Volume 01 — Vision and Business
 
