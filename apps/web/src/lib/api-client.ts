@@ -5,6 +5,7 @@ import type {
   RegistrationResponse,
 } from './auth-contract';
 import { toAuditSearchParams, type AuditEventFilters, type AuditEventPage } from './audit-contract';
+import type { PublicMedicineSearchResponse } from './public-medicine-search-contract';
 import type {
   AuthorizationCatalogue,
   CreateRoleRequest,
@@ -116,6 +117,16 @@ export async function getAuditEvents(filters: AuditEventFilters = {}): Promise<A
 
 export async function getAssignedProviders(): Promise<ProviderAccess[]> {
   return requestJson<ProviderAccess[]>('/api/inventory/providers');
+}
+
+export async function searchPublicMedicine(
+  providerId: string,
+  q: string,
+): Promise<PublicMedicineSearchResponse> {
+  const search = new URLSearchParams({ q });
+  return requestJson<PublicMedicineSearchResponse>(
+    `/api/public/providers/${encodeURIComponent(providerId)}/medicine-search?${search.toString()}`,
+  );
 }
 
 export async function getProviderStock(
