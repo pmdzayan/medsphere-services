@@ -5,10 +5,8 @@ import {
   NOTIFICATION_PROVIDER_REGISTRY,
   NOTIFICATION_RECIPIENT_RESOLVER,
 } from './notification.contracts';
-import {
-  NoopNotificationDeliveryObserver,
-  UnconfiguredNotificationProviderRegistry,
-} from './notification-defaults';
+import { LoggingNotificationDeliveryObserver } from './logging-notification-delivery.observer';
+import { createNotificationProviderRegistry } from './notification-provider-registry.factory';
 import { NotificationOperationsService } from './notification-operations.service';
 import { NotificationQueueService } from './notification-queue.service';
 import { NotificationWorkerService } from './notification-worker.service';
@@ -25,19 +23,21 @@ import { ReservationRecipientResolverService } from './reservation-recipient-res
     ReservationNotificationConsumerService,
     ReservationNotificationComposerService,
     ReservationRecipientResolverService,
-    UnconfiguredNotificationProviderRegistry,
-    NoopNotificationDeliveryObserver,
+    LoggingNotificationDeliveryObserver,
     {
       provide: NOTIFICATION_RECIPIENT_RESOLVER,
       useExisting: ReservationRecipientResolverService,
     },
     {
+      // Activation is read from the process environment exactly once, at
+      // module composition -- see notification-provider-registry.factory.ts
+      // for the full fail-closed/fail-fast behavior.
       provide: NOTIFICATION_PROVIDER_REGISTRY,
-      useExisting: UnconfiguredNotificationProviderRegistry,
+      useFactory: () => createNotificationProviderRegistry(),
     },
     {
       provide: NOTIFICATION_DELIVERY_OBSERVER,
-      useExisting: NoopNotificationDeliveryObserver,
+      useExisting: LoggingNotificationDeliveryObserver,
     },
   ],
   exports: [

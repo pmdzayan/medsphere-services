@@ -7,13 +7,16 @@ import 'dotenv/config';
  *
  * Example: const env = loadEnv(['DATABASE_URL', 'AUTH_JWT_ISSUER'] as const);
  */
-export function loadEnv<T extends string>(required: readonly T[]): Record<T, string> {
-  const missing = required.filter((key) => !process.env[key]);
+export function loadEnv<T extends string>(
+  required: readonly T[],
+  environment: Readonly<Record<string, string | undefined>> = process.env,
+): Record<T, string> {
+  const missing = required.filter((key) => !environment[key]);
   if (missing.length > 0) {
     throw new Error(`Missing required environment variable(s): ${missing.join(', ')}`);
   }
   return required.reduce(
-    (acc, key) => ({ ...acc, [key]: process.env[key] as string }),
+    (acc, key) => ({ ...acc, [key]: environment[key] as string }),
     {} as Record<T, string>,
   );
 }
