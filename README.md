@@ -154,21 +154,49 @@ compose/                    Local orchestration
 
 The layout above reflects the repository today. It will change incrementally as the modular-monolith migration is designed, tested, and approved.
 
+## Local development
+
+For the complete clean-machine bootstrap path (infrastructure, dev-only key
+generation, backend/frontend startup, localhost URLs, health verification,
+and common failure cases), see
+[the Local Development Bible](docs/development-bible/11-devops.md). Short
+version:
+
+```bash
+pnpm install --frozen-lockfile
+cp .env.example .env && pnpm dev:keys   # paste the generated keys into .env
+pnpm dev:infra                          # PostgreSQL + Redis
+pnpm db:verify
+pnpm dev:app                            # auth-service (3000) + web (3001)
+pnpm dev:check                          # smoke check
+```
+
+Only `apps/auth-service` and `apps/web` are the supported V1 backend and
+frontend. The other NestJS applications under `apps/` are unaccepted
+prototype scaffolds; do not run the root `pnpm dev` command expecting only
+the supported stack, since it starts every app in the monorepo.
+
 ## Local quality checks
 
 Requirements:
 
-- Node.js 20.11 or newer
+- Node.js `^20.19.0` or `>=22.12.0` (matches `engines.node` in the root `package.json`; Node 20.11 no longer satisfies this)
 - PNPM 9.15.0
 - A local `.env` created from `.env.example`; never commit real secrets
 
-Start the local PostgreSQL 16 database and verify the full migration chain:
+Start the local PostgreSQL 16 and Redis 7 infrastructure and verify the full migration chain:
 
 ```bash
-docker compose --env-file .env -f compose/docker-compose.database.yml up -d
+pnpm dev:infra
 pnpm db:verify
 pnpm db:verify-upgrade
 ```
+
+`pnpm dev:infra` creates the required external Docker networks (idempotent)
+and starts both PostgreSQL and Redis via
+`compose/docker-compose.database.yml`; see
+[the Local Development Bible](docs/development-bible/11-devops.md) for the
+complete bootstrap path including backend/frontend startup.
 
 `db:verify` validates the Prisma schema, deploys every migration, checks migration status, and fails if the deployed database drifts from the declared schema. Never use `prisma db push` on a shared database.
 
