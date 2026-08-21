@@ -1,0 +1,138 @@
+index 0000000..3591893
+--- /dev/null
++++ b/apps/auth-service/src/notifications/logging-notification-delivery.observer.ts
+@@ -0,0 +1,31 @@
++import { Injectable, Logger } from '@nestjs/common';
++import type {
++  NotificationDeliveryObserver,
++  NotificationObservation,
++} from './notification.contracts';
++
++/**
++ * Real (not no-op) delivery observability for an activated provider.
++ * Logs only the fields the accepted contract classifies as safe:
++ * tenantId, deliveryId, channel, attemptCount, outcome, errorCode. Never
++ * the destination address, composed content, credentials, or raw
++ * provider response -- none of those are present on
++ * NotificationObservation in the first place, so there is nothing to
++ * accidentally leak here.
++ */
++@Injectable()
++export class LoggingNotificationDeliveryObserver implements NotificationDeliveryObserver {
++  private readonly logger = new Logger(LoggingNotificationDeliveryObserver.name);
++
++  record(observation: NotificationObservation): void {
++    this.logger.log({
++      event: 'notification_delivery_outcome',
++      tenantId: observation.tenantId,
++      deliveryId: observation.deliveryId,
++      channel: observation.channel,
++      attemptCount: observation.attemptCount,
++      outcome: observation.outcome,
++      errorCode: observation.errorCode,
++    });
++  }
++}
+diff --git a/apps/auth-service/src/notifications/notification-provider-registry.factory.spec.ts b/apps/auth-service/src/notifications/notification-provider-registry.factory.spec.ts
+new file mode 100644
+index 0000000..a73636f
+--- /dev/null
++++ b/apps/auth-service/src/notifications/notification-provider-registry.factory.spec.ts
+@@ -0,0 +1,78 @@
++import { createNotificationProviderRegistry } from './notification-provider-registry.factory';
++import { SMTP_PROVIDER_KEY } from './smtp-notification-provider.adapter';
++
++const BASE_ENV = {} as Record<string, string | undefined>;
++
++describe('createNotificationProviderRegistry', () => {
++  it('remains disabled by default with no activation configuration', () => {
++    const registry = createNotificationProviderRegistry(BASE_ENV);
++    expect(registry.health('EMAIL')).toEqual({ state: 'DISABLED', channel: 'EMAIL' });
++    expect(() => registry.forChannel('EMAIL')).toThrow();
++  });
++
++  it('activates a real SMTP adapter for valid explicit configuration', () => {
++    const registry = createNotificationProviderRegistry({
++      ...BASE_ENV,
++      NOTIFICATION_EMAIL_PROVIDER_ENABLED: 'true',
++      NOTIFICATION_EMAIL_PROVIDER_KEY: SMTP_PROVIDER_KEY,
++      NOTIFICATION_EMAIL_PROVIDER_CREDENTIAL_REFERENCE: 'TEST_SMTP_CONNECTION_URL',
++      TEST_SMTP_CONNECTION_URL: 'smtp://user:pass@localhost:2525',
++      NOTIFICATION_EMAIL_FROM_ADDRESS: 'reservations@medsphere.test',
++    });
++
++    const health = registry.health('EMAIL');
++    expect(health).toEqual({ state: 'READY', providerKey: SMTP_PROVIDER_KEY, channel: 'EMAIL' });
++    const adapter = registry.forChannel('EMAIL');
++    expect(adapter.providerKey).toBe(SMTP_PROVIDER_KEY);
++  });
++
++  it('fails closed for an unsupported provider key without falling back', () => {
++    const registry = createNotificationProviderRegistry({
++      ...BASE_ENV,
++      NOTIFICATION_EMAIL_PROVIDER_ENABLED: 'true',
++      NOTIFICATION_EMAIL_PROVIDER_KEY: 'unsupported-vendor',
++      NOTIFICATION_EMAIL_PROVIDER_CREDENTIAL_REFERENCE: 'TEST_SMTP_CONNECTION_URL',
++    });
++
++    expect(registry.health('EMAIL').state).toBe('UNAVAILABLE');
++    expect(() => registry.forChannel('EMAIL')).toThrow();
++  });
++
++  it('throws (fails application bootstrap) when enabled but the referenced secret is missing', () => {
++    expect(() =>
++      createNotificationProviderRegistry({
++        ...BASE_ENV,
++        NOTIFICATION_EMAIL_PROVIDER_ENABLED: 'true',
++        NOTIFICATION_EMAIL_PROVIDER_KEY: SMTP_PROVIDER_KEY,
++        NOTIFICATION_EMAIL_PROVIDER_CREDENTIAL_REFERENCE: 'TEST_SMTP_CONNECTION_URL',
++        // TEST_SMTP_CONNECTION_URL and NOTIFICATION_EMAIL_FROM_ADDRESS
++        // deliberately absent.
++      }),
++    ).toThrow(/Missing required environment variable/);
++  });
++
++  it('throws for malformed activation configuration rather than silently disabling', () => {
++    expect(() =>
++      createNotificationProviderRegistry({
++        ...BASE_ENV,
++        NOTIFICATION_EMAIL_PROVIDER_ENABLED: 'not-a-boolean',
++      }),
++    ).toThrow();
++  });
++
++  it('never exposes the credential reference name or value through health()', () => {
++    const registry = createNotificationProviderRegistry({
++      ...BASE_ENV,
++      NOTIFICATION_EMAIL_PROVIDER_ENABLED: 'true',
++      NOTIFICATION_EMAIL_PROVIDER_KEY: SMTP_PROVIDER_KEY,
++      NOTIFICATION_EMAIL_PROVIDER_CREDENTIAL_REFERENCE: 'TEST_SMTP_CONNECTION_URL',
++      TEST_SMTP_CONNECTION_URL: 'smtp://user:super-secret-password@localhost:2525',
++      NOTIFICATION_EMAIL_FROM_ADDRESS: 'reservations@medsphere.test',
++    });
++
++    const serialized = JSON.stringify(registry.health('EMAIL'));
++    expect(serialized).not.toContain('super-secret-password');
++    expect(serialized).not.toContain('TEST_SMTP_CONNECTION_URL');
++    expect(serialized).not.toContain('smtp://');
++  });
++});
+diff --git a/apps/auth-service/src/notifications/notification-provider-registry.factory.ts b/apps/auth-service/src/notifications/notification-provider-registry.factory.ts
+new file mode 100644
+index 0000000..e8d08ac
+--- /dev/null
++++ b/apps/auth-service/src/notifications/notification-provider-registry.factory.ts
+@@ -0,0 +1,48 @@
++import { loadEnv } from '@medsphere/config';
++import {
++  ContractNotificationProviderRegistry,
++  parseProviderActivationEnvironment,
++} from './notification-provider-activation.contracts';
++import {
++  SMTP_PROVIDER_KEY,
++  SmtpNotificationProviderAdapter,
++} from './smtp-notification-provider.adapter';
++
++/**
++ * Reads real activation configuration from the process environment and
++ * constructs the accepted G3.29 registry -- disabled by construction when
