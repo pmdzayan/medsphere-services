@@ -99,8 +99,8 @@ jobs:
       - name: Verify clean database migration and drift
         run: pnpm db:verify
 
-      - name: Build the backend
-        run: pnpm --filter @medsphere/auth-service build
+      - name: Build the backend (and its workspace dependencies via Turbo)
+        run: pnpm exec turbo run build --filter=@medsphere/auth-service
 
       - name: Build the frontend
         run: pnpm --filter @medsphere/web build
