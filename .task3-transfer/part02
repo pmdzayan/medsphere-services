@@ -1,0 +1,111 @@
+persisted through 9.0.0; upgraded again to ^9.0.5, the first patched
+release, confirmed via `pnpm audit --prod` reporting zero known
+vulnerabilities. The adapter does not use the affected raw option in
+any case. Re-ran all tests against the final 9.0.5 runtime to confirm
+no breaking API changes for the surface used here
+(createTransport/sendMail/Transporter).
+
+Tests added:
+- smtp-notification-provider.adapter.spec.ts (7 tests): successful
+  delivery via nodemailer's own zero-network jsonTransport (real
+  library code, no network); non-EMAIL channel rejected before
+  touching the transport; TRANSIENT classification for a connection
+  failure; TERMINAL classification for an authentication failure and
+  for a permanent 5xx SMTP response; TRANSIENT classification for a
+  4xx SMTP response; and confirmation that the raw vendor error
+  message, credential, and destination never appear anywhere in the
+  thrown failure.
+- notification-provider-registry.factory.spec.ts (6 tests): disabled
+  by default with no configuration; a valid explicit SMTP activation
+  produces a READY, correctly provider-keyed registry; an unsupported
+  provider key fails closed (UNAVAILABLE, forChannel() throws) without
+  silently falling back; a missing referenced secret throws (fails
+  bootstrap) rather than silently disabling; malformed activation
+  configuration throws; and health() never exposes the credential
+  reference name or value.
+
+No production code outside the notifications module and
+@medsphere/config was changed. No new reservation lifecycle event was
+invented -- the existing "reservation ready" event remains the only
+one this activation serves. No vendor-specific field was added to any
+reservation event or notification-domain record. No frontend change
+(none was in scope or needed -- this task is provider activation, and
+no notification-management UI exists or was required).
+
+Verified: prettier --check and eslint clean across the full backend
+(apps/auth-service/src, packages/config/src). TypeScript
+(tsc -p tsconfig.spec.json --noEmit): confirmed zero new errors --
+traced one apparent new error (@medsphere/config "cannot find module")
+to the package simply never having been tsc-built before in this
+sandbox; built it and confirmed clean; all remaining errors are the
+same pre-existing @medsphere/database/@medsphere/logger cascade
+already documented throughout this batch, affecting only unmodified
+files. Actually executed (not just typechecked) 13 new unit tests
+directly via Jest, bypassing this sandbox's tsc-precheck wall by
+recognizing ts-jest runs with diagnostics disabled and isolatedModules
+-- all 13 pass against the real nodemailer 9.0.5 runtime. Ran the
+complete existing notifications test suite: 34/34 individual tests
+pass across every file that does not transitively import
+PrismaService; the other 10 suites fail only to load, due to the same
+sandbox-wide Prisma-client generation wall (binaries.prisma.sh, 403)
+documented in every backend task this session -- confirmed by
+checking that only Prisma-importing files are affected, none of which
+this task touched. Dependency audit (pnpm audit --prod): zero known
+vulnerabilities after the nodemailer version resolution above.
+Production build (nest build): blocked by the identical
+@medsphere/database/@medsphere/logger cascade (160 errors, all
+pre-existing) -- confirmed none of the new/modified files appear
+among them. git diff --check: clean. Migration/drift: not applicable,
+no schema change.
+
+Files changed:
+apps/auth-service/package.json
+apps/auth-service/src/notifications/notification.module.ts
+apps/auth-service/src/notifications/notification-provider-registry.factory.ts (new)
+apps/auth-service/src/notifications/notification-provider-registry.factory.spec.ts (new)
+apps/auth-service/src/notifications/smtp-notification-provider.adapter.ts (new)
+apps/auth-service/src/notifications/smtp-notification-provider.adapter.spec.ts (new)
+apps/auth-service/src/notifications/logging-notification-delivery.observer.ts (new)
+packages/config/src/index.ts
+pnpm-lock.yaml
+
+Task 4 was not started.
+---
+ apps/auth-service/package.json                |   2 +
+ .../logging-notification-delivery.observer.ts |  31 ++++
+ ...fication-provider-registry.factory.spec.ts |  78 ++++++++++
+ .../notification-provider-registry.factory.ts |  48 ++++++
+ .../src/notifications/notification.module.ts  |  16 +-
+ ...smtp-notification-provider.adapter.spec.ts | 141 ++++++++++++++++++
+ .../smtp-notification-provider.adapter.ts     | 130 ++++++++++++++++
+ packages/config/src/index.ts                  |   9 +-
+ pnpm-lock.yaml                                |  19 +++
+ 9 files changed, 463 insertions(+), 11 deletions(-)
+ create mode 100644 apps/auth-service/src/notifications/logging-notification-delivery.observer.ts
+ create mode 100644 apps/auth-service/src/notifications/notification-provider-registry.factory.spec.ts
+ create mode 100644 apps/auth-service/src/notifications/notification-provider-registry.factory.ts
+ create mode 100644 apps/auth-service/src/notifications/smtp-notification-provider.adapter.spec.ts
+ create mode 100644 apps/auth-service/src/notifications/smtp-notification-provider.adapter.ts
+
+diff --git a/apps/auth-service/package.json b/apps/auth-service/package.json
+index cec4278..b5d1206 100644
+--- a/apps/auth-service/package.json
++++ b/apps/auth-service/package.json
+@@ -30,6 +30,7 @@
+     "class-transformer": "^0.5.1",
+     "class-validator": "^0.14.1",
+     "ioredis": "^5.3.2",
++    "nodemailer": "^9.0.5",
+     "passport": "^0.7.0",
+     "passport-jwt": "^4.0.1"
+   },
+@@ -38,6 +39,7 @@
+     "@nestjs/testing": "^11.1.28",
+     "@types/jest": "^30.0.0",
+     "@types/passport-jwt": "^4.0.1",
++    "@types/nodemailer": "^8.0.1",
+     "jest": "^30.4.2",
+     "ts-jest": "^29.4.11",
+     "typescript": "^5.3.3"
+diff --git a/apps/auth-service/src/notifications/logging-notification-delivery.observer.ts b/apps/auth-service/src/notifications/logging-notification-delivery.observer.ts
+new file mode 100644
