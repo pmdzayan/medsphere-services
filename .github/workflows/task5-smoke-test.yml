@@ -94,7 +94,7 @@ jobs:
           grep -q '^AUTH_JWT_PRIVATE_KEY_BASE64=' /tmp/dev-keys.env
           grep -q '^AUTH_JWT_PUBLIC_KEY_BASE64=' /tmp/dev-keys.env
           grep -q '^AUTH_REFRESH_TOKEN_PEPPER=' /tmp/dev-keys.env
-          cat /tmp/dev-keys.env >> "$GITHUB_ENV"
+          grep '^AUTH_' /tmp/dev-keys.env >> "$GITHUB_ENV"
 
       - name: Verify clean database migration and drift
         run: pnpm db:verify
