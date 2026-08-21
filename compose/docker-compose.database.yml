@@ -1,5 +1,19 @@
 name: medsphere-database
 
+# Both services join the same external network the application-tier compose
+# file (docker-compose.services.yml) already expects to exist, so
+# auth-service can resolve `postgres`/`redis` by hostname whether it runs
+# via `pnpm --filter @medsphere/auth-service dev` on the host or as its own
+# container. Create the network once with:
+#   docker network create medsphere-infra-network
+# (idempotent -- scripts/dev-network-setup.sh does this safely, ignoring an
+# "already exists" error.)
+
+networks:
+  medsphere-infra:
+    external: true
+    name: medsphere-infra-network
+
 services:
   postgres:
     image: postgres:16-alpine
@@ -13,8 +27,32 @@ services:
       - '${POSTGRES_PORT:-5432}:5432'
     volumes:
       - medsphere-postgres-data:/var/lib/postgresql/data
+    networks:
+      - medsphere-infra
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB']
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 5s
+
+  # Required by auth-service (REDIS_CLUSTER_URL is a fail-closed required
+  # variable -- see apps/auth-service/src/security/redis-throttler.storage.ts
+  # and compose/docker-compose.services.yml) but was previously never
+  # started by any compose file in this repository. This was the actual
+  # root cause of "Redis connection refused" on a clean first-time
+  # localhost bootstrap.
+  redis:
+    image: redis:7-alpine
+    container_name: medsphere-redis
+    restart: unless-stopped
+    command: ['redis-server', '--requirepass', '${REDIS_PASSWORD:?REDIS_PASSWORD is required}']
+    ports:
+      - '${REDIS_PORT:-6379}:6379'
+    networks:
+      - medsphere-infra
+    healthcheck:
+      test: ['CMD-SHELL', 'redis-cli -a "$$REDIS_PASSWORD" ping | grep -q PONG']
       interval: 5s
       timeout: 5s
       retries: 12
