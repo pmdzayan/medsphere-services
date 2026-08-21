@@ -150,6 +150,7 @@ infra('Batch 2 Task 1 cross-tenant and unauthorized transfer rejection', () => {
   async function seedTenantABatch() {
     const productId = randomUUID();
     const inventoryId = randomUUID();
+    const destinationInventoryId = randomUUID();
     const batchId = randomUUID();
     await prisma.client.product.create({
       data: {
@@ -162,18 +163,31 @@ infra('Batch 2 Task 1 cross-tenant and unauthorized transfer rejection', () => {
         strength: '10 mg',
       },
     });
-    await prisma.client.inventory.create({
-      data: {
-        id: inventoryId,
-        tenantId: tenantAId,
-        providerId: sourceProviderId,
-        productId,
-        sellingPrice: '120.00',
-        mrp: '135.00',
-        discountPercentage: '0.00',
-        taxPercentage: '0.00',
-        minimumStockLevel: 1,
-      },
+    await prisma.client.inventory.createMany({
+      data: [
+        {
+          id: inventoryId,
+          tenantId: tenantAId,
+          providerId: sourceProviderId,
+          productId,
+          sellingPrice: '120.00',
+          mrp: '135.00',
+          discountPercentage: '0.00',
+          taxPercentage: '0.00',
+          minimumStockLevel: 1,
+        },
+        {
+          id: destinationInventoryId,
+          tenantId: tenantAId,
+          providerId: destinationProviderId,
+          productId,
+          sellingPrice: '120.00',
+          mrp: '135.00',
+          discountPercentage: '0.00',
+          taxPercentage: '0.00',
+          minimumStockLevel: 1,
+        },
+      ],
     });
     await prisma.client.batch.create({
       data: {
