@@ -1,0 +1,145 @@
++      fromAddress: 'ops@medsphere.test',
++      timeoutMs: 5000,
++    },
++    transport,
++  );
++}
++
++describe('SmtpNotificationProviderAdapter', () => {
++  it('delivers successfully and returns an accepted acknowledgement with a provider reference', async () => {
++    const adapter = adapterWithJsonTransport();
++    const result = await adapter.deliver(baseInput);
++    expect(result.acknowledgement).toBe('ACCEPTED');
++    expect(typeof result.providerReference).toBe('string');
++    expect(result.providerReference!.length).toBeGreaterThan(0);
++  });
++
++  it('rejects a non-EMAIL channel input before ever touching the transport', async () => {
++    const adapter = adapterWithJsonTransport();
++    await expect(adapter.deliver({ ...baseInput, channel: 'SMS' as never })).rejects.toMatchObject({
++      code: 'PROVIDER_CHANNEL_UNSUPPORTED',
++      classification: 'TERMINAL',
++    });
++  });
++
++  it('classifies a connection failure as TRANSIENT', async () => {
++    const adapter = adapterThatThrows(
++      Object.assign(new Error('connect ECONNREFUSED 127.0.0.1:25'), { code: 'ECONNREFUSED' }),
++    );
++    await expect(adapter.deliver(baseInput)).rejects.toMatchObject({
++      code: 'PROVIDER_DELIVERY_TRANSIENT',
++      classification: 'TRANSIENT',
++    });
++  });
++
++  it('classifies an authentication failure as TERMINAL', async () => {
++    const adapter = adapterThatThrows(
++      Object.assign(new Error('Invalid login'), { code: 'EAUTH', responseCode: 535 }),
++    );
++    await expect(adapter.deliver(baseInput)).rejects.toMatchObject({
++      code: 'PROVIDER_REJECTED_TERMINAL',
++      classification: 'TERMINAL',
++    });
++  });
++
++  it('classifies a permanent 5xx SMTP rejection as TERMINAL', async () => {
++    const adapter = adapterThatThrows(
++      Object.assign(new Error('mailbox unavailable'), { responseCode: 550 }),
++    );
++    await expect(adapter.deliver(baseInput)).rejects.toMatchObject({
++      code: 'PROVIDER_REJECTED_TERMINAL',
++      classification: 'TERMINAL',
++    });
++  });
++
++  it('classifies a transient 4xx SMTP response as TRANSIENT', async () => {
++    const adapter = adapterThatThrows(
++      Object.assign(new Error('too many connections'), { responseCode: 421 }),
++    );
++    await expect(adapter.deliver(baseInput)).rejects.toMatchObject({
++      code: 'PROVIDER_DELIVERY_TRANSIENT',
++      classification: 'TRANSIENT',
++    });
++  });
++
++  it('never exposes the raw vendor error message, credential, or destination in the thrown failure', async () => {
++    const secretUrl = 'smtp://user:super-secret-password@vendor.example:465';
++    const transport = {
++      sendMail: jest
++        .fn()
++        .mockRejectedValue(
++          Object.assign(
++            new Error(`SMTP conversation failed for ${secretUrl} to patient@example.test`),
++            { code: 'ECONNRESET' },
++          ),
++        ),
++    } as unknown as Transporter;
++    const adapter = new SmtpNotificationProviderAdapter(
++      { connectionUrl: secretUrl, fromAddress: 'ops@medsphere.test', timeoutMs: 5000 },
++      transport,
++    );
++
++    let thrown: unknown;
++    try {
++      await adapter.deliver(baseInput);
++    } catch (error) {
++      thrown = error;
++    }
++    expect(thrown).toBeInstanceOf(NotificationProviderContractFailure);
++    const serialized = JSON.stringify({
++      code: (thrown as NotificationProviderContractFailure).code,
++      providerKey: (thrown as NotificationProviderContractFailure).providerKey,
++      classification: (thrown as NotificationProviderContractFailure).classification,
++    });
++    expect(serialized).not.toContain('super-secret-password');
++    expect(serialized).not.toContain('vendor.example');
++    expect(serialized).not.toContain('patient@example.test');
++  });
++});
+diff --git a/apps/auth-service/src/notifications/smtp-notification-provider.adapter.ts b/apps/auth-service/src/notifications/smtp-notification-provider.adapter.ts
+new file mode 100644
+index 0000000..49ee1f4
+--- /dev/null
++++ b/apps/auth-service/src/notifications/smtp-notification-provider.adapter.ts
+@@ -0,0 +1,130 @@
++import nodemailer, { type Transporter } from 'nodemailer';
++import type {
++  ActivatedNotificationProviderAdapter,
++  NotificationProviderResult,
++} from './notification-provider-activation.contracts';
++import { NotificationProviderContractFailure } from './notification-provider-activation.contracts';
++import type { NotificationProviderDeliveryInput } from './notification.contracts';
++
++export const SMTP_PROVIDER_KEY = 'smtp';
++
++export interface SmtpNotificationProviderConfig {
++  /** Full SMTP connection URL, e.g. smtps://user:pass@host:465. The secret
++   *  value itself -- callers must obtain this only via a runtime secret
++   *  reference, never a literal, and must never log or persist it. */
++  readonly connectionUrl: string;
++  readonly fromAddress: string;
++  readonly timeoutMs: number;
++}
++
++/**
++ * Smallest adapter that satisfies the accepted NotificationProviderAdapter
++ * contract for the EMAIL channel: a single deliver() method, no
++ * vendor-specific fields leaking into the domain layer, and normalized
++ * TRANSIENT/TERMINAL failure classification. SMTP is protocol-based, not a
++ * proprietary vendor SDK, so this adapter works against any
++ * SMTP-compatible provider (a corporate relay, or any vendor's SMTP
++ * endpoint) without contaminating the domain with vendor-specific types.
++ *
++ * Never logs or persists: the connection URL/credential, the destination
++ * address, the composed subject/body, or the raw provider response/error.
++ * Only a normalized failure code and an optional provider reference are
++ * ever surfaced to the caller.
++ */
++export class SmtpNotificationProviderAdapter implements ActivatedNotificationProviderAdapter {
++  readonly providerKey = SMTP_PROVIDER_KEY;
++  readonly channel = 'EMAIL' as const;
++
++  private transport: Transporter | undefined;
++
++  constructor(
++    private readonly config: SmtpNotificationProviderConfig,
