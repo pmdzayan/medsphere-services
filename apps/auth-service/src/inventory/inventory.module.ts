@@ -16,10 +16,12 @@ import { ReservationRepository } from './reservation.repository';
 import { ReservationService } from './reservation.service';
 import { ReservationCreationService } from './reservation-creation.service';
 import { InventoryEventWriter } from './inventory-event-writer';
+import { PublicMedicineSearchController } from './public-medicine-search.controller';
+import { PublicMedicineSearchService } from './public-medicine-search.service';
 
 @Module({
   imports: [PrismaModule, AuthorizationModule, AuditPersistenceModule],
-  controllers: [InventoryController],
+  controllers: [InventoryController, PublicMedicineSearchController],
   providers: [
     InventoryRepository,
     InventoryEventWriter,
@@ -34,6 +36,7 @@ import { InventoryEventWriter } from './inventory-event-writer';
     ReservationExpiryService,
     BatchExpiryService,
     InventoryQuarantineService,
+    PublicMedicineSearchService,
   ],
   exports: [InventoryService],
 })
