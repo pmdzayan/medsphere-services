@@ -267,6 +267,8 @@ function bootstrapMembershipActivation({ tenantId, adminEmail, staffEmail, roleI
      FROM "User" u WHERE tm."userId" = u.id AND u.email = '${staffEmail}' AND tm."tenantId" = '${tenantId}'
      RETURNING tm.id;`,
   );
+  sql(`UPDATE "User" SET status = 'ACTIVE', "updatedAt" = now()
+       WHERE email IN ('${adminEmail}', '${staffEmail}');`);
   sql(`INSERT INTO "MembershipRole" (id, "tenantId", "membershipId", "roleId")
        VALUES (gen_random_uuid(), '${tenantId}', '${adminMembershipId}', '${roleId}');`);
 }
@@ -313,7 +315,7 @@ async function main() {
   const staffRegister = await register(staffEmail);
   record(
     'registration (accepted API)',
-    adminRegister.status === 200 && staffRegister.status === 200 ? 'WORKING' : 'BROKEN',
+    adminRegister.status === 202 && staffRegister.status === 202 ? 'WORKING' : 'BROKEN',
     `admin=${adminRegister.status} staff=${staffRegister.status}`,
   );
 
