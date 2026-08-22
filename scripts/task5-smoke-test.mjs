@@ -132,7 +132,20 @@ const PSQL_URL = (() => {
 })();
 
 function sql(query) {
-  return execFileSync('psql', [PSQL_URL, '-t', '-A', '-c', query], { encoding: 'utf8' }).trim();
+  // -q ("run quietly -- no messages, only query output") suppresses
+  // psql's command-completion tags (e.g. "UPDATE 1", "INSERT 0 1") that
+  // otherwise print on their own line after any data-modifying
+  // statement, even in -t -A mode -- confirmed directly: without -q, an
+  // `UPDATE ... RETURNING id` returns "<uuid>\nUPDATE 1", corrupting any
+  // caller that expects the returned value alone (bootstrapMembershipActivation's
+  // adminMembershipId, in particular, would otherwise embed literal
+  // "UPDATE 1" text into a later INSERT). -q does not suppress genuine
+  // errors or actual query result rows -- confirmed directly with a
+  // real division-by-zero query, which still surfaced with a non-zero
+  // exit and psql's ERROR text on stderr.
+  return execFileSync('psql', [PSQL_URL, '-t', '-A', '-q', '-c', query], {
+    encoding: 'utf8',
+  }).trim();
 }
 
 async function waitForHealth(name, url, timeoutMs = 60_000) {
