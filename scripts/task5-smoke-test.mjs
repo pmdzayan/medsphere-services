@@ -200,8 +200,8 @@ function bootstrapUncreatableFoundationState({
   roleId,
   productId,
 }) {
-  sql(`INSERT INTO "Tenant" (id, name, slug, "isActive", "selfRegistrationEnabled")
-       VALUES ('${tenantId}', 'Task5 Smoke Tenant', '${tenantSlug}', true, true);`);
+  sql(`INSERT INTO "Tenant" (id, name, slug, "isActive", "selfRegistrationEnabled", "createdAt", "updatedAt")
+       VALUES ('${tenantId}', 'Task5 Smoke Tenant', '${tenantSlug}', true, true, now(), now());`);
 
   sql(`INSERT INTO "Role" (id, "tenantId", name, description, type, version, "createdAt", "updatedAt")
        VALUES ('${roleId}', '${tenantId}', 'TENANT_ADMINISTRATOR', 'Built-in tenant authorization administrator', 'SYSTEM', 1, now(), now());`);
@@ -228,12 +228,12 @@ function bootstrapUncreatableFoundationState({
     [providerAId, 'Task5 Smoke Pharmacy A'],
     [providerBId, 'Task5 Smoke Pharmacy B'],
   ]) {
-    sql(`INSERT INTO "Provider" (id, "tenantId", "providerType", "businessName", "ownerName", email, phone, address, city, state, country, "postalCode", latitude, longitude, "isVerified", "isActive")
-         VALUES ('${id}', '${tenantId}', 'PHARMACY', '${name}', 'Smoke Owner', '${id}@smoke.test', '0000000000', 'Smoke Address', 'Chennai', 'Tamil Nadu', 'India', '600001', 13.0827, 80.2707, true, true);`);
+    sql(`INSERT INTO "Provider" (id, "tenantId", "providerType", "businessName", "ownerName", email, phone, address, city, state, country, "postalCode", latitude, longitude, "isVerified", "isActive", "createdAt", "updatedAt")
+         VALUES ('${id}', '${tenantId}', 'PHARMACY', '${name}', 'Smoke Owner', '${id}@smoke.test', '0000000000', 'Smoke Address', 'Chennai', 'Tamil Nadu', 'India', '600001', 13.0827, 80.2707, true, true, now(), now());`);
   }
 
-  sql(`INSERT INTO "Product" (id, name, brand, category, manufacturer, "dosageForm", strength, "requiresPrescription", "isActive")
-       VALUES ('${productId}', 'Task5 Smoke Paracetamol', 'Smoke Brand', 'MEDICINE', 'Smoke Manufacturer', 'TABLET', '500 mg', false, true);`);
+  sql(`INSERT INTO "Product" (id, name, brand, category, manufacturer, "dosageForm", strength, "requiresPrescription", "isActive", "createdAt", "updatedAt")
+       VALUES ('${productId}', 'Task5 Smoke Paracetamol', 'Smoke Brand', 'MEDICINE', 'Smoke Manufacturer', 'TABLET', '500 mg', false, true, now(), now());`);
 }
 
 // Activates the two self-registered memberships and grants the first
