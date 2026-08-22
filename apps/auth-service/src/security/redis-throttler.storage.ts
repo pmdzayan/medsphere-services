@@ -78,7 +78,9 @@ export class RedisThrottlerStorage implements ThrottlerStorage, OnModuleInit, On
   }
 
   async onModuleInit(): Promise<void> {
-    await this.redis.connect();
+    if (this.redis.status === 'wait') {
+      await this.redis.connect();
+    }
   }
 
   async onModuleDestroy(): Promise<void> {
