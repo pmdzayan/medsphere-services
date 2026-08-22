@@ -1,0 +1,51 @@
+name: Task 5 hardening publisher
+
+on:
+  push:
+    branches:
+      - cto/task5-hardening-publisher-20260822
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout helper branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Reconstruct and verify reviewed patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat .task5-patch/part-*.b64 | tr -d '\n' | base64 -d > /tmp/task5-hardening.patch
+          actual="$(sha256sum /tmp/task5-hardening.patch | awk '{print $1}')"
+          expected="33496d62d58d941c241915e00441d4cecda7038a5db274386e30ff2e2db272f7"
+          echo "patch sha256: ${actual}"
+          test "${actual}" = "${expected}"
+
+      - name: Verify target exact head
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin cto/batch2-task5-deterministic-runtime
+          actual="$(git rev-parse origin/cto/batch2-task5-deterministic-runtime)"
+          expected="65b5d38df8c37977d53883c5e8e60e2f22412c9b"
+          echo "target head: ${actual}"
+          test "${actual}" = "${expected}"
+
+      - name: Apply reviewed patch and fast-forward target branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "MedSphere Task 5 Publisher"
+          git config user.email "task5-publisher@users.noreply.github.com"
+          git checkout -B task5-publish origin/cto/batch2-task5-deterministic-runtime
+          git am /tmp/task5-hardening.patch
+          node --check scripts/task5-smoke-test.mjs
+          git diff --check HEAD^ HEAD
+          echo "new head: $(git rev-parse HEAD)"
+          git push origin HEAD:cto/batch2-task5-deterministic-runtime
