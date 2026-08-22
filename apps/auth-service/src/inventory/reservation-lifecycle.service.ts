@@ -6,13 +6,13 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import {
-  AuditWriter,
   Prisma,
   SerializableRetryError,
   hasPrismaCode,
   withSerializableRetry,
 } from '@medsphere/database';
 import type { AuditMetadata } from '@medsphere/database';
+import { AuditWriter } from '../audit/audit-writer.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { assertTrustedProviderAccess } from './inventory-access';
 import { InventoryEventWriter } from './inventory-event-writer';
