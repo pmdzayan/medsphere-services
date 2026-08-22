@@ -412,7 +412,6 @@ interface AllocationRecord {
   readonly id: string;
   readonly inventoryId: string;
   readonly batchId: string;
-  readonly providerId: string;
   readonly productId: string;
   readonly quantity: number;
   readonly batch: {
