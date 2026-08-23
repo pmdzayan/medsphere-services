@@ -1,0 +1,33 @@
+diff --git a/scripts/task5-smoke-test.mjs b/scripts/task5-smoke-test.mjs
+index 02a7602..5e26653 100644
+--- a/scripts/task5-smoke-test.mjs
++++ b/scripts/task5-smoke-test.mjs
+@@ -656,9 +656,25 @@ async function main() {
+     { phase: 'inventory' },
+   );
+ 
+-  const auditRead = await fetch(`${FRONTEND}/api/audit/events?resourceId=${batchId}&limit=5`, {
+-    headers: { cookie: adminLogin.cookie },
+-  });
++  // AuditEventQueryDto's real backend service enforces a genuine,
++  // correct business rule (audit.service.ts's listTenantEvents,
++  // confirmed directly): resourceType and resourceId must be supplied
++  // together, or not at all -- supplying resourceId alone throws
++  // BadRequestException('Resource type and identifier must be supplied
++  // together'). Reproduced this exact rejection directly against the
++  // real DTO decorators via class-validator/class-transformer before
++  // this fix: resourceId alone passes DTO-level validation with zero
++  // errors, confirming the 400 originates from this service-level
++  // check, not from any DTO defect -- the backend contract itself is
++  // correct and unchanged. The smoke query below was simply missing
++  // resourceType, which this check already independently asserts on
++  // the returned event (auditEvent.resourceType === 'Batch').
++  const auditRead = await fetch(
++    `${FRONTEND}/api/audit/events?resourceType=Batch&resourceId=${batchId}&limit=5`,
++    {
++      headers: { cookie: adminLogin.cookie },
++    },
++  );
+   const auditBody = await json(auditRead);
+   const auditEvent = auditBody?.data?.find((e) => e.eventType === 'inventory.batch.quarantined');
+   const auditMatches =
