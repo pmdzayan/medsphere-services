@@ -57,3 +57,5 @@ jobs:
           git config user.email 'actions@users.noreply.github.com'
           git commit -m 'feat(cert): add genuine Dashboard browser runtime certification'
           git push origin HEAD:cto/runtime-cert-dashboard
+
+# retry after all four verified compressed chunks were staged
