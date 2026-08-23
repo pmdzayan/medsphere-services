@@ -6,12 +6,16 @@ on:
       - cto/runtime-cert-dashboard
     paths:
       - .github/workflows/dashboard-publish.yml
+  pull_request:
+    branches:
+      - feature/database-architecture
 
 permissions:
   contents: write
 
 jobs:
   publish:
+    if: github.event_name == 'push' || github.head_ref == 'cto/runtime-cert-dashboard'
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout certification branch
