@@ -108,6 +108,29 @@ jobs:
       - name: Verify database migration and drift
         run: pnpm db:verify
 
+      # Root cause of the prior failure, confirmed by direct comparison
+      # against the already-green quality-gates.yml: that workflow runs
+      # `pnpm test`, the root-level script that invokes `turbo run test`
+      # -- turbo.json's own "test" task declares `"dependsOn": ["build"]`,
+      # and "build" itself declares `"dependsOn": ["^build"]`, so Turbo
+      # transitively builds every workspace dependency
+      # (@medsphere/common, @medsphere/validation, @medsphere/database,
+      # @medsphere/logger, @medsphere/i18n, etc.) before auth-service's
+      # own test task ever runs. This workflow instead invoked
+      # `pnpm --filter @medsphere/auth-service test` directly, which runs
+      # exactly that one package's own "test" script
+      # (`tsc -p tsconfig.spec.json --noEmit && jest`) via pnpm's native
+      # filter mechanism -- entirely bypassing Turbo's task graph and
+      # dependency ordering, so none of those workspace packages were
+      # ever built, leaving their dist/ (and the type declarations
+      # tsconfig.spec.json's module resolution needs) absent. This
+      # reproduces the same scoped Turbo-orchestrated build already used
+      # elsewhere in this repository for exactly this situation, rather
+      # than the heavier root-level `pnpm build` (which would also build
+      # the frontend and every unrelated prototype app).
+      - name: Build workspace dependencies for auth-service
+        run: pnpm exec turbo run build --filter=@medsphere/auth-service
+
       - name: Certify cross-tenant reservation rejection
         run: |
           pnpm --filter @medsphere/auth-service test -- \
