@@ -26,15 +26,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cat .dashboard-publish/chunk-*.b64 | tr -d '\n' | base64 --decode > /tmp/dashboard-browser-cert.patch
+          cat .dashboard-publish-exact/chunk-*.b64 | tr -d '\n' | base64 --decode > /tmp/dashboard-browser-cert.patch
           echo 'b60205d694db5ed42591bc161ecc6f930933effa9888af15d73f5ed8ef889798  /tmp/dashboard-browser-cert.patch' | sha256sum --check --strict
 
-          # Restore the exact reviewed base version of this workflow before applying the patch.
           git show a0f852ae97bc47fa5d1d0a05dedaba58c724f4a5:.github/workflows/task5-smoke-test.yml > .github/workflows/task5-smoke-test.yml
-
           git apply --check /tmp/dashboard-browser-cert.patch
           git apply /tmp/dashboard-browser-cert.patch
-          rm -rf .dashboard-publish
+
+          rm -rf .dashboard-publish .dashboard-publish-exact
           rm -f .github/workflows/dashboard-publish.yml
 
           git add -A
