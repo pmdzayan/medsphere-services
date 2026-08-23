@@ -553,14 +553,28 @@ async function main() {
         mrp: '25.00',
         discountPercentage: '0.00',
         taxPercentage: '0.00',
+        // ConfigureInventoryDto (inventory-command.dto.ts) requires both
+        // of these -- confirmed directly against the DTO's own
+        // decorators (@IsInt/@Min(0) and @IsBoolean, neither
+        // @IsOptional()). Omitting them was the proven root cause of
+        // the real 400 this harness previously produced; the backend
+        // route and DTO themselves are correct and unchanged.
+        minimumStockLevel: 0,
+        isVisible: true,
         idempotencyKey: `task5-smoke-listing-${randomUUID()}`,
       }),
     },
   );
+  const configureInventoryBody = await json(configureInventory);
+  const configureInventoryOk =
+    typeof configureInventoryBody?.inventoryId === 'string' &&
+    configureInventoryBody?.version === 1 &&
+    configureInventoryBody?.replayed === false;
   record(
-    'inventory listing creation (accepted configureInventory API)',
-    configureInventory.status === 200 ? 'WORKING' : 'BROKEN',
-    `status ${configureInventory.status}`,
+    'inventory listing creation (accepted configureInventory API, real response semantics)',
+    configureInventory.status === 200 && configureInventoryOk ? 'WORKING' : 'BROKEN',
+    `status ${configureInventory.status}, semantics ok: ${Boolean(configureInventoryOk)}`,
+    { phase: 'inventory' },
   );
 
   const expiryDate = new Date(Date.now() + 30 * 86_400_000).toISOString();
@@ -593,6 +607,7 @@ async function main() {
       ? 'WORKING'
       : 'BROKEN',
     `status ${receiveBatch1.status}/${receiveBatch2.status}`,
+    { phase: 'inventory' },
   );
   if (!batchId || !batch2Id) return;
 
@@ -610,6 +625,7 @@ async function main() {
     'inventory read (real product/batch/quantities present)',
     stockRead.status === 200 && stockMatches ? 'WORKING' : 'BROKEN',
     `status ${stockRead.status}, matched seeded batch: ${Boolean(stockMatches)}`,
+    { phase: 'inventory' },
   );
 
   const quarantineRequestId = `task5-smoke-quarantine-${randomUUID()}`;
@@ -637,11 +653,28 @@ async function main() {
     'inventory mutation (quarantine actually mutated batch state)',
     quarantine.status === 200 && quarantineStateOk ? 'WORKING' : 'BROKEN',
     `status ${quarantine.status}, reported status: ${quarantineBody?.status}`,
+    { phase: 'inventory' },
   );
 
-  const auditRead = await fetch(`${FRONTEND}/api/audit/events?resourceId=${batchId}&limit=5`, {
-    headers: { cookie: adminLogin.cookie },
-  });
+  // AuditEventQueryDto's real backend service enforces a genuine,
+  // correct business rule (audit.service.ts's listTenantEvents,
+  // confirmed directly): resourceType and resourceId must be supplied
+  // together, or not at all -- supplying resourceId alone throws
+  // BadRequestException('Resource type and identifier must be supplied
+  // together'). Reproduced this exact rejection directly against the
+  // real DTO decorators via class-validator/class-transformer before
+  // this fix: resourceId alone passes DTO-level validation with zero
+  // errors, confirming the 400 originates from this service-level
+  // check, not from any DTO defect -- the backend contract itself is
+  // correct and unchanged. The smoke query below was simply missing
+  // resourceType, which this check already independently asserts on
+  // the returned event (auditEvent.resourceType === 'Batch').
+  const auditRead = await fetch(
+    `${FRONTEND}/api/audit/events?resourceType=Batch&resourceId=${batchId}&limit=5`,
+    {
+      headers: { cookie: adminLogin.cookie },
+    },
+  );
   const auditBody = await json(auditRead);
   const auditEvent = auditBody?.data?.find((e) => e.eventType === 'inventory.batch.quarantined');
   const auditMatches =
@@ -655,6 +688,7 @@ async function main() {
     'audit evidence (tenant/actor/resource/action/correlation all match)',
     auditRead.status === 200 && auditMatches ? 'WORKING' : 'BROKEN',
     `status ${auditRead.status}, event found: ${Boolean(auditEvent)}, correlation matched: ${auditEvent?.requestId === quarantineRequestId}`,
+    { phase: 'inventory' },
   );
 
   assertProcessesAlive('reservation + transfer + public search');
@@ -841,6 +875,30 @@ try {
     dashboardFailing.length === 0
       ? 'DASHBOARD CERTIFICATION: PASS'
       : `DASHBOARD CERTIFICATION: FAIL (${dashboardFailing.length} check(s): ${dashboardFailing.map((f) => f.name).join(', ')})`,
+  );
+
+  // Inventory certification verdict, isolated the same way as Dashboard
+  // (phase: 'inventory'), covering exactly the five inventory-
+  // authoritative checks: listing creation, batch receipt, stock read,
+  // quarantine mutation, and matching audit evidence. Deliberately does
+  // not include Reservations, Transfers, Notifications, or Public
+  // Search -- those remain visible in the full matrix above (and still
+  // affect the overall exitCode, unchanged) but must not contaminate
+  // this isolated verdict. If any prerequisite (service startup,
+  // authentication, RBAC, foundation seed) failed earlier, main()
+  // already returned before reaching any inventory-tagged check, so
+  // inventoryChecks will simply be empty and this verdict correctly
+  // reports FAIL rather than a false PASS.
+  const inventoryChecks = results.filter((r) => r.phase === 'inventory');
+  const inventoryFailing = inventoryChecks.filter(fails);
+  console.log('\n== INVENTORY CERTIFICATION VERDICT (isolated from later capabilities) ==');
+  for (const r of inventoryChecks) {
+    console.log(`${r.status.padEnd(14)} ${r.name}`);
+  }
+  console.log(
+    inventoryChecks.length > 0 && inventoryFailing.length === 0
+      ? 'INVENTORY CERTIFICATION: PASS'
+      : `INVENTORY CERTIFICATION: FAIL (${inventoryChecks.length === 0 ? 'no inventory checks were reached -- a prerequisite failed earlier' : `${inventoryFailing.length} check(s): ${inventoryFailing.map((f) => f.name).join(', ')}`})`,
   );
 
   process.exitCode = exitCode;
