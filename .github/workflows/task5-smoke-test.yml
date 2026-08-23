@@ -1,32 +1,35 @@
-name: MedSphere RBAC Runtime Certification
+name: MedSphere Cross-Tenant Isolation Runtime Certification
 
-# Temporary validation infrastructure for the RBAC vertical slice only.
-# Login/authentication remains a prerequisite, while later dashboard,
-# inventory, reservation, and notification failures are non-authoritative.
+# Temporary validation infrastructure for tenant-isolation proof only.
+# Login and RBAC have already been certified independently. This workflow
+# exercises existing PostgreSQL-backed cross-tenant rejection suites and
+# intentionally excludes dashboard, inventory UI, reservation lifecycle,
+# and notification verdicts.
 on:
   workflow_dispatch: {}
   push:
     branches:
-      - cto/runtime-cert-rbac-tenant
+      - cto/runtime-cert-cross-tenant
   pull_request:
     branches:
       - feature/database-architecture
 
 concurrency:
-  group: rbac-cert-${{ github.event.pull_request.number || github.ref }}
+  group: cross-tenant-cert-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 permissions:
   contents: read
 
 jobs:
-  rbac:
-    name: Login prerequisite + RBAC allow/deny
+  cross-tenant:
+    name: PostgreSQL-backed cross-tenant isolation
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     env:
       DATABASE_URL: postgresql://medsphere_ci:medsphere_ci@localhost:5432/medsphere_ci?schema=public
       REDIS_CLUSTER_URL: redis://localhost:6379
+      RUN_AUTH_INFRASTRUCTURE_TESTS: 'true'
       ENABLE_UNACCEPTED_PROTOTYPE_SERVICES: 'false'
       AUTH_JWT_ISSUER: https://auth.local.medsphere.test
       AUTH_JWT_AUDIENCE: medsphere-api
@@ -37,8 +40,6 @@ jobs:
       AUTH_ARGON2_MEMORY_KIB: '19456'
       AUTH_ARGON2_TIME_COST: '2'
       AUTH_ARGON2_PARALLELISM: '1'
-      PORT: '3000'
-      AUTH_API_URL: http://localhost:3000
 
     services:
       postgres:
@@ -81,9 +82,6 @@ jobs:
           node-version: 22.12.0
           cache: pnpm
 
-      - name: Install PostgreSQL client
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client
-
       - name: Install locked dependencies
         run: pnpm install --frozen-lockfile
 
@@ -110,72 +108,17 @@ jobs:
       - name: Verify database migration and drift
         run: pnpm db:verify
 
-      - name: Build backend
-        run: pnpm exec turbo run build --filter=@medsphere/auth-service
-
-      - name: Build frontend
-        run: pnpm --filter @medsphere/web build
-
-      - name: Start backend
+      - name: Certify cross-tenant reservation rejection
         run: |
-          nohup node apps/auth-service/dist/main.js > /tmp/backend.log 2>&1 &
-          echo $! > /tmp/backend.pid
+          pnpm --filter @medsphere/auth-service test -- \
+            batch2-task2-reservation-creation-cross-tenant.integration.spec.ts \
+            --runInBand
 
-      - name: Start frontend
+      - name: Certify cross-tenant quarantine rejection
         run: |
-          nohup pnpm --filter @medsphere/web exec next start -p 3001 > /tmp/frontend.log 2>&1 &
-          echo $! > /tmp/frontend.pid
+          pnpm --filter @medsphere/auth-service test -- \
+            cross-tenant-quarantine-mutation.integration.spec.ts \
+            --runInBand
 
-      - name: Certify RBAC allow + deny
-        shell: bash
-        run: |
-          set +e
-          node scripts/task5-smoke-test.mjs 2>&1 | tee /tmp/rbac-cert.log
-          smoke_exit=${PIPESTATUS[0]}
-          set -e
-
-          required_markers=(
-            '[ok  ] service startup: WORKING'
-            '[ok  ] registration (accepted API): WORKING'
-            '[ok  ] authentication + authenticated session (real login, real cookies): WORKING'
-            '[ok  ] provider-access grant (accepted backend API): WORKING'
-            '[ok  ] RBAC allow (admin reads authorization catalogue): WORKING'
-            '[ok  ] RBAC deny (no-role staff account denied inventory read): WORKING'
-          )
-
-          for marker in "${required_markers[@]}"; do
-            if ! grep -Fq "$marker" /tmp/rbac-cert.log; then
-              echo "Missing required RBAC-certification marker: $marker"
-              exit 1
-            fi
-          done
-
-          echo 'RBAC ALLOW + DENY: WORKING'
-          echo "Full smoke script exit code: ${smoke_exit}. Later feature failures are intentionally non-authoritative for this isolated branch."
-
-      - name: Show backend log on failure
-        if: failure()
-        run: cat /tmp/backend.log || true
-
-      - name: Show frontend log on failure
-        if: failure()
-        run: cat /tmp/frontend.log || true
-
-      - name: Upload certification evidence
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: rbac-certification-evidence
-          path: |
-            /tmp/backend.log
-            /tmp/frontend.log
-            /tmp/rbac-cert.log
-          if-no-files-found: ignore
-          retention-days: 7
-
-      - name: Stop background processes
-        if: always()
-        run: |
-          [ -f /tmp/backend.pid ] && kill "$(cat /tmp/backend.pid)" 2>/dev/null || true
-          [ -f /tmp/frontend.pid ] && kill "$(cat /tmp/frontend.pid)" 2>/dev/null || true
-          exit 0
+      - name: Cross-tenant certification verdict
+        run: echo 'CROSS-TENANT ISOLATION: WORKING'
