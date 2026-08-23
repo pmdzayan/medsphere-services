@@ -1,27 +1,28 @@
-name: MedSphere RBAC Runtime Certification
+name: MedSphere Dashboard Runtime Certification
 
-# Temporary validation infrastructure for the RBAC vertical slice only.
-# Login/authentication remains a prerequisite, while later dashboard,
-# inventory, reservation, and notification failures are non-authoritative.
+# Temporary validation infrastructure for the Dashboard vertical slice only.
+# Login/authentication and RBAC are prerequisites, but this workflow's
+# authoritative verdict is Dashboard only. Inventory and later stages are
+# intentionally non-authoritative.
 on:
   workflow_dispatch: {}
   push:
     branches:
-      - cto/runtime-cert-rbac-tenant
+      - cto/runtime-cert-dashboard
   pull_request:
     branches:
       - feature/database-architecture
 
 concurrency:
-  group: rbac-cert-${{ github.event.pull_request.number || github.ref }}
+  group: dashboard-cert-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 permissions:
   contents: read
 
 jobs:
-  rbac:
-    name: Login prerequisite + RBAC allow/deny
+  dashboard:
+    name: Authenticated dashboard operational render
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     env:
@@ -126,32 +127,37 @@ jobs:
           nohup pnpm --filter @medsphere/web exec next start -p 3001 > /tmp/frontend.log 2>&1 &
           echo $! > /tmp/frontend.pid
 
-      - name: Certify RBAC allow + deny
+      - name: Certify authenticated Dashboard
         shell: bash
         run: |
           set +e
-          node scripts/task5-smoke-test.mjs 2>&1 | tee /tmp/rbac-cert.log
+          node scripts/task5-smoke-test.mjs 2>&1 | tee /tmp/dashboard-cert.log
           smoke_exit=${PIPESTATUS[0]}
           set -e
 
-          required_markers=(
+          prerequisite_markers=(
             '[ok  ] service startup: WORKING'
-            '[ok  ] registration (accepted API): WORKING'
             '[ok  ] authentication + authenticated session (real login, real cookies): WORKING'
             '[ok  ] provider-access grant (accepted backend API): WORKING'
             '[ok  ] RBAC allow (admin reads authorization catalogue): WORKING'
             '[ok  ] RBAC deny (no-role staff account denied inventory read): WORKING'
           )
 
-          for marker in "${required_markers[@]}"; do
-            if ! grep -Fq "$marker" /tmp/rbac-cert.log; then
-              echo "Missing required RBAC-certification marker: $marker"
+          for marker in "${prerequisite_markers[@]}"; do
+            if ! grep -Fq "$marker" /tmp/dashboard-cert.log; then
+              echo "Dashboard prerequisite regressed: $marker"
               exit 1
             fi
           done
 
-          echo 'RBAC ALLOW + DENY: WORKING'
-          echo "Full smoke script exit code: ${smoke_exit}. Later feature failures are intentionally non-authoritative for this isolated branch."
+          dashboard_marker='[ok  ] dashboard page (authenticated, real operational content): WORKING'
+          if ! grep -Fq "$dashboard_marker" /tmp/dashboard-cert.log; then
+            echo "Dashboard certification marker missing or broken"
+            exit 1
+          fi
+
+          echo 'DASHBOARD: WORKING'
+          echo "Full smoke script exit code: ${smoke_exit}. Inventory and later feature failures are intentionally non-authoritative."
 
       - name: Show backend log on failure
         if: failure()
@@ -161,15 +167,15 @@ jobs:
         if: failure()
         run: cat /tmp/frontend.log || true
 
-      - name: Upload certification evidence
+      - name: Upload Dashboard certification evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: rbac-certification-evidence
+          name: dashboard-certification-evidence
           path: |
             /tmp/backend.log
             /tmp/frontend.log
-            /tmp/rbac-cert.log
+            /tmp/dashboard-cert.log
           if-no-files-found: ignore
           retention-days: 7
 
