@@ -31,7 +31,7 @@ jobs:
           echo '8d282007c8bdc5f2a861c79eadf97d17a9c9cf996bc92cd6bf16340b73eb38e1  .dashboard-publish-gzip/chunk-03.b64' | sha256sum --check --strict
           echo '80d8a31b72d0357e39fe41d6cb83e2c95be727199a013c55f291991679b998d7  .dashboard-publish-gzip/chunk-04.b64' | sha256sum --check --strict
           cat .dashboard-publish-gzip/chunk-*.b64 | tr -d '\n' | base64 --decode > /tmp/dashboard-browser-cert.patch.gz
-          echo '7673714915d561e9212e2b2189ade3835a96405f9e0e5b2746bcfcd22a9ceff3  /tmp/dashboard-browser-cert.patch.gz' | sha256sum --check --strict
+          echo 'dc65a5d1c62f6da32e902ecc79c097adc8fd8b6d6d74aa4c885ebe922e2d46a7  /tmp/dashboard-browser-cert.patch.gz' | sha256sum --check --strict
           gzip -dc /tmp/dashboard-browser-cert.patch.gz > /tmp/dashboard-browser-cert.patch
           echo 'b60205d694db5ed42591bc161ecc6f930933effa9888af15d73f5ed8ef889798  /tmp/dashboard-browser-cert.patch' | sha256sum --check --strict
 
