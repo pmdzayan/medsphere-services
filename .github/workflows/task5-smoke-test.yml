@@ -121,4 +121,4 @@ jobs:
             --runInBand
 
       - name: Cross-tenant certification verdict
-        run: echo 'CROSS-TENANT ISOLATION: WORKING'
+        run: "echo 'CROSS-TENANT ISOLATION: WORKING'"
