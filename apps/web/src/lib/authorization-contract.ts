@@ -21,7 +21,7 @@ export type AuthorizationPermission =
 const authorizationPermissionKeys = new Set<string>(Object.values(AUTHORIZATION_PERMISSIONS));
 
 export interface EffectivePermissionsResponse {
-  permissionKeys: AuthorizationPermission[];
+  permissionKeys: string[];
 }
 
 export interface Role {
@@ -38,7 +38,7 @@ export interface AuthorizationCatalogue {
   roles: Role[];
   permissions: Permission[];
   total: number;
-  effectivePermissions: AuthorizationPermission[];
+  effectivePermissions: string[];
 }
 
 export interface CreateRoleRequest {
@@ -129,7 +129,7 @@ export function isAuthorizationCatalogue(value: unknown): value is Authorization
     Number.isSafeInteger(candidate.total) &&
     Number(candidate.total) >= candidate.roles.length &&
     Array.isArray(candidate.effectivePermissions) &&
-    candidate.effectivePermissions.every(isAuthorizationPermission) &&
+    candidate.effectivePermissions.every(isPlausiblePermissionKey) &&
     new Set(candidate.effectivePermissions).size === candidate.effectivePermissions.length
   );
 }
@@ -141,7 +141,7 @@ export function isEffectivePermissionsResponse(
   const candidate = value as Partial<EffectivePermissionsResponse>;
   return (
     Array.isArray(candidate.permissionKeys) &&
-    candidate.permissionKeys.every(isAuthorizationPermission) &&
+    candidate.permissionKeys.every(isPlausiblePermissionKey) &&
     new Set(candidate.permissionKeys).size === candidate.permissionKeys.length
   );
 }
@@ -176,7 +176,7 @@ export function isRole(value: unknown): value is Role {
     Number.isSafeInteger(role.version) &&
     Number(role.version) >= 1 &&
     Array.isArray(role.permissionKeys) &&
-    role.permissionKeys.every(isAuthorizationPermission) &&
+    role.permissionKeys.every(isPlausiblePermissionKey) &&
     new Set(role.permissionKeys).size === role.permissionKeys.length &&
     Number.isSafeInteger(role.assignmentCount) &&
     Number(role.assignmentCount) >= 0
@@ -283,8 +283,12 @@ function isPermission(value: unknown): value is Permission {
   return isString(permission.id) && isString(permission.name) && isString(permission.description);
 }
 
-function isAuthorizationPermission(value: unknown): value is AuthorizationPermission {
-  return typeof value === 'string' && authorizationPermissionKeys.has(value);
+function isPlausiblePermissionKey(value: unknown): value is string {
+  return (
+    typeof value === 'string' &&
+    value.length <= 120 &&
+    /^[a-z0-9]+(?:-[a-z0-9]+)*(?:\.[a-z0-9]+(?:-[a-z0-9]+)*)+$/.test(value)
+  );
 }
 
 function isString(value: unknown): value is string {

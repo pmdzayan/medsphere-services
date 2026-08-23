@@ -1,0 +1,147 @@
+name: MedSphere Cross-Tenant Isolation Runtime Certification
+
+# Temporary validation infrastructure for tenant-isolation proof only.
+# Login and RBAC have already been certified independently. This workflow
+# exercises existing PostgreSQL-backed cross-tenant rejection suites and
+# intentionally excludes dashboard, inventory UI, reservation lifecycle,
+# and notification verdicts.
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - cto/runtime-cert-cross-tenant
+  pull_request:
+    branches:
+      - feature/database-architecture
+
+concurrency:
+  group: cross-tenant-cert-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  cross-tenant:
+    name: PostgreSQL-backed cross-tenant isolation
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      DATABASE_URL: postgresql://medsphere_ci:medsphere_ci@localhost:5432/medsphere_ci?schema=public
+      REDIS_CLUSTER_URL: redis://localhost:6379
+      RUN_AUTH_INFRASTRUCTURE_TESTS: 'true'
+      ENABLE_UNACCEPTED_PROTOTYPE_SERVICES: 'false'
+      AUTH_JWT_ISSUER: https://auth.local.medsphere.test
+      AUTH_JWT_AUDIENCE: medsphere-api
+      AUTH_JWT_KEY_ID: local-development-key
+      AUTH_ACCESS_TOKEN_TTL_SECONDS: '900'
+      AUTH_REFRESH_IDLE_TTL_SECONDS: '604800'
+      AUTH_REFRESH_ABSOLUTE_TTL_SECONDS: '2592000'
+      AUTH_ARGON2_MEMORY_KIB: '19456'
+      AUTH_ARGON2_TIME_COST: '2'
+      AUTH_ARGON2_PARALLELISM: '1'
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: medsphere_ci
+          POSTGRES_PASSWORD: medsphere_ci
+          POSTGRES_DB: medsphere_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U medsphere_ci -d medsphere_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install PNPM
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+          run_install: false
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.12.0
+          cache: pnpm
+
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate synthetic JWT keys and refresh pepper
+        run: |
+          node -e '
+            const fs = require("node:fs");
+            const crypto = require("node:crypto");
+            const { generateDevKeyMaterial } = require("./scripts/generate-dev-keys.js");
+            const material = generateDevKeyMaterial();
+            const required = {
+              AUTH_JWT_PRIVATE_KEY_BASE64: material.privateKeyBase64,
+              AUTH_JWT_PUBLIC_KEY_BASE64: material.publicKeyBase64,
+              AUTH_REFRESH_TOKEN_PEPPER: material.refreshPepperBase64,
+            };
+            for (const [name, value] of Object.entries(required)) {
+              if (!value) throw new Error(`Missing generated value: ${name}`);
+              console.log(`::add-mask::${value}`);
+              const delimiter = `EOF_${crypto.randomBytes(8).toString("hex")}`;
+              fs.appendFileSync(process.env.GITHUB_ENV, `${name}<<${delimiter}\n${value}\n${delimiter}\n`, "utf8");
+            }
+          '
+
+      - name: Verify database migration and drift
+        run: pnpm db:verify
+
+      # Root cause of the prior failure, confirmed by direct comparison
+      # against the already-green quality-gates.yml: that workflow runs
+      # `pnpm test`, the root-level script that invokes `turbo run test`
+      # -- turbo.json's own "test" task declares `"dependsOn": ["build"]`,
+      # and "build" itself declares `"dependsOn": ["^build"]`, so Turbo
+      # transitively builds every workspace dependency
+      # (@medsphere/common, @medsphere/validation, @medsphere/database,
+      # @medsphere/logger, @medsphere/i18n, etc.) before auth-service's
+      # own test task ever runs. This workflow instead invoked
+      # `pnpm --filter @medsphere/auth-service test` directly, which runs
+      # exactly that one package's own "test" script
+      # (`tsc -p tsconfig.spec.json --noEmit && jest`) via pnpm's native
+      # filter mechanism -- entirely bypassing Turbo's task graph and
+      # dependency ordering, so none of those workspace packages were
+      # ever built, leaving their dist/ (and the type declarations
+      # tsconfig.spec.json's module resolution needs) absent. This
+      # reproduces the same scoped Turbo-orchestrated build already used
+      # elsewhere in this repository for exactly this situation, rather
+      # than the heavier root-level `pnpm build` (which would also build
+      # the frontend and every unrelated prototype app).
+      - name: Build workspace dependencies for auth-service
+        run: pnpm exec turbo run build --filter=@medsphere/auth-service
+
+      - name: Certify cross-tenant reservation rejection
+        run: |
+          pnpm --filter @medsphere/auth-service test -- \
+            batch2-task2-reservation-creation-cross-tenant.integration.spec.ts \
+            --runInBand
+
+      - name: Certify cross-tenant quarantine rejection
+        run: |
+          pnpm --filter @medsphere/auth-service test -- \
+            cross-tenant-quarantine-mutation.integration.spec.ts \
+            --runInBand
+
+      - name: Cross-tenant certification verdict
+        run: "echo 'CROSS-TENANT ISOLATION: WORKING'"
