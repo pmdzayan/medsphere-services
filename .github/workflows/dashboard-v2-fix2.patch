@@ -1,0 +1,317 @@
+diff --git a/apps/web/e2e/dashboard.spec.ts b/apps/web/e2e/dashboard.spec.ts
+index 5d69a4a..c7bfaf7 100644
+--- a/apps/web/e2e/dashboard.spec.ts
++++ b/apps/web/e2e/dashboard.spec.ts
+@@ -84,20 +84,37 @@ test('authenticated Dashboard completes the real provider-dependent read path in
+   // 403, 'Stock is unavailable' as the fallback for anything else)
+   // distinguishes a successful empty read from a failed one of any kind,
+   // without requiring non-empty data.
++  // Selector precision: PanelHeader and StatePanel both render their
++  // title prop as an <h2> (confirmed directly against
++  // dashboard-workspace.tsx). getByText() performs a case-insensitive,
++  // whitespace-normalized SUBSTRING match by default, so a query for
++  // 'Stock records' also matches the empty-state heading 'No stock
++  // records' -- exactly the real CI strict-mode violation this fixes
++  // ("resolved to 2 elements: heading 'Stock records', heading 'No
++  // stock records'"). getByRole('heading', { name, exact: true })
++  // matches only the element whose accessible name is exactly that
++  // string, correctly excluding the empty-state heading while still
++  // accepting a genuinely empty (but successful) read -- this does not
++  // require non-empty data, and no Dashboard product UI was changed to
++  // satisfy this test.
+   await expect(page.getByText('Loading current-page stock…')).toHaveCount(0, { timeout: 15_000 });
+   await expect(page.getByText('Your session must be verified')).toHaveCount(0);
+   await expect(page.getByText('Access is restricted')).toHaveCount(0);
+   await expect(page.getByText('Stock is unavailable')).toHaveCount(0);
+-  await expect(page.getByText('Stock records')).toBeVisible();
++  await expect(page.getByRole('heading', { name: 'Stock records', exact: true })).toBeVisible();
+ 
+-  // Reservation read path: identical reasoning.
++  // Reservation read path: identical reasoning and identical real
++  // ambiguity (PanelHeader's 'Reservation records' vs StatePanel's 'No
++  // reservation records'), fixed the same way.
+   await expect(page.getByText('Loading current-page reservations…')).toHaveCount(0, {
+     timeout: 15_000,
+   });
+   await expect(page.getByText('Your session must be verified')).toHaveCount(0);
+   await expect(page.getByText('Access is restricted')).toHaveCount(0);
+   await expect(page.getByText('Reservations are unavailable')).toHaveCount(0);
+-  await expect(page.getByText('Reservation records')).toBeVisible();
++  await expect(
++    page.getByRole('heading', { name: 'Reservation records', exact: true }),
++  ).toBeVisible();
+ 
+   // No client-side fatal error should have blocked the workspace --
+   // Next.js's own error overlay/boundary text would appear if a render
+diff --git a/apps/web/src/lib/authorization-contract.test.ts b/apps/web/src/lib/authorization-contract.test.ts
+index b6f770f..daf984f 100644
+--- a/apps/web/src/lib/authorization-contract.test.ts
++++ b/apps/web/src/lib/authorization-contract.test.ts
+@@ -6,6 +6,7 @@ import {
+   isCreateRoleRequest,
+   isEffectivePermissionsResponse,
+   isMembershipCatalogue,
++  isRole,
+   isRoleVersionRequest,
+   isUpdateRoleRequest,
+   normalizeRoleName,
+@@ -73,9 +74,54 @@ describe('authorization contract', () => {
+       }),
+     ).toBe(true);
+     expect(isAuthorizationCatalogue({ roles: [], permissions: [], total: -1 })).toBe(false);
++
++    // Real regression: the actual /authorization/catalogue response
++    // shape that produced the reported 502 -- a role and
++    // effectivePermissions list naming current inventory/provider-access
++    // permission keys the frontend's own AUTHORIZATION_PERMISSIONS
++    // constant does not enumerate, previously rejected outright as
++    // "invalid response."
++    expect(
++      isAuthorizationCatalogue({
++        roles: [
++          {
++            id: 'role-id',
++            name: 'TENANT_ADMINISTRATOR',
++            description: null,
++            type: 'SYSTEM',
++            version: 1,
++            permissionKeys: ['authorization.roles.read', 'inventory.stock.receive'],
++            assignmentCount: 1,
++          },
++        ],
++        permissions: [
++          {
++            id: 'permission-id',
++            name: 'authorization.roles.read',
++            description: 'Read roles',
++          },
++        ],
++        total: 1,
++        effectivePermissions: ['authorization.roles.read', 'authorization.provider-access.manage'],
++      }),
++    ).toBe(true);
++
++    // Unexpected object fields must still be rejected.
++    expect(
++      isAuthorizationCatalogue({
++        roles: [],
++        permissions: [],
++        total: 0,
++        effectivePermissions: [],
++        unexpectedField: true,
++      }),
++    ).toBe(false);
+   });
+ 
+-  it('accepts only unique permission keys from the reviewed authorization vocabulary', () => {
++  it('accepts unique, bounded permission-key strings without requiring membership in a fixed frontend allowlist', () => {
++    // Known key: still accepted, unchanged, and hasAuthorizationPermission
++    // still correctly handles the frontend-known permissions it makes UI
++    // decisions on.
+     const effective = { permissionKeys: ['authorization.roles.read'] } as const;
+     expect(isEffectivePermissionsResponse(effective)).toBe(true);
+     expect(
+@@ -84,12 +130,97 @@ describe('authorization contract', () => {
+         'authorization.roles.read',
+       ),
+     ).toBe(true);
+-    expect(isEffectivePermissionsResponse({ permissionKeys: ['unreviewed.permission'] })).toBe(
+-      false,
+-    );
++    expect(
++      hasAuthorizationPermission(
++        { effectivePermissions: ['inventory.stock.read'] },
++        'authorization.roles.read',
++      ),
++    ).toBe(false);
++
++    // Real regression: a valid administrator response naming current,
++    // migration-owned inventory/reservation/provider-access permissions
++    // the frontend's own AUTHORIZATION_PERMISSIONS constant does not
++    // enumerate must be accepted, not rejected as "invalid response" --
++    // this exact shape previously produced the real 502 reported from a
++    // genuine admin catalogue read.
+     expect(
+       isEffectivePermissionsResponse({
++        permissionKeys: [
++          'authorization.roles.read',
++          'inventory.stock.read',
++          'inventory.stock.receive',
++          'inventory.batch.quarantine',
++          'inventory.reservations.create',
++          'inventory.reservations.manage',
++          'authorization.provider-access.manage',
++        ],
++      }),
++    ).toBe(true);
++
++    // Malformed shapes must still be rejected: empty, no dot-separated
++    // segment, uppercase, leading/trailing dot, and over the 120-char
++    // bound matching Permission.name's real @db.VarChar(120) column.
++    for (const malformed of [
++      '',
++      'nodothere',
++      'Authorization.Roles.Read',
++      '.leading.dot',
++      'trailing.dot.',
++      `${'a'.repeat(115)}.bcdef`,
++    ]) {
++      expect(isEffectivePermissionsResponse({ permissionKeys: [malformed] })).toBe(false);
++    }
++    expect(isEffectivePermissionsResponse({ permissionKeys: [123] })).toBe(false);
++    expect(isEffectivePermissionsResponse({ permissionKeys: [null] })).toBe(false);
++
++    // Duplicate rejection is unchanged.
++    expect(
++      isEffectivePermissionsResponse({
++        permissionKeys: ['authorization.roles.read', 'authorization.roles.read'],
++      }),
++    ).toBe(false);
++
++    // Unexpected object fields must still be rejected.
++    expect(
++      isEffectivePermissionsResponse({
++        permissionKeys: ['authorization.roles.read'],
++        extra: 'field',
++      }),
++    ).toBe(false);
++  });
++
++  it('validates role permissionKeys the same way (accepts current keys beyond the fixed frontend set, rejects malformed/duplicate)', () => {
++    expect(
++      isRole({
++        id: '11111111-1111-4111-8111-111111111111',
++        name: 'TENANT_ADMINISTRATOR',
++        description: null,
++        type: 'SYSTEM',
++        version: 1,
++        permissionKeys: ['authorization.roles.read', 'inventory.stock.receive'],
++        assignmentCount: 1,
++      }),
++    ).toBe(true);
++    expect(
++      isRole({
++        id: '11111111-1111-4111-8111-111111111111',
++        name: 'TENANT_ADMINISTRATOR',
++        description: null,
++        type: 'SYSTEM',
++        version: 1,
++        permissionKeys: ['not valid'],
++        assignmentCount: 1,
++      }),
++    ).toBe(false);
++    expect(
++      isRole({
++        id: '11111111-1111-4111-8111-111111111111',
++        name: 'TENANT_ADMINISTRATOR',
++        description: null,
++        type: 'SYSTEM',
++        version: 1,
+         permissionKeys: ['authorization.roles.read', 'authorization.roles.read'],
++        assignmentCount: 1,
+       }),
+     ).toBe(false);
+   });
+diff --git a/apps/web/src/lib/authorization-contract.ts b/apps/web/src/lib/authorization-contract.ts
+index 815c9ee..ec72acf 100644
+--- a/apps/web/src/lib/authorization-contract.ts
++++ b/apps/web/src/lib/authorization-contract.ts
+@@ -20,8 +20,50 @@ export type AuthorizationPermission =
+ 
+ const authorizationPermissionKeys = new Set<string>(Object.values(AUTHORIZATION_PERMISSIONS));
+ 
++// AUTHORIZATION_PERMISSIONS above intentionally names only the specific
++// permissions this frontend makes its own UI-capability decisions on
++// (e.g. "show the roles tab if the actor has rolesRead") -- every one of
++// those decisions correctly keeps using that fixed set, and
++// isCreateRoleRequest/isUpdateRoleRequest further below (validating
++// requests this frontend itself constructs from its own rendered
++// role-creation UI) also correctly keep using it. But it must not also
++// be used to validate the *shape* of permission keys the backend
++// actually returns: the real, authoritative permission catalogue
++// (apps/auth-service/src/authorization/permission.constants.ts) already
++// has 20 entries today and grows as features ship
++// (EffectivePermissionsResponseDto.permissionKeys is genuinely
++// string[], unrestricted, confirmed directly against the backend DTO),
++// so a response validator requiring membership in this frontend's
++// smaller, static list keeps rejecting perfectly valid current
++// permissions -- confirmed directly: PERMISSIONS in that file already
++// includes 'inventory.stock.read', 'authorization.provider-access.manage',
++// and others this frontend's list has never named. The real 502 this
++// caused was exactly that: a real, current, valid administrator
++// permission list, rejected as "invalid response" purely for not
++// appearing on an already-stale frontend allowlist.
++//
++// isPlausiblePermissionKey validates the actual bounded shape every
++// backend permission key is defined with instead: lowercase
++// dot-separated segments, hyphens allowed within a segment, at most 120
++// characters (matching Permission.name's real @db.VarChar(120) column in
++// packages/database/prisma/schema.prisma). This is not a new fragile
++// list, hardcoded or otherwise -- it accepts any permission key shaped
++// like the real ones, current or future, while still rejecting anything
++// malformed.
++const PERMISSION_KEY_PATTERN = /^[a-z][a-z0-9-]*(\.[a-z][a-z0-9-]*)+$/;
++const PERMISSION_KEY_MAX_LENGTH = 120;
++
++function isPlausiblePermissionKey(value: unknown): value is string {
++  return (
++    typeof value === 'string' &&
++    value.length > 0 &&
++    value.length <= PERMISSION_KEY_MAX_LENGTH &&
++    PERMISSION_KEY_PATTERN.test(value)
++  );
++}
++
+ export interface EffectivePermissionsResponse {
+-  permissionKeys: AuthorizationPermission[];
++  permissionKeys: string[];
+ }
+ 
+ export interface Role {
+@@ -38,7 +80,7 @@ export interface AuthorizationCatalogue {
+   roles: Role[];
+   permissions: Permission[];
+   total: number;
+-  effectivePermissions: AuthorizationPermission[];
++  effectivePermissions: string[];
+ }
+ 
+ export interface CreateRoleRequest {
+@@ -129,7 +171,7 @@ export function isAuthorizationCatalogue(value: unknown): value is Authorization
+     Number.isSafeInteger(candidate.total) &&
+     Number(candidate.total) >= candidate.roles.length &&
+     Array.isArray(candidate.effectivePermissions) &&
+-    candidate.effectivePermissions.every(isAuthorizationPermission) &&
++    candidate.effectivePermissions.every(isPlausiblePermissionKey) &&
+     new Set(candidate.effectivePermissions).size === candidate.effectivePermissions.length
+   );
+ }
+@@ -141,7 +183,7 @@ export function isEffectivePermissionsResponse(
+   const candidate = value as Partial<EffectivePermissionsResponse>;
+   return (
+     Array.isArray(candidate.permissionKeys) &&
+-    candidate.permissionKeys.every(isAuthorizationPermission) &&
++    candidate.permissionKeys.every(isPlausiblePermissionKey) &&
+     new Set(candidate.permissionKeys).size === candidate.permissionKeys.length
+   );
+ }
+@@ -176,7 +218,7 @@ export function isRole(value: unknown): value is Role {
+     Number.isSafeInteger(role.version) &&
+     Number(role.version) >= 1 &&
+     Array.isArray(role.permissionKeys) &&
+-    role.permissionKeys.every(isAuthorizationPermission) &&
++    role.permissionKeys.every(isPlausiblePermissionKey) &&
+     new Set(role.permissionKeys).size === role.permissionKeys.length &&
+     Number.isSafeInteger(role.assignmentCount) &&
+     Number(role.assignmentCount) >= 0
+@@ -283,10 +325,6 @@ function isPermission(value: unknown): value is Permission {
+   return isString(permission.id) && isString(permission.name) && isString(permission.description);
+ }
+ 
+-function isAuthorizationPermission(value: unknown): value is AuthorizationPermission {
+-  return typeof value === 'string' && authorizationPermissionKeys.has(value);
+-}
+-
+ function isString(value: unknown): value is string {
+   return typeof value === 'string' && value.length > 0;
+ }
