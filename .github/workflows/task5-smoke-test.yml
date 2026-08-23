@@ -1,0 +1,157 @@
+name: Batch 2 Task 5 — Live Smoke Test (temporary, manual)
+
+# This is Task 5 validation infrastructure, not a new product feature or
+# an accepted permanent quality gate. It exists to prove the accepted V1
+# stack actually runs end to end (real backend + real frontend + real
+# PostgreSQL/Redis), which the sandbox that authored Task 5 could not do
+# because binaries.prisma.sh is unreachable there. This workflow is
+# intended to be removed once that proof is recorded and Task 5 is
+# accepted, not to become a permanent addition.
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - cto/batch2-task5-deterministic-runtime
+
+concurrency:
+  group: task5-smoke-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    name: Live smoke test (backend + frontend + PostgreSQL + Redis)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      DATABASE_URL: postgresql://medsphere_ci:medsphere_ci@localhost:5432/medsphere_ci?schema=public
+      REDIS_CLUSTER_URL: redis://localhost:6379
+      # Deliberately absent/false: no unaccepted prototype service, no
+      # real notification provider. Both must remain deny-by-default for
+      # this run to mean anything.
+      ENABLE_UNACCEPTED_PROTOTYPE_SERVICES: 'false'
+      AUTH_JWT_ISSUER: https://auth.local.medsphere.test
+      AUTH_JWT_AUDIENCE: medsphere-api
+      AUTH_JWT_KEY_ID: local-development-key
+      AUTH_ACCESS_TOKEN_TTL_SECONDS: '900'
+      AUTH_REFRESH_IDLE_TTL_SECONDS: '604800'
+      AUTH_REFRESH_ABSOLUTE_TTL_SECONDS: '2592000'
+      AUTH_ARGON2_MEMORY_KIB: '19456'
+      AUTH_ARGON2_TIME_COST: '2'
+      AUTH_ARGON2_PARALLELISM: '1'
+      PORT: '3000'
+      AUTH_API_URL: http://localhost:3000
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: medsphere_ci
+          POSTGRES_PASSWORD: medsphere_ci
+          POSTGRES_DB: medsphere_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U medsphere_ci -d medsphere_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install PNPM
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+          run_install: false
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.12.0
+          cache: pnpm
+
+      - name: Install PostgreSQL client (for synthetic seed only)
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client
+
+      - name: Install locked dependencies (runs Prisma generate via postinstall)
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate synthetic development JWT keys/pepper
+        run: |
+          node scripts/generate-dev-keys.js > /tmp/dev-keys.env
+          grep -q '^AUTH_JWT_PRIVATE_KEY_BASE64=' /tmp/dev-keys.env
+          grep -q '^AUTH_JWT_PUBLIC_KEY_BASE64=' /tmp/dev-keys.env
+          grep -q '^AUTH_REFRESH_TOKEN_PEPPER=' /tmp/dev-keys.env
+          grep '^AUTH_' /tmp/dev-keys.env >> "$GITHUB_ENV"
+
+      - name: Verify clean database migration and drift
+        run: pnpm db:verify
+
+      - name: Build the backend (and its workspace dependencies via Turbo)
+        run: pnpm exec turbo run build --filter=@medsphere/auth-service
+
+      - name: Build the frontend
+        run: pnpm --filter @medsphere/web build
+
+      - name: Start the accepted backend (auth-service)
+        run: |
+          nohup node apps/auth-service/dist/main.js > /tmp/backend.log 2>&1 &
+          echo $! > /tmp/backend.pid
+          echo "backend starting, pid $(cat /tmp/backend.pid)"
+
+      - name: Start the frontend (web)
+        run: |
+          nohup pnpm --filter @medsphere/web exec next start -p 3001 > /tmp/frontend.log 2>&1 &
+          echo $! > /tmp/frontend.pid
+          echo "frontend starting, pid $(cat /tmp/frontend.pid)"
+
+      - name: Run live smoke test
+        run: node scripts/task5-smoke-test.mjs
+
+      - name: Show backend log on failure
+        if: failure()
+        run: cat /tmp/backend.log || true
+
+      - name: Show frontend log on failure
+        if: failure()
+        run: cat /tmp/frontend.log || true
+
+      - name: Upload logs as artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: task5-smoke-logs
+          path: |
+            /tmp/backend.log
+            /tmp/frontend.log
+          if-no-files-found: ignore
+          retention-days: 7
+
+      # Runs last, unconditionally, purely to stop the background
+      # processes on this ephemeral runner. `|| true` on each kill only
+      # tolerates "process already gone" -- it cannot flip the job's
+      # overall conclusion, which GitHub Actions already fixed based on
+      # the "Run live smoke test" step's own exit code before this step
+      # ever runs. This step has no way to convert a failed smoke test
+      # into a successful job.
+      - name: Stop background processes
+        if: always()
+        run: |
+          [ -f /tmp/backend.pid ] && kill "$(cat /tmp/backend.pid)" 2>/dev/null || true
+          [ -f /tmp/frontend.pid ] && kill "$(cat /tmp/frontend.pid)" 2>/dev/null || true
+          exit 0

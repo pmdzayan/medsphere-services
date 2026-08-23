@@ -80,7 +80,6 @@ class AuthRateLimitStorageModule {}
 
 @Module({
   imports: [
-    AuthRateLimitStorageModule,
     ThrottlerModule.forRootAsync({
       imports: [AuthRateLimitStorageModule, AuthModule],
       inject: [RedisThrottlerStorage, AuthConfigService],
