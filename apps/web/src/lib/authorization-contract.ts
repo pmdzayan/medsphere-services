@@ -20,8 +20,50 @@ export type AuthorizationPermission =
 
 const authorizationPermissionKeys = new Set<string>(Object.values(AUTHORIZATION_PERMISSIONS));
 
+// AUTHORIZATION_PERMISSIONS above intentionally names only the specific
+// permissions this frontend makes its own UI-capability decisions on
+// (e.g. "show the roles tab if the actor has rolesRead") -- every one of
+// those decisions correctly keeps using that fixed set, and
+// isCreateRoleRequest/isUpdateRoleRequest further below (validating
+// requests this frontend itself constructs from its own rendered
+// role-creation UI) also correctly keep using it. But it must not also
+// be used to validate the *shape* of permission keys the backend
+// actually returns: the real, authoritative permission catalogue
+// (apps/auth-service/src/authorization/permission.constants.ts) already
+// has 20 entries today and grows as features ship
+// (EffectivePermissionsResponseDto.permissionKeys is genuinely
+// string[], unrestricted, confirmed directly against the backend DTO),
+// so a response validator requiring membership in this frontend's
+// smaller, static list keeps rejecting perfectly valid current
+// permissions -- confirmed directly: PERMISSIONS in that file already
+// includes 'inventory.stock.read', 'authorization.provider-access.manage',
+// and others this frontend's list has never named. The real 502 this
+// caused was exactly that: a real, current, valid administrator
+// permission list, rejected as "invalid response" purely for not
+// appearing on an already-stale frontend allowlist.
+//
+// isPlausiblePermissionKey validates the actual bounded shape every
+// backend permission key is defined with instead: lowercase
+// dot-separated segments, hyphens allowed within a segment, at most 120
+// characters (matching Permission.name's real @db.VarChar(120) column in
+// packages/database/prisma/schema.prisma). This is not a new fragile
+// list, hardcoded or otherwise -- it accepts any permission key shaped
+// like the real ones, current or future, while still rejecting anything
+// malformed.
+const PERMISSION_KEY_PATTERN = /^[a-z][a-z0-9-]*(\.[a-z][a-z0-9-]*)+$/;
+const PERMISSION_KEY_MAX_LENGTH = 120;
+
+function isPlausiblePermissionKey(value: unknown): value is string {
+  return (
+    typeof value === 'string' &&
+    value.length > 0 &&
+    value.length <= PERMISSION_KEY_MAX_LENGTH &&
+    PERMISSION_KEY_PATTERN.test(value)
+  );
+}
+
 export interface EffectivePermissionsResponse {
-  permissionKeys: AuthorizationPermission[];
+  permissionKeys: string[];
 }
 
 export interface Role {
@@ -38,7 +80,7 @@ export interface AuthorizationCatalogue {
   roles: Role[];
   permissions: Permission[];
   total: number;
-  effectivePermissions: AuthorizationPermission[];
+  effectivePermissions: string[];
 }
 
 export interface CreateRoleRequest {
@@ -129,7 +171,7 @@ export function isAuthorizationCatalogue(value: unknown): value is Authorization
     Number.isSafeInteger(candidate.total) &&
     Number(candidate.total) >= candidate.roles.length &&
     Array.isArray(candidate.effectivePermissions) &&
-    candidate.effectivePermissions.every(isAuthorizationPermission) &&
+    candidate.effectivePermissions.every(isPlausiblePermissionKey) &&
     new Set(candidate.effectivePermissions).size === candidate.effectivePermissions.length
   );
 }
@@ -141,7 +183,7 @@ export function isEffectivePermissionsResponse(
   const candidate = value as Partial<EffectivePermissionsResponse>;
   return (
     Array.isArray(candidate.permissionKeys) &&
-    candidate.permissionKeys.every(isAuthorizationPermission) &&
+    candidate.permissionKeys.every(isPlausiblePermissionKey) &&
     new Set(candidate.permissionKeys).size === candidate.permissionKeys.length
   );
 }
@@ -176,7 +218,7 @@ export function isRole(value: unknown): value is Role {
     Number.isSafeInteger(role.version) &&
     Number(role.version) >= 1 &&
     Array.isArray(role.permissionKeys) &&
-    role.permissionKeys.every(isAuthorizationPermission) &&
+    role.permissionKeys.every(isPlausiblePermissionKey) &&
     new Set(role.permissionKeys).size === role.permissionKeys.length &&
     Number.isSafeInteger(role.assignmentCount) &&
     Number(role.assignmentCount) >= 0
@@ -281,10 +323,6 @@ function isPermission(value: unknown): value is Permission {
   }
   const permission = value as Partial<Permission>;
   return isString(permission.id) && isString(permission.name) && isString(permission.description);
-}
-
-function isAuthorizationPermission(value: unknown): value is AuthorizationPermission {
-  return typeof value === 'string' && authorizationPermissionKeys.has(value);
 }
 
 function isString(value: unknown): value is string {

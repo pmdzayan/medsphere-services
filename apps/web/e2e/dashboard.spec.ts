@@ -84,20 +84,37 @@ test('authenticated Dashboard completes the real provider-dependent read path in
   // 403, 'Stock is unavailable' as the fallback for anything else)
   // distinguishes a successful empty read from a failed one of any kind,
   // without requiring non-empty data.
+  // Selector precision: PanelHeader and StatePanel both render their
+  // title prop as an <h2> (confirmed directly against
+  // dashboard-workspace.tsx). getByText() performs a case-insensitive,
+  // whitespace-normalized SUBSTRING match by default, so a query for
+  // 'Stock records' also matches the empty-state heading 'No stock
+  // records' -- exactly the real CI strict-mode violation this fixes
+  // ("resolved to 2 elements: heading 'Stock records', heading 'No
+  // stock records'"). getByRole('heading', { name, exact: true })
+  // matches only the element whose accessible name is exactly that
+  // string, correctly excluding the empty-state heading while still
+  // accepting a genuinely empty (but successful) read -- this does not
+  // require non-empty data, and no Dashboard product UI was changed to
+  // satisfy this test.
   await expect(page.getByText('Loading current-page stock…')).toHaveCount(0, { timeout: 15_000 });
   await expect(page.getByText('Your session must be verified')).toHaveCount(0);
   await expect(page.getByText('Access is restricted')).toHaveCount(0);
   await expect(page.getByText('Stock is unavailable')).toHaveCount(0);
-  await expect(page.getByText('Stock records')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Stock records', exact: true })).toBeVisible();
 
-  // Reservation read path: identical reasoning.
+  // Reservation read path: identical reasoning and identical real
+  // ambiguity (PanelHeader's 'Reservation records' vs StatePanel's 'No
+  // reservation records'), fixed the same way.
   await expect(page.getByText('Loading current-page reservations…')).toHaveCount(0, {
     timeout: 15_000,
   });
   await expect(page.getByText('Your session must be verified')).toHaveCount(0);
   await expect(page.getByText('Access is restricted')).toHaveCount(0);
   await expect(page.getByText('Reservations are unavailable')).toHaveCount(0);
-  await expect(page.getByText('Reservation records')).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'Reservation records', exact: true }),
+  ).toBeVisible();
 
   // No client-side fatal error should have blocked the workspace --
   // Next.js's own error overlay/boundary text would appear if a render
