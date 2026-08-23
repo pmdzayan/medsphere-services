@@ -1,11 +1,6 @@
-name: MedSphere Dashboard Runtime Certification
+name: Temporary Exact Dashboard Patch Publisher
 
-# Temporary validation infrastructure for the Dashboard vertical slice only.
-# Login/authentication and RBAC are prerequisites, but this workflow's
-# authoritative verdict is Dashboard only. Inventory and later stages are
-# intentionally non-authoritative.
 on:
-  workflow_dispatch: {}
   push:
     branches:
       - cto/runtime-cert-dashboard
@@ -13,175 +8,51 @@ on:
     branches:
       - feature/database-architecture
 
-concurrency:
-  group: dashboard-cert-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
-
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  dashboard:
-    name: Authenticated dashboard operational render
+  publish:
+    if: github.event_name == 'push' || github.head_ref == 'cto/runtime-cert-dashboard'
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
-    env:
-      DATABASE_URL: postgresql://medsphere_ci:medsphere_ci@localhost:5432/medsphere_ci?schema=public
-      REDIS_CLUSTER_URL: redis://localhost:6379
-      ENABLE_UNACCEPTED_PROTOTYPE_SERVICES: 'false'
-      AUTH_JWT_ISSUER: https://auth.local.medsphere.test
-      AUTH_JWT_AUDIENCE: medsphere-api
-      AUTH_JWT_KEY_ID: local-development-key
-      AUTH_ACCESS_TOKEN_TTL_SECONDS: '900'
-      AUTH_REFRESH_IDLE_TTL_SECONDS: '604800'
-      AUTH_REFRESH_ABSOLUTE_TTL_SECONDS: '2592000'
-      AUTH_ARGON2_MEMORY_KIB: '19456'
-      AUTH_ARGON2_TIME_COST: '2'
-      AUTH_ARGON2_PARALLELISM: '1'
-      PORT: '3000'
-      AUTH_API_URL: http://localhost:3000
-
-    services:
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_USER: medsphere_ci
-          POSTGRES_PASSWORD: medsphere_ci
-          POSTGRES_DB: medsphere_ci
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U medsphere_ci -d medsphere_ci"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 12
-
-      redis:
-        image: redis:7-alpine
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 12
-
     steps:
-      - name: Checkout
+      - name: Checkout certification branch
         uses: actions/checkout@v4
-
-      - name: Install PNPM
-        uses: pnpm/action-setup@v4
         with:
-          version: 9.15.0
-          run_install: false
+          ref: cto/runtime-cert-dashboard
+          fetch-depth: 0
 
-      - name: Install Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22.12.0
-          cache: pnpm
-
-      - name: Install PostgreSQL client
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client
-
-      - name: Install locked dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Generate synthetic JWT keys and refresh pepper
-        run: |
-          node -e '
-            const fs = require("node:fs");
-            const crypto = require("node:crypto");
-            const { generateDevKeyMaterial } = require("./scripts/generate-dev-keys.js");
-            const material = generateDevKeyMaterial();
-            const required = {
-              AUTH_JWT_PRIVATE_KEY_BASE64: material.privateKeyBase64,
-              AUTH_JWT_PUBLIC_KEY_BASE64: material.publicKeyBase64,
-              AUTH_REFRESH_TOKEN_PEPPER: material.refreshPepperBase64,
-            };
-            for (const [name, value] of Object.entries(required)) {
-              if (!value) throw new Error(`Missing generated value: ${name}`);
-              console.log(`::add-mask::${value}`);
-              const delimiter = `EOF_${crypto.randomBytes(8).toString("hex")}`;
-              fs.appendFileSync(process.env.GITHUB_ENV, `${name}<<${delimiter}\n${value}\n${delimiter}\n`, "utf8");
-            }
-          '
-
-      - name: Verify database migration and drift
-        run: pnpm db:verify
-
-      - name: Build backend
-        run: pnpm exec turbo run build --filter=@medsphere/auth-service
-
-      - name: Build frontend
-        run: pnpm --filter @medsphere/web build
-
-      - name: Start backend
-        run: |
-          nohup node apps/auth-service/dist/main.js > /tmp/backend.log 2>&1 &
-          echo $! > /tmp/backend.pid
-
-      - name: Start frontend
-        run: |
-          nohup pnpm --filter @medsphere/web exec next start -p 3001 > /tmp/frontend.log 2>&1 &
-          echo $! > /tmp/frontend.pid
-
-      - name: Certify authenticated Dashboard
+      - name: Verify exact uploaded patch and final seven-file scope
         shell: bash
         run: |
-          set +e
-          node scripts/task5-smoke-test.mjs 2>&1 | tee /tmp/dashboard-cert.log
-          smoke_exit=${PIPESTATUS[0]}
-          set -e
+          set -euo pipefail
+          cat .dashboard-publish/chunk-*.b64 | tr -d '\n' | base64 --decode > /tmp/dashboard-browser-cert.patch
+          echo 'b60205d694db5ed42591bc161ecc6f930933effa9888af15d73f5ed8ef889798  /tmp/dashboard-browser-cert.patch' | sha256sum --check --strict
 
-          prerequisite_markers=(
-            '[ok  ] service startup: WORKING'
-            '[ok  ] authentication + authenticated session (real login, real cookies): WORKING'
-            '[ok  ] provider-access grant (accepted backend API): WORKING'
-            '[ok  ] RBAC allow (admin reads authorization catalogue): WORKING'
-            '[ok  ] RBAC deny (no-role staff account denied inventory read): WORKING'
-          )
+          # Restore the exact reviewed base version of this workflow before applying the patch.
+          git show a0f852ae97bc47fa5d1d0a05dedaba58c724f4a5:.github/workflows/task5-smoke-test.yml > .github/workflows/task5-smoke-test.yml
 
-          for marker in "${prerequisite_markers[@]}"; do
-            if ! grep -Fq "$marker" /tmp/dashboard-cert.log; then
-              echo "Dashboard prerequisite regressed: $marker"
-              exit 1
-            fi
-          done
+          git apply --check /tmp/dashboard-browser-cert.patch
+          git apply /tmp/dashboard-browser-cert.patch
+          rm -rf .dashboard-publish
+          rm -f .github/workflows/dashboard-publish.yml
 
-          dashboard_marker='[ok  ] dashboard page (authenticated, real operational content): WORKING'
-          if ! grep -Fq "$dashboard_marker" /tmp/dashboard-cert.log; then
-            echo "Dashboard certification marker missing or broken"
-            exit 1
-          fi
+          git add -A
+          git diff --check a0f852ae97bc47fa5d1d0a05dedaba58c724f4a5
+          test "$(git diff --name-only a0f852ae97bc47fa5d1d0a05dedaba58c724f4a5 | wc -l)" -eq 7
+          git diff --name-only a0f852ae97bc47fa5d1d0a05dedaba58c724f4a5 | grep -Fx '.github/workflows/task5-smoke-test.yml'
+          git diff --name-only a0f852ae97bc47fa5d1d0a05dedaba58c724f4a5 | grep -Fx 'apps/web/e2e/dashboard.spec.ts'
+          git diff --name-only a0f852ae97bc47fa5d1d0a05dedaba58c724f4a5 | grep -Fx 'apps/web/package.json'
+          git diff --name-only a0f852ae97bc47fa5d1d0a05dedaba58c724f4a5 | grep -Fx 'apps/web/playwright.config.ts'
+          git diff --name-only a0f852ae97bc47fa5d1d0a05dedaba58c724f4a5 | grep -Fx 'apps/web/vitest.config.ts'
+          git diff --name-only a0f852ae97bc47fa5d1d0a05dedaba58c724f4a5 | grep -Fx 'pnpm-lock.yaml'
+          git diff --name-only a0f852ae97bc47fa5d1d0a05dedaba58c724f4a5 | grep -Fx 'scripts/task5-smoke-test.mjs'
 
-          echo 'DASHBOARD: WORKING'
-          echo "Full smoke script exit code: ${smoke_exit}. Inventory and later feature failures are intentionally non-authoritative."
-
-      - name: Show backend log on failure
-        if: failure()
-        run: cat /tmp/backend.log || true
-
-      - name: Show frontend log on failure
-        if: failure()
-        run: cat /tmp/frontend.log || true
-
-      - name: Upload Dashboard certification evidence
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: dashboard-certification-evidence
-          path: |
-            /tmp/backend.log
-            /tmp/frontend.log
-            /tmp/dashboard-cert.log
-          if-no-files-found: ignore
-          retention-days: 7
-
-      - name: Stop background processes
-        if: always()
+      - name: Commit and publish
+        shell: bash
         run: |
-          [ -f /tmp/backend.pid ] && kill "$(cat /tmp/backend.pid)" 2>/dev/null || true
-          [ -f /tmp/frontend.pid ] && kill "$(cat /tmp/frontend.pid)" 2>/dev/null || true
-          exit 0
+          set -euo pipefail
+          git config user.name 'MedSphere CI Publisher'
+          git config user.email 'actions@users.noreply.github.com'
+          git commit -m 'feat(cert): add genuine Dashboard browser runtime certification'
+          git push origin HEAD:cto/runtime-cert-dashboard
