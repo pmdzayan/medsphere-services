@@ -1,20 +1,21 @@
 name: MedSphere Dashboard Runtime Certification
 
-# Temporary validation infrastructure for the Dashboard vertical slice only.
-# Login/authentication and RBAC are prerequisites, but this workflow's
-# authoritative verdict is Dashboard only. Inventory and later stages are
-# intentionally non-authoritative.
+# Temporary validation infrastructure. Each job below is authoritative
+# for exactly one vertical slice; every other slice's checks in the same
+# smoke-script run remain visible for debugging but are explicitly
+# non-authoritative for that job's own verdict.
 on:
   workflow_dispatch: {}
   push:
     branches:
       - cto/runtime-cert-dashboard
+      - cto/runtime-cert-inventory
   pull_request:
     branches:
       - feature/database-architecture
 
 concurrency:
-  group: dashboard-cert-${{ github.event.pull_request.number || github.ref }}
+  group: runtime-cert-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -22,6 +23,7 @@ permissions:
 
 jobs:
   dashboard:
+    if: github.ref_name != 'cto/runtime-cert-inventory'
     name: Authenticated dashboard operational render
     runs-on: ubuntu-24.04
     timeout-minutes: 20
@@ -175,6 +177,176 @@ jobs:
             /tmp/backend.log
             /tmp/frontend.log
             /tmp/dashboard-cert.log
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Stop background processes
+        if: always()
+        run: |
+          [ -f /tmp/backend.pid ] && kill "$(cat /tmp/backend.pid)" 2>/dev/null || true
+          [ -f /tmp/frontend.pid ] && kill "$(cat /tmp/frontend.pid)" 2>/dev/null || true
+          exit 0
+
+  inventory:
+    if: github.ref_name != 'cto/runtime-cert-dashboard'
+    name: Inventory runtime certification
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      DATABASE_URL: postgresql://medsphere_ci:medsphere_ci@localhost:5432/medsphere_ci?schema=public
+      REDIS_CLUSTER_URL: redis://localhost:6379
+      ENABLE_UNACCEPTED_PROTOTYPE_SERVICES: 'false'
+      AUTH_JWT_ISSUER: https://auth.local.medsphere.test
+      AUTH_JWT_AUDIENCE: medsphere-api
+      AUTH_JWT_KEY_ID: local-development-key
+      AUTH_ACCESS_TOKEN_TTL_SECONDS: '900'
+      AUTH_REFRESH_IDLE_TTL_SECONDS: '604800'
+      AUTH_REFRESH_ABSOLUTE_TTL_SECONDS: '2592000'
+      AUTH_ARGON2_MEMORY_KIB: '19456'
+      AUTH_ARGON2_TIME_COST: '2'
+      AUTH_ARGON2_PARALLELISM: '1'
+      PORT: '3000'
+      AUTH_API_URL: http://localhost:3000
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: medsphere_ci
+          POSTGRES_PASSWORD: medsphere_ci
+          POSTGRES_DB: medsphere_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U medsphere_ci -d medsphere_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install PNPM
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+          run_install: false
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.12.0
+          cache: pnpm
+
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client
+
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+
+      # No Playwright install here -- Inventory certification is
+      # exercised entirely through real HTTP against the running
+      # backend/frontend (scripts/task5-smoke-test.mjs), the same
+      # runtime stack setup as the Dashboard job above, reused rather
+      # than duplicated as a separate workflow file. No browser
+      # automation is required for Inventory's own checks.
+
+      - name: Generate synthetic JWT keys and refresh pepper
+        run: |
+          node -e '
+            const fs = require("node:fs");
+            const crypto = require("node:crypto");
+            const { generateDevKeyMaterial } = require("./scripts/generate-dev-keys.js");
+            const material = generateDevKeyMaterial();
+            const required = {
+              AUTH_JWT_PRIVATE_KEY_BASE64: material.privateKeyBase64,
+              AUTH_JWT_PUBLIC_KEY_BASE64: material.publicKeyBase64,
+              AUTH_REFRESH_TOKEN_PEPPER: material.refreshPepperBase64,
+            };
+            for (const [name, value] of Object.entries(required)) {
+              if (!value) throw new Error(`Missing generated value: ${name}`);
+              console.log(`::add-mask::${value}`);
+              const delimiter = `EOF_${crypto.randomBytes(8).toString("hex")}`;
+              fs.appendFileSync(process.env.GITHUB_ENV, `${name}<<${delimiter}\n${value}\n${delimiter}\n`, "utf8");
+            }
+          '
+
+      - name: Verify database migration and drift
+        run: pnpm db:verify
+
+      - name: Build backend
+        run: pnpm exec turbo run build --filter=@medsphere/auth-service
+
+      - name: Build frontend
+        run: pnpm --filter @medsphere/web build
+
+      - name: Start backend
+        run: |
+          nohup node apps/auth-service/dist/main.js > /tmp/backend.log 2>&1 &
+          echo $! > /tmp/backend.pid
+
+      - name: Start frontend
+        run: |
+          nohup pnpm --filter @medsphere/web exec next start -p 3001 > /tmp/frontend.log 2>&1 &
+          echo $! > /tmp/frontend.pid
+
+      - name: Certify Inventory
+        shell: bash
+        run: |
+          set +e
+          node scripts/task5-smoke-test.mjs 2>&1 | tee /tmp/inventory-cert.log
+          smoke_exit=${PIPESTATUS[0]}
+          set -e
+
+          # The script itself computes and prints an isolated Inventory
+          # verdict (tagged phase: 'inventory' internally, covering
+          # exactly: inventory listing creation, batch receipt, stock
+          # read, quarantine mutation, and matching audit evidence),
+          # independent of later Reservation/Notification/Public Search
+          # checks in the same run, and independent of the Dashboard
+          # verdict computed in the same script. If any prerequisite
+          # (service startup, registration, authentication, RBAC)
+          # failed earlier, the script never reaches any inventory-
+          # tagged check at all, and this verdict correctly reports FAIL
+          # rather than a false PASS. Checking for this one line is a
+          # single source of truth, rather than duplicating each
+          # individual marker's exact text in this workflow file.
+          if ! grep -Fq 'INVENTORY CERTIFICATION: PASS' /tmp/inventory-cert.log; then
+            echo 'Inventory certification did not pass -- see the INVENTORY CERTIFICATION VERDICT section above for the exact failing check(s), or confirm a prerequisite check failed earlier in the matrix.'
+            exit 1
+          fi
+
+          echo 'INVENTORY: WORKING'
+          echo "Full smoke script exit code: ${smoke_exit}. Reservation/Notification/Public Search and other later feature failures are intentionally non-authoritative for this Inventory verdict."
+
+      - name: Show backend log on failure
+        if: failure()
+        run: cat /tmp/backend.log || true
+
+      - name: Show frontend log on failure
+        if: failure()
+        run: cat /tmp/frontend.log || true
+
+      - name: Upload Inventory certification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: inventory-certification-evidence
+          path: |
+            /tmp/backend.log
+            /tmp/frontend.log
+            /tmp/inventory-cert.log
           if-no-files-found: ignore
           retention-days: 7
 
