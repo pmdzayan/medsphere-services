@@ -8,9 +8,12 @@ on:
   push:
     branches:
       - cto/runtime-cert-login-auth
+  pull_request:
+    branches:
+      - feature/database-architecture
 
 concurrency:
-  group: login-auth-cert-${{ github.ref }}
+  group: login-auth-cert-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 permissions:
