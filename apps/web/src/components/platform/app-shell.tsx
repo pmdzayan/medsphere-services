@@ -3,22 +3,24 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
+import { useLanguage } from '@/components/language-provider';
+import type { TranslationKey } from '@/lib/i18n';
 import type { SessionProfile } from '@/lib/session-profile';
 import { PlatformBrand } from './brand';
 import { Icon, type IconName } from './icon';
 
 const primaryNavigation: NavigationItem[] = [
-  { label: 'Overview', href: '/dashboard', icon: 'dashboard' },
-  { label: 'Inventory', href: '/inventory', icon: 'inventory' },
-  { label: 'Reservations', href: '/reservations', icon: 'reservations' },
-  { label: 'Billing', href: '/billing', icon: 'billing', available: false },
-  { label: 'Documents', href: '/documents', icon: 'documents', available: false },
+  { labelKey: 'shell.overview', href: '/dashboard', icon: 'dashboard' },
+  { labelKey: 'shell.inventory', href: '/inventory', icon: 'inventory' },
+  { labelKey: 'shell.reservations', href: '/reservations', icon: 'reservations' },
+  { labelKey: 'shell.billing', href: '/billing', icon: 'billing', available: false },
+  { labelKey: 'shell.documents', href: '/documents', icon: 'documents', available: false },
 ];
 
 const organizationNavigation: NavigationItem[] = [
-  { label: 'Team & access', href: '/team', icon: 'team' },
-  { label: 'Audit trail', href: '/audit', icon: 'audit' },
-  { label: 'Settings', href: '/settings', icon: 'settings' },
+  { labelKey: 'shell.teamAccess', href: '/team', icon: 'team' },
+  { labelKey: 'shell.auditTrail', href: '/audit', icon: 'audit' },
+  { labelKey: 'shell.settings', href: '/settings', icon: 'settings' },
 ];
 
 export function AppShell({
@@ -26,6 +28,7 @@ export function AppShell({
   session,
 }: Readonly<{ children: React.ReactNode; session: SessionProfile }>) {
   const pathname = usePathname();
+  const { t } = useLanguage();
   const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
@@ -36,9 +39,6 @@ export function AppShell({
 
   useEffect(() => setMobileNavigationOpen(false), [pathname]);
 
-  // Move focus into the drawer when it opens, and back to the button that
-  // opened it when it closes -- but only if it was actually opened first;
-  // otherwise this would steal focus to the trigger on initial mount.
   const mobileNavWasOpenRef = useRef(false);
   useEffect(() => {
     if (mobileNavigationOpen) {
@@ -50,8 +50,6 @@ export function AppShell({
     }
   }, [mobileNavigationOpen]);
 
-  // Escape dismisses whichever overlay is open; the drawer is prioritised
-  // since it's modal (aria-modal="true").
   useEffect(() => {
     if (!mobileNavigationOpen && !accountMenuOpen) return;
     function handleKeyDown(event: KeyboardEvent) {
@@ -63,8 +61,6 @@ export function AppShell({
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [mobileNavigationOpen, accountMenuOpen]);
 
-  // The account menu is a non-modal popover: clicking anywhere outside it
-  // (not just pressing Escape) is expected to close it.
   useEffect(() => {
     if (!accountMenuOpen) return;
     function handlePointerDown(event: PointerEvent) {
@@ -83,7 +79,7 @@ export function AppShell({
         href="#main-content"
         className="fixed left-4 top-3 z-[100] -translate-y-20 rounded-full bg-[#09251f] px-4 py-2 text-sm font-bold text-white transition focus:translate-y-0"
       >
-        Skip to content
+        {t('shell.skipToContent')}
       </a>
 
       <aside className="fixed inset-y-0 left-0 z-40 hidden w-[17.5rem] flex-col bg-[#071713] px-4 pb-5 pt-5 text-white lg:flex">
@@ -101,7 +97,7 @@ export function AppShell({
             type="button"
             className="absolute inset-0 bg-[#03110e]/65 backdrop-blur-sm"
             onClick={() => setMobileNavigationOpen(false)}
-            aria-label="Close navigation"
+            aria-label={t('shell.closeNavigation')}
           />
           <aside className="relative flex h-full w-[min(88vw,21rem)] flex-col bg-[#071713] px-4 pb-5 pt-5 text-white shadow-2xl">
             <div className="flex items-center justify-between px-2">
@@ -111,7 +107,7 @@ export function AppShell({
                 type="button"
                 onClick={() => setMobileNavigationOpen(false)}
                 className="grid size-10 place-items-center rounded-xl border border-white/10 bg-white/[.06] text-white/70"
-                aria-label="Close navigation"
+                aria-label={t('shell.closeNavigation')}
               >
                 <Icon name="close" className="size-5" />
               </button>
@@ -132,7 +128,7 @@ export function AppShell({
               className="grid size-10 shrink-0 place-items-center rounded-xl border border-[#102c24]/10 bg-white text-[#21433a] shadow-sm lg:hidden"
               onClick={() => setMobileNavigationOpen(true)}
               aria-expanded={mobileNavigationOpen}
-              aria-label="Open navigation"
+              aria-label={t('shell.openNavigation')}
             >
               <Icon name="menu" className="size-5" />
             </button>
@@ -142,9 +138,11 @@ export function AppShell({
                 <Icon name="shield" className="size-4" />
               </span>
               <span>
-                <span className="block text-xs font-bold text-[#26463b]">Protected workspace</span>
+                <span className="block text-xs font-bold text-[#26463b]">
+                  {t('shell.protectedWorkspace')}
+                </span>
                 <span className="mt-0.5 block text-[10px] text-[#7a8a84]">
-                  Tenant-scoped access
+                  {t('shell.tenantScopedAccess')}
                 </span>
               </span>
             </div>
@@ -152,14 +150,14 @@ export function AppShell({
             <div className="ml-auto flex items-center gap-2 sm:gap-3">
               <span className="hidden items-center gap-2 rounded-full border border-emerald-800/10 bg-emerald-50 px-3 py-2 text-[11px] font-bold text-emerald-800 sm:flex">
                 <span className="size-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_#10b981]" />
-                Secure session
+                {t('shell.secureSession')}
               </span>
               <div className="relative" ref={accountMenuRef}>
                 <button
                   ref={accountMenuTriggerRef}
                   type="button"
                   className="flex items-center gap-3 rounded-2xl border border-[#102c24]/10 bg-white py-1.5 pl-1.5 pr-2 shadow-sm transition hover:border-emerald-500/25"
-                  aria-label="Open account menu"
+                  aria-label={t('shell.openAccountMenu')}
                   aria-expanded={accountMenuOpen}
                   onClick={() => setAccountMenuOpen((open) => !open)}
                 >
@@ -171,7 +169,7 @@ export function AppShell({
                       {session.user.firstName} {session.user.lastName}
                     </span>
                     <span className="mt-0.5 block text-[10px] text-[#71817c]">
-                      Authenticated member
+                      {t('shell.authenticatedMember')}
                     </span>
                   </span>
                   <Icon
@@ -199,7 +197,7 @@ export function AppShell({
                       }}
                       className="mt-1 w-full rounded-xl px-3 py-2.5 text-left text-xs font-bold text-rose-700 transition hover:bg-rose-50 disabled:opacity-60"
                     >
-                      {signingOut ? 'Signing out…' : 'Sign out securely'}
+                      {signingOut ? t('shell.signingOut') : t('shell.signOutSecurely')}
                     </button>
                   </div>
                 ) : null}
@@ -215,7 +213,7 @@ export function AppShell({
 
       <nav
         className="fixed inset-x-3 bottom-3 z-30 flex h-[4.25rem] items-center justify-around rounded-[1.35rem] border border-white/10 bg-[#071713]/95 px-2 text-white shadow-[0_22px_60px_-20px_rgba(2,20,15,.75)] backdrop-blur-xl lg:hidden"
-        aria-label="Mobile navigation"
+        aria-label={t('shell.mobileNavigation')}
       >
         {primaryNavigation
           .filter((item) => item.available !== false)
@@ -228,7 +226,7 @@ export function AppShell({
                 className={`flex min-w-14 flex-col items-center gap-1 rounded-xl px-2 py-2 text-[9px] font-semibold transition ${active ? 'bg-emerald-300/10 text-emerald-300' : 'text-white/45'}`}
               >
                 <Icon name={item.icon} className="size-[19px]" />
-                {item.label}
+                {t(item.labelKey)}
               </Link>
             );
           })}
@@ -236,11 +234,11 @@ export function AppShell({
           type="button"
           onClick={() => setMobileNavigationOpen(true)}
           aria-expanded={mobileNavigationOpen}
-          aria-label="More navigation, team, and settings"
+          aria-label={t('shell.moreNavigation')}
           className="flex min-w-14 flex-col items-center gap-1 rounded-xl px-2 py-2 text-[9px] font-semibold text-white/45 transition"
         >
           <Icon name="menu" className="size-[19px]" />
-          More
+          {t('shell.more')}
         </button>
       </nav>
     </div>
@@ -248,6 +246,7 @@ export function AppShell({
 }
 
 function TenantContext({ session }: { session: SessionProfile }) {
+  const { t } = useLanguage();
   return (
     <div className="mt-7 flex w-full items-center gap-3 rounded-2xl border border-white/[.08] bg-white/[.045] p-3 text-left">
       <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-[#d9b568] text-xs font-black text-[#1f281e]">
@@ -258,7 +257,7 @@ function TenantContext({ session }: { session: SessionProfile }) {
           {formatTenantName(session.tenantSlug)}
         </span>
         <span className="mt-1 block text-[10px] text-white/38">
-          Tenant · {abbreviateId(session.context.tenantId)}
+          {t('shell.tenant')} · {abbreviateId(session.context.tenantId)}
         </span>
       </span>
     </div>
@@ -266,11 +265,15 @@ function TenantContext({ session }: { session: SessionProfile }) {
 }
 
 function Navigation({ pathname }: { pathname: string }) {
+  const { t } = useLanguage();
   return (
-    <nav className="mt-7 flex min-h-0 flex-1 flex-col overflow-y-auto" aria-label="Workspace">
-      <NavigationGroup label="Workspace" items={primaryNavigation} pathname={pathname} />
+    <nav
+      className="mt-7 flex min-h-0 flex-1 flex-col overflow-y-auto"
+      aria-label={t('shell.workspace')}
+    >
+      <NavigationGroup labelKey="shell.workspace" items={primaryNavigation} pathname={pathname} />
       <NavigationGroup
-        label="Organization"
+        labelKey="shell.organization"
         items={organizationNavigation}
         pathname={pathname}
         className="mt-7"
@@ -280,19 +283,22 @@ function Navigation({ pathname }: { pathname: string }) {
 }
 
 function NavigationGroup({
-  label,
+  labelKey,
   items,
   pathname,
   className = '',
 }: {
-  label: string;
+  labelKey: TranslationKey;
   items: readonly NavigationItem[];
   pathname: string;
   className?: string;
 }) {
+  const { t } = useLanguage();
   return (
     <div className={className}>
-      <p className="px-3 text-[9px] font-bold uppercase tracking-[.22em] text-white/25">{label}</p>
+      <p className="px-3 text-[9px] font-bold uppercase tracking-[.22em] text-white/25">
+        {t(labelKey)}
+      </p>
       <div className="mt-2 space-y-1">
         {items.map((item) => {
           const active = isActivePath(pathname, item.href);
@@ -301,12 +307,12 @@ function NavigationGroup({
               <div
                 key={item.href}
                 className="flex min-h-11 cursor-not-allowed items-center gap-3 rounded-xl px-3 text-[13px] font-semibold text-white/25"
-                title="Available when its accepted backend API is connected"
+                title={t('shell.availableWhenConnected')}
               >
                 <Icon name={item.icon} className="size-[18px] text-white/20" />
-                <span className="flex-1">{item.label}</span>
+                <span className="flex-1">{t(item.labelKey)}</span>
                 <span className="rounded-full bg-white/[.06] px-2 py-0.5 text-[8px] font-black uppercase tracking-wide text-white/28">
-                  Soon
+                  {t('shell.soon')}
                 </span>
               </div>
             );
@@ -325,7 +331,7 @@ function NavigationGroup({
                 name={item.icon}
                 className={`size-[18px] ${active ? 'text-emerald-300' : 'text-white/34 group-hover:text-white/65'}`}
               />
-              <span className="flex-1">{item.label}</span>
+              <span className="flex-1">{t(item.labelKey)}</span>
               {item.badge ? (
                 <span
                   className={`rounded-full px-2 py-0.5 text-[9px] font-black ${
@@ -344,6 +350,7 @@ function NavigationGroup({
 }
 
 function SidebarFooter() {
+  const { t } = useLanguage();
   return (
     <div className="mt-5 rounded-2xl border border-white/[.07] bg-white/[.035] p-3">
       <div className="flex items-start gap-3">
@@ -351,9 +358,9 @@ function SidebarFooter() {
           <Icon name="help" className="size-4" />
         </span>
         <span>
-          <span className="block text-[11px] font-bold text-white/75">Need help?</span>
+          <span className="block text-[11px] font-bold text-white/75">{t('shell.needHelp')}</span>
           <span className="mt-1 block text-[9px] leading-4 text-white/34">
-            Read the operations guide or contact support.
+            {t('shell.helpText')}
           </span>
         </span>
       </div>
@@ -366,7 +373,7 @@ function isActivePath(pathname: string, href: string) {
 }
 
 interface NavigationItem {
-  readonly label: string;
+  readonly labelKey: TranslationKey;
   readonly href: string;
   readonly icon: IconName;
   readonly badge?: string;
