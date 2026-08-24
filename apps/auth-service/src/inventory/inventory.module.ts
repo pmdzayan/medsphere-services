@@ -18,10 +18,16 @@ import { ReservationCreationService } from './reservation-creation.service';
 import { InventoryEventWriter } from './inventory-event-writer';
 import { PublicMedicineSearchController } from './public-medicine-search.controller';
 import { PublicMedicineSearchService } from './public-medicine-search.service';
+import { PublicNearbyMedicineSearchService } from './public-nearby-medicine-search.service';
+import { PublicNearbyMedicineSearchController } from './public-nearby-medicine-search.controller';
 
 @Module({
   imports: [PrismaModule, AuthorizationModule, AuditPersistenceModule],
-  controllers: [InventoryController, PublicMedicineSearchController],
+  controllers: [
+    InventoryController,
+    PublicMedicineSearchController,
+    PublicNearbyMedicineSearchController,
+  ],
   providers: [
     InventoryRepository,
     InventoryEventWriter,
@@ -37,6 +43,7 @@ import { PublicMedicineSearchService } from './public-medicine-search.service';
     BatchExpiryService,
     InventoryQuarantineService,
     PublicMedicineSearchService,
+    PublicNearbyMedicineSearchService,
   ],
   exports: [InventoryService],
 })
