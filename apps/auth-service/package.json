@@ -8,6 +8,7 @@
     "worker:reservation-expiry": "node dist/reservation-expiry.worker.js",
     "worker:batch-expiry": "node dist/batch-expiry.worker.js",
     "worker:notification": "node dist/notification-delivery.worker.js",
+    "worker:notification:daemon": "node dist/notification-delivery.daemon.js",
     "test": "tsc -p tsconfig.spec.json --noEmit && jest",
     "test:cov": "tsc -p tsconfig.spec.json --noEmit && jest --coverage",
     "lint": "eslint \"src/**/*.ts\"",
@@ -37,7 +38,7 @@
   },
   "devDependencies": {
     "@nestjs/cli": "^11.0.24",
-    "@nestjs/testing": "^11.1.28",
+    "@nestjs/testing": "^11.0.24",
     "@types/jest": "^30.0.0",
     "@types/passport-jwt": "^4.0.1",
     "@types/nodemailer": "^8.0.1",
