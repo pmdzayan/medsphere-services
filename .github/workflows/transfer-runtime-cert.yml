@@ -141,7 +141,7 @@ jobs:
             throw new Error('Expected exactly one stale transfer version token in Task 5 smoke harness');
           }
 
-          const preconditions = String.raw`  // Transfer certification preconditions: the completed-transfer contract
+          const preconditions = `  // Transfer certification preconditions: the completed-transfer contract
           // requires a destination inventory listing and the caller's current
           // optimistic-concurrency token. The shared Task 5 harness predates
           // reservation allocation incrementing the source batch version and
