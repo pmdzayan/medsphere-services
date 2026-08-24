@@ -1,5 +1,6 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { LanguageProvider } from '@/components/language-provider';
 import { ApiError, login } from '@/lib/api-client';
 import { LoginForm } from './login-form';
 
@@ -16,6 +17,7 @@ vi.mock('@/lib/api-client', async () => {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  window.localStorage.clear();
   vi.mocked(login).mockResolvedValue({
     expiresIn: 3600,
     user: { id: 'user-1', email: 'operator@example.com', firstName: 'Mira', lastName: 'Patel' },
@@ -25,9 +27,17 @@ beforeEach(() => {
 
 afterEach(() => cleanup());
 
+function renderLoginForm() {
+  return render(
+    <LanguageProvider>
+      <LoginForm />
+    </LanguageProvider>,
+  );
+}
+
 describe('LoginForm interactions', () => {
   it('rejects invalid fields without calling the API', () => {
-    render(<LoginForm />);
+    renderLoginForm();
 
     fill('Organization slug', 'Invalid Tenant');
     fill('Work email', 'invalid');
@@ -42,7 +52,7 @@ describe('LoginForm interactions', () => {
   });
 
   it('announces field-level validation errors to assistive technology', () => {
-    render(<LoginForm />);
+    renderLoginForm();
 
     fill('Work email', 'invalid');
     fireEvent.click(screen.getByRole('button', { name: 'Sign in securely' }));
@@ -52,7 +62,7 @@ describe('LoginForm interactions', () => {
   });
 
   it('submits the normalized request and navigates to the dashboard', async () => {
-    render(<LoginForm />);
+    renderLoginForm();
 
     fill('Organization slug', 'central-pharmacy');
     fill('Work email', ' OPERATOR@EXAMPLE.COM ');
@@ -73,7 +83,7 @@ describe('LoginForm interactions', () => {
   it('prevents duplicate submission while a request is pending, then recovers on error', async () => {
     const pendingLogin = deferred<Awaited<ReturnType<typeof login>>>();
     vi.mocked(login).mockReturnValueOnce(pendingLogin.promise);
-    render(<LoginForm />);
+    renderLoginForm();
 
     fill('Organization slug', 'central-pharmacy');
     fill('Work email', 'operator@example.com');
@@ -81,13 +91,9 @@ describe('LoginForm interactions', () => {
     const submit = screen.getByRole('button', { name: 'Sign in securely' });
     fireEvent.click(submit);
 
-    // The control must reflect the pending state and disable itself before
-    // any second attempt is made.
     expect(await screen.findByText('Signing in…')).toBeVisible();
     expect(submit).toBeDisabled();
 
-    // A second click while the first request is still in flight must not
-    // trigger a second call.
     fireEvent.click(submit);
     expect(login).toHaveBeenCalledTimes(1);
 
