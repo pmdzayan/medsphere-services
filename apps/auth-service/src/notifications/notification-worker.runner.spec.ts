@@ -42,6 +42,12 @@ describe('executeNotificationWorker', () => {
 
   it('fails closed and reports a non-zero exit when no provider is configured -- never a false success or external-delivery claim', async () => {
     const { service, logger } = harness();
+    // Mirrors what NotificationWorkerService.run() genuinely returns when a
+    // real claimed delivery's provider.deliver() call fails because no
+    // provider is configured (PROVIDER_CONFIGURATION_INVALID, caught and
+    // recorded internally by recordNotificationFailed -- the worker never
+    // throws for this, it counts it): one claimed delivery, zero delivered,
+    // one failed.
     service.run.mockResolvedValue({ claimed: 1, delivered: 0, failed: 1, deadLettered: 0 });
 
     await expect(executeNotificationWorker(service as never, config, logger)).resolves.toBe(1);
@@ -49,6 +55,7 @@ describe('executeNotificationWorker', () => {
       'Notification delivery worker completed with failures',
       expect.objectContaining({ claimed: 1, delivered: 0, failed: 1 }),
     );
+    // No external delivery was ever claimed as having succeeded.
     expect(logger.info).not.toHaveBeenCalledWith(
       'Notification delivery worker completed',
       expect.anything(),
