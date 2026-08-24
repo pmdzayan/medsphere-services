@@ -20,11 +20,6 @@ export interface PublicSearchCopy {
   missingDescription: string;
 }
 
-type StaticCopy = Omit<PublicSearchCopy, 'noMatchesFor' | 'contactToReserve'> & {
-  noMatchesFor: string;
-  contactToReserve: string;
-};
-
 function create(values: readonly string[]): PublicSearchCopy {
   const [
     title,

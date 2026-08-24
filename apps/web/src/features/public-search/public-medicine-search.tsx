@@ -57,7 +57,12 @@ export function PublicMedicineSearch({ providerId }: { providerId: string }) {
             maxLength={120}
           />
         </div>
-        <Button type="submit" loading={loading} loadingLabel={copy.searching} disabled={!term.trim()}>
+        <Button
+          type="submit"
+          loading={loading}
+          loadingLabel={copy.searching}
+          disabled={!term.trim()}
+        >
           {copy.search}
         </Button>
       </form>
