@@ -2,13 +2,17 @@
 
 import { FormEvent, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useLanguage } from '@/components/language-provider';
 import { login } from '@/lib/api-client';
 import { normalizeTenantSlug, validateLoginRequest } from '@/lib/auth-contract';
+import { loginCopy } from './login-copy';
 
 type Fields = 'tenantSlug' | 'email' | 'password';
 
 export function LoginForm() {
   const router = useRouter();
+  const { locale } = useLanguage();
+  const copy = loginCopy[locale];
   const [errors, setErrors] = useState<Partial<Record<Fields | 'form', string>>>({});
   const [pending, setPending] = useState(false);
 
@@ -24,7 +28,11 @@ export function LoginForm() {
     };
     const validation = validateLoginRequest(request);
     if (Object.keys(validation).length > 0) {
-      setErrors(validation);
+      setErrors({
+        tenantSlug: validation.tenantSlug ? copy.errorTenant : undefined,
+        email: validation.email ? copy.errorEmail : undefined,
+        password: validation.password ? copy.errorPassword : undefined,
+      });
       return;
     }
 
@@ -35,7 +43,7 @@ export function LoginForm() {
       router.replace('/dashboard');
       router.refresh();
     } catch (error) {
-      setErrors({ form: error instanceof Error ? error.message : 'Sign-in failed.' });
+      setErrors({ form: error instanceof Error ? error.message : copy.errorGeneric });
     } finally {
       setPending(false);
     }
@@ -45,14 +53,14 @@ export function LoginForm() {
     <form className="space-y-4" onSubmit={handleSubmit} noValidate>
       <Field
         name="tenantSlug"
-        label="Organization slug"
+        label={copy.organizationSlug}
         placeholder="central-pharmacy"
         autoComplete="organization"
         error={errors.tenantSlug}
       />
       <Field
         name="email"
-        label="Work email"
+        label={copy.workEmail}
         placeholder="you@organization.com"
         type="email"
         autoComplete="username"
@@ -60,7 +68,7 @@ export function LoginForm() {
       />
       <Field
         name="password"
-        label="Password"
+        label={copy.password}
         type="password"
         autoComplete="current-password"
         error={errors.password}
@@ -78,7 +86,7 @@ export function LoginForm() {
         disabled={pending}
         className="group mt-2 flex w-full items-center justify-center gap-3 rounded-xl bg-[#0b2f28] px-5 py-4 text-sm font-bold text-white shadow-[0_18px_35px_-20px_rgba(11,47,40,.8)] transition hover:-translate-y-0.5 hover:bg-[#075f49] disabled:cursor-wait disabled:opacity-60 disabled:hover:translate-y-0"
       >
-        {pending ? 'Signing in…' : 'Sign in securely'}
+        {pending ? copy.signingIn : copy.signInSecurely}
         {!pending ? (
           <span className="transition-transform group-hover:translate-x-1" aria-hidden="true">
             →
