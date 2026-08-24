@@ -2,20 +2,31 @@
 
 import Link from 'next/link';
 import { FormEvent, useState } from 'react';
+import { useLanguage } from '@/components/language-provider';
 import { register } from '@/lib/api-client';
 import {
   normalizeRegistrationRequest,
   type RegistrationRequest,
   validateRegistrationRequest,
 } from '@/lib/auth-contract';
+import type { TranslationKey } from '@/lib/i18n';
 
 type RegistrationField = keyof RegistrationRequest;
 type FormErrors = Partial<Record<RegistrationField | 'confirmPassword' | 'form', string>>;
 
+const validationMessageKeys: Record<string, TranslationKey> = {
+  'Use the organization slug provided by your administrator.': 'registration.errorTenant',
+  'Enter a valid email address.': 'registration.errorEmail',
+  'Password must be between 15 and 128 characters.': 'registration.errorPassword',
+  'Enter a first name between 1 and 100 characters.': 'registration.errorFirstName',
+  'Enter a last name between 1 and 100 characters.': 'registration.errorLastName',
+};
+
 export function RegistrationForm() {
+  const { t } = useLanguage();
   const [errors, setErrors] = useState<FormErrors>({});
   const [pending, setPending] = useState(false);
-  const [confirmation, setConfirmation] = useState<string | null>(null);
+  const [confirmation, setConfirmation] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -28,9 +39,14 @@ export function RegistrationForm() {
       firstName: String(form.get('firstName') ?? ''),
       lastName: String(form.get('lastName') ?? ''),
     });
-    const nextErrors: FormErrors = validateRegistrationRequest(request);
+    const contractErrors = validateRegistrationRequest(request);
+    const nextErrors: FormErrors = {};
+    for (const [field, message] of Object.entries(contractErrors)) {
+      const key = validationMessageKeys[message];
+      nextErrors[field as RegistrationField] = key ? t(key) : message;
+    }
     if (String(form.get('confirmPassword') ?? '') !== request.password) {
-      nextErrors.confirmPassword = 'Passwords do not match.';
+      nextErrors.confirmPassword = t('registration.errorConfirmPassword');
     }
     if (Object.keys(nextErrors).length > 0) {
       setErrors(nextErrors);
@@ -40,12 +56,10 @@ export function RegistrationForm() {
     setPending(true);
     setErrors({});
     try {
-      const response = await register(request);
-      setConfirmation(response.message);
-    } catch (error) {
-      setErrors({
-        form: error instanceof Error ? error.message : 'Unable to process the onboarding request.',
-      });
+      await register(request);
+      setConfirmation(true);
+    } catch {
+      setErrors({ form: t('registration.errorGeneric') });
     } finally {
       setPending(false);
     }
@@ -61,34 +75,34 @@ export function RegistrationForm() {
           ✓
         </span>
         <p className="mt-6 text-[10px] font-extrabold uppercase tracking-[.2em] text-emerald-700">
-          Request received
+          {t('registration.requestReceived')}
         </p>
         <h2 className="mt-2 font-[var(--font-display)] text-2xl font-bold tracking-[-.035em] text-[#15372d]">
-          Your request is safely queued.
+          {t('registration.queuedTitle')}
         </h2>
-        <p className="mt-4 text-sm leading-7 text-[#526b63]">{confirmation}</p>
+        <p className="mt-4 text-sm leading-7 text-[#526b63]">
+          {t('registration.confirmationMessage')}
+        </p>
         <div className="mt-6 rounded-2xl border border-emerald-900/[.08] bg-white/70 p-4 text-xs leading-6 text-[#60736d]">
-          For privacy, this confirmation does not reveal whether the organization or email already
-          exists. Access becomes available only after the organization&apos;s onboarding policy is
-          satisfied.
+          {t('registration.privacyConfirmation')}
         </div>
         <div className="mt-7 flex flex-col gap-3 sm:flex-row">
           <Link
             href="/login"
             className="inline-flex min-h-12 items-center justify-center rounded-xl bg-[#0b342b] px-5 text-sm font-bold text-white transition hover:bg-emerald-800"
           >
-            Return to sign in
+            {t('registration.returnSignIn')}
           </Link>
           <button
             type="button"
             onClick={() => {
-              setConfirmation(null);
+              setConfirmation(false);
               setErrors({});
               setShowPassword(false);
             }}
             className="min-h-12 rounded-xl border border-[#17372e]/10 bg-white px-5 text-sm font-bold text-[#264b40] transition hover:border-emerald-700/25"
           >
-            Submit another request
+            {t('registration.submitAnother')}
           </button>
         </div>
       </section>
@@ -100,14 +114,14 @@ export function RegistrationForm() {
       <div className="grid gap-4 sm:grid-cols-2">
         <Field
           name="firstName"
-          label="First name"
+          label={t('registration.firstName')}
           autoComplete="given-name"
           maxLength={100}
           error={errors.firstName}
         />
         <Field
           name="lastName"
-          label="Last name"
+          label={t('registration.lastName')}
           autoComplete="family-name"
           maxLength={100}
           error={errors.lastName}
@@ -115,8 +129,8 @@ export function RegistrationForm() {
       </div>
       <Field
         name="tenantSlug"
-        label="Organization slug"
-        description="Use the exact slug supplied by the organization administrator."
+        label={t('registration.organizationSlug')}
+        description={t('registration.organizationSlugDescription')}
         placeholder="central-pharmacy"
         autoComplete="organization"
         maxLength={100}
@@ -124,7 +138,7 @@ export function RegistrationForm() {
       />
       <Field
         name="email"
-        label="Work email"
+        label={t('registration.workEmail')}
         placeholder="you@organization.com"
         type="email"
         autoComplete="email"
@@ -134,8 +148,8 @@ export function RegistrationForm() {
       <div className="grid gap-4 sm:grid-cols-2">
         <Field
           name="password"
-          label="Create password"
-          description="Use 15–128 characters. Do not reuse a password from another service."
+          label={t('registration.createPassword')}
+          description={t('registration.passwordDescription')}
           type={showPassword ? 'text' : 'password'}
           autoComplete="new-password"
           minLength={15}
@@ -144,7 +158,7 @@ export function RegistrationForm() {
         />
         <Field
           name="confirmPassword"
-          label="Confirm password"
+          label={t('registration.confirmPassword')}
           type={showPassword ? 'text' : 'password'}
           autoComplete="new-password"
           minLength={15}
@@ -159,7 +173,7 @@ export function RegistrationForm() {
           onChange={(event) => setShowPassword(event.target.checked)}
           className="size-4 rounded border-[#17372e]/20 text-emerald-700"
         />
-        Show password
+        {t('registration.showPassword')}
       </label>
       {errors.form ? (
         <p
@@ -174,7 +188,7 @@ export function RegistrationForm() {
         disabled={pending}
         className="group flex min-h-14 w-full items-center justify-center gap-3 rounded-xl bg-[#0b2f28] px-5 text-sm font-bold text-white shadow-[0_18px_35px_-20px_rgba(11,47,40,.8)] transition hover:-translate-y-0.5 hover:bg-[#075f49] disabled:cursor-wait disabled:opacity-60 disabled:hover:translate-y-0"
       >
-        {pending ? 'Submitting securely…' : 'Request organization access'}
+        {pending ? t('registration.submitting') : t('registration.requestAccess')}
         {!pending ? (
           <span className="transition-transform group-hover:translate-x-1" aria-hidden="true">
             →
@@ -182,9 +196,9 @@ export function RegistrationForm() {
         ) : null}
       </button>
       <p className="text-center text-xs leading-5 text-[#71807b]">
-        Already have an active membership?{' '}
+        {t('registration.alreadyMember')}{' '}
         <Link href="/login" className="font-bold text-emerald-800 hover:text-emerald-600">
-          Sign in
+          {t('registration.signIn')}
         </Link>
       </p>
     </form>
