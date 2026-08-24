@@ -66,6 +66,15 @@ infrastructure(
     afterAll(async () => prisma.client.$disconnect());
 
     it('claims a real eligible delivery, attempts it with no provider configured, records failure/dead-letter (never success), and reports it accurately', async () => {
+      // Use a fixed historical eligibility window so this test remains
+      // deterministic even when sibling integration suites leave newer
+      // eligible deliveries in the shared CI database. The production
+      // worker is intentionally global across tenants; constraining the
+      // test clock isolates this row without changing production claim
+      // semantics or mutating another test's deliveries.
+      const availableAt = new Date('2000-01-01T00:00:00.000Z');
+      const claimNow = new Date('2000-01-01T00:00:01.000Z');
+
       // 1. An eligible notification delivery genuinely exists and can be
       // claimed: real outbox event, real enqueue call, both using the
       // exact accepted persistence functions the real application uses.
@@ -76,7 +85,7 @@ infrastructure(
         eventVersion: 1,
         aggregateType: 'MedicineReservation',
         aggregateId: randomUUID(),
-        occurredAt: new Date().toISOString(),
+        occurredAt: availableAt.toISOString(),
         actor: { actorType: 'TENANT_USER', tenantId, membershipId, userId },
         payload: { status: 'READY', version: 2 },
       });
@@ -90,7 +99,7 @@ infrastructure(
         templateKey: 'reservation-ready',
         templateVersion: 1,
         variables: { status: 'READY' },
-        availableAt: new Date(),
+        availableAt,
       });
       expect(enqueueResult).toEqual({ enqueued: true });
 
@@ -117,7 +126,7 @@ infrastructure(
         limit: 10,
         leaseMs: 30_000,
         maximumAttempts: 1,
-        now: new Date(),
+        now: claimNow,
       });
 
       // 4. The delivery is not recorded as successfully delivered.
