@@ -7,6 +7,7 @@
     "dev": "nest start --watch",
     "worker:reservation-expiry": "node dist/reservation-expiry.worker.js",
     "worker:batch-expiry": "node dist/batch-expiry.worker.js",
+    "worker:notification": "node dist/notification-delivery.worker.js",
     "test": "tsc -p tsconfig.spec.json --noEmit && jest",
     "test:cov": "tsc -p tsconfig.spec.json --noEmit && jest --coverage",
     "lint": "eslint \"src/**/*.ts\"",
