@@ -1,0 +1,249 @@
+name: MedSphere Stock Transfer Runtime Certification
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - cto/runtime-cert-transfers
+  pull_request:
+    branches:
+      - feature/database-architecture
+
+concurrency:
+  group: transfer-runtime-cert-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  transfers:
+    name: Stock transfer runtime certification
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      DATABASE_URL: postgresql://medsphere_ci:medsphere_ci@localhost:5432/medsphere_ci?schema=public
+      REDIS_CLUSTER_URL: redis://localhost:6379
+      ENABLE_UNACCEPTED_PROTOTYPE_SERVICES: 'false'
+      AUTH_JWT_ISSUER: https://auth.local.medsphere.test
+      AUTH_JWT_AUDIENCE: medsphere-api
+      AUTH_JWT_KEY_ID: local-development-key
+      AUTH_ACCESS_TOKEN_TTL_SECONDS: '900'
+      AUTH_REFRESH_IDLE_TTL_SECONDS: '604800'
+      AUTH_REFRESH_ABSOLUTE_TTL_SECONDS: '2592000'
+      AUTH_ARGON2_MEMORY_KIB: '19456'
+      AUTH_ARGON2_TIME_COST: '2'
+      AUTH_ARGON2_PARALLELISM: '1'
+      PORT: '3000'
+      AUTH_API_URL: http://localhost:3000
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: medsphere_ci
+          POSTGRES_PASSWORD: medsphere_ci
+          POSTGRES_DB: medsphere_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U medsphere_ci -d medsphere_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install PNPM
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+          run_install: false
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.12.0
+          cache: pnpm
+
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client
+
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate synthetic JWT keys and refresh pepper
+        run: |
+          node -e '
+            const fs = require("node:fs");
+            const crypto = require("node:crypto");
+            const { generateDevKeyMaterial } = require("./scripts/generate-dev-keys.js");
+            const material = generateDevKeyMaterial();
+            const required = {
+              AUTH_JWT_PRIVATE_KEY_BASE64: material.privateKeyBase64,
+              AUTH_JWT_PUBLIC_KEY_BASE64: material.publicKeyBase64,
+              AUTH_REFRESH_TOKEN_PEPPER: material.refreshPepperBase64,
+            };
+            for (const [name, value] of Object.entries(required)) {
+              if (!value) throw new Error(`Missing generated value: ${name}`);
+              console.log(`::add-mask::${value}`);
+              const delimiter = `EOF_${crypto.randomBytes(8).toString("hex")}`;
+              fs.appendFileSync(process.env.GITHUB_ENV, `${name}<<${delimiter}\n${value}\n${delimiter}\n`, "utf8");
+            }
+          '
+
+      - name: Verify database migration and drift
+        run: pnpm db:verify
+
+      - name: Build backend
+        run: pnpm exec turbo run build --filter=@medsphere/auth-service
+
+      - name: Build frontend
+        run: pnpm --filter @medsphere/web build
+
+      - name: Start backend
+        run: |
+          nohup node apps/auth-service/dist/main.js > /tmp/backend.log 2>&1 &
+          echo $! > /tmp/backend.pid
+
+      - name: Start frontend
+        run: |
+          nohup pnpm --filter @medsphere/web exec next start -p 3001 > /tmp/frontend.log 2>&1 &
+          echo $! > /tmp/frontend.pid
+
+      - name: Prepare Transfer-specific smoke harness
+        shell: bash
+        run: |
+          node <<'NODE'
+          const { readFileSync, writeFileSync } = require('node:fs');
+
+          let source = readFileSync('scripts/task5-smoke-test.mjs', 'utf8');
+          const transferMarker =
+            '  const transfer = await fetch(`${FRONTEND}/api/inventory/providers/${providerAId}/transfers`, {';
+          const staleVersion = '      expectedSourceVersion: 1,\n      quantity: 3,';
+
+          if (source.split(transferMarker).length !== 2) {
+            throw new Error('Expected exactly one stock-transfer marker in Task 5 smoke harness');
+          }
+          if (source.split(staleVersion).length !== 2) {
+            throw new Error('Expected exactly one stale transfer version token in Task 5 smoke harness');
+          }
+
+          const preconditions = `  // Transfer certification preconditions: the completed-transfer contract
+          // requires a destination inventory listing and the caller's current
+          // optimistic-concurrency token. The shared Task 5 harness predates
+          // reservation allocation incrementing the source batch version and
+          // previously supplied a stale hard-coded version of 1. Set up the
+          // destination through the accepted API and read the source version
+          // through the accepted stock API immediately before transfer.
+          const configureDestinationInventory = await fetch(
+            \`\${BACKEND}/inventory/providers/\${providerBId}/products/\${productId}\`,
+            {
+              method: 'PUT',
+              headers: {
+                'content-type': 'application/json',
+                authorization: \`Bearer \${adminLogin.accessToken}\`,
+              },
+              body: JSON.stringify({
+                sellingPrice: '20.00',
+                mrp: '25.00',
+                discountPercentage: '0.00',
+                taxPercentage: '0.00',
+                minimumStockLevel: 0,
+                isVisible: true,
+                idempotencyKey: \`task5-smoke-destination-listing-\${randomUUID()}\`,
+              }),
+            },
+          );
+          const configureDestinationBody = await json(configureDestinationInventory);
+          const destinationListingOk =
+            configureDestinationInventory.status === 200 &&
+            typeof configureDestinationBody?.inventoryId === 'string';
+          record(
+            'stock transfer destination listing precondition (accepted API)',
+            destinationListingOk ? 'WORKING' : 'BROKEN',
+            \`status \${configureDestinationInventory.status}, listing present: \${Boolean(destinationListingOk)}\`,
+          );
+
+          const transferSourceRead = await fetch(
+            \`\${FRONTEND}/api/inventory/stock?providerId=\${providerAId}&limit=10&offset=0\`,
+            { headers: { cookie: adminLogin.cookie } },
+          );
+          const transferSourceBody = await json(transferSourceRead);
+          const transferSourceBatch = transferSourceBody?.data
+            ?.flatMap((item) => item.batches ?? [])
+            .find((batch) => batch.id === batch2Id);
+          const transferSourceVersion = transferSourceBatch?.version;
+          const sourceVersionOk =
+            transferSourceRead.status === 200 && Number.isInteger(transferSourceVersion);
+          record(
+            'stock transfer current source version precondition (accepted stock API)',
+            sourceVersionOk ? 'WORKING' : 'BROKEN',
+            \`status \${transferSourceRead.status}, version: \${transferSourceVersion}\`,
+          );
+
+          if (!destinationListingOk || !sourceVersionOk) return;
+          `;
+
+          source = source.replace(transferMarker, `${preconditions}\n${transferMarker}`);
+          source = source.replace(
+            staleVersion,
+            '      expectedSourceVersion: transferSourceVersion,\n      quantity: 3,',
+          );
+          writeFileSync('/tmp/task5-transfer-smoke.mjs', source, 'utf8');
+          NODE
+
+      - name: Certify Stock Transfers
+        shell: bash
+        run: |
+          set +e
+          node /tmp/task5-transfer-smoke.mjs 2>&1 | tee /tmp/transfer-cert.log
+          smoke_exit=${PIPESTATUS[0]}
+          set -e
+
+          if ! grep -Eq '^WORKING[[:space:]]+\[required\] stock transfer \(correct source/target quantities\)$' /tmp/transfer-cert.log; then
+            echo 'Stock transfer certification failed: transfer check was not WORKING.'
+            exit 1
+          fi
+
+          echo 'STOCK TRANSFER CERTIFICATION: PASS'
+          echo "Full smoke script exit code: ${smoke_exit}. Later non-transfer failures remain visible in the evidence log but are non-authoritative for this isolated Transfer verdict."
+
+      - name: Show backend log on failure
+        if: failure()
+        run: cat /tmp/backend.log || true
+
+      - name: Show frontend log on failure
+        if: failure()
+        run: cat /tmp/frontend.log || true
+
+      - name: Upload Stock Transfer certification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stock-transfer-certification-evidence
+          path: |
+            /tmp/backend.log
+            /tmp/frontend.log
+            /tmp/transfer-cert.log
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Stop background processes
+        if: always()
+        run: |
+          [ -f /tmp/backend.pid ] && kill "$(cat /tmp/backend.pid)" 2>/dev/null || true
+          [ -f /tmp/frontend.pid ] && kill "$(cat /tmp/frontend.pid)" 2>/dev/null || true
+          exit 0
