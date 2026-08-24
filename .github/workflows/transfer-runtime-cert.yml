@@ -195,7 +195,7 @@ jobs:
           );
 
           if (!destinationListingOk || !sourceVersionOk) return;
-`;
+          `;
 
           source = source.replace(transferMarker, `${preconditions}\n${transferMarker}`);
           source = source.replace(
