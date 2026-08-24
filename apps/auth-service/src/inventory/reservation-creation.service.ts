@@ -248,6 +248,9 @@ export class ReservationCreationService {
         };
       });
     } catch (error) {
+      if (hasPrismaCode(error, 'P2034')) {
+        throw new ConflictException('Concurrent reservation stock allocation detected');
+      }
       if (!hasPrismaCode(error, 'P2002')) throw error;
       return withSerializableRetry(this.prisma.client, async (transaction) => {
         await assertTrustedProviderAccess(transaction, command.actor, command.providerId);
