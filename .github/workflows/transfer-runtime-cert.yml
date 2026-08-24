@@ -149,12 +149,12 @@ jobs:
           // destination through the accepted API and read the source version
           // through the accepted stock API immediately before transfer.
           const configureDestinationInventory = await fetch(
-            \`${BACKEND}/inventory/providers/${providerBId}/products/${productId}\`,
+            \`\${BACKEND}/inventory/providers/\${providerBId}/products/\${productId}\`,
             {
               method: 'PUT',
               headers: {
                 'content-type': 'application/json',
-                authorization: \`Bearer ${adminLogin.accessToken}\`,
+                authorization: \`Bearer \${adminLogin.accessToken}\`,
               },
               body: JSON.stringify({
                 sellingPrice: '20.00',
@@ -163,7 +163,7 @@ jobs:
                 taxPercentage: '0.00',
                 minimumStockLevel: 0,
                 isVisible: true,
-                idempotencyKey: \`task5-smoke-destination-listing-${randomUUID()}\`,
+                idempotencyKey: \`task5-smoke-destination-listing-\${randomUUID()}\`,
               }),
             },
           );
@@ -174,11 +174,11 @@ jobs:
           record(
             'stock transfer destination listing precondition (accepted API)',
             destinationListingOk ? 'WORKING' : 'BROKEN',
-            \`status ${configureDestinationInventory.status}, listing present: ${Boolean(destinationListingOk)}\`,
+            \`status \${configureDestinationInventory.status}, listing present: \${Boolean(destinationListingOk)}\`,
           );
 
           const transferSourceRead = await fetch(
-            \`${FRONTEND}/api/inventory/stock?providerId=${providerAId}&limit=10&offset=0\`,
+            \`\${FRONTEND}/api/inventory/stock?providerId=\${providerAId}&limit=10&offset=0\`,
             { headers: { cookie: adminLogin.cookie } },
           );
           const transferSourceBody = await json(transferSourceRead);
@@ -191,7 +191,7 @@ jobs:
           record(
             'stock transfer current source version precondition (accepted stock API)',
             sourceVersionOk ? 'WORKING' : 'BROKEN',
-            \`status ${transferSourceRead.status}, version: ${transferSourceVersion}\`,
+            \`status \${transferSourceRead.status}, version: \${transferSourceVersion}\`,
           );
 
           if (!destinationListingOk || !sourceVersionOk) return;
