@@ -1,6 +1,7 @@
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { AppShell } from '@/components/platform/app-shell';
+import { PlatformLanguageDock } from '@/components/platform/language-dock';
 import { PROFILE_COOKIE, REFRESH_COOKIE, readSessionProfile } from '@/lib/session-profile';
 
 export default async function PlatformLayout({
@@ -12,5 +13,10 @@ export default async function PlatformLayout({
   if (!profile) {
     redirect('/login?reason=session');
   }
-  return <AppShell session={profile}>{children}</AppShell>;
+  return (
+    <>
+      <AppShell session={profile}>{children}</AppShell>
+      <PlatformLanguageDock />
+    </>
+  );
 }

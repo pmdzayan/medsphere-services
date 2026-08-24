@@ -1,5 +1,6 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { LanguageProvider } from '@/components/language-provider';
 import type { SessionProfile } from '@/lib/session-profile';
 import { AppShell } from './app-shell';
 
@@ -21,9 +22,11 @@ const session: SessionProfile = {
 
 function renderShell() {
   const utils = render(
-    <AppShell session={session}>
-      <p>Workspace content</p>
-    </AppShell>,
+    <LanguageProvider>
+      <AppShell session={session}>
+        <p>Workspace content</p>
+      </AppShell>
+    </LanguageProvider>,
   );
   function getDrawerCloseButton() {
     const aside = utils.container.querySelector('aside:not([class*="fixed inset-y-0"])');

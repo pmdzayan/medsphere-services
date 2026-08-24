@@ -1,7 +1,13 @@
 'use client';
 
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
-import { isLocale, translate, type Locale, type TranslationKey } from '@/lib/i18n';
+import {
+  getLocaleDirection,
+  isLocale,
+  translate,
+  type Locale,
+  type TranslationKey,
+} from '@/lib/i18n';
 
 const LANGUAGE_STORAGE_KEY = 'medsphere.locale';
 
@@ -13,6 +19,11 @@ type LanguageContextValue = {
 
 const LanguageContext = createContext<LanguageContextValue | null>(null);
 
+function applyDocumentLocale(locale: Locale) {
+  document.documentElement.lang = locale;
+  document.documentElement.dir = getLocaleDirection(locale);
+}
+
 export function LanguageProvider({ children }: Readonly<{ children: React.ReactNode }>) {
   const [locale, setLocaleState] = useState<Locale>('en');
 
@@ -20,14 +31,16 @@ export function LanguageProvider({ children }: Readonly<{ children: React.ReactN
     const storedLocale = window.localStorage.getItem(LANGUAGE_STORAGE_KEY);
     if (isLocale(storedLocale)) {
       setLocaleState(storedLocale);
-      document.documentElement.lang = storedLocale;
+      applyDocumentLocale(storedLocale);
+      return;
     }
+    applyDocumentLocale('en');
   }, []);
 
   function setLocale(nextLocale: Locale) {
     setLocaleState(nextLocale);
     window.localStorage.setItem(LANGUAGE_STORAGE_KEY, nextLocale);
-    document.documentElement.lang = nextLocale;
+    applyDocumentLocale(nextLocale);
   }
 
   const value = useMemo<LanguageContextValue>(
