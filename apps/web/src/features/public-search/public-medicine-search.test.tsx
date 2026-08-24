@@ -1,5 +1,6 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { LanguageProvider } from '@/components/language-provider';
 import { ApiError, searchPublicMedicine } from '@/lib/api-client';
 import type { PublicMedicineSearchResult } from '@/lib/public-medicine-search-contract';
 import { PublicMedicineSearch } from './public-medicine-search';
@@ -28,8 +29,17 @@ const inStockResult: PublicMedicineSearchResult = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  window.localStorage.clear();
 });
 afterEach(() => cleanup());
+
+function renderSearch() {
+  return render(
+    <LanguageProvider>
+      <PublicMedicineSearch providerId={providerId} />
+    </LanguageProvider>,
+  );
+}
 
 function fillAndSubmit(term: string) {
   fireEvent.change(screen.getByLabelText('Medicine name'), { target: { value: term } });
@@ -43,7 +53,7 @@ describe('PublicMedicineSearch', () => {
       limit: 20,
       offset: 0,
     });
-    render(<PublicMedicineSearch providerId={providerId} />);
+    renderSearch();
 
     fillAndSubmit('paracetamol');
 
@@ -65,7 +75,7 @@ describe('PublicMedicineSearch', () => {
       limit: 20,
       offset: 0,
     });
-    render(<PublicMedicineSearch providerId={providerId} />);
+    renderSearch();
 
     fillAndSubmit('paracetamol');
 
@@ -75,7 +85,7 @@ describe('PublicMedicineSearch', () => {
 
   it('shows an empty state with no fabricated results', async () => {
     vi.mocked(searchPublicMedicine).mockResolvedValue({ data: [], limit: 20, offset: 0 });
-    render(<PublicMedicineSearch providerId={providerId} />);
+    renderSearch();
 
     fillAndSubmit('nonexistent-medicine');
 
@@ -85,7 +95,7 @@ describe('PublicMedicineSearch', () => {
 
   it('shows the exact server error message on failure', async () => {
     vi.mocked(searchPublicMedicine).mockRejectedValue(new ApiError('Provider not found', 404));
-    render(<PublicMedicineSearch providerId={providerId} />);
+    renderSearch();
 
     fillAndSubmit('paracetamol');
 
@@ -100,7 +110,7 @@ describe('PublicMedicineSearch', () => {
       offset: number;
     }>();
     vi.mocked(searchPublicMedicine).mockReturnValueOnce(pending.promise);
-    render(<PublicMedicineSearch providerId={providerId} />);
+    renderSearch();
 
     fillAndSubmit('paracetamol');
 
@@ -116,9 +126,18 @@ describe('PublicMedicineSearch', () => {
   });
 
   it('does not submit an empty search', () => {
-    render(<PublicMedicineSearch providerId={providerId} />);
+    renderSearch();
     expect(screen.getByRole('button', { name: 'Search' })).toBeDisabled();
     expect(searchPublicMedicine).not.toHaveBeenCalled();
+  });
+
+  it('switches public search UI to Tamil while preserving catalog data', () => {
+    renderSearch();
+    fireEvent.change(screen.getByLabelText('Language'), { target: { value: 'ta' } });
+
+    expect(screen.getByText('மருந்து கிடைப்பைச் சரிபார்க்கவும்')).toBeVisible();
+    expect(screen.getByLabelText('மருந்தின் பெயர்')).toBeVisible();
+    expect(screen.getByRole('button', { name: 'தேடுக' })).toBeDisabled();
   });
 });
 
