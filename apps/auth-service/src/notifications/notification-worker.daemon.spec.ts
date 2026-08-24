@@ -25,14 +25,11 @@ describe('notification worker daemon', () => {
     );
   });
 
-  it.each(['0', '999', '300001', '1.5', ' 5000'])(
-    'rejects unsafe poll interval %s',
-    (value) => {
-      expect(() =>
-        parseNotificationWorkerPollInterval({ NOTIFICATION_WORKER_POLL_INTERVAL_MS: value }),
-      ).toThrow('NOTIFICATION_WORKER_POLL_INTERVAL_MS');
-    },
-  );
+  it.each(['0', '999', '300001', '1.5', ' 5000'])('rejects unsafe poll interval %s', (value) => {
+    expect(() =>
+      parseNotificationWorkerPollInterval({ NOTIFICATION_WORKER_POLL_INTERVAL_MS: value }),
+    ).toThrow('NOTIFICATION_WORKER_POLL_INTERVAL_MS');
+  });
 
   it('runs repeatedly until shutdown without duplicating delivery logic', async () => {
     const { service, logger } = harness();
