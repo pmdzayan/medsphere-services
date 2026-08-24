@@ -55,6 +55,32 @@ services:
           cpus: '0.5'
           memory: 512M
 
+  notification-worker:
+    image: medsphere-auth-service:local
+    container_name: medsphere-notification-worker
+    restart: 'no'
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      args:
+        TARGET_SERVICE: auth-service
+    command: ['node', 'dist/notification-delivery.worker.js']
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://${POSTGRES_USER:?POSTGRES_USER is required}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/${POSTGRES_DB:?POSTGRES_DB is required}?schema=public
+      REDIS_CLUSTER_URL: redis://:${REDIS_PASSWORD:?REDIS_PASSWORD is required}@redis:6379
+      NOTIFICATION_WORKER_LIMIT: ${NOTIFICATION_WORKER_LIMIT:-25}
+      NOTIFICATION_WORKER_LEASE_MS: ${NOTIFICATION_WORKER_LEASE_MS:-30000}
+      NOTIFICATION_WORKER_MAX_ATTEMPTS: ${NOTIFICATION_WORKER_MAX_ATTEMPTS:-5}
+    networks:
+      - medsphere-infra
+      - medsphere-apps
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 256M
+
   inventory-service:
     profiles:
       - unaccepted-prototypes
