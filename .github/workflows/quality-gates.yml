@@ -84,7 +84,26 @@ jobs:
         run: pnpm lint
 
       - name: Test
-        run: pnpm test
+        shell: bash
+        run: |
+          set +e
+          pnpm test:architecture 2>&1 | tee /tmp/pnpm-test-full.log
+          architecture_exit=${PIPESTATUS[0]}
+          if [ "$architecture_exit" -ne 0 ]; then
+            exit "$architecture_exit"
+          fi
+          pnpm exec turbo run test --concurrency=1 --output-logs=full 2>&1 | tee -a /tmp/pnpm-test-full.log
+          test_exit=${PIPESTATUS[0]}
+          exit "$test_exit"
+
+      - name: Upload full test output (diagnostic only)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pnpm-test-full-log
+          path: /tmp/pnpm-test-full.log
+          if-no-files-found: warn
+          retention-days: 14
 
       - name: Build
         run: pnpm build
