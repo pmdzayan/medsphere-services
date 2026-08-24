@@ -1,5 +1,4 @@
 import { ConflictException } from '@nestjs/common';
-import { SerializableRetryError } from '@medsphere/database';
 import { ReservationCreationService } from './reservation-creation.service';
 
 function createHarness() {
@@ -167,7 +166,7 @@ describe('ReservationCreationService', () => {
     harness.transaction.medicineReservationItem.create.mockResolvedValue({ id: 'item-1' });
     harness.transaction.batch.updateMany.mockResolvedValue({ count: 0 });
 
-    await expect(harness.service.create(command)).rejects.toBeInstanceOf(SerializableRetryError);
+    await expect(harness.service.create(command)).rejects.toBeInstanceOf(ConflictException);
     expect(harness.transaction.medicineReservationAllocation.create).not.toHaveBeenCalled();
     expect(harness.audit.appendTenantUser).not.toHaveBeenCalled();
   });
