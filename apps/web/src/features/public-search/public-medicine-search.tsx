@@ -1,13 +1,18 @@
 'use client';
 
 import { FormEvent, useState } from 'react';
+import { LanguageSelector } from '@/components/language-selector';
+import { useLanguage } from '@/components/language-provider';
 import { Badge, Button, Card, EmptyState, Input, Skeleton } from '@/components/platform/primitives';
 import { ApiError, searchPublicMedicine } from '@/lib/api-client';
 import type { PublicMedicineSearchResult } from '@/lib/public-medicine-search-contract';
+import { publicSearchCopy } from './public-search-copy';
 
 type PublicError = { message: string; status?: number };
 
 export function PublicMedicineSearch({ providerId }: { providerId: string }) {
+  const { locale } = useLanguage();
+  const copy = publicSearchCopy[locale];
   const [term, setTerm] = useState('');
   const [results, setResults] = useState<PublicMedicineSearchResult[] | null>(null);
   const [loading, setLoading] = useState(false);
@@ -26,7 +31,7 @@ export function PublicMedicineSearch({ providerId }: { providerId: string }) {
       setSearchedFor(query);
     } catch (thrown) {
       setResults(null);
-      setError(toPublicError(thrown, 'Search is unavailable right now.'));
+      setError(toPublicError(thrown, copy.unavailable));
     } finally {
       setLoading(false);
     }
@@ -34,27 +39,26 @@ export function PublicMedicineSearch({ providerId }: { providerId: string }) {
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-10 sm:px-6 sm:py-14">
-      <h1 className="text-2xl font-extrabold text-[#173128] sm:text-3xl">
-        Check medicine availability
-      </h1>
-      <p className="mt-2 text-sm text-[#536a62]">
-        Search by medicine name to see what this pharmacy currently has in stock.
-      </p>
+      <div className="flex justify-end">
+        <LanguageSelector />
+      </div>
+      <h1 className="mt-6 text-2xl font-extrabold text-[#173128] sm:text-3xl">{copy.title}</h1>
+      <p className="mt-2 text-sm text-[#536a62]">{copy.description}</p>
 
       <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-end">
         <div className="flex-1">
           <Input
-            label="Medicine name"
+            label={copy.medicineName}
             name="q"
             value={term}
             onChange={(event) => setTerm(event.target.value)}
-            placeholder="e.g. Paracetamol"
+            placeholder={copy.placeholder}
             autoComplete="off"
             maxLength={120}
           />
         </div>
-        <Button type="submit" loading={loading} loadingLabel="Searching…" disabled={!term.trim()}>
-          Search
+        <Button type="submit" loading={loading} loadingLabel={copy.searching} disabled={!term.trim()}>
+          {copy.search}
         </Button>
       </form>
 
@@ -67,19 +71,15 @@ export function PublicMedicineSearch({ providerId }: { providerId: string }) {
         ) : error ? (
           <Card>
             <EmptyState
-              title={error.status === 404 ? 'Pharmacy not found' : 'Something went wrong'}
+              title={error.status === 404 ? copy.pharmacyNotFound : copy.somethingWrong}
               description={error.message}
             />
           </Card>
         ) : results && results.length === 0 ? (
           <Card>
             <EmptyState
-              title="No matches"
-              description={
-                searchedFor
-                  ? `No medicine matching "${searchedFor}" was found at this pharmacy.`
-                  : undefined
-              }
+              title={copy.noMatches}
+              description={searchedFor ? copy.noMatchesFor(searchedFor) : undefined}
             />
           </Card>
         ) : results ? (
@@ -100,15 +100,15 @@ export function PublicMedicineSearch({ providerId }: { providerId: string }) {
                     </div>
                     <div className="flex shrink-0 flex-col items-end gap-2">
                       <Badge tone={result.availability === 'IN_STOCK' ? 'emerald' : 'slate'}>
-                        {result.availability === 'IN_STOCK' ? 'In stock' : 'Out of stock'}
+                        {result.availability === 'IN_STOCK' ? copy.inStock : copy.outOfStock}
                       </Badge>
                       {result.requiresPrescription ? (
-                        <Badge tone="amber">Prescription required</Badge>
+                        <Badge tone="amber">{copy.prescriptionRequired}</Badge>
                       ) : null}
                     </div>
                   </div>
                   <p className="mt-3 text-xs text-[#899792]">
-                    Contact {result.providerName} to reserve or purchase.
+                    {copy.contactToReserve(result.providerName)}
                   </p>
                 </Card>
               </li>
