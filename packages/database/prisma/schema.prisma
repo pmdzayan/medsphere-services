@@ -251,7 +251,7 @@ model User {
 
   status UserStatus @default(ACTIVE)
 
-  phoneVerifiedAt           DateTime?
+  phoneVerifiedAt            DateTime?
   identityVerificationStatus VerificationStatus @default(PENDING)
   ageVerificationStatus      VerificationStatus @default(PENDING)
   ageVerified18Plus          Boolean?
@@ -375,7 +375,7 @@ model Role {
 
 model Permission {
   id          String   @id @db.Uuid
-  name        String   @unique
+  name        String   @unique @db.VarChar(120)
   description String   @db.VarChar(240)
   createdAt   DateTime @default(now())
 
