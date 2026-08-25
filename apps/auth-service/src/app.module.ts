@@ -12,6 +12,7 @@ import { AuthorizationModule } from './authorization/authorization.module';
 import { AuditModule } from './audit/audit.module';
 import { InventoryModule } from './inventory/inventory.module';
 import { NotificationModule } from './notifications/notification.module';
+import { VerificationModule } from './verification/verification.module';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { NotificationModule } from './notifications/notification.module';
     AuditModule,
     InventoryModule,
     NotificationModule,
+    VerificationModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },
