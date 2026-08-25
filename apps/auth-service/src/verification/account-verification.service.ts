@@ -27,7 +27,11 @@ export class AccountVerificationService {
     ) {
       throw new NotFoundException('Verification route not found');
     }
-    if (input.method === 'AGE' && input.approved && input.ageVerified18Plus === undefined) {
+    if (
+      input.method === 'AGE' &&
+      input.approved &&
+      input.ageVerified18Plus === undefined
+    ) {
       throw new ConflictException('Successful age verification requires an adult-age decision');
     }
 
@@ -190,7 +194,12 @@ export class AccountVerificationService {
           : await transaction.tenantMembership.update({
               where: { id: membership.id },
               data: { status: 'ACTIVE', joinedAt: new Date() },
-              select: { id: true, tenantId: true, status: true, user: { select: { id: true } } },
+              select: {
+                id: true,
+                tenantId: true,
+                status: true,
+                user: { select: { id: true } },
+              },
             });
 
       await this.audit.appendTenantSystem(transaction, {
