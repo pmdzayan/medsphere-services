@@ -3,6 +3,13 @@ export interface GoogleLoginRequest {
   idToken: string;
 }
 
+export interface GoogleRegisterRequest {
+  tenantSlug: string;
+  idToken: string;
+  firstName: string;
+  lastName: string;
+}
+
 export interface LoginRequest {
   tenantSlug: string;
   email: string;
@@ -49,6 +56,45 @@ export interface TokenResponse {
 }
 
 export type AuthenticatedSession = Omit<LoginResponse, 'accessToken' | 'refreshToken'>;
+
+export function normalizeGoogleRegisterRequest(
+  input: GoogleRegisterRequest,
+): GoogleRegisterRequest {
+  return {
+    tenantSlug: normalizeTenantSlug(input.tenantSlug),
+    idToken: input.idToken.trim(),
+    firstName: input.firstName.trim(),
+    lastName: input.lastName.trim(),
+  };
+}
+
+export function isGoogleRegisterRequest(value: unknown): value is GoogleRegisterRequest {
+  return hasExactStringKeys(value, ['firstName', 'idToken', 'lastName', 'tenantSlug']);
+}
+
+export function validateGoogleRegisterRequest(
+  input: GoogleRegisterRequest,
+): Partial<Record<keyof GoogleRegisterRequest, string>> {
+  const errors: Partial<Record<keyof GoogleRegisterRequest, string>> = {};
+
+  if (input.tenantSlug.length < 1 || input.tenantSlug.length > 100) {
+    errors.tenantSlug = 'Use the organization slug provided by your administrator.';
+  }
+
+  if (input.idToken.length < 1 || input.idToken.length > 10000) {
+    errors.idToken = 'Invalid Google sign-in credential.';
+  }
+
+  if (input.firstName.length < 1 || input.firstName.length > 100) {
+    errors.firstName = 'Enter a first name between 1 and 100 characters.';
+  }
+
+  if (input.lastName.length < 1 || input.lastName.length > 100) {
+    errors.lastName = 'Enter a last name between 1 and 100 characters.';
+  }
+
+  return errors;
+}
 
 export function normalizeGoogleLoginRequest(input: GoogleLoginRequest): GoogleLoginRequest {
   return {
