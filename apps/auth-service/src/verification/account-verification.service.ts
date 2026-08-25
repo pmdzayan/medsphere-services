@@ -97,7 +97,7 @@ export class AccountVerificationService {
         };
       }
 
-      const status = input.approved ? 'APPROVED' : 'REJECTED';
+      const status = input.approved ? ('APPROVED' as const) : ('REJECTED' as const);
       await transaction.accountVerificationAttempt.create({
         data: {
           userId: membership.user.id,
