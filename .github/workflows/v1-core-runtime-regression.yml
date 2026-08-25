@@ -1,24 +1,41 @@
-name: MedSphere Stock Transfer Runtime Certification
+name: MedSphere V1 Core Runtime Regression
 
+# Single authoritative certification of the merged V1 core runtime chain
+# (Frontend -> Backend -> PostgreSQL -> Redis), covering, in order:
+# service startup, registration/login, authenticated session, RBAC
+# allow, RBAC deny, cross-tenant rejection, authenticated dashboard
+# load, inventory configuration/listing, inventory batch/mutation,
+# reservation creation, reservation lifecycle, and stock transfer.
+#
+# This reuses the existing accepted real-stack harness
+# (scripts/task5-smoke-test.mjs) exactly as the Dashboard/Inventory/
+# Reservations/Transfer workflows already do -- nothing here duplicates
+# that harness. Public Search and Notification checks still run inside
+# the same script invocation and remain fully visible in the uploaded
+# evidence log, but are deliberately non-authoritative for this job's
+# verdict, the same way later-capability checks are already treated as
+# non-authoritative in the existing per-vertical workflows below. This
+# job does not touch notification worker code, PR #108/#109 work, or
+# anything else out of scope for V1 core runtime regression.
 on:
   workflow_dispatch: {}
   push:
     branches:
-      - cto/runtime-cert-transfers
+      - cto/v1-core-runtime-regression
   pull_request:
     branches:
       - feature/database-architecture
 
 concurrency:
-  group: transfer-runtime-cert-${{ github.event.pull_request.number || github.ref }}
+  group: v1-core-runtime-regression-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 permissions:
   contents: read
 
 jobs:
-  transfers:
-    name: Stock transfer runtime certification
+  v1-core-runtime-regression:
+    name: V1 core runtime regression certification
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     env:
@@ -84,6 +101,9 @@ jobs:
       - name: Install locked dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Install Playwright browser (Dashboard browser runtime certification)
+        run: pnpm --filter @medsphere/web exec playwright install --with-deps chromium
+
       - name: Generate synthetic JWT keys and refresh pepper
         run: |
           node -e '
@@ -123,54 +143,64 @@ jobs:
           nohup pnpm --filter @medsphere/web exec next start -p 3001 > /tmp/frontend.log 2>&1 &
           echo $! > /tmp/frontend.pid
 
-      - name: Certify Stock Transfers
+      - name: Certify V1 core runtime regression
         shell: bash
         run: |
           set +e
-          # Runs the canonical, unmodified accepted harness directly --
-          # the same pattern already used by reservation-runtime-cert.yml.
-          # The runtime text-patching step this workflow previously used
-          # here (rewriting a copy of the script to inject a dynamically
-          # read source batch version and a destination listing
-          # precondition) is now stale: scripts/task5-smoke-test.mjs
-          # itself owns both of those fixes directly (a dedicated,
-          # freshly received transfer source batch, and an explicit
-          # destination inventory listing setup via the same accepted
-          # configureInventory API), so patching a second, divergent
-          # copy at CI time would only reintroduce the risk of the two
-          # implementations drifting apart again. This job still only
-          # gates on the specific transfer-related required lines below
-          # -- it does not install Playwright/Chromium and does not
-          # depend on the dashboard browser certification passing,
-          # matching the same isolation already accepted by
-          # reservation-runtime-cert.yml: an unrelated dashboard failure
-          # remains visible in the evidence log but cannot invalidate
-          # this transfer-only verdict.
-          node scripts/task5-smoke-test.mjs 2>&1 | tee /tmp/transfer-cert.log
+          node scripts/task5-smoke-test.mjs 2>&1 | tee /tmp/v1-core-runtime-regression-cert.log
           smoke_exit=${PIPESTATUS[0]}
           set -e
 
+          # This is a single source of truth check against the script's
+          # own final results matrix line for each required chain step,
+          # rather than duplicating the script's internal pass/fail
+          # logic here -- the same reuse pattern already used by
+          # reservation-runtime-cert.yml and transfer-runtime-cert.yml.
+          # Public Search and Notification checks are intentionally
+          # excluded from this list: they remain fully visible in the
+          # uploaded evidence log and still affect the full script's own
+          # exit code, but they are not part of the required V1 core
+          # runtime chain this job certifies, and Notification in
+          # particular is explicitly out of scope (PR #108/#109).
           declare -a required_checks=(
-            "stock transfer source batch precondition (dedicated, freshly received batch, accepted receiveBatch API)"
-            "stock transfer destination listing precondition (accepted configureInventory API)"
+            "service startup"
+            "foundation seed (tenant, providers, product, admin role/permissions)"
+            "registration (accepted API)"
+            "authentication + authenticated session (real login, real cookies)"
+            "provider-access grant (accepted backend API)"
+            "RBAC allow (admin reads authorization catalogue)"
+            "RBAC deny (no-role staff account denied inventory read)"
+            "cross-tenant positive control (tenant B admin genuinely has inventory-read permission and access to its own provider)"
+            "cross-tenant access is rejected (tenant B admin denied reading tenant A provider stock)"
+            "dashboard unauthenticated protection (real server-side redirect to the exact login route)"
+            "dashboard shell served for authenticated admin (server-rendered shell only, not post-hydration data -- see the separate browser runtime certification for that)"
+            "dashboard browser runtime certification (real login, real hydration, real provider-dependent read path)"
+            "inventory listing creation (accepted configureInventory API, real response semantics)"
+            "batch receipt (accepted receiveBatch API)"
+            "inventory read (real product/batch/quantities present)"
+            "inventory mutation (quarantine actually mutated batch state)"
+            "audit evidence (tenant/actor/resource/action/correlation all match)"
+            "staff-assisted reservation creation (correct provider/product/quantity/status)"
+            "reservation lifecycle (CONFIRM -> READY, correct resulting status each step)"
             "stock transfer (correct source/target quantities)"
           )
 
           missing=0
           for name in "${required_checks[@]}"; do
             escaped=$(printf '%s' "$name" | sed -e 's/[.[\*^$/+]/\\&/g' -e 's/(/\\(/g' -e 's/)/\\)/g')
-            if ! grep -Eq "^WORKING[[:space:]]+\[required\] ${escaped}\$" /tmp/transfer-cert.log; then
-              echo "Stock transfer certification failed: required check was not WORKING: ${name}"
+            if ! grep -Eq "^WORKING[[:space:]]+\[required\] ${escaped}\$" /tmp/v1-core-runtime-regression-cert.log; then
+              echo "V1 core runtime regression: required step was not WORKING: ${name}"
               missing=1
             fi
           done
 
           if [ "$missing" -ne 0 ]; then
+            echo 'V1 core runtime regression certification FAILED: one or more required chain steps did not pass.'
             exit 1
           fi
 
-          echo 'STOCK TRANSFER CERTIFICATION: PASS'
-          echo "Full smoke script exit code: ${smoke_exit}. Later non-transfer failures (including the dashboard browser certification, which this job does not install a browser for) remain visible in the evidence log but are non-authoritative for this isolated Transfer verdict."
+          echo 'V1 CORE RUNTIME REGRESSION CERTIFICATION: PASS'
+          echo "Full smoke script exit code: ${smoke_exit}. Public Search and Notification results remain visible in the evidence log but are non-authoritative for this verdict."
 
       - name: Show backend log on failure
         if: failure()
@@ -180,15 +210,15 @@ jobs:
         if: failure()
         run: cat /tmp/frontend.log || true
 
-      - name: Upload Stock Transfer certification evidence
+      - name: Upload V1 core runtime regression evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: stock-transfer-certification-evidence
+          name: v1-core-runtime-regression-evidence
           path: |
             /tmp/backend.log
             /tmp/frontend.log
-            /tmp/transfer-cert.log
+            /tmp/v1-core-runtime-regression-cert.log
           if-no-files-found: ignore
           retention-days: 7
 

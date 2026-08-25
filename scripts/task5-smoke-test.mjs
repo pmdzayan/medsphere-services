@@ -278,6 +278,47 @@ function bootstrapMembershipActivation({ tenantId, adminEmail, staffEmail, roleI
        VALUES (gen_random_uuid(), '${tenantId}', '${adminMembershipId}', '${roleId}');`);
 }
 
+// ---------------------------------------------------------------------
+// bootstrapCrossTenantActor -- required chain step 6 (cross-tenant
+// rejection).
+//
+// Creates a second, wholly separate tenant with its own genuine
+// TENANT_ADMINISTRATOR, using the exact same accepted permission-grant
+// rule cited in bootstrapUncreatableFoundationState (no accepted API
+// creates a Tenant or a SYSTEM role, so this remains direct SQL). This
+// tenant also gets its own provider (providerC): that provider is used
+// purely as a same-tenant positive control, proving the admin's
+// permission and provider-access authorization genuinely work before
+// the cross-tenant negative case is trusted to mean anything.
+// ---------------------------------------------------------------------
+function bootstrapCrossTenantActor({ tenantId, tenantSlug, roleId, providerId }) {
+  sql(`INSERT INTO "Tenant" (id, name, slug, "isActive", "selfRegistrationEnabled", "createdAt", "updatedAt")
+       VALUES ('${tenantId}', 'Task5 Smoke Tenant B', '${tenantSlug}', true, true, now(), now());`);
+  sql(`INSERT INTO "Role" (id, "tenantId", name, description, type, version, "createdAt", "updatedAt")
+       VALUES ('${roleId}', '${tenantId}', 'TENANT_ADMINISTRATOR', 'Built-in tenant authorization administrator', 'SYSTEM', 1, now(), now());`);
+  sql(`INSERT INTO "RolePermission" (id, "tenantId", "roleId", "permissionId", "createdAt")
+       SELECT gen_random_uuid(), '${tenantId}', '${roleId}', id, now() FROM "Permission";`);
+  sql(`INSERT INTO "Provider" (id, "tenantId", "providerType", "businessName", "ownerName", email, phone, address, city, state, country, "postalCode", latitude, longitude, "isVerified", "isActive", "createdAt", "updatedAt")
+       VALUES ('${providerId}', '${tenantId}', 'PHARMACY', 'Task5 Smoke Pharmacy C', 'Smoke Owner', '${providerId}@smoke.test', '0000000000', 'Smoke Address', 'Chennai', 'Tamil Nadu', 'India', '600001', 13.0827, 80.2707, true, true, now(), now());`);
+}
+
+// Activates exactly one membership in tenant B and grants it the
+// TENANT_ADMINISTRATOR role. This is the same documented bootstrap-only
+// workaround as bootstrapMembershipActivation above (no accepted
+// self-service verification path exists yet) -- it is not a second,
+// separate gap, so it deliberately does not add a second PARTIAL
+// result; that gap is already recorded once, and this reuses it.
+function activateCrossTenantAdmin({ tenantId, adminEmail, roleId }) {
+  const membershipId = sql(
+    `UPDATE "TenantMembership" tm SET status = 'ACTIVE', "joinedAt" = now()
+     FROM "User" u WHERE tm."userId" = u.id AND u.email = '${adminEmail}' AND tm."tenantId" = '${tenantId}'
+     RETURNING tm.id;`,
+  );
+  sql(`UPDATE "User" SET status = 'ACTIVE', "updatedAt" = now() WHERE email = '${adminEmail}';`);
+  sql(`INSERT INTO "MembershipRole" (id, "tenantId", "membershipId", "roleId")
+       VALUES (gen_random_uuid(), '${tenantId}', '${membershipId}', '${roleId}');`);
+}
+
 async function main() {
   console.log('== Waiting for backend + frontend health ==');
   const backendUp = await waitForHealth('backend', `${BACKEND}/health/live`);
@@ -313,11 +354,17 @@ async function main() {
   });
   record('foundation seed (tenant, providers, product, admin role/permissions)', 'WORKING');
 
-  async function register(email) {
+  async function register(email, slug = tenantSlug) {
     return fetch(`${FRONTEND}/api/auth/register`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', origin: FRONTEND },
-      body: JSON.stringify({ tenantSlug, email, password, firstName: 'Task5', lastName: 'Smoke' }),
+      body: JSON.stringify({
+        tenantSlug: slug,
+        email,
+        password,
+        firstName: 'Task5',
+        lastName: 'Smoke',
+      }),
     });
   }
   const adminRegister = await register(adminEmail);
@@ -337,11 +384,11 @@ async function main() {
     { allowedPartial: true },
   );
 
-  async function login(email) {
+  async function login(email, slug = tenantSlug) {
     const res = await fetch(`${FRONTEND}/api/auth/login`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', origin: FRONTEND },
-      body: JSON.stringify({ tenantSlug, email, password }),
+      body: JSON.stringify({ tenantSlug: slug, email, password }),
     });
     const setCookie = res.headers.getSetCookie?.() ?? [];
     const cookie = cookieHeader(setCookie);
@@ -411,6 +458,125 @@ async function main() {
     `expected 403, got ${staffStockAttempt.status}`,
     { phase: 'dashboard' },
   );
+
+  // Required chain step 6: cross-tenant access is rejected. A genuinely
+  // separate tenant, with its own real TENANT_ADMINISTRATOR, attempts a
+  // real authenticated HTTP request against tenant A's provider stock.
+  //
+  // Confirmed directly against inventory.service.ts's listStock(): the
+  // ONLY gate in front of the query is
+  // `if (!(await this.repository.hasProviderAccess(identity, providerId)))
+  //   throw new NotFoundException('Provider stock not found')`, and
+  // hasProviderAccess() (inventory.repository.ts) looks up
+  // membershipProviderAccess scoped by `tenantId: identity.tenantId`.
+  // No row can exist linking a tenant-B identity to tenant A's provider,
+  // so this is not a "some server error occurred, could be 403 or 404"
+  // situation -- it is a single, deterministic, always-404 code path.
+  // The @RequirePermissions(inventoryStockRead) guard is a separate,
+  // earlier check; a 403 could only ever come from THAT layer, meaning
+  // "no permission", not "wrong tenant". Accepting 403 as a pass would
+  // let a broken/missing RBAC grant on tenant B masquerade as proof of
+  // tenant isolation. The assertion below therefore requires exactly
+  // 404 with the exact NotFoundException message, and only after first
+  // proving tenant B's admin genuinely holds the required permission
+  // and a genuine, granted, same-tenant provider-access record (the
+  // positive control) -- so a 403 on the real cross-tenant call cannot
+  // be explained away as "well, RBAC probably would have blocked it
+  // anyway".
+  const tenantBId = randomUUID();
+  const tenantBSlug = `task5-smoke-b-${Date.now()}`;
+  const roleBId = randomUUID();
+  const providerCId = randomUUID();
+  const adminBEmail = `task5-admin-b-${Date.now()}@smoke.test`;
+  const crossTenantCheckName =
+    'cross-tenant access is rejected (tenant B admin denied reading tenant A provider stock)';
+  const crossTenantPositiveControlName =
+    'cross-tenant positive control (tenant B admin genuinely has inventory-read permission and access to its own provider)';
+
+  bootstrapCrossTenantActor({
+    tenantId: tenantBId,
+    tenantSlug: tenantBSlug,
+    roleId: roleBId,
+    providerId: providerCId,
+  });
+  const adminBRegister = await register(adminBEmail, tenantBSlug);
+  if (adminBRegister.status !== 202) {
+    record(
+      crossTenantCheckName,
+      'BROKEN',
+      `tenant B admin registration failed: status ${adminBRegister.status}`,
+      {
+        phase: 'dashboard',
+      },
+    );
+  } else {
+    activateCrossTenantAdmin({ tenantId: tenantBId, adminEmail: adminBEmail, roleId: roleBId });
+    const adminBLogin = await login(adminBEmail, tenantBSlug);
+    if (adminBLogin.res.status !== 200 || !adminBLogin.accessToken) {
+      record(
+        crossTenantCheckName,
+        'BROKEN',
+        `tenant B admin login failed: status ${adminBLogin.res.status}`,
+        {
+          phase: 'dashboard',
+        },
+      );
+    } else {
+      // Positive control: grant tenant B's admin real, accepted
+      // provider-access to its OWN provider (providerC), through the
+      // same accepted backend API used for tenant A above, then read
+      // that provider's stock. This proves the permission guard and
+      // the provider-access mechanism both genuinely work for this
+      // exact admin and this exact route before the cross-tenant
+      // negative result is allowed to mean anything.
+      const adminBMembershipId = membershipIdByEmail(adminBEmail, tenantBId);
+      const ownProviderGrant = await fetch(
+        `${BACKEND}/authorization/memberships/${adminBMembershipId}/provider-access/${providerCId}`,
+        { method: 'PUT', headers: { authorization: `Bearer ${adminBLogin.accessToken}` } },
+      );
+      const ownProviderAttempt = await fetch(
+        `${FRONTEND}/api/inventory/stock?providerId=${providerCId}&limit=1&offset=0`,
+        { headers: { cookie: adminBLogin.cookie } },
+      );
+      const positiveControlOk = ownProviderGrant.ok && ownProviderAttempt.status === 200;
+      record(
+        crossTenantPositiveControlName,
+        positiveControlOk ? 'WORKING' : 'BROKEN',
+        `provider-access grant: ${ownProviderGrant.status}, own-provider stock read: ${ownProviderAttempt.status} (expected 200)`,
+        { phase: 'dashboard' },
+      );
+
+      if (!positiveControlOk) {
+        record(
+          crossTenantCheckName,
+          'BROKEN',
+          'skipped: positive control failed, so a denial on the cross-tenant call would not prove tenant isolation',
+          { phase: 'dashboard' },
+        );
+      } else {
+        const beforeCount = sql(
+          `SELECT count(*) FROM "Inventory" WHERE "tenantId" = '${tenantId}' AND "providerId" = '${providerAId}';`,
+        );
+        const crossTenantAttempt = await fetch(
+          `${FRONTEND}/api/inventory/stock?providerId=${providerAId}&limit=1&offset=0`,
+          { headers: { cookie: adminBLogin.cookie } },
+        );
+        const crossTenantBody = await json(crossTenantAttempt);
+        const afterCount = sql(
+          `SELECT count(*) FROM "Inventory" WHERE "tenantId" = '${tenantId}' AND "providerId" = '${providerAId}';`,
+        );
+        const stateUnchanged = beforeCount === afterCount;
+        const statusExactly404 = crossTenantAttempt.status === 404;
+        const messageMatches = crossTenantBody?.message === 'Provider stock not found';
+        record(
+          crossTenantCheckName,
+          statusExactly404 && messageMatches && stateUnchanged ? 'WORKING' : 'BROKEN',
+          `expected exactly 404 with message "Provider stock not found" and unchanged tenant A inventory row count; got status ${crossTenantAttempt.status}, message "${crossTenantBody?.message}", tenant A inventory rows before/after: ${beforeCount}/${afterCount}`,
+          { phase: 'dashboard' },
+        );
+      }
+    }
+  }
 
   // The dashboard route ((platform)/layout.tsx + dashboard/page.tsx)
   // renders DashboardWorkspace, a 'use client' component. Its actual
@@ -778,12 +944,91 @@ async function main() {
     `confirm status ${confirm.status}/${confirmBody?.status}, ready status ${ready.status}/${readyBody?.status}`,
   );
 
+  // Stock transfer isolation fix (PR #111 CI evidence): confirmed
+  // directly against inventory-transfer.service.ts (line 85-86,
+  // "Source batch version conflict") and reservation-creation.service.ts
+  // (line 189, batch version increment on allocation) that this was a
+  // harness sequencing/data-isolation defect, not a production defect.
+  // Once batch1 is quarantined above, it is no longer 'ACTIVE'
+  // (reservation-creation.service.ts only allocates against ACTIVE
+  // batches), so the reservation created below is forced to allocate
+  // against batch2 -- incrementing batch2's version past 1 before this
+  // step runs. A hard-coded expectedSourceVersion: 1 against batch2 is
+  // therefore stale by construction and is correctly rejected by the
+  // transfer service's own optimistic-concurrency check -- proven by
+  // the standalone stock-transfer-runtime-cert.yml workflow, which
+  // works around this same defect at CI time by patching in a
+  // dynamically-read version instead of a hard-coded one. Rather than
+  // coupling the transfer scenario to exactly how many prior operations
+  // touched batch2's version, this gives the transfer its own
+  // independent, freshly received batch that no quarantine or
+  // reservation allocation has touched, so expectedSourceVersion: 1 is
+  // always correct by construction and full quarantine + reservation
+  // interaction coverage against batch1/batch2 remains completely
+  // unchanged above.
+  const receiveTransferBatch = await receiveBatch(`TASK5-SMOKE3-${randomUUID().slice(0, 8)}`, 10);
+  const transferBatchBody = await json(receiveTransferBatch);
+  const transferBatchId = transferBatchBody?.batchId;
+  record(
+    'stock transfer source batch precondition (dedicated, freshly received batch, accepted receiveBatch API)',
+    receiveTransferBatch.status === 200 && transferBatchId ? 'WORKING' : 'BROKEN',
+    `status ${receiveTransferBatch.status}, batchId present: ${Boolean(transferBatchId)}`,
+  );
+  if (!transferBatchId) return;
+
+  // Combined-harness 404 fix (PR #111 Debug Task 2 CI evidence): traced
+  // directly against inventory-transfer.service.ts's lookup sequence
+  // before changing anything. Two NotFoundException sources exist in
+  // recordCompleted(): 'Assigned provider batch not found' (source
+  // lookup) and 'Destination inventory listing not found' (line ~103,
+  // destinationInventory = tx.inventory.findFirst({ providerId:
+  // command.destinationProviderId, productId: source.productId, ... })).
+  // The freshly received transferBatchId above proves the source lookup
+  // succeeds (confirmed WORKING immediately above), so by elimination
+  // the 404 was the destination listing: providerB has never had
+  // configureInventory called for this product in this harness (only
+  // providerA's listing was created earlier). Confirmed further by the
+  // standalone stock-transfer-runtime-cert.yml workflow's own
+  // already-proven precondition, which does exactly this same
+  // configureInventory call for providerB before transfer. Fixed here
+  // via the same accepted API already used for providerA's own listing
+  // above -- not hidden DB state.
+  const configureDestinationInventory = await fetch(
+    `${BACKEND}/inventory/providers/${providerBId}/products/${productId}`,
+    {
+      method: 'PUT',
+      headers: {
+        'content-type': 'application/json',
+        authorization: `Bearer ${adminLogin.accessToken}`,
+      },
+      body: JSON.stringify({
+        sellingPrice: '20.00',
+        mrp: '25.00',
+        discountPercentage: '0.00',
+        taxPercentage: '0.00',
+        minimumStockLevel: 0,
+        isVisible: true,
+        idempotencyKey: `task5-smoke-destination-listing-${randomUUID()}`,
+      }),
+    },
+  );
+  const configureDestinationBody = await json(configureDestinationInventory);
+  const destinationListingOk =
+    configureDestinationInventory.status === 200 &&
+    typeof configureDestinationBody?.inventoryId === 'string';
+  record(
+    'stock transfer destination listing precondition (accepted configureInventory API)',
+    destinationListingOk ? 'WORKING' : 'BROKEN',
+    `status ${configureDestinationInventory.status}, listing present: ${Boolean(destinationListingOk)}`,
+  );
+  if (!destinationListingOk) return;
+
   const transfer = await fetch(`${FRONTEND}/api/inventory/providers/${providerAId}/transfers`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', origin: FRONTEND, cookie: adminLogin.cookie },
     body: JSON.stringify({
       destinationProviderId: providerBId,
-      sourceBatchId: batch2Id,
+      sourceBatchId: transferBatchId,
       expectedSourceVersion: 1,
       quantity: 3,
       idempotencyKey: `task5-smoke-transfer-${randomUUID()}`,
