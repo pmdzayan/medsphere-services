@@ -11,6 +11,7 @@ import { AuthSecurityEventService } from './auth-security-event.service';
 import { GoogleIdentityVerifierService } from './google-identity-verifier.service';
 import { AuthenticatedIdentity, LoginIdentity, RequestMetadata } from './auth.types';
 import { RegisterDto } from './dto/register.dto';
+import { GoogleRegisterDto } from './dto/google-register.dto';
 import { LoginDto } from './dto/login.dto';
 import { LoginResponseDto } from './dto/login-response.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
@@ -41,6 +42,25 @@ export class AuthService {
     return response;
   }
 
+  async googleRegister(googleRegisterDto: GoogleRegisterDto): Promise<RegistrationResponseDto> {
+    const googleIdentity = await this.googleIdentityVerifier.verify(googleRegisterDto.idToken);
+
+    await this.usersRepository.createPendingGoogleRegistration({
+      tenantSlug: googleRegisterDto.tenantSlug,
+      subject: googleIdentity.subject,
+      email: googleIdentity.email,
+      firstName: googleRegisterDto.firstName,
+      lastName: googleRegisterDto.lastName,
+    });
+
+    this.securityEvents.record('registration', {
+      outcome: 'success',
+      reason: 'registration-processed',
+    });
+
+    return new RegistrationResponseDto();
+  }
+
   async login(loginDto: LoginDto, metadata: RequestMetadata): Promise<LoginResponseDto> {
     const loginIdentity = await this.usersRepository.findLoginIdentity(
       loginDto.tenantSlug,
@@ -48,6 +68,12 @@ export class AuthService {
     );
 
     if (!loginIdentity) {
+      await this.passwordService.verifyAgainstDummy(loginDto.password);
+      this.recordInvalidLogin();
+      throw new UnauthorizedException(INVALID_CREDENTIALS_MESSAGE);
+    }
+
+    if (!loginIdentity.user.passwordHash) {
       await this.passwordService.verifyAgainstDummy(loginDto.password);
       this.recordInvalidLogin();
       throw new UnauthorizedException(INVALID_CREDENTIALS_MESSAGE);

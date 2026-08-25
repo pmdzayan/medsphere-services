@@ -48,6 +48,7 @@ describe('AuthService', () => {
     usersRepository = {
       findLoginIdentity: jest.fn(),
       findGoogleLoginIdentity: jest.fn(),
+      createPendingGoogleRegistration: jest.fn(),
       update: jest.fn(),
     } as unknown as jest.Mocked<UsersRepository>;
     passwordService = {
@@ -150,6 +151,71 @@ describe('AuthService', () => {
     await expect(service.login(loginDto, metadata)).rejects.toThrow(
       new UnauthorizedException('Invalid credentials'),
     );
+    expect(sessionRepository.createSession).not.toHaveBeenCalled();
+  });
+
+  it('provisions Google onboarding only from a verified Google identity', async () => {
+    googleIdentityVerifier.verify.mockResolvedValue({
+      subject: 'google-subject-123',
+      email: 'verified@example.com',
+      emailVerified: true,
+    });
+
+    const response = await service.googleRegister({
+      tenantSlug: 'central-pharmacy',
+      idToken: 'google-id-token',
+      firstName: 'Asha',
+      lastName: 'Sharma',
+    });
+
+    expect(googleIdentityVerifier.verify).toHaveBeenCalledWith('google-id-token');
+    expect(usersRepository.createPendingGoogleRegistration).toHaveBeenCalledWith({
+      tenantSlug: 'central-pharmacy',
+      subject: 'google-subject-123',
+      email: 'verified@example.com',
+      firstName: 'Asha',
+      lastName: 'Sharma',
+    });
+    expect(response.message).toBe(
+      'If registration is available, onboarding instructions will be sent.',
+    );
+    expect(sessionRepository.createSession).not.toHaveBeenCalled();
+  });
+
+  it('does not provision Google onboarding when Google verification fails', async () => {
+    googleIdentityVerifier.verify.mockRejectedValue(
+      new UnauthorizedException('Invalid Google identity'),
+    );
+
+    await expect(
+      service.googleRegister({
+        tenantSlug: 'central-pharmacy',
+        idToken: 'invalid-google-token',
+        firstName: 'Asha',
+        lastName: 'Sharma',
+      }),
+    ).rejects.toThrow(new UnauthorizedException('Invalid Google identity'));
+
+    expect(usersRepository.createPendingGoogleRegistration).not.toHaveBeenCalled();
+    expect(sessionRepository.createSession).not.toHaveBeenCalled();
+  });
+
+  it('rejects password authentication for a Google-only account without a password hash', async () => {
+    usersRepository.findLoginIdentity.mockResolvedValue({
+      ...loginIdentity,
+      user: {
+        ...loginIdentity.user,
+        passwordHash: null,
+      },
+    });
+
+    await expect(service.login(loginDto, metadata)).rejects.toThrow(
+      new UnauthorizedException('Invalid credentials'),
+    );
+
+    expect(passwordService.verifyAgainstDummy).toHaveBeenCalledWith(loginDto.password);
+    expect(passwordService.verify).not.toHaveBeenCalled();
+    expect(passwordService.needsRehash).not.toHaveBeenCalled();
     expect(sessionRepository.createSession).not.toHaveBeenCalled();
   });
 
