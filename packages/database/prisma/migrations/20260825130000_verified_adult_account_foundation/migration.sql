@@ -26,7 +26,7 @@ CREATE TABLE "AccountVerificationAttempt" (
   CONSTRAINT "AccountVerificationAttempt_pkey" PRIMARY KEY ("id")
 );
 
-CREATE UNIQUE INDEX "AccountVerificationAttempt_userId_provider_method_idempotencyKey_key"
+CREATE UNIQUE INDEX "AccountVerificationAttempt_userId_provider_method_idempoten_key"
   ON "AccountVerificationAttempt"("userId", "provider", "method", "idempotencyKey");
 
 CREATE INDEX "AccountVerificationAttempt_userId_method_status_createdAt_idx"
