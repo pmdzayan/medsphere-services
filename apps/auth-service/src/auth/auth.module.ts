@@ -5,6 +5,7 @@ import { PassportModule } from '@nestjs/passport';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { AuthConfigService } from './auth-config.service';
+import { GoogleIdentityVerifierService } from './google-identity-verifier.service';
 import { AuthSecurityEventService } from './auth-security-event.service';
 import { JwtStrategy } from './jwt.strategy';
 import { PasswordService } from './password.service';
@@ -27,6 +28,7 @@ import { AuditPersistenceModule } from '../audit/audit-persistence.module';
   providers: [
     AuthService,
     AuthConfigService,
+    GoogleIdentityVerifierService,
     AuthSecurityEventService,
     JwtStrategy,
     PasswordService,

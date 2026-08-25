@@ -262,12 +262,36 @@ model User {
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
-  memberships          TenantMembership[]
-  sessions             UserSession[]
-  platformAuditEvents  AuditEvent[]
-  privacy              UserPrivacy?
-  medicineReservations MedicineReservation[]
-  verificationAttempts AccountVerificationAttempt[]
+  memberships            TenantMembership[]
+  sessions               UserSession[]
+  platformAuditEvents    AuditEvent[]
+  privacy                UserPrivacy?
+  medicineReservations   MedicineReservation[]
+  verificationAttempts   AccountVerificationAttempt[]
+  externalAuthIdentities ExternalAuthIdentity[]
+}
+
+model ExternalAuthIdentity {
+  id String @id @default(uuid()) @db.Uuid
+
+  userId String @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  provider ExternalAuthProvider
+  subject  String               @db.VarChar(255)
+
+  email         String? @db.Citext
+  emailVerified Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([provider, subject])
+  @@index([userId])
+}
+
+enum ExternalAuthProvider {
+  GOOGLE
 }
 
 model AccountVerificationAttempt {
@@ -278,11 +302,11 @@ model AccountVerificationAttempt {
 
   method   AccountVerificationMethod
   provider AccountVerificationProvider
-  status   VerificationStatus @default(PENDING)
+  status   VerificationStatus          @default(PENDING)
 
-  providerReference String? @db.VarChar(240)
-  idempotencyKey    String  @db.VarChar(120)
-  commandHash       String  @db.VarChar(64)
+  providerReference String?   @db.VarChar(240)
+  idempotencyKey    String    @db.VarChar(120)
+  commandHash       String    @db.VarChar(64)
   verifiedAt        DateTime?
 
   createdAt DateTime @default(now())

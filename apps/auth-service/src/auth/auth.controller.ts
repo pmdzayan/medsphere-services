@@ -13,6 +13,7 @@ import {
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
+import { GoogleLoginDto } from './dto/google-login.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { CurrentIdentity } from '../common/decorators/current-identity.decorator';
 import { AuthenticatedIdentity } from './auth.types';
@@ -56,6 +57,24 @@ export class AuthController {
   @ApiUnauthorizedResponse({ description: 'Invalid credentials' })
   login(@Body() loginDto: LoginDto, @Req() request: MetadataHttpRequest) {
     return this.authService.login(loginDto, extractRequestMetadata(request));
+  }
+
+  @Post('google')
+  @PublicEndpoint()
+  @Throttle({
+    ip: { limit: 10, ttl: 60_000 },
+    account: { limit: 10, ttl: 60_000 },
+  })
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Create a membership-bound session with Google' })
+  @ApiOkResponse({ type: LoginResponseDto })
+  @ApiUnauthorizedResponse({ description: 'Invalid Google identity' })
+  google(@Body() googleLoginDto: GoogleLoginDto, @Req() request: MetadataHttpRequest) {
+    return this.authService.googleLogin(
+      googleLoginDto.tenantSlug,
+      googleLoginDto.idToken,
+      extractRequestMetadata(request),
+    );
   }
 
   @Post('refresh')
