@@ -1,6 +1,14 @@
-import { Transform } from 'class-transformer';
-import { IsBoolean, IsEmail, IsIn, IsOptional, IsString, Matches, MaxLength } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Transform } from 'class-transformer';
+import {
+  IsBoolean,
+  IsEmail,
+  IsIn,
+  IsOptional,
+  IsString,
+  Matches,
+  MaxLength,
+} from 'class-validator';
 import { normalizeAuthenticationLocator } from '../../auth/auth-normalization';
 import { ACCOUNT_VERIFICATION_METHODS } from '../verification.types';
 
@@ -43,7 +51,8 @@ export class CompleteMockVerificationDto {
   ageVerified18Plus?: boolean;
 
   @ApiPropertyOptional({
-    description: 'Opaque provider reference. Never submit Aadhaar numbers, OTPs, biometrics, or document images.',
+    description:
+      'Opaque provider reference. Never submit Aadhaar numbers, OTPs, biometrics, or document images.',
     maxLength: 240,
   })
   @IsOptional()
