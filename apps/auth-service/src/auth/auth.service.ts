@@ -8,7 +8,8 @@ import { TokenService } from './token.service';
 import { SessionRepository } from './session.repository';
 import { AuthConfigService } from './auth-config.service';
 import { AuthSecurityEventService } from './auth-security-event.service';
-import { AuthenticatedIdentity, RequestMetadata } from './auth.types';
+import { GoogleIdentityVerifierService } from './google-identity-verifier.service';
+import { AuthenticatedIdentity, LoginIdentity, RequestMetadata } from './auth.types';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { LoginResponseDto } from './dto/login-response.dto';
@@ -28,6 +29,7 @@ export class AuthService {
     private readonly sessionRepository: SessionRepository,
     private readonly authConfig: AuthConfigService,
     private readonly securityEvents: AuthSecurityEventService,
+    private readonly googleIdentityVerifier: GoogleIdentityVerifierService,
   ) {}
 
   async register(registerDto: RegisterDto): Promise<RegistrationResponseDto> {
@@ -65,10 +67,43 @@ export class AuthService {
       await this.usersRepository.update(loginIdentity.user.id, { passwordHash });
     }
 
+    return this.createAuthenticatedSession(loginIdentity, metadata);
+  }
+
+  async googleLogin(
+    tenantSlug: string,
+    idToken: string,
+    metadata: RequestMetadata,
+  ): Promise<LoginResponseDto> {
+    const googleIdentity = await this.googleIdentityVerifier.verify(idToken);
+
+    const loginIdentity = await this.usersRepository.findGoogleLoginIdentity(
+      tenantSlug,
+      googleIdentity.subject,
+    );
+
+    if (!loginIdentity) {
+      this.recordInvalidLogin();
+      throw new UnauthorizedException(INVALID_CREDENTIALS_MESSAGE);
+    }
+
+    if (loginIdentity.user.email.trim().toLowerCase() !== googleIdentity.email) {
+      this.recordInvalidLogin();
+      throw new UnauthorizedException(INVALID_CREDENTIALS_MESSAGE);
+    }
+
+    return this.createAuthenticatedSession(loginIdentity, metadata);
+  }
+
+  private async createAuthenticatedSession(
+    loginIdentity: LoginIdentity,
+    metadata: RequestMetadata,
+  ): Promise<LoginResponseDto> {
     const now = Date.now();
     const configuration = this.authConfig.value;
     const refreshCredential = this.tokenService.issueRefreshCredential();
     const familyId = randomUUID();
+
     const expiresAt = new Date(now + configuration.refreshIdleTtlSeconds * 1000);
     const absoluteExpiresAt = new Date(now + configuration.refreshAbsoluteTtlSeconds * 1000);
 
@@ -98,6 +133,7 @@ export class AuthService {
       tenantId: loginIdentity.tenantId,
       sessionId: refreshCredential.sessionId,
     };
+
     this.securityEvents.record('login', eventContext);
     this.securityEvents.record('session-created', eventContext);
 

@@ -7,6 +7,56 @@ import { hasPrismaCode, withSerializableRetry } from '../prisma/transaction.util
 export class UsersRepository {
   constructor(private readonly prisma: PrismaService) {}
 
+  async findGoogleLoginIdentity(
+    tenantSlug: string,
+    subject: string,
+  ): Promise<LoginIdentity | null> {
+    const membership = await this.prisma.client.tenantMembership.findFirst({
+      where: {
+        status: 'ACTIVE',
+        deletedAt: null,
+        tenant: {
+          slug: tenantSlug,
+          isActive: true,
+          deletedAt: null,
+        },
+        user: {
+          status: 'ACTIVE',
+          deletedAt: null,
+          externalAuthIdentities: {
+            some: {
+              provider: 'GOOGLE',
+              subject,
+            },
+          },
+        },
+      },
+      select: {
+        id: true,
+        tenantId: true,
+        user: {
+          select: {
+            id: true,
+            email: true,
+            passwordHash: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
+      },
+    });
+
+    if (!membership) {
+      return null;
+    }
+
+    return {
+      user: membership.user,
+      membershipId: membership.id,
+      tenantId: membership.tenantId,
+    };
+  }
+
   async findLoginIdentity(tenantSlug: string, email: string): Promise<LoginIdentity | null> {
     const membership = await this.prisma.client.tenantMembership.findFirst({
       where: {

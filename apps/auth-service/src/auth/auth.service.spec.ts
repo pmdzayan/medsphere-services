@@ -3,6 +3,7 @@ import { UnauthorizedException } from '@nestjs/common';
 import { AuthConfigService } from './auth-config.service';
 import { AuthSecurityEventService } from './auth-security-event.service';
 import { AuthService } from './auth.service';
+import { GoogleIdentityVerifierService } from './google-identity-verifier.service';
 import { PasswordService } from './password.service';
 import { RegistrationService } from './registration.service';
 import { SessionRepository } from './session.repository';
@@ -40,11 +41,13 @@ describe('AuthService', () => {
   let tokenService: jest.Mocked<TokenService>;
   let sessionRepository: jest.Mocked<SessionRepository>;
   let securityEvents: jest.Mocked<AuthSecurityEventService>;
+  let googleIdentityVerifier: jest.Mocked<GoogleIdentityVerifierService>;
   let service: AuthService;
 
   beforeEach(() => {
     usersRepository = {
       findLoginIdentity: jest.fn(),
+      findGoogleLoginIdentity: jest.fn(),
       update: jest.fn(),
     } as unknown as jest.Mocked<UsersRepository>;
     passwordService = {
@@ -71,6 +74,9 @@ describe('AuthService', () => {
     securityEvents = {
       record: jest.fn(),
     } as unknown as jest.Mocked<AuthSecurityEventService>;
+    googleIdentityVerifier = {
+      verify: jest.fn(),
+    } as unknown as jest.Mocked<GoogleIdentityVerifierService>;
 
     service = new AuthService(
       usersRepository,
@@ -85,6 +91,7 @@ describe('AuthService', () => {
         },
       } as unknown as AuthConfigService,
       securityEvents,
+      googleIdentityVerifier,
     );
   });
 
@@ -143,6 +150,73 @@ describe('AuthService', () => {
     await expect(service.login(loginDto, metadata)).rejects.toThrow(
       new UnauthorizedException('Invalid credentials'),
     );
+    expect(sessionRepository.createSession).not.toHaveBeenCalled();
+  });
+
+  it('creates the normal membership-bound session for a linked Google identity', async () => {
+    googleIdentityVerifier.verify.mockResolvedValue({
+      subject: 'google-subject-123',
+      email: loginDto.email,
+      emailVerified: true,
+    });
+    usersRepository.findGoogleLoginIdentity.mockResolvedValue(loginIdentity);
+    tokenService.issueRefreshCredential.mockReturnValue({
+      value: 'google-refresh',
+      hash: 'c'.repeat(64),
+      sessionId,
+    });
+    tokenService.issueAccessToken.mockReturnValue({
+      value: 'google-access',
+      expiresIn: 900,
+      tokenId,
+    });
+
+    const result = await service.googleLogin(loginDto.tenantSlug, 'google-id-token', metadata);
+
+    expect(googleIdentityVerifier.verify).toHaveBeenCalledWith('google-id-token');
+    expect(usersRepository.findGoogleLoginIdentity).toHaveBeenCalledWith(
+      loginDto.tenantSlug,
+      'google-subject-123',
+    );
+    expect(sessionRepository.createSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId,
+        membershipId,
+        tenantId,
+        metadata,
+      }),
+    );
+    expect(result.accessToken).toBe('google-access');
+    expect(result.context).toEqual({ membershipId, tenantId });
+  });
+
+  it('rejects an unknown Google identity without creating a session', async () => {
+    googleIdentityVerifier.verify.mockResolvedValue({
+      subject: 'unknown-google-subject',
+      email: loginDto.email,
+      emailVerified: true,
+    });
+    usersRepository.findGoogleLoginIdentity.mockResolvedValue(null);
+
+    await expect(
+      service.googleLogin(loginDto.tenantSlug, 'google-id-token', metadata),
+    ).rejects.toThrow(new UnauthorizedException('Invalid credentials'));
+
+    expect(sessionRepository.createSession).not.toHaveBeenCalled();
+  });
+
+  it('rejects a Google identity when the verified email does not match the linked user', async () => {
+    googleIdentityVerifier.verify.mockResolvedValue({
+      subject: 'google-subject-123',
+      email: 'attacker@example.com',
+      emailVerified: true,
+    });
+    usersRepository.findGoogleLoginIdentity.mockResolvedValue(loginIdentity);
+
+    await expect(
+      service.googleLogin(loginDto.tenantSlug, 'google-id-token', metadata),
+    ).rejects.toThrow(new UnauthorizedException('Invalid credentials'));
+
     expect(sessionRepository.createSession).not.toHaveBeenCalled();
   });
 

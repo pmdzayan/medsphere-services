@@ -17,6 +17,7 @@ export interface AuthConfiguration {
   readonly argon2MemoryKiB: number;
   readonly argon2TimeCost: number;
   readonly argon2Parallelism: number;
+  readonly googleOAuthClientId?: string;
 }
 
 type AuthEnvironment = NodeJS.ProcessEnv;
@@ -186,6 +187,7 @@ export function parseAuthEnvironment(environment: AuthEnvironment): AuthConfigur
     argon2MemoryKiB: parseInteger(environment, 'AUTH_ARGON2_MEMORY_KIB', 19_456, 262_144),
     argon2TimeCost: parseInteger(environment, 'AUTH_ARGON2_TIME_COST', 2, 10),
     argon2Parallelism: parseInteger(environment, 'AUTH_ARGON2_PARALLELISM', 1, 8),
+    googleOAuthClientId: environment.GOOGLE_OAUTH_CLIENT_ID?.trim() || undefined,
   });
 }
 
