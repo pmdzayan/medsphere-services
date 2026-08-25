@@ -944,12 +944,44 @@ async function main() {
     `confirm status ${confirm.status}/${confirmBody?.status}, ready status ${ready.status}/${readyBody?.status}`,
   );
 
+  // Stock transfer isolation fix (PR #111 CI evidence): confirmed
+  // directly against inventory-transfer.service.ts (line 85-86,
+  // "Source batch version conflict") and reservation-creation.service.ts
+  // (line 189, batch version increment on allocation) that this was a
+  // harness sequencing/data-isolation defect, not a production defect.
+  // Once batch1 is quarantined above, it is no longer 'ACTIVE'
+  // (reservation-creation.service.ts only allocates against ACTIVE
+  // batches), so the reservation created below is forced to allocate
+  // against batch2 -- incrementing batch2's version past 1 before this
+  // step runs. A hard-coded expectedSourceVersion: 1 against batch2 is
+  // therefore stale by construction and is correctly rejected by the
+  // transfer service's own optimistic-concurrency check -- proven by
+  // the standalone stock-transfer-runtime-cert.yml workflow, which
+  // works around this same defect at CI time by patching in a
+  // dynamically-read version instead of a hard-coded one. Rather than
+  // coupling the transfer scenario to exactly how many prior operations
+  // touched batch2's version, this gives the transfer its own
+  // independent, freshly received batch that no quarantine or
+  // reservation allocation has touched, so expectedSourceVersion: 1 is
+  // always correct by construction and full quarantine + reservation
+  // interaction coverage against batch1/batch2 remains completely
+  // unchanged above.
+  const receiveTransferBatch = await receiveBatch(`TASK5-SMOKE3-${randomUUID().slice(0, 8)}`, 10);
+  const transferBatchBody = await json(receiveTransferBatch);
+  const transferBatchId = transferBatchBody?.batchId;
+  record(
+    'stock transfer source batch precondition (dedicated, freshly received batch, accepted receiveBatch API)',
+    receiveTransferBatch.status === 200 && transferBatchId ? 'WORKING' : 'BROKEN',
+    `status ${receiveTransferBatch.status}, batchId present: ${Boolean(transferBatchId)}`,
+  );
+  if (!transferBatchId) return;
+
   const transfer = await fetch(`${FRONTEND}/api/inventory/providers/${providerAId}/transfers`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', origin: FRONTEND, cookie: adminLogin.cookie },
     body: JSON.stringify({
       destinationProviderId: providerBId,
-      sourceBatchId: batch2Id,
+      sourceBatchId: transferBatchId,
       expectedSourceVersion: 1,
       quantity: 3,
       idempotencyKey: `task5-smoke-transfer-${randomUUID()}`,
