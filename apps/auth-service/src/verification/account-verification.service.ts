@@ -27,11 +27,7 @@ export class AccountVerificationService {
     ) {
       throw new NotFoundException('Verification route not found');
     }
-    if (
-      input.method === 'AGE' &&
-      input.approved &&
-      input.ageVerified18Plus === undefined
-    ) {
+    if (input.method === 'AGE' && input.approved && input.ageVerified18Plus === undefined) {
       throw new ConflictException('Successful age verification requires an adult-age decision');
     }
 
@@ -91,8 +87,7 @@ export class AccountVerificationService {
           membershipId: membership.id,
           userStatus: membership.user.status,
           membershipStatus: membership.status,
-          activated:
-            membership.user.status === 'ACTIVE' && membership.status === 'ACTIVE',
+          activated: membership.user.status === 'ACTIVE' && membership.status === 'ACTIVE',
           replayed: true,
         };
       }
@@ -147,7 +142,7 @@ export class AccountVerificationService {
           method: input.method,
           provider: 'MOCK',
           status,
-          age18Plus: input.method === 'AGE' ? input.ageVerified18Plus ?? false : null,
+          age18Plus: input.method === 'AGE' ? (input.ageVerified18Plus ?? false) : null,
         },
       });
 
@@ -169,7 +164,9 @@ export class AccountVerificationService {
       }
 
       if (membership.status !== 'PENDING' && membership.status !== 'ACTIVE') {
-        throw new ServiceUnavailableException('Membership cannot be activated from its current state');
+        throw new ServiceUnavailableException(
+          'Membership cannot be activated from its current state',
+        );
       }
 
       const activatedUser =

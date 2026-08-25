@@ -35,3 +35,41 @@ CREATE INDEX "AccountVerificationAttempt_userId_method_status_createdAt_idx"
 ALTER TABLE "AccountVerificationAttempt"
   ADD CONSTRAINT "AccountVerificationAttempt_userId_fkey"
   FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- Extend the database audit-event allowlist for verified-account lifecycle events.
+ALTER TABLE "AuditEvent"
+  DROP CONSTRAINT "AuditEvent_event_type_check";
+
+ALTER TABLE "AuditEvent"
+  ADD CONSTRAINT "AuditEvent_event_type_check"
+  CHECK ("eventType" IN (
+    'authorization.role.created',
+    'authorization.role.updated',
+    'authorization.role.deleted',
+    'authorization.assignment.added',
+    'authorization.assignment.removed',
+    'authorization.provider-access.added',
+    'authorization.provider-access.removed',
+    'authorization.permission.denied',
+    'authentication.session.created',
+    'authentication.session.refresh.succeeded',
+    'authentication.session.refresh.failed',
+    'authentication.session.refresh.replayed',
+    'authentication.session.logout.succeeded',
+    'authentication.sessions.logout.succeeded',
+    'authentication.verification.completed',
+    'authentication.account.activated',
+    'inventory.listing.configured',
+    'inventory.batch.received',
+    'inventory.stock.adjusted',
+    'inventory.stock.transferred',
+    'inventory.stock.damaged',
+    'inventory.batch.expired',
+    'inventory.batch.quarantined',
+    'inventory.reservation.created',
+    'inventory.reservation.confirmed',
+    'inventory.reservation.ready',
+    'inventory.reservation.completed',
+    'inventory.reservation.cancelled',
+    'inventory.reservation.expired'
+  ));

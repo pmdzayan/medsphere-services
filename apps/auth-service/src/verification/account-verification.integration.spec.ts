@@ -1,10 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { ConflictException } from '@nestjs/common';
 import { AuditWriter } from '../audit/audit-writer.service';
-import {
-  isInfrastructureTestEnabled,
-  requireEnv,
-} from '../auth/testing/infrastructure-test-gate';
+import { isInfrastructureTestEnabled, requireEnv } from '../auth/testing/infrastructure-test-gate';
 import { PrismaService } from '../prisma/prisma.service';
 import { UsersRepository } from '../users/users.repository';
 import { AccountVerificationService } from './account-verification.service';
@@ -145,11 +142,13 @@ describeVerificationInfra('AccountVerificationService PostgreSQL integration', (
       activated: true,
       replayed: false,
     });
-    await expect(users.findLoginIdentity(subject.tenantSlug, subject.email)).resolves.toMatchObject({
-      user: { id: subject.userId, email: subject.email },
-      membershipId: subject.membershipId,
-      tenantId: subject.tenantId,
-    });
+    await expect(users.findLoginIdentity(subject.tenantSlug, subject.email)).resolves.toMatchObject(
+      {
+        user: { id: subject.userId, email: subject.email },
+        membershipId: subject.membershipId,
+        tenantId: subject.tenantId,
+      },
+    );
 
     const otherMembership = await prisma.client.tenantMembership.findUniqueOrThrow({
       where: { id: subject.otherMembershipId },
