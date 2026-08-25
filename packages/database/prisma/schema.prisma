@@ -66,6 +66,17 @@ enum VerificationStatus {
   EXPIRED
 }
 
+enum AccountVerificationMethod {
+  PHONE
+  IDENTITY
+  AGE
+}
+
+enum AccountVerificationProvider {
+  MOCK
+  EXTERNAL_IDENTITY_PROVIDER
+}
+
 enum ProductCategory {
   MEDICINE
   OTC
@@ -240,6 +251,11 @@ model User {
 
   status UserStatus @default(ACTIVE)
 
+  phoneVerifiedAt           DateTime?
+  identityVerificationStatus VerificationStatus @default(PENDING)
+  ageVerificationStatus      VerificationStatus @default(PENDING)
+  ageVerified18Plus          Boolean?
+
   version Int @default(1)
 
   createdAt DateTime  @default(now())
@@ -251,6 +267,29 @@ model User {
   platformAuditEvents  AuditEvent[]
   privacy              UserPrivacy?
   medicineReservations MedicineReservation[]
+  verificationAttempts AccountVerificationAttempt[]
+}
+
+model AccountVerificationAttempt {
+  id String @id @default(uuid()) @db.Uuid
+
+  userId String @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  method   AccountVerificationMethod
+  provider AccountVerificationProvider
+  status   VerificationStatus @default(PENDING)
+
+  providerReference String? @db.VarChar(240)
+  idempotencyKey    String  @db.VarChar(120)
+  commandHash       String  @db.VarChar(64)
+  verifiedAt        DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, provider, method, idempotencyKey])
+  @@index([userId, method, status, createdAt(sort: Desc)])
 }
 
 model TenantMembership {
@@ -336,7 +375,7 @@ model Role {
 
 model Permission {
   id          String   @id @db.Uuid
-  name        String   @unique @db.VarChar(120)
+  name        String   @unique
   description String   @db.VarChar(240)
   createdAt   DateTime @default(now())
 
