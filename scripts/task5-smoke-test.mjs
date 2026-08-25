@@ -976,6 +976,53 @@ async function main() {
   );
   if (!transferBatchId) return;
 
+  // Combined-harness 404 fix (PR #111 Debug Task 2 CI evidence): traced
+  // directly against inventory-transfer.service.ts's lookup sequence
+  // before changing anything. Two NotFoundException sources exist in
+  // recordCompleted(): 'Assigned provider batch not found' (source
+  // lookup) and 'Destination inventory listing not found' (line ~103,
+  // destinationInventory = tx.inventory.findFirst({ providerId:
+  // command.destinationProviderId, productId: source.productId, ... })).
+  // The freshly received transferBatchId above proves the source lookup
+  // succeeds (confirmed WORKING immediately above), so by elimination
+  // the 404 was the destination listing: providerB has never had
+  // configureInventory called for this product in this harness (only
+  // providerA's listing was created earlier). Confirmed further by the
+  // standalone stock-transfer-runtime-cert.yml workflow's own
+  // already-proven precondition, which does exactly this same
+  // configureInventory call for providerB before transfer. Fixed here
+  // via the same accepted API already used for providerA's own listing
+  // above -- not hidden DB state.
+  const configureDestinationInventory = await fetch(
+    `${BACKEND}/inventory/providers/${providerBId}/products/${productId}`,
+    {
+      method: 'PUT',
+      headers: {
+        'content-type': 'application/json',
+        authorization: `Bearer ${adminLogin.accessToken}`,
+      },
+      body: JSON.stringify({
+        sellingPrice: '20.00',
+        mrp: '25.00',
+        discountPercentage: '0.00',
+        taxPercentage: '0.00',
+        minimumStockLevel: 0,
+        isVisible: true,
+        idempotencyKey: `task5-smoke-destination-listing-${randomUUID()}`,
+      }),
+    },
+  );
+  const configureDestinationBody = await json(configureDestinationInventory);
+  const destinationListingOk =
+    configureDestinationInventory.status === 200 &&
+    typeof configureDestinationBody?.inventoryId === 'string';
+  record(
+    'stock transfer destination listing precondition (accepted configureInventory API)',
+    destinationListingOk ? 'WORKING' : 'BROKEN',
+    `status ${configureDestinationInventory.status}, listing present: ${Boolean(destinationListingOk)}`,
+  );
+  if (!destinationListingOk) return;
+
   const transfer = await fetch(`${FRONTEND}/api/inventory/providers/${providerAId}/transfers`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', origin: FRONTEND, cookie: adminLogin.cookie },

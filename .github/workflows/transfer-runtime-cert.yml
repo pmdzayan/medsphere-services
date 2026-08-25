@@ -123,103 +123,54 @@ jobs:
           nohup pnpm --filter @medsphere/web exec next start -p 3001 > /tmp/frontend.log 2>&1 &
           echo $! > /tmp/frontend.pid
 
-      - name: Prepare Transfer-specific smoke harness
-        shell: bash
-        run: |
-          node <<'NODE'
-          const { readFileSync, writeFileSync } = require('node:fs');
-
-          let source = readFileSync('scripts/task5-smoke-test.mjs', 'utf8');
-          const transferMarker =
-            '  const transfer = await fetch(`${FRONTEND}/api/inventory/providers/${providerAId}/transfers`, {';
-          const staleVersion = '      expectedSourceVersion: 1,\n      quantity: 3,';
-
-          if (source.split(transferMarker).length !== 2) {
-            throw new Error('Expected exactly one stock-transfer marker in Task 5 smoke harness');
-          }
-          if (source.split(staleVersion).length !== 2) {
-            throw new Error('Expected exactly one stale transfer version token in Task 5 smoke harness');
-          }
-
-          const preconditions = `  // Transfer certification preconditions: the completed-transfer contract
-          // requires a destination inventory listing and the caller's current
-          // optimistic-concurrency token. The shared Task 5 harness predates
-          // reservation allocation incrementing the source batch version and
-          // previously supplied a stale hard-coded version of 1. Set up the
-          // destination through the accepted API and read the source version
-          // through the accepted stock API immediately before transfer.
-          const configureDestinationInventory = await fetch(
-            \`\${BACKEND}/inventory/providers/\${providerBId}/products/\${productId}\`,
-            {
-              method: 'PUT',
-              headers: {
-                'content-type': 'application/json',
-                authorization: \`Bearer \${adminLogin.accessToken}\`,
-              },
-              body: JSON.stringify({
-                sellingPrice: '20.00',
-                mrp: '25.00',
-                discountPercentage: '0.00',
-                taxPercentage: '0.00',
-                minimumStockLevel: 0,
-                isVisible: true,
-                idempotencyKey: \`task5-smoke-destination-listing-\${randomUUID()}\`,
-              }),
-            },
-          );
-          const configureDestinationBody = await json(configureDestinationInventory);
-          const destinationListingOk =
-            configureDestinationInventory.status === 200 &&
-            typeof configureDestinationBody?.inventoryId === 'string';
-          record(
-            'stock transfer destination listing precondition (accepted API)',
-            destinationListingOk ? 'WORKING' : 'BROKEN',
-            \`status \${configureDestinationInventory.status}, listing present: \${Boolean(destinationListingOk)}\`,
-          );
-
-          const transferSourceRead = await fetch(
-            \`\${FRONTEND}/api/inventory/stock?providerId=\${providerAId}&limit=10&offset=0\`,
-            { headers: { cookie: adminLogin.cookie } },
-          );
-          const transferSourceBody = await json(transferSourceRead);
-          const transferSourceBatch = transferSourceBody?.data
-            ?.flatMap((item) => item.batches ?? [])
-            .find((batch) => batch.id === batch2Id);
-          const transferSourceVersion = transferSourceBatch?.version;
-          const sourceVersionOk =
-            transferSourceRead.status === 200 && Number.isInteger(transferSourceVersion);
-          record(
-            'stock transfer current source version precondition (accepted stock API)',
-            sourceVersionOk ? 'WORKING' : 'BROKEN',
-            \`status \${transferSourceRead.status}, version: \${transferSourceVersion}\`,
-          );
-
-          if (!destinationListingOk || !sourceVersionOk) return;
-          `;
-
-          source = source.replace(transferMarker, `${preconditions}\n${transferMarker}`);
-          source = source.replace(
-            staleVersion,
-            '      expectedSourceVersion: transferSourceVersion,\n      quantity: 3,',
-          );
-          writeFileSync('/tmp/task5-transfer-smoke.mjs', source, 'utf8');
-          NODE
-
       - name: Certify Stock Transfers
         shell: bash
         run: |
           set +e
-          node /tmp/task5-transfer-smoke.mjs 2>&1 | tee /tmp/transfer-cert.log
+          # Runs the canonical, unmodified accepted harness directly --
+          # the same pattern already used by reservation-runtime-cert.yml.
+          # The runtime text-patching step this workflow previously used
+          # here (rewriting a copy of the script to inject a dynamically
+          # read source batch version and a destination listing
+          # precondition) is now stale: scripts/task5-smoke-test.mjs
+          # itself owns both of those fixes directly (a dedicated,
+          # freshly received transfer source batch, and an explicit
+          # destination inventory listing setup via the same accepted
+          # configureInventory API), so patching a second, divergent
+          # copy at CI time would only reintroduce the risk of the two
+          # implementations drifting apart again. This job still only
+          # gates on the specific transfer-related required lines below
+          # -- it does not install Playwright/Chromium and does not
+          # depend on the dashboard browser certification passing,
+          # matching the same isolation already accepted by
+          # reservation-runtime-cert.yml: an unrelated dashboard failure
+          # remains visible in the evidence log but cannot invalidate
+          # this transfer-only verdict.
+          node scripts/task5-smoke-test.mjs 2>&1 | tee /tmp/transfer-cert.log
           smoke_exit=${PIPESTATUS[0]}
           set -e
 
-          if ! grep -Eq '^WORKING[[:space:]]+\[required\] stock transfer \(correct source/target quantities\)$' /tmp/transfer-cert.log; then
-            echo 'Stock transfer certification failed: transfer check was not WORKING.'
+          declare -a required_checks=(
+            "stock transfer source batch precondition (dedicated, freshly received batch, accepted receiveBatch API)"
+            "stock transfer destination listing precondition (accepted configureInventory API)"
+            "stock transfer (correct source/target quantities)"
+          )
+
+          missing=0
+          for name in "${required_checks[@]}"; do
+            escaped=$(printf '%s' "$name" | sed -e 's/[.[\*^$/+]/\\&/g' -e 's/(/\\(/g' -e 's/)/\\)/g')
+            if ! grep -Eq "^WORKING[[:space:]]+\[required\] ${escaped}\$" /tmp/transfer-cert.log; then
+              echo "Stock transfer certification failed: required check was not WORKING: ${name}"
+              missing=1
+            fi
+          done
+
+          if [ "$missing" -ne 0 ]; then
             exit 1
           fi
 
           echo 'STOCK TRANSFER CERTIFICATION: PASS'
-          echo "Full smoke script exit code: ${smoke_exit}. Later non-transfer failures remain visible in the evidence log but are non-authoritative for this isolated Transfer verdict."
+          echo "Full smoke script exit code: ${smoke_exit}. Later non-transfer failures (including the dashboard browser certification, which this job does not install a browser for) remain visible in the evidence log but are non-authoritative for this isolated Transfer verdict."
 
       - name: Show backend log on failure
         if: failure()
