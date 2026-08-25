@@ -1,5 +1,6 @@
 import type {
   AuthenticatedSession,
+  GoogleLoginRequest,
   LoginRequest,
   RegistrationRequest,
   RegistrationResponse,
@@ -53,6 +54,26 @@ export class ApiError extends Error {
     super(message);
     this.name = 'ApiError';
   }
+}
+
+export async function googleLogin(request: GoogleLoginRequest): Promise<AuthenticatedSession> {
+  const response = await fetch('/api/auth/google', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(request),
+    cache: 'no-store',
+  });
+
+  if (!response.ok) {
+    throw new ApiError(
+      response.status === 401
+        ? 'Google sign-in could not be authorized.'
+        : 'Google sign-in failed. Try again.',
+      response.status,
+    );
+  }
+
+  return (await response.json()) as AuthenticatedSession;
 }
 
 export async function login(request: LoginRequest): Promise<AuthenticatedSession> {
