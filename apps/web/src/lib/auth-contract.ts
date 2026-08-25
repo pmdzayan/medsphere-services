@@ -1,3 +1,8 @@
+export interface GoogleLoginRequest {
+  tenantSlug: string;
+  idToken: string;
+}
+
 export interface LoginRequest {
   tenantSlug: string;
   email: string;
@@ -44,6 +49,42 @@ export interface TokenResponse {
 }
 
 export type AuthenticatedSession = Omit<LoginResponse, 'accessToken' | 'refreshToken'>;
+
+export function normalizeGoogleLoginRequest(input: GoogleLoginRequest): GoogleLoginRequest {
+  return {
+    tenantSlug: normalizeTenantSlug(input.tenantSlug),
+    idToken: input.idToken.trim(),
+  };
+}
+
+export function isGoogleLoginRequest(value: unknown): value is GoogleLoginRequest {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return false;
+  }
+
+  const candidate = value as Record<string, unknown>;
+  return (
+    Object.keys(candidate).sort().join(',') === 'idToken,tenantSlug' &&
+    typeof candidate.tenantSlug === 'string' &&
+    typeof candidate.idToken === 'string'
+  );
+}
+
+export function validateGoogleLoginRequest(
+  input: GoogleLoginRequest,
+): Partial<Record<keyof GoogleLoginRequest, string>> {
+  const errors: Partial<Record<keyof GoogleLoginRequest, string>> = {};
+
+  if (input.tenantSlug.length < 1 || input.tenantSlug.length > 100) {
+    errors.tenantSlug = 'Use the organization slug provided by your administrator.';
+  }
+
+  if (input.idToken.length < 1 || input.idToken.length > 10000) {
+    errors.idToken = 'Invalid Google sign-in credential.';
+  }
+
+  return errors;
+}
 
 export function normalizeLoginRequest(input: LoginRequest): LoginRequest {
   return {
