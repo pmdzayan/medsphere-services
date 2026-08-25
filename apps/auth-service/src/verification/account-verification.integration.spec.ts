@@ -1,9 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import { ConflictException } from '@nestjs/common';
 import { AuditWriter } from '../audit/audit-writer.service';
+import {
+  isInfrastructureTestEnabled,
+  requireEnv,
+} from '../auth/testing/infrastructure-test-gate';
 import { PrismaService } from '../prisma/prisma.service';
 import { UsersRepository } from '../users/users.repository';
-import { isInfrastructureTestEnabled, requireEnv } from '../auth/testing/infrastructure-test-gate';
 import { AccountVerificationService } from './account-verification.service';
 import type { AccountVerificationMethod } from './verification.types';
 
@@ -85,14 +88,15 @@ describeVerificationInfra('AccountVerificationService PostgreSQL integration', (
     method: AccountVerificationMethod,
     options: { approved?: boolean; ageVerified18Plus?: boolean; key?: string } = {},
   ) {
+    const idempotencyKey = options.key ?? `${method.toLowerCase()}-${randomUUID()}`;
     return service.completeMockVerification({
       tenantSlug: subject.tenantSlug,
       email: subject.email,
       method,
-      idempotencyKey: options.key ?? `${method.toLowerCase()}-${randomUUID()}`,
+      idempotencyKey,
       approved: options.approved ?? true,
       ageVerified18Plus: options.ageVerified18Plus,
-      providerReference: `opaque-${randomUUID()}`,
+      providerReference: `opaque-${idempotencyKey}`,
     });
   }
 
@@ -118,7 +122,9 @@ describeVerificationInfra('AccountVerificationService PostgreSQL integration', (
     const phoneOnly = await createPendingSubject();
     const phoneResult = await complete(phoneOnly, 'PHONE');
     expect(phoneResult.activated).toBe(false);
-    await expect(users.findLoginIdentity(phoneOnly.tenantSlug, phoneOnly.email)).resolves.toBeNull();
+    await expect(
+      users.findLoginIdentity(phoneOnly.tenantSlug, phoneOnly.email),
+    ).resolves.toBeNull();
 
     const noPhone = await createPendingSubject();
     await complete(noPhone, 'IDENTITY');
@@ -181,9 +187,9 @@ describeVerificationInfra('AccountVerificationService PostgreSQL integration', (
       }),
     ).toBe(1);
 
-    await expect(
-      complete(subject, 'PHONE', { key, approved: false }),
-    ).rejects.toBeInstanceOf(ConflictException);
+    await expect(complete(subject, 'PHONE', { key, approved: false })).rejects.toBeInstanceOf(
+      ConflictException,
+    );
   });
 
   it('does not partially activate after a rejected verification and keeps audit metadata minimized', async () => {
