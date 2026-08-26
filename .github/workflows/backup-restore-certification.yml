@@ -1,0 +1,81 @@
+name: MedSphere Backup & Restore Certification
+
+on:
+  workflow_dispatch: {}
+  pull_request:
+    branches:
+      - feature/database-architecture
+
+concurrency:
+  group: backup-restore-cert-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  backup-restore:
+    name: PostgreSQL backup/restore certification
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      DATABASE_URL: postgresql://medsphere_ci:medsphere_ci@localhost:5432/medsphere_ci?schema=public
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: medsphere_ci
+          POSTGRES_PASSWORD: medsphere_ci
+          POSTGRES_DB: medsphere_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U medsphere_ci -d medsphere_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install PNPM
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+          run_install: false
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.12.0
+          cache: pnpm
+
+      - name: Install PostgreSQL 16 client tools
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client-16
+
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify database migration and drift
+        run: pnpm db:verify
+
+      - name: Run backup/restore certification
+        run: node scripts/backup-restore-certification.mjs | tee /tmp/backup-restore-cert.log
+
+      - name: Confirm explicit PASS verdict
+        run: |
+          if ! grep -Fq 'BACKUP RESTORE CERTIFICATION: PASS' /tmp/backup-restore-cert.log; then
+            echo 'Backup/restore certification did not report an explicit PASS verdict.'
+            exit 1
+          fi
+
+      - name: Upload certification evidence (text log only -- no backup artifact)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backup-restore-certification-evidence
+          path: /tmp/backup-restore-cert.log
+          if-no-files-found: ignore
+          retention-days: 7
