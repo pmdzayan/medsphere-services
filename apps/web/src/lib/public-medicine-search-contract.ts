@@ -58,3 +58,55 @@ export function isPublicMedicineSearchResponse(
     Number.isInteger(page.offset)
   );
 }
+
+export interface PublicNearbyMedicineSearchResult extends PublicMedicineSearchResult {
+  readonly distanceKm: number;
+}
+
+export interface PublicNearbyMedicineSearchResponse {
+  readonly data: PublicNearbyMedicineSearchResult[];
+  readonly limit: number;
+  readonly offset: number;
+  readonly radiusKm: number;
+}
+
+export interface PublicNearbyMedicineSearchRequest {
+  readonly q: string;
+  readonly latitude: number;
+  readonly longitude: number;
+  readonly radiusKm?: number;
+  readonly limit?: number;
+  readonly offset?: number;
+}
+
+function isPublicNearbyMedicineSearchResult(
+  value: unknown,
+): value is PublicNearbyMedicineSearchResult {
+  if (!isPublicMedicineSearchResult(value)) return false;
+
+  const result = value as PublicMedicineSearchResult & {
+    distanceKm?: unknown;
+  };
+
+  return (
+    typeof result.distanceKm === 'number' &&
+    Number.isFinite(result.distanceKm) &&
+    result.distanceKm >= 0
+  );
+}
+
+export function isPublicNearbyMedicineSearchResponse(
+  value: unknown,
+): value is PublicNearbyMedicineSearchResponse {
+  if (typeof value !== 'object' || value === null) return false;
+  const page = value as Partial<PublicNearbyMedicineSearchResponse>;
+
+  return (
+    Array.isArray(page.data) &&
+    page.data.every(isPublicNearbyMedicineSearchResult) &&
+    Number.isInteger(page.limit) &&
+    Number.isInteger(page.offset) &&
+    typeof page.radiusKm === 'number' &&
+    Number.isFinite(page.radiusKm)
+  );
+}

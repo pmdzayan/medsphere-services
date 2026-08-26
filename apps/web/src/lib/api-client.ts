@@ -7,7 +7,11 @@ import type {
   RegistrationResponse,
 } from './auth-contract';
 import { toAuditSearchParams, type AuditEventFilters, type AuditEventPage } from './audit-contract';
-import type { PublicMedicineSearchResponse } from './public-medicine-search-contract';
+import type {
+  PublicMedicineSearchResponse,
+  PublicNearbyMedicineSearchRequest,
+  PublicNearbyMedicineSearchResponse,
+} from './public-medicine-search-contract';
 import type {
   AuthorizationCatalogue,
   CreateRoleRequest,
@@ -182,6 +186,32 @@ export async function searchPublicMedicine(
   const search = new URLSearchParams({ q });
   return requestJson<PublicMedicineSearchResponse>(
     `/api/public/providers/${encodeURIComponent(providerId)}/medicine-search?${search.toString()}`,
+  );
+}
+
+export async function searchNearbyMedicine(
+  request: PublicNearbyMedicineSearchRequest,
+): Promise<PublicNearbyMedicineSearchResponse> {
+  const search = new URLSearchParams({
+    q: request.q,
+    latitude: String(request.latitude),
+    longitude: String(request.longitude),
+  });
+
+  if (request.radiusKm !== undefined) {
+    search.set('radiusKm', String(request.radiusKm));
+  }
+
+  if (request.limit !== undefined) {
+    search.set('limit', String(request.limit));
+  }
+
+  if (request.offset !== undefined) {
+    search.set('offset', String(request.offset));
+  }
+
+  return requestJson<PublicNearbyMedicineSearchResponse>(
+    `/api/public/medicine-discovery/nearby?${search.toString()}`,
   );
 }
 

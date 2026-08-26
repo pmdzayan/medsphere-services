@@ -1,16 +1,60 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { LanguageProvider } from '@/components/language-provider';
-import { ApiError, searchPublicMedicine } from '@/lib/api-client';
+import { ApiError, searchNearbyMedicine, searchPublicMedicine } from '@/lib/api-client';
 import type { PublicMedicineSearchResult } from '@/lib/public-medicine-search-contract';
 import { PublicMedicineSearch } from './public-medicine-search';
 
 vi.mock('@/lib/api-client', async () => {
   const actual = await vi.importActual<typeof import('@/lib/api-client')>('@/lib/api-client');
-  return { ...actual, searchPublicMedicine: vi.fn() };
+  return {
+    ...actual,
+    searchPublicMedicine: vi.fn(),
+    searchNearbyMedicine: vi.fn(),
+  };
 });
 
 const providerId = '11111111-1111-4111-8111-111111111111';
+
+function mockGeolocationSuccess(latitude = 12.9716, longitude = 77.5946) {
+  Object.defineProperty(navigator, 'geolocation', {
+    configurable: true,
+    value: {
+      getCurrentPosition: vi.fn((success: PositionCallback) =>
+        success({
+          coords: {
+            latitude,
+            longitude,
+            accuracy: 10,
+            altitude: null,
+            altitudeAccuracy: null,
+            heading: null,
+            speed: null,
+          },
+          timestamp: Date.now(),
+          toJSON: () => ({}),
+        } as GeolocationPosition),
+      ),
+    },
+  });
+}
+
+function mockGeolocationDenied() {
+  Object.defineProperty(navigator, 'geolocation', {
+    configurable: true,
+    value: {
+      getCurrentPosition: vi.fn((_success: PositionCallback, error: PositionErrorCallback) =>
+        error({
+          code: 1,
+          message: 'denied',
+          PERMISSION_DENIED: 1,
+          POSITION_UNAVAILABLE: 2,
+          TIMEOUT: 3,
+        } as GeolocationPositionError),
+      ),
+    },
+  });
+}
 
 const inStockResult: PublicMedicineSearchResult = {
   productId: '22222222-2222-4222-8222-222222222222',
@@ -138,6 +182,90 @@ describe('PublicMedicineSearch', () => {
     expect(screen.getByText('மருந்து கிடைப்பைச் சரிபார்க்கவும்')).toBeVisible();
     expect(screen.getByLabelText('மருந்தின் பெயர்')).toBeVisible();
     expect(screen.getByRole('button', { name: 'தேடுக' })).toBeDisabled();
+  });
+
+  it('uses browser geolocation for nearby medicine search and renders distance', async () => {
+    mockGeolocationSuccess(12.9716, 77.5946);
+
+    vi.mocked(searchNearbyMedicine).mockResolvedValue({
+      data: [
+        {
+          ...inStockResult,
+          distanceKm: 1.4,
+        },
+      ],
+      limit: 20,
+      offset: 0,
+      radiusKm: 10,
+    });
+
+    renderSearch();
+
+    fireEvent.change(screen.getByLabelText('Medicine name'), {
+      target: { value: 'paracetamol' },
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Find near me' }));
+
+    expect(await screen.findByText('1.4 km away')).toBeVisible();
+
+    expect(searchNearbyMedicine).toHaveBeenCalledWith({
+      q: 'paracetamol',
+      latitude: 12.9716,
+      longitude: 77.5946,
+      radiusKm: 10,
+      limit: 20,
+      offset: 0,
+    });
+
+    expect(searchPublicMedicine).not.toHaveBeenCalled();
+  });
+
+  it('shows a bounded error when location permission is denied', async () => {
+    mockGeolocationDenied();
+
+    renderSearch();
+
+    fireEvent.change(screen.getByLabelText('Medicine name'), {
+      target: { value: 'paracetamol' },
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Find near me' }));
+
+    expect(
+      await screen.findByText(
+        'Location permission was denied. Allow location access to search nearby pharmacies.',
+      ),
+    ).toBeVisible();
+
+    expect(searchNearbyMedicine).not.toHaveBeenCalled();
+  });
+
+  it('does not persist precise location coordinates in browser storage', async () => {
+    mockGeolocationSuccess(12.9716, 77.5946);
+
+    const localStorageSpy = vi.spyOn(Storage.prototype, 'setItem');
+    const sessionStorageSpy = vi.spyOn(Storage.prototype, 'setItem');
+
+    vi.mocked(searchNearbyMedicine).mockResolvedValue({
+      data: [],
+      limit: 20,
+      offset: 0,
+      radiusKm: 10,
+    });
+
+    renderSearch();
+
+    fireEvent.change(screen.getByLabelText('Medicine name'), {
+      target: { value: 'paracetamol' },
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Find near me' }));
+
+    await screen.findByText(/No matches/i);
+
+    expect(localStorageSpy).not.toHaveBeenCalled();
+    expect(sessionStorageSpy).not.toHaveBeenCalled();
   });
 });
 
