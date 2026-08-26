@@ -61,6 +61,7 @@ describe('RegistrationForm interactions', () => {
         password: 'a-secure-password',
         firstName: 'Mira',
         lastName: 'Patel',
+        phone: '+919876543210',
       }),
     );
     expect(await screen.findByText('Your request is safely queued.')).toBeVisible();
@@ -109,6 +110,7 @@ function fillValidForm() {
   fill('Last name', ' Patel ');
   fill('Organization slug', ' Central-Pharmacy ');
   fill('Work email', ' OPERATOR@EXAMPLE.COM ');
+  fill('Phone number', ' +91 98765 43210 ');
   fill('Create password', 'a-secure-password');
   fill('Confirm password', 'a-secure-password');
 }

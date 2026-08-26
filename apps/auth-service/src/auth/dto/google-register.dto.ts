@@ -3,6 +3,7 @@ import { IsString, Matches, MaxLength, MinLength } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 import { normalizeAuthenticationLocator } from '../auth-normalization';
+import { normalizePhoneNumber } from '../../verification/otp/phone-normalization';
 
 export class GoogleRegisterDto {
   @ApiProperty({ example: 'central-pharmacy', maxLength: 100 })
@@ -13,6 +14,13 @@ export class GoogleRegisterDto {
   @MaxLength(100)
   @Matches(/^[a-z0-9]+(?:-[a-z0-9]+)*$/)
   tenantSlug!: string;
+
+  @ApiProperty({ example: '+919876543210', maxLength: 20 })
+  @Transform(({ value }) => (typeof value === 'string' ? normalizePhoneNumber(value) : value))
+  @IsString()
+  @MaxLength(20)
+  @Matches(/^\+[1-9]\d{7,14}$/)
+  phone!: string;
 
   @ApiProperty({ maxLength: 10000, description: 'Google ID token' })
   @IsString()

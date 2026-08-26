@@ -103,6 +103,7 @@ describe('accepted registration contract', () => {
     password: 'a-secure-password',
     firstName: 'Mira',
     lastName: 'Patel',
+    phone: '+919876543210',
   };
 
   it('normalizes public locators and names without changing the password', () => {
@@ -113,6 +114,7 @@ describe('accepted registration contract', () => {
         email: ' OPERATOR@EXAMPLE.COM ',
         firstName: ' Mira ',
         lastName: ' Patel ',
+        phone: ' +91 98765 43210 ',
       }),
     ).toEqual(request);
   });
@@ -140,6 +142,7 @@ describe('accepted registration contract', () => {
         password: 'short',
         firstName: '',
         lastName: 'x'.repeat(101),
+        phone: 'invalid',
       }),
     ).toEqual({
       tenantSlug: expect.any(String),
@@ -147,6 +150,7 @@ describe('accepted registration contract', () => {
       password: expect.any(String),
       firstName: expect.any(String),
       lastName: expect.any(String),
+      phone: expect.any(String),
     });
   });
 });

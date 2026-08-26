@@ -90,6 +90,7 @@ describeOtpInfrastructure('PhoneOtpService PostgreSQL integration', () => {
         passwordHash: 'integration-only-placeholder',
         firstName: 'OTP',
         lastName: 'Subject',
+        phone: '+15551234567',
         status: 'PENDING_VERIFICATION',
       },
     });
@@ -112,7 +113,6 @@ describeOtpInfrastructure('PhoneOtpService PostgreSQL integration', () => {
     await service.requestOtp({
       tenantSlug: subject.tenantSlug,
       email: subject.email,
-      phone: '+15551234567',
     });
 
     expect(deliveredBodies).toHaveLength(1);

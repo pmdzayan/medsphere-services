@@ -11,6 +11,7 @@ const validRequest = {
   password: 'a-secure-password',
   firstName: 'Mira',
   lastName: 'Patel',
+  phone: '+919876543210',
 };
 
 afterEach(() => vi.unstubAllGlobals());
@@ -53,6 +54,7 @@ describe('public onboarding BFF boundary', () => {
         email: ' OPERATOR@EXAMPLE.COM ',
         firstName: ' Mira ',
         lastName: ' Patel ',
+        phone: ' +91 98765 43210 ',
       }),
     );
 

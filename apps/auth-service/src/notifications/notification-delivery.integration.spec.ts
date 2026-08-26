@@ -56,6 +56,44 @@ infrastructure('G3.23 PostgreSQL notification delivery foundation', () => {
     ).rejects.toMatchObject({ code: 'P2003' });
   });
 
+  it('scopes notification claims to the requested tenant', async () => {
+    const tenantEventId = await createSourceEvent();
+    await enqueueNotificationDelivery(prisma.client, deliveryInput(tenantEventId));
+
+    const otherEventId = randomUUID();
+    await appendOutboxEvent(prisma.client, {
+      eventId: otherEventId,
+      eventType: 'inventory.reservation.ready',
+      eventVersion: 1,
+      aggregateType: 'MedicineReservation',
+      aggregateId: randomUUID(),
+      occurredAt: new Date().toISOString(),
+      actor: {
+        actorType: 'SYSTEM',
+        tenantId: otherTenantId,
+        service: 'notification-delivery.integration',
+      },
+      payload: { status: 'READY', version: 2 },
+    });
+
+    await enqueueNotificationDelivery(prisma.client, {
+      ...deliveryInput(otherEventId),
+      tenantId: otherTenantId,
+    });
+
+    const now = new Date();
+    const claimed = await claimNotificationDeliveries(prisma.client, {
+      limit: 100,
+      now,
+      leaseMs: 30_000,
+      tenantId,
+    });
+
+    expect(claimed.filter((item) => item.sourceEventId === tenantEventId)).toHaveLength(1);
+    expect(claimed.some((item) => item.sourceEventId === otherEventId)).toBe(false);
+    expect(claimed.every((item) => item.tenantId === tenantId)).toBe(true);
+  });
+
   it('claims once across overlapping workers and rejects a stale outcome lease', async () => {
     const eventId = await createSourceEvent();
     await enqueueNotificationDelivery(prisma.client, deliveryInput(eventId));

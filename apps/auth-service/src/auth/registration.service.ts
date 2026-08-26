@@ -20,6 +20,7 @@ export class RegistrationService {
     await this.usersRepository.createPendingRegistration({
       tenantSlug: registerDto.tenantSlug,
       email: registerDto.email,
+      phone: registerDto.phone,
       passwordHash,
       firstName: registerDto.firstName,
       lastName: registerDto.lastName,

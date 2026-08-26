@@ -4,12 +4,13 @@ import Script from 'next/script';
 import { useRef, useState } from 'react';
 
 import { googleRegister } from '@/lib/api-client';
-import { normalizeTenantSlug } from '@/lib/auth-contract';
+import { normalizeGoogleRegisterRequest, validateGoogleRegisterRequest } from '@/lib/auth-contract';
 
 interface GoogleRegisterProps {
   tenantSlug: string;
   firstName: string;
   lastName: string;
+  phone: string;
   onSuccess: () => void;
   onError: () => void;
 }
@@ -18,6 +19,7 @@ export function GoogleRegister({
   tenantSlug,
   firstName,
   lastName,
+  phone,
   onSuccess,
   onError,
 }: GoogleRegisterProps) {
@@ -34,11 +36,20 @@ export function GoogleRegister({
     window.google.accounts.id.initialize({
       client_id: clientId,
       callback: async ({ credential }) => {
-        const normalizedTenantSlug = normalizeTenantSlug(tenantSlug);
-        const normalizedFirstName = firstName.trim();
-        const normalizedLastName = lastName.trim();
+        if (!credential) {
+          onError();
+          return;
+        }
 
-        if (!normalizedTenantSlug || !normalizedFirstName || !normalizedLastName || !credential) {
+        const request = normalizeGoogleRegisterRequest({
+          tenantSlug,
+          idToken: credential,
+          firstName,
+          lastName,
+          phone,
+        });
+
+        if (Object.keys(validateGoogleRegisterRequest(request)).length > 0) {
           onError();
           return;
         }
@@ -46,12 +57,7 @@ export function GoogleRegister({
         setPending(true);
 
         try {
-          await googleRegister({
-            tenantSlug: normalizedTenantSlug,
-            idToken: credential,
-            firstName: normalizedFirstName,
-            lastName: normalizedLastName,
-          });
+          await googleRegister(request);
 
           onSuccess();
         } catch {

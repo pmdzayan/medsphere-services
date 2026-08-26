@@ -8,6 +8,7 @@ export interface GoogleRegisterRequest {
   idToken: string;
   firstName: string;
   lastName: string;
+  phone: string;
 }
 
 export interface LoginRequest {
@@ -22,6 +23,7 @@ export interface RegistrationRequest {
   password: string;
   firstName: string;
   lastName: string;
+  phone: string;
 }
 
 export interface RegistrationResponse {
@@ -65,11 +67,12 @@ export function normalizeGoogleRegisterRequest(
     idToken: input.idToken.trim(),
     firstName: input.firstName.trim(),
     lastName: input.lastName.trim(),
+    phone: normalizePhoneNumber(input.phone),
   };
 }
 
 export function isGoogleRegisterRequest(value: unknown): value is GoogleRegisterRequest {
-  return hasExactStringKeys(value, ['firstName', 'idToken', 'lastName', 'tenantSlug']);
+  return hasExactStringKeys(value, ['firstName', 'idToken', 'lastName', 'phone', 'tenantSlug']);
 }
 
 export function validateGoogleRegisterRequest(
@@ -91,6 +94,10 @@ export function validateGoogleRegisterRequest(
 
   if (input.lastName.length < 1 || input.lastName.length > 100) {
     errors.lastName = 'Enter a last name between 1 and 100 characters.';
+  }
+
+  if (!isValidE164PhoneNumber(input.phone)) {
+    errors.phone = 'Enter a valid phone number including country code.';
   }
 
   return errors;
@@ -201,11 +208,19 @@ export function normalizeRegistrationRequest(input: RegistrationRequest): Regist
     password: input.password,
     firstName: input.firstName.trim(),
     lastName: input.lastName.trim(),
+    phone: normalizePhoneNumber(input.phone),
   };
 }
 
 export function isRegistrationRequest(value: unknown): value is RegistrationRequest {
-  return hasExactStringKeys(value, ['email', 'firstName', 'lastName', 'password', 'tenantSlug']);
+  return hasExactStringKeys(value, [
+    'email',
+    'firstName',
+    'lastName',
+    'password',
+    'phone',
+    'tenantSlug',
+  ]);
 }
 
 export function isRegistrationResponse(value: unknown): value is RegistrationResponse {
@@ -226,6 +241,9 @@ export function validateRegistrationRequest(
   if (shared.tenantSlug) errors.tenantSlug = shared.tenantSlug;
   if (shared.email) errors.email = shared.email;
   if (shared.password) errors.password = shared.password;
+  if (!isValidE164PhoneNumber(input.phone)) {
+    errors.phone = 'Enter a valid phone number including country code.';
+  }
   if (input.firstName.length < 1 || input.firstName.length > 100) {
     errors.firstName = 'Enter a first name between 1 and 100 characters.';
   }
@@ -249,6 +267,15 @@ export function validateLoginRequest(
     errors.password = 'Password must be between 15 and 128 characters.';
   }
   return errors;
+}
+
+export function normalizePhoneNumber(value: string): string {
+  const stripped = value.replace(/[\s()-]/g, '');
+  return stripped.startsWith('+') ? stripped : `+${stripped}`;
+}
+
+export function isValidE164PhoneNumber(value: string): boolean {
+  return /^\+?[1-9]\d{7,14}$/.test(value);
 }
 
 function hasExactStringKeys<T extends string>(

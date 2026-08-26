@@ -11,6 +11,7 @@ const validRequest = {
   idToken: 'google-id-token',
   firstName: 'Mira',
   lastName: 'Patel',
+  phone: '+919876543210',
 };
 
 afterEach(() => vi.unstubAllGlobals());
@@ -55,6 +56,7 @@ describe('Google registration BFF boundary', () => {
         idToken: ' google-id-token ',
         firstName: ' Mira ',
         lastName: ' Patel ',
+        phone: ' +91 98765 43210 ',
       }),
     );
 

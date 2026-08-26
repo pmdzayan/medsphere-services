@@ -49,6 +49,7 @@ export class AuthService {
       tenantSlug: googleRegisterDto.tenantSlug,
       subject: googleIdentity.subject,
       email: googleIdentity.email,
+      phone: googleRegisterDto.phone,
       firstName: googleRegisterDto.firstName,
       lastName: googleRegisterDto.lastName,
     });

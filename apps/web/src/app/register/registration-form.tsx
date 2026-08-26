@@ -18,6 +18,7 @@ type FormErrors = Partial<Record<RegistrationField | 'confirmPassword' | 'form',
 const validationMessageKeys: Record<string, TranslationKey> = {
   'Use the organization slug provided by your administrator.': 'registration.errorTenant',
   'Enter a valid email address.': 'registration.errorEmail',
+  'Enter a valid phone number including country code.': 'registration.errorPhone',
   'Password must be between 15 and 128 characters.': 'registration.errorPassword',
   'Enter a first name between 1 and 100 characters.': 'registration.errorFirstName',
   'Enter a last name between 1 and 100 characters.': 'registration.errorLastName',
@@ -31,6 +32,7 @@ export function RegistrationForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
+  const [phone, setPhone] = useState('');
   const [tenantSlug, setTenantSlug] = useState('');
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -42,6 +44,7 @@ export function RegistrationForm() {
       password: String(form.get('password') ?? ''),
       firstName: String(form.get('firstName') ?? ''),
       lastName: String(form.get('lastName') ?? ''),
+      phone: String(form.get('phone') ?? ''),
     });
     const contractErrors = validateRegistrationRequest(request);
     const nextErrors: FormErrors = {};
@@ -155,6 +158,18 @@ export function RegistrationForm() {
         maxLength={254}
         error={errors.email}
       />
+      <Field
+        name="phone"
+        label={t('registration.phone')}
+        description={t('registration.phoneDescription')}
+        placeholder="+91 98765 43210"
+        type="tel"
+        autoComplete="tel"
+        maxLength={20}
+        value={phone}
+        onChange={(event) => setPhone(event.target.value)}
+        error={errors.phone}
+      />
       <div className="grid gap-4 sm:grid-cols-2">
         <Field
           name="password"
@@ -205,6 +220,7 @@ export function RegistrationForm() {
             tenantSlug={tenantSlug}
             firstName={firstName}
             lastName={lastName}
+            phone={phone}
             onSuccess={() => {
               setErrors({});
               setConfirmation(true);

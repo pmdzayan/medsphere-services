@@ -20,9 +20,4 @@ export class RequestPhoneOtpDto {
   @IsString()
   @MaxLength(254)
   email!: string;
-
-  @ApiProperty({ example: '+15551234567', maxLength: 20 })
-  @IsString()
-  @MaxLength(20)
-  phone!: string;
 }

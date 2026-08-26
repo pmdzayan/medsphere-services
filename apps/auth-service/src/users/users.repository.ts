@@ -112,6 +112,7 @@ export class UsersRepository {
   async createPendingRegistration(data: {
     tenantSlug: string;
     email: string;
+    phone: string;
     passwordHash: string;
     firstName: string;
     lastName: string;
@@ -144,6 +145,7 @@ export class UsersRepository {
         const user = await transaction.user.create({
           data: {
             email: data.email,
+            phone: data.phone,
             passwordHash: data.passwordHash,
             firstName: data.firstName,
             lastName: data.lastName,
@@ -179,6 +181,7 @@ export class UsersRepository {
     tenantSlug: string;
     subject: string;
     email: string;
+    phone: string;
     firstName: string;
     lastName: string;
   }): Promise<void> {
@@ -223,6 +226,7 @@ export class UsersRepository {
         const user = await transaction.user.create({
           data: {
             email: data.email,
+            phone: data.phone,
             passwordHash: null,
             firstName: data.firstName,
             lastName: data.lastName,

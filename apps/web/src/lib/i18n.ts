@@ -84,6 +84,8 @@ const englishMessages = {
   'registration.organizationSlugDescription':
     'Use the exact slug supplied by the organization administrator.',
   'registration.workEmail': 'Work email',
+  'registration.phone': 'Phone number',
+  'registration.phoneDescription': 'Include the country code, for example +91 98765 43210.',
   'registration.createPassword': 'Create password',
   'registration.passwordDescription':
     'Use 15–128 characters. Do not reuse a password from another service.',
@@ -105,6 +107,7 @@ const englishMessages = {
     'Use test identities only. This stabilization environment is not approved for real patient, employee, or clinical data.',
   'registration.errorTenant': 'Use the organization slug provided by your administrator.',
   'registration.errorEmail': 'Enter a valid email address.',
+  'registration.errorPhone': 'Enter a valid phone number including country code.',
   'registration.errorPassword': 'Password must be between 15 and 128 characters.',
   'registration.errorFirstName': 'Enter a first name between 1 and 100 characters.',
   'registration.errorLastName': 'Enter a last name between 1 and 100 characters.',
@@ -172,6 +175,9 @@ const tamilMessages: MessageOverrides = {
   'registration.organizationSlugDescription':
     'நிறுவன நிர்வாகி வழங்கிய சரியான ஸ்லக் மதிப்பைப் பயன்படுத்தவும்.',
   'registration.workEmail': 'பணி மின்னஞ்சல்',
+  'registration.phone': 'தொலைபேசி எண்',
+  'registration.phoneDescription':
+    'நாட்டுக் குறியீட்டுடன் எண்ணை உள்ளிடவும், எடுத்துக்காட்டாக +91 98765 43210.',
   'registration.createPassword': 'கடவுச்சொல்லை உருவாக்கவும்',
   'registration.passwordDescription':
     '15–128 எழுத்துகளைப் பயன்படுத்தவும். வேறு சேவையில் பயன்படுத்திய கடவுச்சொல்லை மீண்டும் பயன்படுத்த வேண்டாம்.',
@@ -192,6 +198,7 @@ const tamilMessages: MessageOverrides = {
     'சோதனை அடையாளங்களை மட்டும் பயன்படுத்தவும். இந்த நிலைப்படுத்தல் சூழல் உண்மையான நோயாளர், பணியாளர் அல்லது மருத்துவத் தரவுகளுக்காக அனுமதிக்கப்படவில்லை.',
   'registration.errorTenant': 'உங்கள் நிர்வாகி வழங்கிய நிறுவன ஸ்லக் மதிப்பைப் பயன்படுத்தவும்.',
   'registration.errorEmail': 'சரியான மின்னஞ்சல் முகவரியை உள்ளிடவும்.',
+  'registration.errorPhone': 'நாட்டுக் குறியீட்டுடன் சரியான தொலைபேசி எண்ணை உள்ளிடவும்.',
   'registration.errorPassword': 'கடவுச்சொல் 15 முதல் 128 எழுத்துகளுக்குள் இருக்க வேண்டும்.',
   'registration.errorFirstName': '1 முதல் 100 எழுத்துகளுக்குள் முதல் பெயரை உள்ளிடவும்.',
   'registration.errorLastName': '1 முதல் 100 எழுத்துகளுக்குள் கடைசி பெயரை உள்ளிடவும்.',
