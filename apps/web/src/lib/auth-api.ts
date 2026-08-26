@@ -1,8 +1,66 @@
 import { NextResponse, type NextRequest } from 'next/server';
 
+const DEVELOPMENT_AUTH_API_URL = 'http://localhost:3000';
+
+function isLoopbackHost(hostname: string): boolean {
+  const normalized = hostname.toLowerCase();
+  return (
+    normalized === 'localhost' ||
+    normalized === '127.0.0.1' ||
+    normalized === '0.0.0.0' ||
+    normalized === '::1' ||
+    normalized === '[::1]'
+  );
+}
+
+export function resolveAuthApiBaseUrl(
+  environment: Readonly<Record<string, string | undefined>> = process.env,
+): string {
+  const configured = environment.AUTH_API_URL?.trim();
+
+  if (!configured) {
+    if (environment.NODE_ENV === 'production') {
+      throw new Error('AUTH_API_URL is required in production');
+    }
+    return DEVELOPMENT_AUTH_API_URL;
+  }
+
+  if (!/^https?:\/\//i.test(configured)) {
+    throw new Error('AUTH_API_URL must be an absolute HTTP(S) URL');
+  }
+
+  let parsed: URL;
+  try {
+    parsed = new URL(configured);
+  } catch {
+    throw new Error('AUTH_API_URL must be an absolute HTTP(S) URL');
+  }
+
+  if (!['http:', 'https:'].includes(parsed.protocol)) {
+    throw new Error('AUTH_API_URL must use http:// or https://');
+  }
+
+  if (parsed.username || parsed.password) {
+    throw new Error('AUTH_API_URL must not contain embedded credentials');
+  }
+
+  if (parsed.pathname !== '/' || parsed.search || parsed.hash) {
+    throw new Error('AUTH_API_URL must contain only an origin');
+  }
+
+  if (environment.NODE_ENV === 'production' && isLoopbackHost(parsed.hostname)) {
+    throw new Error('AUTH_API_URL must not target a loopback host in production');
+  }
+
+  return parsed.origin;
+}
+
 export function authApiUrl(path: string): string {
-  const baseUrl = process.env.AUTH_API_URL ?? 'http://localhost:3000';
-  return `${baseUrl.replace(/\/$/, '')}${path}`;
+  if (!path.startsWith('/')) {
+    throw new Error('Auth API path must start with /');
+  }
+
+  return `${resolveAuthApiBaseUrl()}${path}`;
 }
 
 export function upstreamHeaders(request: NextRequest, accessToken?: string): Headers {
