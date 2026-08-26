@@ -60,22 +60,6 @@ describeOtpInfrastructure('PhoneOtpService PostgreSQL integration', () => {
   const createdUserIds: string[] = [];
   const createdTenantIds: string[] = [];
 
-  afterEach(async () => {
-    deliveredBodies.length = 0;
-
-    if (createdTenantIds.length > 0) {
-      await prisma.client.tenant.deleteMany({
-        where: { id: { in: createdTenantIds.splice(0) } },
-      });
-    }
-
-    if (createdUserIds.length > 0) {
-      await prisma.client.user.deleteMany({
-        where: { id: { in: createdUserIds.splice(0) } },
-      });
-    }
-  });
-
   afterAll(async () => {
     await prisma.client.$disconnect();
   });
