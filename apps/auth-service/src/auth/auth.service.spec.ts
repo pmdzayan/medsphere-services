@@ -164,6 +164,7 @@ describe('AuthService', () => {
     const response = await service.googleRegister({
       tenantSlug: 'central-pharmacy',
       idToken: 'google-id-token',
+      phone: '+919876543210',
       firstName: 'Asha',
       lastName: 'Sharma',
     });
@@ -173,6 +174,7 @@ describe('AuthService', () => {
       tenantSlug: 'central-pharmacy',
       subject: 'google-subject-123',
       email: 'verified@example.com',
+      phone: '+919876543210',
       firstName: 'Asha',
       lastName: 'Sharma',
     });
@@ -191,6 +193,7 @@ describe('AuthService', () => {
       service.googleRegister({
         tenantSlug: 'central-pharmacy',
         idToken: 'invalid-google-token',
+        phone: '+919876543210',
         firstName: 'Asha',
         lastName: 'Sharma',
       }),
