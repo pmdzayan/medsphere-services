@@ -355,7 +355,7 @@ async function main() {
   record('foundation seed (tenant, providers, product, admin role/permissions)', 'WORKING');
 
   async function register(email, slug = tenantSlug) {
-    const phoneDigits = randomUUID().replace(/\\D/g, '').padEnd(10, '0').slice(0, 10);
+    const phoneDigits = randomUUID().replace(/\D/g, '').padEnd(10, '0').slice(0, 10);
     const phone = `+91${phoneDigits[0] === '0' ? '9' : phoneDigits[0]}${phoneDigits.slice(1)}`;
 
     return fetch(`${FRONTEND}/api/auth/register`, {
