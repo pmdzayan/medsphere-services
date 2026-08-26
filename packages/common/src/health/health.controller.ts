@@ -1,5 +1,18 @@
-import { Controller, Get, HttpCode } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  HttpCode,
+  Inject,
+  Optional,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { PublicEndpoint } from '../auth/public-endpoint.decorator';
+
+export const HEALTH_READINESS_CHECK = Symbol('HEALTH_READINESS_CHECK');
+
+export interface HealthReadinessCheck {
+  check(): Promise<void>;
+}
 
 /**
  * Shared across every service so liveness/readiness semantics — and the
@@ -10,6 +23,12 @@ import { PublicEndpoint } from '../auth/public-endpoint.decorator';
 @Controller('health')
 @PublicEndpoint()
 export class HealthController {
+  constructor(
+    @Optional()
+    @Inject(HEALTH_READINESS_CHECK)
+    private readonly readinessCheck?: HealthReadinessCheck,
+  ) {}
+
   @Get('live')
   @HttpCode(200)
   live() {
@@ -19,11 +38,14 @@ export class HealthController {
 
   @Get('ready')
   @HttpCode(200)
-  ready() {
-    // Intentionally mirrors `live` for now. Once a service wires a real
-    // database/Kafka client, extend this to verify those dependencies before
-    // reporting ready — faking a dependency check here would be worse than
-    // not having one, since it would hide real outages.
-    return { status: 'ok' };
+  async ready() {
+    try {
+      await this.readinessCheck?.check();
+      return { status: 'ok' };
+    } catch {
+      // Readiness responses must never expose dependency URLs, credentials,
+      // provider details, or underlying exception messages.
+      throw new ServiceUnavailableException({ status: 'unavailable' });
+    }
   }
 }

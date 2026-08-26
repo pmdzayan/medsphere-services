@@ -89,6 +89,13 @@ export class RedisThrottlerStorage implements ThrottlerStorage, OnModuleInit, On
     }
   }
 
+  async ping(): Promise<void> {
+    const response = await this.redis.ping();
+    if (response !== 'PONG') {
+      throw new Error('Redis readiness probe returned an unexpected response');
+    }
+  }
+
   async increment(
     key: string,
     ttl: number,

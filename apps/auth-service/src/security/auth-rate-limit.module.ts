@@ -127,5 +127,6 @@ class AuthRateLimitStorageModule {}
       }),
     }),
   ],
+  exports: [AuthRateLimitStorageModule],
 })
 export class AuthRateLimitModule {}

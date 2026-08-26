@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard } from '@nestjs/throttler';
-import { HealthModule } from '@medsphere/common';
+import { HEALTH_READINESS_CHECK, HealthModule } from '@medsphere/common';
 import { PrismaModule } from './prisma/prisma.module';
 import { UsersModule } from './users/users.module';
 import { LocalizationModule } from './localization/localization.module';
@@ -13,10 +13,17 @@ import { AuditModule } from './audit/audit.module';
 import { InventoryModule } from './inventory/inventory.module';
 import { NotificationModule } from './notifications/notification.module';
 import { VerificationModule } from './verification/verification.module';
+import { AuthReadinessService } from './health/auth-readiness.service';
 
 @Module({
   imports: [
-    HealthModule,
+    HealthModule.register({
+      imports: [PrismaModule, AuthRateLimitModule],
+      readinessProvider: {
+        provide: HEALTH_READINESS_CHECK,
+        useClass: AuthReadinessService,
+      },
+    }),
     AuthRateLimitModule,
     PrismaModule,
     AuthModule,
