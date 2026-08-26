@@ -94,7 +94,7 @@ const MEMBERSHIP = {
   id: 'membership-1',
   tenantId: 'tenant-1',
   status: 'PENDING',
-  user: { id: 'user-1' },
+  user: { id: 'user-1', phone: '+15551234567' },
 };
 
 describe('PhoneOtpService.requestOtp', () => {
@@ -103,18 +103,26 @@ describe('PhoneOtpService.requestOtp', () => {
     const result = await service.requestOtp({
       tenantSlug: 'acme',
       email: 'nobody@example.com',
-      phone: '+15551234567',
     });
     expect(result.message).toBe('If eligible, a verification code has been sent.');
     expect(deliver).not.toHaveBeenCalled();
   });
 
-  it('rejects an invalid phone number before touching the database', async () => {
-    const { service, transaction } = buildService({ membership: MEMBERSHIP });
-    await expect(
-      service.requestOtp({ tenantSlug: 'acme', email: 'a@example.com', phone: 'not-a-phone' }),
-    ).rejects.toThrow(BadRequestException);
-    expect(transaction.tenantMembership.findFirst).not.toHaveBeenCalled();
+  it('uses only the phone bound to the stored user and exposes no caller-controlled destination', async () => {
+    const { service, deliver } = buildService({
+      membership: {
+        ...MEMBERSHIP,
+        user: { id: 'user-1', phone: '+15550001111' },
+      },
+    });
+
+    await service.requestOtp({
+      tenantSlug: 'acme',
+      email: 'a@example.com',
+    });
+
+    expect(deliver).toHaveBeenCalledTimes(1);
+    expect(deliver.mock.calls[0][0].to).toBe('+15550001111');
   });
 
   it('creates a challenge and dispatches via the SMS provider for an eligible subject', async () => {
@@ -122,7 +130,6 @@ describe('PhoneOtpService.requestOtp', () => {
     const result = await service.requestOtp({
       tenantSlug: 'acme',
       email: 'a@example.com',
-      phone: '+15551234567',
     });
     expect(result.message).toBe('If eligible, a verification code has been sent.');
     expect(deliver).toHaveBeenCalledTimes(1);
@@ -152,7 +159,6 @@ describe('PhoneOtpService.requestOtp', () => {
     const result = await service.requestOtp({
       tenantSlug: 'acme',
       email: 'a@example.com',
-      phone: '+15551234567',
     });
     expect(result.message).toBe('If eligible, a verification code has been sent.');
     expect(deliver).not.toHaveBeenCalled();
@@ -166,7 +172,7 @@ describe('PhoneOtpService.requestOtp', () => {
       );
     const { service, transaction } = buildService({ membership: MEMBERSHIP, deliver });
     await expect(
-      service.requestOtp({ tenantSlug: 'acme', email: 'a@example.com', phone: '+15551234567' }),
+      service.requestOtp({ tenantSlug: 'acme', email: 'a@example.com' }),
     ).rejects.toThrow(BadRequestException);
     expect(transaction.phoneOtpChallenge.updateMany).toHaveBeenCalled();
   });

@@ -25,7 +25,6 @@ type OtpTransaction = Prisma.TransactionClient;
 export interface RequestPhoneOtpInput {
   readonly tenantSlug: string;
   readonly email: string;
-  readonly phone: string;
 }
 
 export interface VerifyPhoneOtpInput {
@@ -63,20 +62,26 @@ export class PhoneOtpService {
   async requestOtp(input: RequestPhoneOtpInput): Promise<RequestPhoneOtpResult> {
     const tenantSlug = normalizeAuthenticationLocator(input.tenantSlug);
     const email = normalizeAuthenticationLocator(input.email);
-    const phone = normalizePhoneNumber(input.phone);
     const genericResult: RequestPhoneOtpResult = {
       message: 'If eligible, a verification code has been sent.',
     };
 
-    if (!isValidE164PhoneNumber(phone)) {
-      throw new BadRequestException('Invalid phone number');
-    }
-
     const dispatch = await withSerializableRetry(this.prisma.client, async (transaction) => {
       const membership = await this.findEligibleMembership(transaction, tenantSlug, email);
       if (!membership) {
-        // Non-enumerating: identical outward response either way (see
-        // RegistrationResponseDto for the same convention elsewhere).
+        // Non-enumerating: identical outward response either way.
+        return null;
+      }
+
+      // Security boundary: the SMS destination comes only from the phone
+      // bound to the user during registration. A public OTP request can
+      // never redirect another user's code to a caller-selected number.
+      if (!membership.user.phone) {
+        return null;
+      }
+
+      const phone = normalizePhoneNumber(membership.user.phone);
+      if (!isValidE164PhoneNumber(phone)) {
         return null;
       }
 
@@ -250,7 +255,7 @@ export class PhoneOtpService {
         id: true,
         tenantId: true,
         status: true,
-        user: { select: { id: true } },
+        user: { select: { id: true, phone: true } },
       },
     });
   }
