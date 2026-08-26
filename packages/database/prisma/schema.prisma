@@ -75,6 +75,7 @@ enum AccountVerificationMethod {
 enum AccountVerificationProvider {
   MOCK
   EXTERNAL_IDENTITY_PROVIDER
+  SMS_OTP
 }
 
 enum ProductCategory {
@@ -232,6 +233,7 @@ model Tenant {
   eventInboxReceipts             EventInboxReceipt[]
   notificationDeliveries         NotificationDelivery[]
   notificationDeliveryAttempts   NotificationDeliveryAttempt[]
+  phoneOtpChallenges             PhoneOtpChallenge[]
 
   @@index([slug])
 }
@@ -269,6 +271,7 @@ model User {
   medicineReservations   MedicineReservation[]
   verificationAttempts   AccountVerificationAttempt[]
   externalAuthIdentities ExternalAuthIdentity[]
+  phoneOtpChallenges     PhoneOtpChallenge[]
 }
 
 model ExternalAuthIdentity {
@@ -314,6 +317,37 @@ model AccountVerificationAttempt {
 
   @@unique([userId, provider, method, idempotencyKey])
   @@index([userId, method, status, createdAt(sort: Desc)])
+}
+
+/// Live, mutable, single-use OTP challenge state -- deliberately separate
+/// from the immutable AccountVerificationAttempt audit trail. Exactly one
+/// active challenge exists per (tenant, user); a new OTP request overwrites
+/// it after the resend-cooldown check. Only a cryptographic representation
+/// of the code is stored, never the plaintext OTP.
+model PhoneOtpChallenge {
+  id String @id @default(uuid()) @db.Uuid
+
+  tenantId String @db.Uuid
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  userId String @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  phone    String @db.VarChar(20)
+  codeHash String @db.VarChar(64)
+
+  attempts        Int       @default(0)
+  expiresAt       DateTime
+  consumedAt      DateTime?
+  lastRequestedAt DateTime  @default(now())
+
+  version Int @default(1)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, userId])
+  @@index([expiresAt])
 }
 
 model TenantMembership {

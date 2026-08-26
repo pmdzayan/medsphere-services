@@ -17,6 +17,10 @@ function requestFrom(context: ExecutionContext): ThrottleRequest {
   return context.switchToHttp().getRequest<ThrottleRequest>();
 }
 
+function skipUnlessHandler(handlerName: string) {
+  return (context: ExecutionContext): boolean => context.getHandler().name !== handlerName;
+}
+
 function skipHealth(context: ExecutionContext): boolean {
   return requestFrom(context).url?.startsWith('/health/') ?? false;
 }
@@ -100,6 +104,22 @@ class AuthRateLimitStorageModule {}
             ttl: 60_000,
             limit: 120,
             skipIf: skipHealth,
+            getTracker: accountTracker,
+          },
+          {
+            name: 'otp-request',
+            ttl: 60_000,
+            limit: 1,
+            skipIf: (context) =>
+              skipHealth(context) || skipUnlessHandler('requestPhoneOtp')(context),
+            getTracker: accountTracker,
+          },
+          {
+            name: 'otp-verify',
+            ttl: 60_000,
+            limit: 10,
+            skipIf: (context) =>
+              skipHealth(context) || skipUnlessHandler('verifyPhoneOtp')(context),
             getTracker: accountTracker,
           },
         ],

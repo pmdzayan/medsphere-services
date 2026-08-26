@@ -1,7 +1,11 @@
 export const ACCOUNT_VERIFICATION_METHODS = ['PHONE', 'IDENTITY', 'AGE'] as const;
 export type AccountVerificationMethod = (typeof ACCOUNT_VERIFICATION_METHODS)[number];
 
-export const ACCOUNT_VERIFICATION_PROVIDERS = ['MOCK', 'EXTERNAL_IDENTITY_PROVIDER'] as const;
+export const ACCOUNT_VERIFICATION_PROVIDERS = [
+  'MOCK',
+  'EXTERNAL_IDENTITY_PROVIDER',
+  'SMS_OTP',
+] as const;
 export type AccountVerificationProvider = (typeof ACCOUNT_VERIFICATION_PROVIDERS)[number];
 
 export interface VerificationCompletionResult {

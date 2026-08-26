@@ -3,6 +3,7 @@ import { Injectable } from '@nestjs/common';
 
 const MINIMUM_RSA_MODULUS_BITS = 2048;
 const MINIMUM_REFRESH_PEPPER_BYTES = 32;
+const MINIMUM_OTP_PEPPER_BYTES = 32;
 
 export interface AuthConfiguration {
   readonly privateKeyPem: string;
@@ -14,6 +15,7 @@ export interface AuthConfiguration {
   readonly refreshIdleTtlSeconds: number;
   readonly refreshAbsoluteTtlSeconds: number;
   readonly refreshTokenPepper: Buffer;
+  readonly otpPepper: Buffer;
   readonly argon2MemoryKiB: number;
   readonly argon2TimeCost: number;
   readonly argon2Parallelism: number;
@@ -175,6 +177,11 @@ export function parseAuthEnvironment(environment: AuthEnvironment): AuthConfigur
     throw new Error('AUTH_REFRESH_TOKEN_PEPPER must contain at least 32 random bytes');
   }
 
+  const otpPepper = decodeBase64('AUTH_OTP_PEPPER', requireValue(environment, 'AUTH_OTP_PEPPER'));
+  if (otpPepper.length < MINIMUM_OTP_PEPPER_BYTES) {
+    throw new Error('AUTH_OTP_PEPPER must contain at least 32 random bytes');
+  }
+
   return Object.freeze({
     ...keys,
     issuer: parseIssuer(environment),
@@ -184,6 +191,7 @@ export function parseAuthEnvironment(environment: AuthEnvironment): AuthConfigur
     refreshIdleTtlSeconds,
     refreshAbsoluteTtlSeconds,
     refreshTokenPepper: Buffer.from(refreshTokenPepper),
+    otpPepper: Buffer.from(otpPepper),
     argon2MemoryKiB: parseInteger(environment, 'AUTH_ARGON2_MEMORY_KIB', 19_456, 262_144),
     argon2TimeCost: parseInteger(environment, 'AUTH_ARGON2_TIME_COST', 2, 10),
     argon2Parallelism: parseInteger(environment, 'AUTH_ARGON2_PARALLELISM', 1, 8),
