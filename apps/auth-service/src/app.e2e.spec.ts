@@ -4,7 +4,7 @@ import { AddressInfo } from 'node:net';
 import { Controller, Get, HttpException, HttpStatus, INestApplication } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { Test, TestingModule } from '@nestjs/testing';
-import { DomainException, PublicEndpoint } from '@medsphere/common';
+import { DomainException, HEALTH_READINESS_CHECK, PublicEndpoint } from '@medsphere/common';
 
 import { AppModule } from './app.module';
 import { configureAuthApplication } from './app.bootstrap';
@@ -82,6 +82,9 @@ describe('S0.4 authentication and authorization HTTP security boundary', () => {
       timeToBlockExpire: 0,
     }),
   } as unknown as RedisThrottlerStorage;
+  const readinessCheck = {
+    check: jest.fn(),
+  };
   const hasAllPermissions = jest.fn();
   const listRoles = jest.fn();
   const updateRole = jest.fn();
@@ -143,6 +146,8 @@ describe('S0.4 authentication and authorization HTTP security boundary', () => {
       .useValue(usersService)
       .overrideProvider(RedisThrottlerStorage)
       .useValue(rateLimitStorage)
+      .overrideProvider(HEALTH_READINESS_CHECK)
+      .useValue(readinessCheck)
       .overrideProvider(AuthorizationService)
       .useValue(authorizationService)
       .overrideProvider(AuditService)
@@ -184,6 +189,7 @@ describe('S0.4 authentication and authorization HTTP security boundary', () => {
   });
 
   beforeEach(() => {
+    readinessCheck.check.mockReset().mockResolvedValue(undefined);
     validateAccessIdentity.mockReset();
     getPrivacy.mockReset();
     hasAllPermissions.mockReset();
@@ -247,6 +253,39 @@ describe('S0.4 authentication and authorization HTTP security boundary', () => {
     expect(typeof (publicLoginBoundary.body as { error: { message: unknown } }).error.message).toBe(
       'string',
     );
+  });
+
+  it('separates process liveness from dependency-backed readiness', async () => {
+    const healthy = await sendRequest('/health/ready');
+
+    expect(healthy).toMatchObject({
+      status: 200,
+      body: { status: 'ok' },
+    });
+    expect(readinessCheck.check).toHaveBeenCalledTimes(1);
+
+    readinessCheck.check
+      .mockReset()
+      .mockRejectedValue(
+        new Error('postgresql://private-user:private-password@private-host/medsphere'),
+      );
+
+    const liveDuringDependencyFailure = await sendRequest('/health/live');
+    expect(liveDuringDependencyFailure).toMatchObject({
+      status: 200,
+      body: { status: 'ok' },
+    });
+    expect(readinessCheck.check).not.toHaveBeenCalled();
+
+    const unavailable = await sendRequest('/health/ready');
+    expect(unavailable.status).toBe(503);
+    expect(readinessCheck.check).toHaveBeenCalledTimes(1);
+
+    const serialized = JSON.stringify(unavailable.body);
+    expect(serialized).not.toContain('private-password');
+    expect(serialized).not.toContain('private-user');
+    expect(serialized).not.toContain('private-host');
+    expect(serialized).not.toContain('postgresql://');
   });
 
   it('denies a protected route without a bearer token using the shared error envelope', async () => {

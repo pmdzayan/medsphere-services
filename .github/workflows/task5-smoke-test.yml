@@ -41,7 +41,7 @@ jobs:
       AUTH_ARGON2_TIME_COST: '2'
       AUTH_ARGON2_PARALLELISM: '1'
       PORT: '3000'
-      AUTH_API_URL: http://localhost:3000
+      AUTH_API_URL: http://auth.medsphere.test:3000
 
     services:
       postgres:
@@ -86,6 +86,9 @@ jobs:
 
       - name: Install PostgreSQL client
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client
+
+      - name: Configure synthetic auth-service hostname
+        run: echo '127.0.0.1 auth.medsphere.test' | sudo tee -a /etc/hosts
 
       - name: Install locked dependencies
         run: pnpm install --frozen-lockfile
@@ -207,7 +210,7 @@ jobs:
       AUTH_ARGON2_TIME_COST: '2'
       AUTH_ARGON2_PARALLELISM: '1'
       PORT: '3000'
-      AUTH_API_URL: http://localhost:3000
+      AUTH_API_URL: http://auth.medsphere.test:3000
 
     services:
       postgres:
@@ -252,6 +255,9 @@ jobs:
 
       - name: Install PostgreSQL client
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client
+
+      - name: Configure synthetic auth-service hostname
+        run: echo '127.0.0.1 auth.medsphere.test' | sudo tee -a /etc/hosts
 
       - name: Install locked dependencies
         run: pnpm install --frozen-lockfile
