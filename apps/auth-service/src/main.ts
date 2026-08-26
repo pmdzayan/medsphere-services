@@ -13,7 +13,7 @@ async function bootstrap(): Promise<void> {
     bufferLogs: true,
   });
 
-  configureAuthApplication(app);
+  configureAuthApplication(app, logger);
 
   const port = Number(process.env.PORT) || 3000;
 

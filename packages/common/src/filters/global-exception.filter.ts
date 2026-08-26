@@ -18,6 +18,18 @@ export interface ErrorEnvelope {
   };
 }
 
+export interface ExceptionTelemetryLogger {
+  error(message: string, error?: Error | unknown, meta?: Record<string, unknown>): void;
+}
+
+class SafeNestExceptionLogger implements ExceptionTelemetryLogger {
+  private readonly logger = new Logger('GlobalExceptionFilter');
+
+  error(message: string, _error?: Error | unknown, meta?: Record<string, unknown>): void {
+    this.logger.error(message, meta ?? {});
+  }
+}
+
 const MAX_CLIENT_ERROR_MESSAGE_LENGTH = 512;
 
 function boundedMessage(value: string, fallback: string): string {
@@ -61,7 +73,11 @@ function isServerErrorStatus(status: number): boolean {
  */
 @Catch()
 export class GlobalExceptionFilter implements ExceptionFilter {
-  private readonly logger = new Logger(GlobalExceptionFilter.name);
+  private readonly logger: ExceptionTelemetryLogger;
+
+  constructor(logger?: ExceptionTelemetryLogger) {
+    this.logger = logger ?? new SafeNestExceptionLogger();
+  }
 
   catch(exception: unknown, host: ArgumentsHost): void {
     const ctx = host.switchToHttp();
@@ -97,7 +113,15 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       ) {
         status = exception.httpStatus;
       }
-      this.logger.error(exception instanceof Error ? exception.stack : String(exception));
+      const rawErrorType = exception instanceof Error ? exception.name : typeof exception;
+      const errorType =
+        rawErrorType.replace(/[^A-Za-z0-9_.:-]/g, '').slice(0, 128) || 'UnknownError';
+
+      this.logger.error('Unhandled HTTP exception', undefined, {
+        requestId,
+        status,
+        errorType,
+      });
     }
 
     response.status(status).json(envelope);

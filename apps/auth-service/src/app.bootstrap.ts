@@ -1,18 +1,24 @@
 import { INestApplication } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { configureHttpSecurityHeaders, GlobalExceptionFilter } from '@medsphere/common';
+import type { ServiceLogger } from '@medsphere/logger';
 import { createValidationPipe } from '@medsphere/validation';
+import { configureRequestObservability } from './request-observability';
 
 /**
  * Applies the HTTP boundary shared by production bootstrap and API tests.
  * Keeping this in one place prevents tests from proving a different filter,
  * validation, or OpenAPI configuration than the running service uses.
  */
-export function configureAuthApplication(app: INestApplication): void {
+export function configureAuthApplication(app: INestApplication, logger?: ServiceLogger): void {
+  if (logger) {
+    configureRequestObservability(app, logger);
+  }
+
   configureHttpSecurityHeaders(app, {
     interactiveDocumentation: process.env.ENABLE_SWAGGER === 'true',
   });
-  app.useGlobalFilters(new GlobalExceptionFilter());
+  app.useGlobalFilters(new GlobalExceptionFilter(logger));
   app.useGlobalPipes(createValidationPipe());
 
   if (process.env.ENABLE_SWAGGER === 'true') {
