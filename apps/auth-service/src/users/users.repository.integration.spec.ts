@@ -254,6 +254,7 @@ describeUsersInfra('UsersRepository Google onboarding PostgreSQL safety', () => 
       tenantSlug,
       subject,
       email,
+      phone: '+919876543210',
       firstName: 'Asha',
       lastName: 'Sharma',
     });
@@ -308,6 +309,7 @@ describeUsersInfra('UsersRepository Google onboarding PostgreSQL safety', () => 
       tenantSlug,
       subject,
       email,
+      phone: '+919876543210',
       firstName: 'Google',
       lastName: 'Attempt',
     });
@@ -355,6 +357,7 @@ describeUsersInfra('UsersRepository Google onboarding PostgreSQL safety', () => 
       tenantSlug,
       subject,
       email: attemptedEmail,
+      phone: '+919876543210',
       firstName: 'Other',
       lastName: 'User',
     });
@@ -386,6 +389,7 @@ describeUsersInfra('UsersRepository Google onboarding PostgreSQL safety', () => 
       tenantSlug: disabledTenantSlug,
       subject,
       email,
+      phone: '+919876543210',
       firstName: 'Blocked',
       lastName: 'User',
     });
@@ -413,6 +417,7 @@ describeUsersInfra('UsersRepository Google onboarding PostgreSQL safety', () => 
         tenantSlug,
         subject,
         email,
+        phone: '+919876543210',
         firstName: 'Concurrent',
         lastName: 'User',
       }),
