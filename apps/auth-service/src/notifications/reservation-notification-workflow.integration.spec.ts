@@ -86,8 +86,8 @@ infrastructure('G3.27 end-to-end queued reservation notification workflow', () =
     const worker = buildWorker(deliver);
     const now = new Date(Date.now() + 5_000);
     const results = await Promise.all([
-      worker.run({ limit: 10, leaseMs: 30_000, now }),
-      worker.run({ limit: 10, leaseMs: 30_000, now }),
+      worker.run({ limit: 10, leaseMs: 30_000, now, tenantId }),
+      worker.run({ limit: 10, leaseMs: 30_000, now, tenantId }),
     ]);
 
     expect(results.reduce((sum, result) => sum + result.delivered, 0)).toBe(1);
@@ -131,7 +131,13 @@ infrastructure('G3.27 end-to-end queued reservation notification workflow', () =
     const firstAt = new Date(Date.now() + 5_000);
 
     await expect(
-      worker.run({ limit: 10, leaseMs: 30_000, maximumAttempts: 3, now: firstAt }),
+      worker.run({
+        limit: 10,
+        leaseMs: 30_000,
+        maximumAttempts: 3,
+        now: firstAt,
+        tenantId,
+      }),
     ).resolves.toMatchObject({ claimed: 1, failed: 1, delivered: 0 });
     await expect(
       worker.run({
@@ -139,6 +145,7 @@ infrastructure('G3.27 end-to-end queued reservation notification workflow', () =
         leaseMs: 30_000,
         maximumAttempts: 3,
         now: new Date(firstAt.getTime() + 2_100),
+        tenantId,
       }),
     ).resolves.toMatchObject({ claimed: 1, failed: 0, delivered: 1 });
 

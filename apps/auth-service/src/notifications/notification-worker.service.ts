@@ -24,6 +24,7 @@ export interface NotificationWorkerConfig {
   readonly leaseMs: number;
   readonly maximumAttempts?: number;
   readonly now?: Date;
+  readonly tenantId?: string;
 }
 
 export interface NotificationWorkerSummary {
@@ -52,6 +53,7 @@ export class NotificationWorkerService {
       limit: config.limit,
       now,
       leaseMs: config.leaseMs,
+      tenantId: config.tenantId,
     });
     let delivered = 0;
     let failed = 0;

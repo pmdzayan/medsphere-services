@@ -116,7 +116,12 @@ export async function enqueueNotificationDelivery(
 
 export async function claimNotificationDeliveries(
   database: NotificationClaimHost,
-  options: { readonly limit: number; readonly now: Date; readonly leaseMs: number },
+  options: {
+    readonly limit: number;
+    readonly now: Date;
+    readonly leaseMs: number;
+    readonly tenantId?: string;
+  },
 ): Promise<readonly ClaimedNotificationDelivery[]> {
   if (!Number.isSafeInteger(options.limit) || options.limit < 1 || options.limit > 100) {
     throw new Error('Notification claim limit must be between 1 and 100');
@@ -141,6 +146,7 @@ export async function claimNotificationDeliveries(
         d."status" = 'PROCESSING'
         AND d."lockedUntil" <= ${options.now}
       ))
+      ${options.tenantId ? Prisma.sql`AND d."tenantId" = ${options.tenantId}::uuid` : Prisma.empty}
       ORDER BY d."availableAt" ASC, d."createdAt" ASC, d."id" ASC
       FOR UPDATE OF d SKIP LOCKED
       LIMIT ${options.limit}
