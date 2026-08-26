@@ -5,6 +5,7 @@ import { Controller, Get, HttpException, HttpStatus, INestApplication } from '@n
 import { JwtService } from '@nestjs/jwt';
 import { Test, TestingModule } from '@nestjs/testing';
 import { DomainException, HEALTH_READINESS_CHECK, PublicEndpoint } from '@medsphere/common';
+import type { ServiceLogger } from '@medsphere/logger';
 
 import { AppModule } from './app.module';
 import { configureAuthApplication } from './app.bootstrap';
@@ -65,6 +66,14 @@ describe('S0.4 authentication and authorization HTTP security boundary', () => {
   const authEnvironment = createAuthConfigFixture();
   const previousEnvironment = new Map<AuthConfigFixtureKey, string | undefined>();
   const previousSwaggerEnvironment = process.env.ENABLE_SWAGGER;
+
+  const observabilityLogger = {
+    log: jest.fn(),
+    info: jest.fn(),
+    warn: jest.fn(),
+    error: jest.fn(),
+    debug: jest.fn(),
+  } satisfies ServiceLogger;
 
   const validateAccessIdentity = jest.fn();
   const sessionRepository = {
@@ -165,7 +174,7 @@ describe('S0.4 authentication and authorization HTTP security boundary', () => {
       .compile();
 
     app = module.createNestApplication();
-    configureAuthApplication(app);
+    configureAuthApplication(app, observabilityLogger);
     await app.listen(0, '127.0.0.1');
 
     tokenService = module.get(TokenService);
@@ -303,24 +312,29 @@ describe('S0.4 authentication and authorization HTTP security boundary', () => {
     expect(getPrivacy).not.toHaveBeenCalled();
   });
 
-  it('echoes only bounded, log-safe request identifiers in error envelopes', async () => {
-    await expect(
-      sendRequest('/users/me/privacy', {
-        headers: { 'x-request-id': 'gateway:request-123' },
-      }),
-    ).resolves.toMatchObject({
+  it('propagates valid request identifiers and replaces unsafe identifiers', async () => {
+    const accepted = await sendRequest('/users/me/privacy', {
+      headers: { 'x-request-id': 'gateway:request-123' },
+    });
+
+    expect(accepted).toMatchObject({
       status: 401,
       body: { error: { requestId: 'gateway:request-123' } },
     });
+    expect(accepted.headers['x-request-id']).toBe('gateway:request-123');
 
     const unsafe = await sendRequest('/users/me/privacy', {
       headers: { 'x-request-id': 'patient@example.test' },
     });
+
     expect(unsafe.status).toBe(401);
-    expect(unsafe.body).not.toEqual(
-      expect.objectContaining({
-        error: expect.objectContaining({ requestId: expect.anything() }),
-      }),
+
+    const generatedRequestId = unsafe.headers['x-request-id'];
+
+    expect(typeof generatedRequestId).toBe('string');
+    expect(generatedRequestId).not.toBe('patient@example.test');
+    expect((unsafe.body as { error: { requestId?: string } }).error.requestId).toBe(
+      generatedRequestId,
     );
   });
 
