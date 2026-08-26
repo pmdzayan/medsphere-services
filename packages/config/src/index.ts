@@ -44,3 +44,20 @@ export function assertUnacceptedPrototypeRuntimeAllowed(
     );
   }
 }
+
+export function assertProductionFlagsDisabled(
+  serviceName: string,
+  flags: readonly string[],
+  environment: Readonly<Record<string, string | undefined>> = process.env,
+): void {
+  if (environment.NODE_ENV !== 'production') {
+    return;
+  }
+
+  const enabled = flags.filter((flag) => environment[flag] === 'true');
+  if (enabled.length > 0) {
+    throw new Error(
+      `${serviceName} production runtime forbids development/test flag(s): ${enabled.join(', ')}`,
+    );
+  }
+}

@@ -2,8 +2,11 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { createServiceLogger } from '@medsphere/logger';
 import { configureAuthApplication } from './app.bootstrap';
+import { assertAuthProductionRuntimePolicy } from './auth-production-runtime';
 
 async function bootstrap(): Promise<void> {
+  assertAuthProductionRuntimePolicy();
+
   const logger = createServiceLogger('auth-service');
 
   const app = await NestFactory.create(AppModule, {
