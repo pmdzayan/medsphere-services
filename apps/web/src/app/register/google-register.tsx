@@ -36,6 +36,11 @@ export function GoogleRegister({
     window.google.accounts.id.initialize({
       client_id: clientId,
       callback: async ({ credential }) => {
+        if (!credential) {
+          onError();
+          return;
+        }
+
         const request = normalizeGoogleRegisterRequest({
           tenantSlug,
           idToken: credential,
