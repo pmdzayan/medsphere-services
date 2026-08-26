@@ -239,8 +239,8 @@ model Tenant {
 model User {
   id String @id @default(uuid()) @db.Uuid
 
-  email        String @unique @db.Citext
-  passwordHash String
+  email        String  @unique @db.Citext
+  passwordHash String?
 
   firstName String
   lastName  String

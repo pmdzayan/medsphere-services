@@ -14,6 +14,7 @@ import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { GoogleLoginDto } from './dto/google-login.dto';
+import { GoogleRegisterDto } from './dto/google-register.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { CurrentIdentity } from '../common/decorators/current-identity.decorator';
 import { AuthenticatedIdentity } from './auth.types';
@@ -43,6 +44,19 @@ export class AuthController {
   @ApiAcceptedResponse({ type: RegistrationResponseDto })
   register(@Body() registerDto: RegisterDto) {
     return this.authService.register(registerDto);
+  }
+
+  @Post('google/register')
+  @PublicEndpoint()
+  @Throttle({
+    ip: { limit: 5, ttl: 15 * 60_000 },
+    account: { limit: 3, ttl: 15 * 60_000 },
+  })
+  @HttpCode(HttpStatus.ACCEPTED)
+  @ApiOperation({ summary: 'Request Google-backed tenant onboarding' })
+  @ApiAcceptedResponse({ type: RegistrationResponseDto })
+  googleRegister(@Body() googleRegisterDto: GoogleRegisterDto) {
+    return this.authService.googleRegister(googleRegisterDto);
   }
 
   @Post('login')

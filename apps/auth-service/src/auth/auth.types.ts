@@ -53,7 +53,7 @@ export interface LoginIdentity {
   readonly user: {
     readonly id: string;
     readonly email: string;
-    readonly passwordHash: string;
+    readonly passwordHash: string | null;
     readonly firstName: string;
     readonly lastName: string;
   };

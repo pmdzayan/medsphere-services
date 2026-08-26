@@ -170,6 +170,96 @@ export class UsersRepository {
     }
   }
 
+  /**
+   * Public Google onboarding follows the same tenant boundary as password
+   * registration: it never attaches an existing global user to another tenant.
+   * The Google subject and email must already have been verified upstream.
+   */
+  async createPendingGoogleRegistration(data: {
+    tenantSlug: string;
+    subject: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+  }): Promise<void> {
+    try {
+      await withSerializableRetry(this.prisma.client, async (transaction) => {
+        const tenant = await transaction.tenant.findFirst({
+          where: {
+            slug: data.tenantSlug,
+            isActive: true,
+            selfRegistrationEnabled: true,
+            deletedAt: null,
+          },
+          select: { id: true },
+        });
+
+        if (!tenant) {
+          return;
+        }
+
+        const existingExternalIdentity = await transaction.externalAuthIdentity.findFirst({
+          where: {
+            provider: 'GOOGLE',
+            subject: data.subject,
+          },
+          select: { id: true },
+        });
+
+        if (existingExternalIdentity) {
+          return;
+        }
+
+        const existingUser = await transaction.user.findUnique({
+          where: { email: data.email },
+          select: { id: true },
+        });
+
+        // Never auto-link an existing global account by matching email.
+        if (existingUser) {
+          return;
+        }
+
+        const user = await transaction.user.create({
+          data: {
+            email: data.email,
+            passwordHash: null,
+            firstName: data.firstName,
+            lastName: data.lastName,
+            status: 'PENDING_VERIFICATION',
+          },
+          select: { id: true },
+        });
+
+        await transaction.externalAuthIdentity.create({
+          data: {
+            userId: user.id,
+            provider: 'GOOGLE',
+            subject: data.subject,
+            email: data.email,
+            emailVerified: true,
+          },
+        });
+
+        await transaction.tenantMembership.create({
+          data: {
+            tenantId: tenant.id,
+            userId: user.id,
+            status: 'PENDING',
+          },
+        });
+      });
+    } catch (error) {
+      // Concurrent email/Google-subject races must remain indistinguishable
+      // through the public registration response.
+      if (hasPrismaCode(error, 'P2002')) {
+        return;
+      }
+
+      throw error;
+    }
+  }
+
   async update(
     id: string,
     data: {

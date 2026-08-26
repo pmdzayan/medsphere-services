@@ -10,6 +10,7 @@ import {
   validateRegistrationRequest,
 } from '@/lib/auth-contract';
 import type { TranslationKey } from '@/lib/i18n';
+import { GoogleRegister } from './google-register';
 
 type RegistrationField = keyof RegistrationRequest;
 type FormErrors = Partial<Record<RegistrationField | 'confirmPassword' | 'form', string>>;
@@ -28,6 +29,9 @@ export function RegistrationForm() {
   const [pending, setPending] = useState(false);
   const [confirmation, setConfirmation] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [tenantSlug, setTenantSlug] = useState('');
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -117,6 +121,8 @@ export function RegistrationForm() {
           label={t('registration.firstName')}
           autoComplete="given-name"
           maxLength={100}
+          value={firstName}
+          onChange={(event) => setFirstName(event.target.value)}
           error={errors.firstName}
         />
         <Field
@@ -124,6 +130,8 @@ export function RegistrationForm() {
           label={t('registration.lastName')}
           autoComplete="family-name"
           maxLength={100}
+          value={lastName}
+          onChange={(event) => setLastName(event.target.value)}
           error={errors.lastName}
         />
       </div>
@@ -134,6 +142,8 @@ export function RegistrationForm() {
         placeholder="central-pharmacy"
         autoComplete="organization"
         maxLength={100}
+        value={tenantSlug}
+        onChange={(event) => setTenantSlug(event.target.value)}
         error={errors.tenantSlug}
       />
       <Field
@@ -183,6 +193,27 @@ export function RegistrationForm() {
           {errors.form}
         </p>
       ) : null}
+      <div className="space-y-4">
+        <div className="flex items-center gap-3" aria-hidden="true">
+          <span className="h-px flex-1 bg-[#10201c]/10" />
+          <span className="text-xs font-semibold text-[#71807b]">or</span>
+          <span className="h-px flex-1 bg-[#10201c]/10" />
+        </div>
+
+        <div className="flex justify-center">
+          <GoogleRegister
+            tenantSlug={tenantSlug}
+            firstName={firstName}
+            lastName={lastName}
+            onSuccess={() => {
+              setErrors({});
+              setConfirmation(true);
+            }}
+            onError={() => setErrors({ form: t('registration.errorGeneric') })}
+          />
+        </div>
+      </div>
+
       <button
         type="submit"
         disabled={pending}

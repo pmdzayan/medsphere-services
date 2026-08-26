@@ -1,6 +1,7 @@
 import type {
   AuthenticatedSession,
   GoogleLoginRequest,
+  GoogleRegisterRequest,
   LoginRequest,
   RegistrationRequest,
   RegistrationResponse,
@@ -54,6 +55,40 @@ export class ApiError extends Error {
     super(message);
     this.name = 'ApiError';
   }
+}
+
+export async function googleRegister(
+  request: GoogleRegisterRequest,
+): Promise<RegistrationResponse> {
+  const response = await fetch('/api/auth/google/register', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(request),
+    cache: 'no-store',
+  });
+
+  if (!response.ok) {
+    let message =
+      response.status === 429
+        ? 'Too many onboarding requests. Try again later.'
+        : 'Unable to process the onboarding request.';
+
+    try {
+      const payload: unknown = await response.json();
+      if (payload && typeof payload === 'object') {
+        const candidate = payload as { message?: unknown };
+        if (typeof candidate.message === 'string' && candidate.message.length > 0) {
+          message = candidate.message.slice(0, 240);
+        }
+      }
+    } catch {
+      // Preserve bounded fallback.
+    }
+
+    throw new ApiError(message, response.status);
+  }
+
+  return (await response.json()) as RegistrationResponse;
 }
 
 export async function googleLogin(request: GoogleLoginRequest): Promise<AuthenticatedSession> {
