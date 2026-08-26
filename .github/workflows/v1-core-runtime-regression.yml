@@ -115,6 +115,7 @@ jobs:
               AUTH_JWT_PRIVATE_KEY_BASE64: material.privateKeyBase64,
               AUTH_JWT_PUBLIC_KEY_BASE64: material.publicKeyBase64,
               AUTH_REFRESH_TOKEN_PEPPER: material.refreshPepperBase64,
+              AUTH_OTP_PEPPER: material.otpPepperBase64,
             };
             for (const [name, value] of Object.entries(required)) {
               if (!value) throw new Error(`Missing generated value: ${name}`);
