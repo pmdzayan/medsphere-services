@@ -1,0 +1,702 @@
+diff --git a/apps/web/src/app/api/settings/language/route.test.ts b/apps/web/src/app/api/settings/language/route.test.ts
+index 64072eb..1b1cf77 100644
+--- a/apps/web/src/app/api/settings/language/route.test.ts
++++ b/apps/web/src/app/api/settings/language/route.test.ts
+@@ -2,6 +2,13 @@
+ 
+ import { afterEach, describe, expect, it, vi } from 'vitest';
+ import { NextRequest } from 'next/server';
++import {
++  PROFILE_COOKIE,
++  REFRESH_COOKIE,
++  readSessionProfile,
++  sealSessionProfile,
++  type SessionProfile,
++} from '@/lib/session-profile';
+ import { PATCH } from './route';
+ 
+ afterEach(() => vi.unstubAllGlobals());
+@@ -33,14 +40,47 @@ describe('preferred language BFF boundary', () => {
+     const fetchMock = vi.fn().mockResolvedValue(Response.json({ message: 'Language updated' }));
+     vi.stubGlobal('fetch', fetchMock);
+ 
+-    const response = await PATCH(request({ preferredLanguage: 'kn' }));
++    const response = await PATCH(request({ preferredLanguage: 'ur' }, 'http://localhost', sessionCookies('en')));
+ 
+     expect(response.status).toBe(200);
+     await expect(response.json()).resolves.toEqual({ message: 'Language updated' });
+     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+     expect(url).toContain('/users/me/language');
+-    expect(init.body).toBe(JSON.stringify({ preferredLanguage: 'kn' }));
++    expect(init.body).toBe(JSON.stringify({ preferredLanguage: 'ur' }));
+     expect(new Headers(init.headers).get('authorization')).toBe('Bearer access-secret');
++
++    const sealed = response.cookies.get(PROFILE_COOKIE)?.value;
++    expect(sealed).toBeTruthy();
++    expect(readSessionProfile(sealed, REFRESH_SECRET)?.user.preferredLanguage).toBe('ur');
++  });
++
++  it('clears a stale profile cookie rather than resealing untrusted profile data', async () => {
++    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ message: 'Language updated' })));
++
++    const response = await PATCH(
++      request(
++        { preferredLanguage: 'ta' },
++        'http://localhost',
++        `medsphere_access=access-secret; ${REFRESH_COOKIE}=${REFRESH_SECRET}; ${PROFILE_COOKIE}=forged`,
++      ),
++    );
++
++    expect(response.status).toBe(200);
++    expect(response.cookies.get(PROFILE_COOKIE)?.value ?? '').toBe('');
++  });
++
++  it('maps upstream failures to a stable public code without reflecting raw server text', async () => {
++    vi.stubGlobal(
++      'fetch',
++      vi.fn().mockResolvedValue(new Response('database exploded: secret-row', { status: 500 })),
++    );
++
++    const response = await PATCH(request({ preferredLanguage: 'ta' }, 'http://localhost', sessionCookies('en')));
++    const payload = (await response.json()) as { code: string; message: string };
++
++    expect(response.status).toBe(502);
++    expect(payload).toEqual({ code: 'LANGUAGE_UPDATE_FAILED', message: 'Unable to update language.' });
++    expect(JSON.stringify(payload)).not.toContain('database exploded');
+   });
+ 
+   it('rejects malformed successful upstream responses', async () => {
+@@ -61,3 +101,25 @@ function request(
+     body: JSON.stringify(body),
+   });
+ }
++
++
++const REFRESH_SECRET = 'refresh-secret';
++
++const profile: SessionProfile = {
++  tenantSlug: 'acme',
++  expiresIn: 900,
++  user: {
++    id: 'user-1',
++    email: 'user@example.com',
++    firstName: 'Mira',
++    lastName: 'Patel',
++    preferredLanguage: 'en',
++  },
++  context: { membershipId: 'membership-1', tenantId: 'tenant-1' },
++};
++
++function sessionCookies(preferredLanguage: 'en' | 'ta' | 'ur'): string {
++  const next = { ...profile, user: { ...profile.user, preferredLanguage } };
++  const sealed = sealSessionProfile(next, REFRESH_SECRET);
++  return `medsphere_access=access-secret; ${REFRESH_COOKIE}=${REFRESH_SECRET}; ${PROFILE_COOKIE}=${sealed}`;
++}
+diff --git a/apps/web/src/app/api/settings/language/route.ts b/apps/web/src/app/api/settings/language/route.ts
+index a34c4e8..df6ea01 100644
+--- a/apps/web/src/app/api/settings/language/route.ts
++++ b/apps/web/src/app/api/settings/language/route.ts
+@@ -1,29 +1,42 @@
+ import { NextRequest, NextResponse } from 'next/server';
+ import {
+   authApiUrl,
+-  boundedUpstreamMessage,
+   isSameOriginMutation,
+   publicUpstreamStatus,
+   upstreamHeaders,
+ } from '@/lib/auth-api';
+-import { isLanguageUpdateRequest, isLanguageUpdateResponse } from '@/lib/settings-contract';
+-import { ACCESS_COOKIE } from '@/lib/session-profile';
++import {
++  isLanguageUpdateRequest,
++  isLanguageUpdateResponse,
++  type SupportedLanguageCode,
++} from '@/lib/settings-contract';
++import {
++  clearSessionProfileCookie,
++  setSessionProfileCookie,
++} from '@/lib/session-cookies';
++import {
++  ACCESS_COOKIE,
++  PROFILE_COOKIE,
++  REFRESH_COOKIE,
++  readSessionProfile,
++} from '@/lib/session-profile';
+ 
+ export async function PATCH(request: NextRequest): Promise<NextResponse> {
+   if (!isSameOriginMutation(request)) {
+-    return noStore({ message: 'Cross-origin request rejected.' }, 403);
++    return failure('CROSS_ORIGIN_MUTATION_REJECTED', 'Cross-origin request rejected.', 403);
+   }
+   const accessToken = request.cookies.get(ACCESS_COOKIE)?.value;
+   if (!accessToken) {
+-    return noStore({ message: 'Your session has expired. Sign in again.' }, 401);
++    return failure('SESSION_EXPIRED', 'Your session has expired. Sign in again.', 401);
+   }
+ 
+-  let body: unknown;
++  let preferredLanguage: SupportedLanguageCode;
+   try {
+-    body = await request.json();
++    const body: unknown = await request.json();
+     if (!isLanguageUpdateRequest(body)) throw new Error('Invalid language update');
++    preferredLanguage = body.preferredLanguage;
+   } catch {
+-    return noStore({ message: 'Invalid language update.' }, 400);
++    return failure('LANGUAGE_UPDATE_INVALID', 'Invalid language update.', 400);
+   }
+ 
+   let upstream: Response;
+@@ -33,27 +46,71 @@ export async function PATCH(request: NextRequest): Promise<NextResponse> {
+     upstream = await fetch(authApiUrl('/users/me/language'), {
+       method: 'PATCH',
+       headers,
+-      body: JSON.stringify(body),
++      body: JSON.stringify({ preferredLanguage }),
+       cache: 'no-store',
+     });
+   } catch {
+-    return noStore({ message: 'Language service is unavailable.' }, 503);
++    return failure('LANGUAGE_SERVICE_UNAVAILABLE', 'Language service is unavailable.', 503);
+   }
+ 
+   if (!upstream.ok) {
+-    const message = await boundedUpstreamMessage(upstream, 'Unable to update language.');
+-    return noStore({ message }, publicUpstreamStatus(upstream.status));
++    // Do not reflect upstream exception text through this public BFF.
++    return failure(
++      upstream.status === 401 ? 'SESSION_EXPIRED' : 'LANGUAGE_UPDATE_FAILED',
++      upstream.status === 401
++        ? 'Your session has expired. Sign in again.'
++        : 'Unable to update language.',
++      publicUpstreamStatus(upstream.status),
++    );
+   }
+ 
+   try {
+     const payload: unknown = await upstream.json();
+     if (!isLanguageUpdateResponse(payload)) throw new Error('Invalid language update response');
+-    return noStore(payload, 200);
++    const response = noStore(payload, 200);
++    synchronizeSessionProfileLanguage(request, response, preferredLanguage);
++    return response;
+   } catch {
+-    return noStore({ message: 'Language service returned an invalid response.' }, 502);
++    return failure(
++      'LANGUAGE_SERVICE_RESPONSE_INVALID',
++      'Language service returned an invalid response.',
++      502,
++    );
+   }
+ }
+ 
+ function noStore(body: unknown, status: number): NextResponse {
+   return NextResponse.json(body, { status, headers: { 'cache-control': 'no-store' } });
+ }
++
++
++function synchronizeSessionProfileLanguage(
++  request: NextRequest,
++  response: NextResponse,
++  preferredLanguage: SupportedLanguageCode,
++): void {
++  const refreshToken = request.cookies.get(REFRESH_COOKIE)?.value;
++  const sealedProfile = request.cookies.get(PROFILE_COOKIE)?.value;
++  const profile = readSessionProfile(sealedProfile, refreshToken);
++
++  if (!refreshToken || !profile) {
++    // The backend preference is already durable. Never mint a profile from
++    // untrusted cookie contents; remove only the stale cache so it cannot
++    // override local/browser preference on the next server render.
++    clearSessionProfileCookie(response);
++    return;
++  }
++
++  setSessionProfileCookie(
++    response,
++    {
++      ...profile,
++      user: { ...profile.user, preferredLanguage },
++    },
++    refreshToken,
++  );
++}
++
++function failure(code: string, message: string, status: number): NextResponse {
++  return noStore({ code, message }, status);
++}
+diff --git a/apps/web/src/app/layout.test.tsx b/apps/web/src/app/layout.test.tsx
+new file mode 100644
+index 0000000..7812f64
+--- /dev/null
++++ b/apps/web/src/app/layout.test.tsx
+@@ -0,0 +1,59 @@
++// @vitest-environment node
++
++import { describe, expect, it, vi } from 'vitest';
++import { cookies } from 'next/headers';
++import RootLayout from './layout';
++import {
++  PROFILE_COOKIE,
++  REFRESH_COOKIE,
++  sealSessionProfile,
++  type SessionProfile,
++} from '@/lib/session-profile';
++
++vi.mock('next/headers', () => ({ cookies: vi.fn() }));
++
++const profile: SessionProfile = {
++  tenantSlug: 'acme',
++  expiresIn: 900,
++  user: {
++    id: 'user-1',
++    email: 'user@example.com',
++    firstName: 'Mira',
++    lastName: 'Patel',
++    preferredLanguage: 'ur',
++  },
++  context: { membershipId: 'membership-1', tenantId: 'tenant-1' },
++};
++
++describe('RootLayout server locale', () => {
++  it('server-renders authenticated Urdu with lang=ur and dir=rtl', async () => {
++    const refresh = 'refresh-secret';
++    const sealed = sealSessionProfile(profile, refresh);
++    vi.mocked(cookies).mockResolvedValue({
++      get(name: string) {
++        if (name === REFRESH_COOKIE) return { name, value: refresh };
++        if (name === PROFILE_COOKIE) return { name, value: sealed };
++        return undefined;
++      },
++    } as never);
++
++    const element = await RootLayout({ children: <main>child</main> });
++    expect(element.props.lang).toBe('ur');
++    expect(element.props.dir).toBe('rtl');
++    expect(element.props.children.props.children.props.initialLocale).toBe('ur');
++  });
++
++  it('fails closed to English/LTR when the sealed profile is invalid', async () => {
++    vi.mocked(cookies).mockResolvedValue({
++      get(name: string) {
++        if (name === REFRESH_COOKIE) return { name, value: 'refresh-secret' };
++        if (name === PROFILE_COOKIE) return { name, value: 'forged' };
++        return undefined;
++      },
++    } as never);
++
++    const element = await RootLayout({ children: <main>child</main> });
++    expect(element.props.lang).toBe('en');
++    expect(element.props.dir).toBe('ltr');
++  });
++});
+diff --git a/apps/web/src/app/layout.tsx b/apps/web/src/app/layout.tsx
+index 2c0043b..cf20c0c 100644
+--- a/apps/web/src/app/layout.tsx
++++ b/apps/web/src/app/layout.tsx
+@@ -1,6 +1,7 @@
+ import type { Metadata } from 'next';
+ import { cookies } from 'next/headers';
+ import { LanguageProvider } from '@/components/language-provider';
++import { getLocaleDirection, isLocale, isLocaleComplete } from '@/lib/i18n';
+ import { PROFILE_COOKIE, REFRESH_COOKIE, readSessionProfile } from '@/lib/session-profile';
+ import './globals.css';
+ 
+@@ -22,11 +23,17 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
+   const cookieStore = await cookies();
+   const refreshToken = cookieStore.get(REFRESH_COOKIE)?.value;
+   const session = readSessionProfile(cookieStore.get(PROFILE_COOKIE)?.value, refreshToken);
++  const preferredLanguage = session?.user.preferredLanguage;
++  const profileLocale =
++    preferredLanguage && isLocale(preferredLanguage) && isLocaleComplete(preferredLanguage)
++      ? preferredLanguage
++      : null;
++  const serverLocale = profileLocale ?? 'en';
+ 
+   return (
+-    <html lang="en">
++    <html lang={serverLocale} dir={getLocaleDirection(serverLocale)}>
+       <body className="font-[var(--font-body)]">
+-        <LanguageProvider initialLocale={session?.user.preferredLanguage ?? null}>
++        <LanguageProvider initialLocale={profileLocale}>
+           {children}
+         </LanguageProvider>
+       </body>
+diff --git a/apps/web/src/components/language-provider.test.tsx b/apps/web/src/components/language-provider.test.tsx
+new file mode 100644
+index 0000000..2ec6b88
+--- /dev/null
++++ b/apps/web/src/components/language-provider.test.tsx
+@@ -0,0 +1,163 @@
++import { cleanup, render, screen, waitFor } from '@testing-library/react';
++import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
++import { LanguageProvider, useLanguage } from '@/components/language-provider';
++
++beforeEach(() => {
++  window.localStorage.clear();
++  document.documentElement.lang = 'en';
++  document.documentElement.dir = 'ltr';
++});
++
++afterEach(() => {
++  cleanup();
++  vi.restoreAllMocks();
++});
++
++function LocaleProbe() {
++  const { locale } = useLanguage();
++  return <span data-testid="locale">{locale}</span>;
++}
++
++function Setter() {
++  const { setLocale } = useLanguage();
++  return <button onClick={() => setLocale('ur')}>switch</button>;
++}
++
++function IncompleteLocaleSetter() {
++  const { setLocale } = useLanguage();
++  return <button onClick={() => setLocale('hi')}>switch-hi</button>;
++}
++
++function LocalOnlySetter() {
++  const { setLocale } = useLanguage();
++  return <button onClick={() => setLocale('ur', { persist: false })}>switch-local-only</button>;
++}
++
++describe('LanguageProvider precedence', () => {
++  it('an authenticated profile preference takes precedence over local storage', async () => {
++    window.localStorage.setItem('medsphere.locale', 'ta');
++
++    render(
++      <LanguageProvider initialLocale="ur">
++        <LocaleProbe />
++      </LanguageProvider>,
++    );
++
++    // The profile locale is present on the very first client render; no
++    // post-hydration English fallback is observable.
++    expect(screen.getByTestId('locale')).toHaveTextContent('ur');
++    await waitFor(() => expect(document.documentElement.dir).toBe('rtl'));
++  });
++
++  it('falls back to local storage when no authenticated preference is present', async () => {
++    window.localStorage.setItem('medsphere.locale', 'ta');
++
++    render(
++      <LanguageProvider initialLocale={null}>
++        <LocaleProbe />
++      </LanguageProvider>,
++    );
++
++    await waitFor(() => expect(screen.getByTestId('locale')).toHaveTextContent('ta'));
++  });
++
++  it('ignores an incomplete authenticated preference and falls through to local storage', async () => {
++    window.localStorage.setItem('medsphere.locale', 'ta');
++
++    render(
++      // 'bn' is a known but currently incomplete locale -- must never be
++      // silently applied even if somehow persisted as a stale profile value.
++      <LanguageProvider initialLocale="bn">
++        <LocaleProbe />
++      </LanguageProvider>,
++    );
++
++    await waitFor(() => expect(screen.getByTestId('locale')).toHaveTextContent('ta'));
++  });
++
++  it('defaults to English when nothing else is available', async () => {
++    render(
++      <LanguageProvider initialLocale={null}>
++        <LocaleProbe />
++      </LanguageProvider>,
++    );
++
++    await waitFor(() => expect(screen.getByTestId('locale')).toHaveTextContent('en'));
++  });
++});
++
++describe('LanguageProvider persistence', () => {
++  it('fires a best-effort PATCH to persist an enabled locale choice', async () => {
++    const fetchSpy = vi
++      .spyOn(globalThis, 'fetch')
++      .mockResolvedValue(new Response('{}', { status: 200 }));
++
++    render(
++      <LanguageProvider initialLocale={null}>
++        <Setter />
++      </LanguageProvider>,
++    );
++
++    screen.getByText('switch').click();
++
++    await waitFor(() =>
++      expect(fetchSpy).toHaveBeenCalledWith(
++        '/api/settings/language',
++        expect.objectContaining({ method: 'PATCH' }),
++      ),
++    );
++    const [, init] = fetchSpy.mock.calls[0];
++    expect(JSON.parse(init!.body as string)).toEqual({ preferredLanguage: 'ur' });
++  });
++
++  it('never blocks or reverts the local UI change when persistence fails', async () => {
++    vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('network down'));
++
++    render(
++      <LanguageProvider initialLocale={null}>
++        <LocaleProbe />
++        <Setter />
++      </LanguageProvider>,
++    );
++
++    screen.getByText('switch').click();
++
++    await waitFor(() => expect(screen.getByTestId('locale')).toHaveTextContent('ur'));
++    expect(document.documentElement.lang).toBe('ur');
++  });
++
++  it('fails closed instead of applying a known-but-incomplete locale', async () => {
++    const fetchSpy = vi
++      .spyOn(globalThis, 'fetch')
++      .mockResolvedValue(new Response('{}', { status: 200 }));
++
++    render(
++      <LanguageProvider initialLocale={null}>
++        <LocaleProbe />
++        <IncompleteLocaleSetter />
++      </LanguageProvider>,
++    );
++
++    screen.getByText('switch-hi').click();
++    await waitFor(() => expect(screen.getByTestId('locale')).toHaveTextContent('en'));
++    expect(fetchSpy).not.toHaveBeenCalled();
++    expect(window.localStorage.getItem('medsphere.locale')).not.toBe('hi');
++  });
++
++  it('can apply an already-persisted Settings save without issuing a duplicate PATCH', async () => {
++    const fetchSpy = vi
++      .spyOn(globalThis, 'fetch')
++      .mockResolvedValue(new Response('{}', { status: 200 }));
++
++    render(
++      <LanguageProvider initialLocale="en">
++        <LocaleProbe />
++        <LocalOnlySetter />
++      </LanguageProvider>,
++    );
++
++    screen.getByText('switch-local-only').click();
++    await waitFor(() => expect(screen.getByTestId('locale')).toHaveTextContent('ur'));
++    expect(fetchSpy).not.toHaveBeenCalled();
++  });
++});
+diff --git a/apps/web/src/components/language-provider.tsx b/apps/web/src/components/language-provider.tsx
+index f75c474..60470b9 100644
+--- a/apps/web/src/components/language-provider.tsx
++++ b/apps/web/src/components/language-provider.tsx
+@@ -9,12 +9,13 @@ import {
+   type Locale,
+   type TranslationKey,
+ } from '@/lib/i18n';
++import { isSupportedLanguageCode } from '@/lib/settings-contract';
+ 
+ const LANGUAGE_STORAGE_KEY = 'medsphere.locale';
+ 
+ type LanguageContextValue = {
+   locale: Locale;
+-  setLocale: (locale: Locale) => void;
++  setLocale: (locale: Locale, options?: Readonly<{ persist?: boolean }>) => void;
+   t: (key: TranslationKey) => string;
+ };
+ 
+@@ -25,15 +26,18 @@ function applyDocumentLocale(locale: Locale) {
+   document.documentElement.dir = getLocaleDirection(locale);
+ }
+ 
++export function resolveCompleteLocale(value: string | null | undefined): Locale | null {
++  return value && isLocale(value) && isLocaleComplete(value) ? value : null;
++}
++
+ /** Best-effort match of the browser's locale against a complete, enabled MedSphere locale. */
+ function detectBrowserLocale(): Locale | null {
+   if (typeof navigator === 'undefined') return null;
+   const candidates = navigator.languages ?? [navigator.language];
+   for (const candidate of candidates) {
+     const code = candidate?.split('-')[0];
+-    if (code && isLocale(code) && isLocaleComplete(code)) {
+-      return code;
+-    }
++    const locale = resolveCompleteLocale(code);
++    if (locale) return locale;
+   }
+   return null;
+ }
+@@ -53,11 +57,14 @@ export interface LanguageProviderProps {
+ }
+ 
+ export function LanguageProvider({ children, initialLocale }: Readonly<LanguageProviderProps>) {
+-  const [locale, setLocaleState] = useState<Locale>('en');
+-  const resolvedInitialLocale = initialLocale ?? null;
++  const resolvedInitialLocale = resolveCompleteLocale(initialLocale);
++  // A valid authenticated profile locale is used on the very first render.
++  // This keeps client-component copy consistent with RootLayout's server-side
++  // <html lang/dir> attributes and avoids an English/LTR hydration flash.
++  const [locale, setLocaleState] = useState<Locale>(() => resolvedInitialLocale ?? 'en');
+ 
+   useEffect(() => {
+-    if (isLocale(resolvedInitialLocale) && isLocaleComplete(resolvedInitialLocale)) {
++    if (resolvedInitialLocale) {
+       setLocaleState(resolvedInitialLocale);
+       applyDocumentLocale(resolvedInitialLocale);
+       // Keep local storage in sync so a subsequent signed-out visit (or
+@@ -82,10 +89,11 @@ export function LanguageProvider({ children, initialLocale }: Readonly<LanguageP
+     }
+ 
+     applyDocumentLocale('en');
+-    // eslint-disable-next-line react-hooks/exhaustive-deps
+   }, [resolvedInitialLocale]);
+ 
+-  function setLocale(nextLocale: Locale) {
++  function setLocale(nextLocale: Locale, options: Readonly<{ persist?: boolean }> = {}) {
++    // Never permit a known-but-incomplete locale to create a mixed-language UI.
++    if (!isLocaleComplete(nextLocale)) return;
+     setLocaleState(nextLocale);
+     window.localStorage.setItem(LANGUAGE_STORAGE_KEY, nextLocale);
+     applyDocumentLocale(nextLocale);
+@@ -97,7 +105,7 @@ export function LanguageProvider({ children, initialLocale }: Readonly<LanguageP
+     // screens, without this component needing its own auth-state
+     // plumbing. A failure here never blocks or reverts the immediate,
+     // already-applied local UI change.
+-    if (isEnabledLocaleForPersistence(nextLocale)) {
++    if (options.persist !== false && isSupportedLanguageCode(nextLocale)) {
+       fetch('/api/settings/language', {
+         method: 'PATCH',
+         headers: { 'content-type': 'application/json' },
+@@ -122,19 +130,6 @@ export function LanguageProvider({ children, initialLocale }: Readonly<LanguageP
+   return <LanguageContext.Provider value={value}>{children}</LanguageContext.Provider>;
+ }
+ 
+-/**
+- * The backend only accepts a fixed, narrow set of whole-app UI language
+- * codes for a persisted preference (see
+- * apps/auth-service/src/localization/dto/update-language.dto.ts's
+- * ENABLED_UI_LANGUAGES) -- currently a subset of this frontend's own
+- * complete-locale set. Skipping the PATCH entirely for a locale outside
+- * that backend-accepted set avoids a guaranteed, noisy 400 for a
+- * combination that cannot yet be persisted server-side.
+- */
+-function isEnabledLocaleForPersistence(locale: Locale): boolean {
+-  return locale === 'en' || locale === 'ta' || locale === 'ur';
+-}
+-
+ export function useLanguage(): LanguageContextValue {
+   const value = useContext(LanguageContext);
+   if (!value) {
+diff --git a/apps/web/src/lib/session-cookies.ts b/apps/web/src/lib/session-cookies.ts
+index face093..ea6ade4 100644
+--- a/apps/web/src/lib/session-cookies.ts
++++ b/apps/web/src/lib/session-cookies.ts
+@@ -27,11 +27,30 @@ export function setSessionCookies(
+     sameSite: 'strict',
+     path: '/',
+   });
+-  response.cookies.set(PROFILE_COOKIE, sealSessionProfile(profile, credentials.refreshToken), {
++  setSessionProfileCookie(response, profile, credentials.refreshToken);
++}
++
++
++export function setSessionProfileCookie(
++  response: NextResponse,
++  profile: SessionProfile,
++  integrityKey: string,
++): void {
++  response.cookies.set(PROFILE_COOKIE, sealSessionProfile(profile, integrityKey), {
+     httpOnly: true,
+-    secure,
++    secure: process.env.NODE_ENV === 'production',
++    sameSite: 'lax',
++    path: '/',
++  });
++}
++
++export function clearSessionProfileCookie(response: NextResponse): void {
++  response.cookies.set(PROFILE_COOKIE, '', {
++    httpOnly: true,
++    secure: process.env.NODE_ENV === 'production',
+     sameSite: 'lax',
+     path: '/',
++    maxAge: 0,
+   });
+ }
+ 
+diff --git a/apps/web/src/lib/session-profile.ts b/apps/web/src/lib/session-profile.ts
+index 979d4cf..45dc8a0 100644
+--- a/apps/web/src/lib/session-profile.ts
++++ b/apps/web/src/lib/session-profile.ts
+@@ -1,6 +1,7 @@
+ import { createHmac, timingSafeEqual } from 'node:crypto';
+ 
+ import type { AuthenticatedSession } from './auth-contract';
++import { isSupportedLanguageCode } from './settings-contract';
+ 
+ export const ACCESS_COOKIE = 'medsphere_access';
+ export const REFRESH_COOKIE = 'medsphere_refresh';
+@@ -64,7 +65,8 @@ function isSessionProfile(value: unknown): value is SessionProfile {
+       isBoundedString(candidate.user.id, 100) &&
+       isBoundedString(candidate.user.email, 254) &&
+       isBoundedString(candidate.user.firstName, 100) &&
+-      isBoundedString(candidate.user.lastName, 100),
++      isBoundedString(candidate.user.lastName, 100) &&
++      isSupportedLanguageCode(candidate.user.preferredLanguage),
+     ) &&
+     Boolean(
+       candidate.context &&
+diff --git a/apps/web/src/lib/settings-contract.ts b/apps/web/src/lib/settings-contract.ts
+index de23252..d8b09ca 100644
+--- a/apps/web/src/lib/settings-contract.ts
++++ b/apps/web/src/lib/settings-contract.ts
+@@ -1,8 +1,7 @@
+-// Kept in sync by hand with apps/auth-service/src/localization/dto/update-language.dto.ts's
+-// ENABLED_UI_LANGUAGES and apps/web/src/lib/i18n.ts's enabledLocaleOptions
+-// -- the set of locales whose app-wide UI translation is actually
+-// complete. This is deliberately narrower than the full 23-code Eighth
+-// Schedule catalog in lib/i18n.ts.
++// This public BFF contract intentionally exposes only locales that are
++// translation-complete for the audited V1 UI. The auth service validates
++// the same values via @medsphere/i18n's ENABLED_UI_LANGUAGES. A dedicated
++// cross-consistency test prevents the two package boundaries from drifting.
+ export const SUPPORTED_LANGUAGE_CODES = ['en', 'ta', 'ur'] as const;
+ 
+ export type SupportedLanguageCode = (typeof SUPPORTED_LANGUAGE_CODES)[number];
+@@ -42,6 +41,10 @@ const privacyKeys = [
+ 
+ const supportedLanguageCodes = new Set<string>(SUPPORTED_LANGUAGE_CODES);
+ 
++export function isSupportedLanguageCode(value: unknown): value is SupportedLanguageCode {
++  return typeof value === 'string' && supportedLanguageCodes.has(value);
++}
++
+ export function isPrivacyPreferences(value: unknown): value is PrivacyPreferences {
+   if (!isRecord(value) || !hasExactKeys(value, privacyKeys)) return false;
+   return privacyKeys.every((key) => typeof value[key] === 'boolean');
+@@ -67,8 +70,7 @@ export function isSupportedLanguages(value: unknown): value is SupportedLanguage
+   return value.every((item) => {
+     if (!isRecord(item) || !hasExactKeys(item, ['code', 'name'])) return false;
+     if (
+-      typeof item.code !== 'string' ||
+-      !supportedLanguageCodes.has(item.code) ||
++      !isSupportedLanguageCode(item.code) ||
+       seen.has(item.code) ||
+       typeof item.name !== 'string' ||
+       item.name.trim().length === 0 ||
+@@ -84,8 +86,7 @@ export function isLanguageUpdateRequest(value: unknown): value is LanguageUpdate
+   return (
+     isRecord(value) &&
+     hasExactKeys(value, ['preferredLanguage']) &&
+-    typeof value.preferredLanguage === 'string' &&
+-    supportedLanguageCodes.has(value.preferredLanguage)
++    isSupportedLanguageCode(value.preferredLanguage)
+   );
+ }
+ 
