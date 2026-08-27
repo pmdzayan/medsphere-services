@@ -148,6 +148,7 @@ export class PhoneOtpService {
       await provider.deliver({
         to: dispatch.phone,
         body: `Your MedSphere verification code is ${dispatch.code}. It expires in 10 minutes.`,
+        otpCode: dispatch.code,
       });
     } catch (error) {
       await this.invalidateChallenge(dispatch.tenantId, dispatch.userId);

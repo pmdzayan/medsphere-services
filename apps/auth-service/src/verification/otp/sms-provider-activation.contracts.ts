@@ -49,6 +49,22 @@ export interface SmsProviderDeliveryInput {
   readonly to: string;
   /** Fully composed message body. Adapters must not log this. */
   readonly body: string;
+  /**
+   * The plaintext OTP MedSphere already generated, exposed as a discrete
+   * field alongside `body` -- never embedded-only. Some providers (e.g.
+   * MSG91's DLT-approved template/Flow delivery, required for Indian
+   * transactional SMS) cannot accept an arbitrary free-text `body` at
+   * all: they require the OTP as a single bounded template variable
+   * matching a pre-approved template, and reject anything else. Adapters
+   * for such providers use this field and ignore `body`; adapters for a
+   * free-text-capable channel may ignore this and use `body` alone. This
+   * is an additive, backward-compatible extension of the existing
+   * contract (see ADR-024) -- not a redesign: MedSphere remains the sole
+   * OTP generator/authority, and this field only lets a template-based
+   * provider deliver the same value `body` already describes in prose.
+   * Adapters must not log this.
+   */
+  readonly otpCode?: string;
 }
 
 export interface SmsProviderResult {
