@@ -48,222 +48,232 @@ export class ReservationCreationService {
     const commandHash = this.hash(command, items);
 
     try {
-      return await withSerializableRetry(this.prisma.client, async (transaction) => {
-        await assertTrustedProviderAccess(transaction, command.actor, command.providerId);
-        const replay = await this.findReplay(
-          transaction,
-          command.actor.tenantId,
-          command.idempotencyKey,
-          commandHash,
-        );
-        if (replay) return replay;
+      return await withSerializableRetry(
+        this.prisma.client,
+        async (transaction) => {
+          await assertTrustedProviderAccess(transaction, command.actor, command.providerId);
+          const replay = await this.findReplay(
+            transaction,
+            command.actor.tenantId,
+            command.idempotencyKey,
+            commandHash,
+          );
+          if (replay) return replay;
 
-        const [{ occurredAt }] = await transaction.$queryRaw<Array<{ occurredAt: Date }>>(
-          Prisma.sql`SELECT CURRENT_TIMESTAMP AS "occurredAt"`,
-        );
-        if (!(occurredAt instanceof Date) || Number.isNaN(occurredAt.getTime())) {
-          throw new Error('Database timestamp was not returned');
-        }
-        if (command.expiresAt.getTime() <= occurredAt.getTime()) {
-          throw new BadRequestException('Reservation expiry must be in the future');
-        }
-
-        const subject = await transaction.user.findFirst({
-          where: {
-            id: command.subjectUserId,
-            status: 'ACTIVE',
-            deletedAt: null,
-            memberships: {
-              some: {
-                tenantId: command.actor.tenantId,
-                status: 'ACTIVE',
-                deletedAt: null,
-                tenant: { isActive: true, deletedAt: null },
-              },
-            },
-          },
-          select: { id: true },
-        });
-        if (!subject) throw new NotFoundException('Reservation subject not found');
-
-        const reservationId = randomUUID();
-        const plans: Array<{
-          item: ReservationCreationItem;
-          itemId: string;
-          allocations: Array<{
-            batchId: string;
-            inventoryId: string;
-            quantity: number;
-            onHandQuantity: number;
-            heldQuantity: number;
-            version: number;
-          }>;
-        }> = [];
-
-        for (const item of items) {
-          const batches = await transaction.batch.findMany({
-            where: {
-              tenantId: command.actor.tenantId,
-              providerId: command.providerId,
-              productId: item.productId,
-              status: 'ACTIVE',
-              expiryDate: { gt: occurredAt },
-              deletedAt: null,
-              inventory: { isVisible: true, deletedAt: null },
-              product: { isActive: true, deletedAt: null },
-            },
-            select: {
-              id: true,
-              inventoryId: true,
-              expiryDate: true,
-              manufacturingDate: true,
-              onHandQuantity: true,
-              heldQuantity: true,
-              version: true,
-              createdAt: true,
-            },
-          });
-          try {
-            const byId = new Map(batches.map((batch) => [batch.id, batch]));
-            const allocations = planReservationFefo(batches, item.quantity).map((allocation) => {
-              const batch = byId.get(allocation.batchId);
-              if (!batch) throw new Error('Reservation FEFO candidate invariant violated');
-              return {
-                ...allocation,
-                onHandQuantity: batch.onHandQuantity,
-                heldQuantity: batch.heldQuantity,
-                version: batch.version,
-              };
-            });
-            plans.push({ item, itemId: randomUUID(), allocations });
-          } catch (error) {
-            if (error instanceof InsufficientReservationStockError) {
-              throw new ConflictException(
-                `Insufficient eligible stock for product ${item.productId}`,
-              );
-            }
-            throw error;
+          const [{ occurredAt }] = await transaction.$queryRaw<Array<{ occurredAt: Date }>>(
+            Prisma.sql`SELECT CURRENT_TIMESTAMP AS "occurredAt"`,
+          );
+          if (!(occurredAt instanceof Date) || Number.isNaN(occurredAt.getTime())) {
+            throw new Error('Database timestamp was not returned');
           }
-        }
+          if (command.expiresAt.getTime() <= occurredAt.getTime()) {
+            throw new BadRequestException('Reservation expiry must be in the future');
+          }
 
-        await transaction.medicineReservation.create({
-          data: {
-            id: reservationId,
-            tenantId: command.actor.tenantId,
-            providerId: command.providerId,
-            subjectUserId: command.subjectUserId,
-            expiresAt: command.expiresAt,
-            idempotencyKey: command.idempotencyKey,
-            creationHash: commandHash,
-          },
-          select: { id: true },
-        });
-
-        for (const plan of plans) {
-          await transaction.medicineReservationItem.create({
-            data: {
-              id: plan.itemId,
-              tenantId: command.actor.tenantId,
-              reservationId,
-              providerId: command.providerId,
-              productId: plan.item.productId,
-              quantity: plan.item.quantity,
+          const subject = await transaction.user.findFirst({
+            where: {
+              id: command.subjectUserId,
+              status: 'ACTIVE',
+              deletedAt: null,
+              memberships: {
+                some: {
+                  tenantId: command.actor.tenantId,
+                  status: 'ACTIVE',
+                  deletedAt: null,
+                  tenant: { isActive: true, deletedAt: null },
+                },
+              },
             },
             select: { id: true },
           });
-          for (const allocation of plan.allocations) {
-            const updated = await transaction.batch.updateMany({
+          if (!subject) throw new NotFoundException('Reservation subject not found');
+
+          const reservationId = randomUUID();
+          const plans: Array<{
+            item: ReservationCreationItem;
+            itemId: string;
+            allocations: Array<{
+              batchId: string;
+              inventoryId: string;
+              quantity: number;
+              onHandQuantity: number;
+              heldQuantity: number;
+              version: number;
+            }>;
+          }> = [];
+
+          for (const item of items) {
+            const batches = await transaction.batch.findMany({
               where: {
-                id: allocation.batchId,
                 tenantId: command.actor.tenantId,
                 providerId: command.providerId,
-                productId: plan.item.productId,
+                productId: item.productId,
                 status: 'ACTIVE',
                 expiryDate: { gt: occurredAt },
                 deletedAt: null,
-                onHandQuantity: allocation.onHandQuantity,
-                heldQuantity: allocation.heldQuantity,
-                version: allocation.version,
+                inventory: { isVisible: true, deletedAt: null },
+                product: { isActive: true, deletedAt: null },
               },
-              data: {
-                heldQuantity: { increment: allocation.quantity },
-                version: { increment: 1 },
+              select: {
+                id: true,
+                inventoryId: true,
+                expiryDate: true,
+                manufacturingDate: true,
+                onHandQuantity: true,
+                heldQuantity: true,
+                version: true,
+                createdAt: true,
               },
             });
-            if (updated.count !== 1) {
-              throw new SerializableRetryError('Concurrent reservation stock allocation detected');
+            try {
+              const byId = new Map(batches.map((batch) => [batch.id, batch]));
+              const allocations = planReservationFefo(batches, item.quantity).map((allocation) => {
+                const batch = byId.get(allocation.batchId);
+                if (!batch) throw new Error('Reservation FEFO candidate invariant violated');
+                return {
+                  ...allocation,
+                  onHandQuantity: batch.onHandQuantity,
+                  heldQuantity: batch.heldQuantity,
+                  version: batch.version,
+                };
+              });
+              plans.push({ item, itemId: randomUUID(), allocations });
+            } catch (error) {
+              if (error instanceof InsufficientReservationStockError) {
+                throw new ConflictException(
+                  `Insufficient eligible stock for product ${item.productId}`,
+                );
+              }
+              throw error;
             }
-            await transaction.medicineReservationAllocation.create({
+          }
+
+          await transaction.medicineReservation.create({
+            data: {
+              id: reservationId,
+              tenantId: command.actor.tenantId,
+              providerId: command.providerId,
+              subjectUserId: command.subjectUserId,
+              expiresAt: command.expiresAt,
+              idempotencyKey: command.idempotencyKey,
+              creationHash: commandHash,
+            },
+            select: { id: true },
+          });
+
+          for (const plan of plans) {
+            await transaction.medicineReservationItem.create({
               data: {
-                id: randomUUID(),
+                id: plan.itemId,
                 tenantId: command.actor.tenantId,
                 reservationId,
-                itemId: plan.itemId,
-                inventoryId: allocation.inventoryId,
-                batchId: allocation.batchId,
                 providerId: command.providerId,
                 productId: plan.item.productId,
-                quantity: allocation.quantity,
+                quantity: plan.item.quantity,
               },
               select: { id: true },
             });
+            for (const allocation of plan.allocations) {
+              const updated = await transaction.batch.updateMany({
+                where: {
+                  id: allocation.batchId,
+                  tenantId: command.actor.tenantId,
+                  providerId: command.providerId,
+                  productId: plan.item.productId,
+                  status: 'ACTIVE',
+                  expiryDate: { gt: occurredAt },
+                  deletedAt: null,
+                  onHandQuantity: allocation.onHandQuantity,
+                  heldQuantity: allocation.heldQuantity,
+                  version: allocation.version,
+                },
+                data: {
+                  heldQuantity: { increment: allocation.quantity },
+                  version: { increment: 1 },
+                },
+              });
+              if (updated.count !== 1) {
+                throw new SerializableRetryError(
+                  'Concurrent reservation stock allocation detected',
+                );
+              }
+              await transaction.medicineReservationAllocation.create({
+                data: {
+                  id: randomUUID(),
+                  tenantId: command.actor.tenantId,
+                  reservationId,
+                  itemId: plan.itemId,
+                  inventoryId: allocation.inventoryId,
+                  batchId: allocation.batchId,
+                  providerId: command.providerId,
+                  productId: plan.item.productId,
+                  quantity: allocation.quantity,
+                },
+                select: { id: true },
+              });
+            }
           }
-        }
 
-        await this.audit.appendTenantUser(transaction, {
-          tenantId: command.actor.tenantId,
-          actorMembershipId: command.actor.membershipId,
-          eventType: 'inventory.reservation.created',
-          outcome: 'SUCCEEDED',
-          resourceType: 'MedicineReservation',
-          resourceId: reservationId,
-          occurredAt,
-          metadata: {
-            itemCount: items.length,
-            totalQuantity,
-            expiresAt: command.expiresAt.toISOString(),
-          },
-          request: command.request,
-        });
-        await this.events.appendTenantUser(transaction, command.actor, {
-          eventType: 'inventory.reservation.created',
-          aggregateType: 'MedicineReservation',
-          aggregateId: reservationId,
-          occurredAt,
-          payload: {
-            providerId: command.providerId,
+          await this.audit.appendTenantUser(transaction, {
+            tenantId: command.actor.tenantId,
+            actorMembershipId: command.actor.membershipId,
+            eventType: 'inventory.reservation.created',
+            outcome: 'SUCCEEDED',
+            resourceType: 'MedicineReservation',
+            resourceId: reservationId,
+            occurredAt,
+            metadata: {
+              itemCount: items.length,
+              totalQuantity,
+              expiresAt: command.expiresAt.toISOString(),
+            },
+            request: command.request,
+          });
+          await this.events.appendTenantUser(transaction, command.actor, {
+            eventType: 'inventory.reservation.created',
+            aggregateType: 'MedicineReservation',
+            aggregateId: reservationId,
+            occurredAt,
+            payload: {
+              providerId: command.providerId,
+              status: 'PENDING',
+              version: 1,
+              itemCount: items.length,
+              totalQuantity,
+              expiresAt: command.expiresAt.toISOString(),
+            },
+          });
+          return {
+            reservationId,
             status: 'PENDING',
             version: 1,
             itemCount: items.length,
             totalQuantity,
-            expiresAt: command.expiresAt.toISOString(),
-          },
-        });
-        return {
-          reservationId,
-          status: 'PENDING',
-          version: 1,
-          itemCount: items.length,
-          totalQuantity,
-          replayed: false,
-        };
-      }, RESERVATION_SERIALIZABLE_ATTEMPTS);
+            replayed: false,
+          };
+        },
+        RESERVATION_SERIALIZABLE_ATTEMPTS,
+      );
     } catch (error) {
       if (hasPrismaCode(error, 'P2034')) {
         throw new ConflictException('Concurrent reservation stock allocation detected');
       }
       if (!hasPrismaCode(error, 'P2002')) throw error;
-      return withSerializableRetry(this.prisma.client, async (transaction) => {
-        await assertTrustedProviderAccess(transaction, command.actor, command.providerId);
-        const replay = await this.findReplay(
-          transaction,
-          command.actor.tenantId,
-          command.idempotencyKey,
-          commandHash,
-        );
-        if (!replay) throw error;
-        return replay;
-      }, RESERVATION_SERIALIZABLE_ATTEMPTS);
+      return withSerializableRetry(
+        this.prisma.client,
+        async (transaction) => {
+          await assertTrustedProviderAccess(transaction, command.actor, command.providerId);
+          const replay = await this.findReplay(
+            transaction,
+            command.actor.tenantId,
+            command.idempotencyKey,
+            commandHash,
+          );
+          if (!replay) throw error;
+          return replay;
+        },
+        RESERVATION_SERIALIZABLE_ATTEMPTS,
+      );
     }
   }
 
