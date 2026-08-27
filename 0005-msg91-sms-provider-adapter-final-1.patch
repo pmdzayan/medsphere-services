@@ -1,0 +1,896 @@
+# MEDSPHERE V1 — Task 0005 MSG91 SMS Provider Adapter — complete replacement patch
+# Authoritative branch: feature/database-architecture
+# Authoritative base SHA: 058b38c7e45004caed2a14a330bdde230e6a8f4d
+# Generated: 2026-08-27
+# Scope: Task 0005 only. No publish/deploy performed.
+diff --git a/.env.example b/.env.example
+--- a/.env.example
++++ b/.env.example
+@@ -87,3 +87,26 @@
+ # and provide MEDSPHERE_NOTIFICATION_SMTP_URL through the deployment secret store.
+ # Do not commit a real credential value.
+ MEDSPHERE_NOTIFICATION_SMTP_URL=
++
++# Phone OTP SMS provider (see ADR-023, ADR-024)
++# Disabled by default. Production activation is explicit and fail-closed.
++OTP_SMS_PROVIDER_ENABLED=false
++OTP_SMS_PROVIDER_KEY=
++OTP_SMS_PROVIDER_CREDENTIAL_REFERENCE=
++OTP_SMS_PROVIDER_TIMEOUT_MS=5000
++
++# When activating MSG91, configure:
++# OTP_SMS_PROVIDER_KEY=msg91
++# OTP_SMS_PROVIDER_CREDENTIAL_REFERENCE=MSG91_AUTH_KEY
++# MSG91_AUTH_KEY is the secret value named by the credential reference.
++# MSG91_FLOW_ID is the MSG91 Flow ID used in the /api/v5/flow/ request.
++# It is NOT the Indian DLT Template ID; DLT template mapping/approval is
++# external provider/telecom configuration. MSG91_SENDER_ID must be the
++# configured sender/header and must be DLT-approved where applicable.
++# Do not commit real credentials or production identifiers.
++MSG91_AUTH_KEY=
++MSG91_FLOW_ID=
++MSG91_SENDER_ID=
++# Flow variable that receives MedSphere's existing six-digit OTP.
++# Keep this aligned with the variable configured in the MSG91 Flow.
++MSG91_OTP_FLOW_VARIABLE_NAME=OTP
+diff --git a/apps/auth-service/src/verification/otp/msg91-sms-provider.adapter.spec.ts b/apps/auth-service/src/verification/otp/msg91-sms-provider.adapter.spec.ts
+new file mode 100644
+--- /dev/null
++++ b/apps/auth-service/src/verification/otp/msg91-sms-provider.adapter.spec.ts
+@@ -0,0 +1,293 @@
++import {
++  Msg91SmsProviderAdapter,
++  type Msg91SmsProviderConfig,
++} from './msg91-sms-provider.adapter';
++import { SmsProviderContractFailure } from './sms-provider-activation.contracts';
++
++const CONFIG = {
++  authKey: 'test-auth-key-never-logged',
++  flowId: 'flow-123',
++  senderId: 'MSGTST',
++  timeoutMs: 5_000,
++};
++const INPUT = {
++  to: '+919876543210',
++  body: 'Your MedSphere verification code is 123456. It expires in 10 minutes.',
++  otpCode: '123456',
++};
++
++function jsonResponse(status: number, body: unknown): Response {
++  return new Response(JSON.stringify(body), {
++    status,
++    headers: { 'content-type': 'application/json' },
++  });
++}
++
++function createAdapter(fetchMock: jest.Mock, overrides: Partial<Msg91SmsProviderConfig> = {}) {
++  return new Msg91SmsProviderAdapter(
++    { ...CONFIG, ...overrides },
++    fetchMock as unknown as typeof fetch,
++  );
++}
++
++async function expectFailure(
++  adapter: Msg91SmsProviderAdapter,
++  input: typeof INPUT,
++  expected: { code: string; classification: 'TRANSIENT' | 'TERMINAL' },
++) {
++  await expect(adapter.deliver(input)).rejects.toMatchObject(expected);
++}
++
++describe('Msg91SmsProviderAdapter', () => {
++  it('uses only the documented HTTPS Flow endpoint and sends MedSphere OTP as a Flow variable', async () => {
++    const fetchMock = jest
++      .fn()
++      .mockResolvedValue(jsonResponse(200, { type: 'success', message: 'request-id-123' }));
++    const adapter = createAdapter(fetchMock);
++
++    await expect(adapter.deliver(INPUT)).resolves.toEqual({
++      acknowledgement: 'ACCEPTED',
++      providerReference: 'request-id-123',
++    });
++
++    expect(fetchMock).toHaveBeenCalledTimes(1);
++    const [url, init] = fetchMock.mock.calls[0];
++    expect(url).toBe('https://api.msg91.com/api/v5/flow/');
++    expect(url).toMatch(/^https:\/\//);
++    expect(init.method).toBe('POST');
++    expect(init.redirect).toBe('manual');
++    expect(init.headers.authkey).toBe(CONFIG.authKey);
++    expect(JSON.parse(init.body)).toEqual({
++      flow_id: CONFIG.flowId,
++      sender: CONFIG.senderId,
++      recipients: [{ mobiles: '919876543210', OTP: '123456' }],
++    });
++  });
++
++  it('uses the explicitly configured OTP Flow variable name', async () => {
++    const fetchMock = jest
++      .fn()
++      .mockResolvedValue(jsonResponse(200, { type: 'success', message: 'request-id-456' }));
++    const adapter = createAdapter(fetchMock, { otpVariableName: 'LOGIN_OTP' });
++
++    await adapter.deliver({ ...INPUT, otpCode: '654321' });
++
++    expect(JSON.parse(fetchMock.mock.calls[0][1].body).recipients[0]).toEqual({
++      mobiles: '919876543210',
++      LOGIN_OTP: '654321',
++    });
++  });
++
++  describe('configuration validation', () => {
++    it.each([
++      [{ authKey: '' }, 'empty auth key'],
++      [{ authKey: '   ' }, 'whitespace auth key'],
++      [{ flowId: '' }, 'empty Flow ID'],
++      [{ flowId: '   ' }, 'whitespace Flow ID'],
++      [{ senderId: '' }, 'empty sender ID'],
++      [{ senderId: '   ' }, 'whitespace sender ID'],
++      [{ otpVariableName: '' }, 'empty Flow variable'],
++      [{ otpVariableName: 'OTP-VAR' }, 'invalid Flow variable'],
++      [{ otpVariableName: '9OTP' }, 'invalid leading digit in Flow variable'],
++      [{ timeoutMs: 249 }, 'timeout below MedSphere minimum'],
++      [{ timeoutMs: 10_001 }, 'timeout above MedSphere maximum'],
++      [{ timeoutMs: 1_000.5 }, 'non-integer timeout'],
++    ] as const)('rejects %s (%s) before any request', (overrides: Partial<Msg91SmsProviderConfig>) => {
++      expect(() => createAdapter(jest.fn(), overrides as Partial<Msg91SmsProviderConfig>)).toThrow(
++        SmsProviderContractFailure,
++      );
++    });
++  });
++
++  describe('destination guard', () => {
++    it.each(['', '   ', 'abc', '+91ABC7654321', '+0123456789', '+1234', '+1234567890123456'])(
++      'rejects malformed destination %j without contacting MSG91',
++      async (to: string) => {
++        const fetchMock = jest.fn();
++        const adapter = createAdapter(fetchMock);
++        await expectFailure(adapter, { ...INPUT, to }, {
++          code: 'PROVIDER_DESTINATION_INVALID',
++          classification: 'TERMINAL',
++        });
++        expect(fetchMock).not.toHaveBeenCalled();
++      },
++    );
++  });
++
++  describe('OTP guard', () => {
++    it.each(['', '12345', '1234567', 'abcdef', '12 456', '12345a'])(
++      'rejects malformed OTP %j without contacting MSG91',
++      async (otpCode: string) => {
++        const fetchMock = jest.fn();
++        const adapter = createAdapter(fetchMock);
++        await expectFailure(adapter, { ...INPUT, otpCode }, {
++          code: 'PROVIDER_REQUEST_INVALID_OTP',
++          classification: 'TERMINAL',
++        });
++        expect(fetchMock).not.toHaveBeenCalled();
++      },
++    );
++  });
++
++  it('classifies a network error as transient', async () => {
++    const adapter = createAdapter(jest.fn().mockRejectedValue(new TypeError('network failed')));
++    await expectFailure(adapter, INPUT, {
++      code: 'PROVIDER_NETWORK_FAILURE',
++      classification: 'TRANSIENT',
++    });
++  });
++
++  it('classifies a timeout abort as transient', async () => {
++    const adapter = createAdapter(
++      jest.fn().mockRejectedValue(new DOMException('aborted', 'AbortError')),
++    );
++    await expectFailure(adapter, INPUT, {
++      code: 'PROVIDER_NETWORK_FAILURE',
++      classification: 'TRANSIENT',
++    });
++  });
++
++  it.each([400, 422])('classifies HTTP %i as terminal request rejection', async (status: number) => {
++    const adapter = createAdapter(jest.fn().mockResolvedValue(jsonResponse(status, {})));
++    await expectFailure(adapter, INPUT, {
++      code: 'PROVIDER_REQUEST_REJECTED',
++      classification: 'TERMINAL',
++    });
++  });
++
++  it.each([401, 403])('classifies HTTP %i as terminal authentication rejection', async (status: number) => {
++    const adapter = createAdapter(jest.fn().mockResolvedValue(jsonResponse(status, {})));
++    await expectFailure(adapter, INPUT, {
++      code: 'PROVIDER_AUTH_REJECTED',
++      classification: 'TERMINAL',
++    });
++  });
++
++  it('classifies HTTP 429 as transient', async () => {
++    const adapter = createAdapter(jest.fn().mockResolvedValue(jsonResponse(429, {})));
++    await expectFailure(adapter, INPUT, {
++      code: 'PROVIDER_RATE_LIMITED',
++      classification: 'TRANSIENT',
++    });
++  });
++
++  it.each([500, 503, 599])('classifies HTTP %i as transient provider failure', async (status: number) => {
++    const adapter = createAdapter(jest.fn().mockResolvedValue(jsonResponse(status, {})));
++    await expectFailure(adapter, INPUT, {
++      code: 'PROVIDER_SERVER_ERROR',
++      classification: 'TRANSIENT',
++    });
++  });
++
++  it('rejects an unexpected redirect instead of following it', async () => {
++    const adapter = createAdapter(jest.fn().mockResolvedValue(jsonResponse(302, {})));
++    await expectFailure(adapter, INPUT, {
++      code: 'PROVIDER_REDIRECT_REJECTED',
++      classification: 'TERMINAL',
++    });
++  });
++
++  it('rejects malformed 2xx JSON', async () => {
++    const adapter = createAdapter(jest.fn().mockResolvedValue(new Response('not-json', { status: 200 })));
++    await expectFailure(adapter, INPUT, {
++      code: 'PROVIDER_RESPONSE_MALFORMED',
++      classification: 'TERMINAL',
++    });
++  });
++
++  it.each([
++    { type: 'success' },
++    { type: 'success', message: '' },
++    { type: 'success', message: '   ' },
++    { type: 'success', message: 12345 },
++    { type: 'success', message: { id: 'request-id' } },
++  ])('rejects success-shaped responses without a safe provider reference: %p', async (body: unknown) => {
++    const adapter = createAdapter(jest.fn().mockResolvedValue(jsonResponse(200, body)));
++    await expectFailure(adapter, INPUT, {
++      code: 'PROVIDER_RESPONSE_MALFORMED',
++      classification: 'TERMINAL',
++    });
++  });
++
++  it('classifies a functional MSG91 rejection as terminal without exposing its message', async () => {
++    const providerMessage = `invalid request for ${INPUT.to} code ${INPUT.otpCode}`;
++    const adapter = createAdapter(
++      jest.fn().mockResolvedValue(jsonResponse(200, { type: 'error', message: providerMessage })),
++    );
++
++    let caught: unknown;
++    try {
++      await adapter.deliver(INPUT);
++    } catch (error) {
++      caught = error;
++    }
++    expect(caught).toMatchObject({
++      code: 'PROVIDER_REJECTED_TERMINAL',
++      classification: 'TERMINAL',
++    });
++    expect(JSON.stringify(caught, Object.getOwnPropertyNames(caught))).not.toContain(providerMessage);
++  });
++
++  it('rejects a provider reference that echoes sensitive request data', async () => {
++    const adapter = createAdapter(
++      jest.fn().mockResolvedValue(jsonResponse(200, { type: 'success', message: INPUT.otpCode })),
++    );
++    await expectFailure(adapter, INPUT, {
++      code: 'PROVIDER_RESPONSE_MALFORMED',
++      classification: 'TERMINAL',
++    });
++  });
++
++  describe('privacy boundary', () => {
++    it('does not leak auth key, phone, OTP, or composed body through errors, logs, results, or URL', async () => {
++      const consoleSpies = [
++        jest.spyOn(console, 'log').mockImplementation(() => undefined),
++        jest.spyOn(console, 'info').mockImplementation(() => undefined),
++        jest.spyOn(console, 'warn').mockImplementation(() => undefined),
++        jest.spyOn(console, 'error').mockImplementation(() => undefined),
++      ];
++      try {
++        const fetchMock = jest
++          .fn()
++          .mockResolvedValue(jsonResponse(200, { type: 'success', message: 'opaque-request-789' }));
++        const adapter = createAdapter(fetchMock);
++        const result = await adapter.deliver(INPUT);
++        const [url] = fetchMock.mock.calls[0];
++        const serializedResult = JSON.stringify(result);
++
++        for (const sensitive of [CONFIG.authKey, INPUT.to, INPUT.otpCode, INPUT.body]) {
++          expect(url).not.toContain(sensitive);
++          expect(serializedResult).not.toContain(sensitive);
++        }
++        for (const spy of consoleSpies) {
++          expect(spy).not.toHaveBeenCalled();
++        }
++      } finally {
++        for (const spy of consoleSpies) {
++          spy.mockRestore();
++        }
++      }
++    });
++
++    it('does not leak sensitive values in a thrown failure', async () => {
++      const adapter = createAdapter(
++        jest.fn().mockResolvedValue(
++          jsonResponse(401, {
++            message: `${CONFIG.authKey} ${INPUT.to} ${INPUT.otpCode} ${INPUT.body}`,
++          }),
++        ),
++      );
++
++      let caught: unknown;
++      try {
++        await adapter.deliver(INPUT);
++      } catch (error) {
++        caught = error;
++      }
++      const serialized = JSON.stringify(caught, Object.getOwnPropertyNames(caught));
++      for (const sensitive of [CONFIG.authKey, INPUT.to, INPUT.otpCode, INPUT.body]) {
++        expect(serialized).not.toContain(sensitive);
++      }
++    });
++  });
++});
+diff --git a/apps/auth-service/src/verification/otp/msg91-sms-provider.adapter.ts b/apps/auth-service/src/verification/otp/msg91-sms-provider.adapter.ts
+new file mode 100644
+--- /dev/null
++++ b/apps/auth-service/src/verification/otp/msg91-sms-provider.adapter.ts
+@@ -0,0 +1,222 @@
++import type {
++  ActivatedSmsProviderAdapter,
++  SmsProviderDeliveryInput,
++  SmsProviderResult,
++} from './sms-provider-activation.contracts';
++import {
++  MAX_SMS_PROVIDER_TIMEOUT_MS,
++  MIN_SMS_PROVIDER_TIMEOUT_MS,
++  SmsProviderContractFailure,
++} from './sms-provider-activation.contracts';
++import { isValidOtpCodeFormat } from './otp-crypto.util';
++import { isValidE164PhoneNumber } from './phone-normalization';
++
++/**
++ * ADR-024: production MSG91 delivery adapter behind ADR-023's existing
++ * fail-closed SMS provider boundary. MedSphere remains the sole OTP
++ * authority: the service generates, hashes, expires, verifies, throttles,
++ * and invalidates OTP challenges. This adapter only transmits the exact
++ * OTP MedSphere already generated through MSG91's Flow API.
++ *
++ * It never calls MSG91 SendOTP or Verify OTP and therefore never creates a
++ * second OTP state machine. It also never logs or returns credentials,
++ * destinations, OTP values, composed SMS bodies, or raw provider payloads.
++ */
++export const MSG91_PROVIDER_KEY = 'msg91';
++
++const MSG91_FLOW_ENDPOINT = 'https://api.msg91.com/api/v5/flow/';
++const DEFAULT_OTP_FLOW_VARIABLE_NAME = 'OTP';
++const FLOW_VARIABLE_NAME_PATTERN = /^[A-Za-z_][A-Za-z0-9_]{0,63}$/;
++const PROVIDER_REFERENCE_PATTERN = /^[A-Za-z0-9._:-]{1,160}$/;
++const MAX_CONFIGURATION_VALUE_LENGTH = 256;
++
++export interface Msg91SmsProviderConfig {
++  /** Resolved MSG91 auth key. Secret: never log, persist, or expose it. */
++  readonly authKey: string;
++  /** MSG91 Flow ID used by the Flow API. This is not a DLT Template ID. */
++  readonly flowId: string;
++  /** Sender/header configured in MSG91 and DLT-approved where required. */
++  readonly senderId: string;
++  /** Named Flow variable that receives MedSphere's OTP. Defaults to OTP. */
++  readonly otpVariableName?: string;
++  readonly timeoutMs: number;
++}
++
++interface ValidatedMsg91SmsProviderConfig {
++  readonly authKey: string;
++  readonly flowId: string;
++  readonly senderId: string;
++  readonly otpVariableName: string;
++  readonly timeoutMs: number;
++}
++
++interface Msg91FlowResponseShape {
++  readonly type?: unknown;
++  readonly message?: unknown;
++}
++
++export class Msg91SmsProviderAdapter implements ActivatedSmsProviderAdapter {
++  readonly providerKey = MSG91_PROVIDER_KEY;
++  private readonly config: ValidatedMsg91SmsProviderConfig;
++
++  constructor(
++    config: Msg91SmsProviderConfig,
++    /** Test seam only. Production uses the platform fetch implementation. */
++    private readonly fetchImpl: typeof fetch = fetch,
++  ) {
++    this.config = validateConfig(config);
++  }
++
++  async deliver(input: SmsProviderDeliveryInput): Promise<SmsProviderResult> {
++    if (!isValidE164PhoneNumber(input.to)) {
++      throw failure('PROVIDER_DESTINATION_INVALID', 'TERMINAL');
++    }
++    if (!input.otpCode || !isValidOtpCodeFormat(input.otpCode)) {
++      throw failure('PROVIDER_REQUEST_INVALID_OTP', 'TERMINAL');
++    }
++
++    const mobile = toMsg91MobileFormat(input.to);
++    let response: Response;
++    try {
++      response = await this.fetchImpl(MSG91_FLOW_ENDPOINT, {
++        method: 'POST',
++        redirect: 'manual',
++        headers: {
++          'content-type': 'application/json',
++          authkey: this.config.authKey,
++        },
++        body: JSON.stringify({
++          flow_id: this.config.flowId,
++          sender: this.config.senderId,
++          recipients: [
++            {
++              mobiles: mobile,
++              [this.config.otpVariableName]: input.otpCode,
++            },
++          ],
++        }),
++        signal: AbortSignal.timeout(this.config.timeoutMs),
++      });
++    } catch {
++      // Network/DNS failures and timeout aborts are retryable at MedSphere's
++      // existing bounded retry boundary. Provider details are deliberately
++      // discarded so secrets or message data cannot leak into errors.
++      throw failure('PROVIDER_NETWORK_FAILURE', 'TRANSIENT');
++    }
++
++    if (response.status === 429) {
++      throw failure('PROVIDER_RATE_LIMITED', 'TRANSIENT');
++    }
++    if (response.status >= 500 && response.status <= 599) {
++      throw failure('PROVIDER_SERVER_ERROR', 'TRANSIENT');
++    }
++    if (response.status === 401 || response.status === 403) {
++      throw failure('PROVIDER_AUTH_REJECTED', 'TERMINAL');
++    }
++    if (response.status === 400 || response.status === 422) {
++      throw failure('PROVIDER_REQUEST_REJECTED', 'TERMINAL');
++    }
++    if (response.status >= 300 && response.status <= 399) {
++      throw failure('PROVIDER_REDIRECT_REJECTED', 'TERMINAL');
++    }
++    if (!response.ok) {
++      throw failure('PROVIDER_REQUEST_REJECTED', 'TERMINAL');
++    }
++
++    let parsed: Msg91FlowResponseShape;
++    try {
++      parsed = (await response.json()) as Msg91FlowResponseShape;
++    } catch {
++      throw failure('PROVIDER_RESPONSE_MALFORMED', 'TERMINAL');
++    }
++
++    if (typeof parsed.type !== 'string') {
++      throw failure('PROVIDER_RESPONSE_MALFORMED', 'TERMINAL');
++    }
++
++    const responseType = parsed.type.trim().toLowerCase();
++    if (responseType === 'error') {
++      throw failure('PROVIDER_REJECTED_TERMINAL', 'TERMINAL');
++    }
++    if (responseType !== 'success') {
++      throw failure('PROVIDER_RESPONSE_MALFORMED', 'TERMINAL');
++    }
++
++    const providerReference = safeProviderReference(parsed.message, input, mobile, this.config.authKey);
++    if (!providerReference) {
++      throw failure('PROVIDER_RESPONSE_MALFORMED', 'TERMINAL');
++    }
++
++    return { acknowledgement: 'ACCEPTED', providerReference };
++  }
++}
++
++function validateConfig(config: Msg91SmsProviderConfig): ValidatedMsg91SmsProviderConfig {
++  const authKey = boundedNonEmpty(config.authKey);
++  const flowId = boundedNonEmpty(config.flowId);
++  const senderId = boundedNonEmpty(config.senderId);
++  const otpVariableName =
++    config.otpVariableName === undefined ? DEFAULT_OTP_FLOW_VARIABLE_NAME : config.otpVariableName;
++
++  if (!authKey || !flowId || !senderId || !FLOW_VARIABLE_NAME_PATTERN.test(otpVariableName)) {
++    throw failure('PROVIDER_CONFIGURATION_INVALID', 'TERMINAL');
++  }
++  if (
++    !Number.isInteger(config.timeoutMs) ||
++    config.timeoutMs < MIN_SMS_PROVIDER_TIMEOUT_MS ||
++    config.timeoutMs > MAX_SMS_PROVIDER_TIMEOUT_MS
++  ) {
++    throw failure('PROVIDER_CONFIGURATION_INVALID', 'TERMINAL');
++  }
++
++  return {
++    authKey,
++    flowId,
++    senderId,
++    otpVariableName,
++    timeoutMs: config.timeoutMs,
++  };
++}
++
++function boundedNonEmpty(value: string): string | null {
++  if (typeof value !== 'string') {
++    return null;
++  }
++  const trimmed = value.trim();
++  return trimmed.length > 0 && trimmed.length <= MAX_CONFIGURATION_VALUE_LENGTH ? trimmed : null;
++}
++
++function toMsg91MobileFormat(e164Phone: string): string {
++  return e164Phone.startsWith('+') ? e164Phone.slice(1) : e164Phone;
++}
++
++function safeProviderReference(
++  value: unknown,
++  input: SmsProviderDeliveryInput,
++  mobile: string,
++  authKey: string,
++): string | null {
++  if (typeof value !== 'string') {
++    return null;
++  }
++  const reference = value.trim();
++  if (!PROVIDER_REFERENCE_PATTERN.test(reference)) {
++    return null;
++  }
++
++  const sensitiveValues = [authKey, input.to, mobile, input.otpCode, input.body].filter(
++    (candidate): candidate is string => typeof candidate === 'string' && candidate.length > 0,
++  );
++  return sensitiveValues.some((sensitive) => reference.includes(sensitive)) ? null : reference;
++}
++
++function failure(code: string, classification: 'TRANSIENT' | 'TERMINAL') {
++  return new Msg91ContractFailure(code, classification);
++}
++
++class Msg91ContractFailure extends SmsProviderContractFailure {
++  constructor(code: string, classification: 'TRANSIENT' | 'TERMINAL') {
++    super(code, MSG91_PROVIDER_KEY, classification);
++    this.name = 'Msg91ContractFailure';
++  }
++}
+diff --git a/apps/auth-service/src/verification/otp/phone-otp.service.ts b/apps/auth-service/src/verification/otp/phone-otp.service.ts
+--- a/apps/auth-service/src/verification/otp/phone-otp.service.ts
++++ b/apps/auth-service/src/verification/otp/phone-otp.service.ts
+@@ -148,6 +148,7 @@
+       await provider.deliver({
+         to: dispatch.phone,
+         body: `Your MedSphere verification code is ${dispatch.code}. It expires in 10 minutes.`,
++        otpCode: dispatch.code,
+       });
+     } catch (error) {
+       await this.invalidateChallenge(dispatch.tenantId, dispatch.userId);
+diff --git a/apps/auth-service/src/verification/otp/sms-provider-activation.contracts.ts b/apps/auth-service/src/verification/otp/sms-provider-activation.contracts.ts
+--- a/apps/auth-service/src/verification/otp/sms-provider-activation.contracts.ts
++++ b/apps/auth-service/src/verification/otp/sms-provider-activation.contracts.ts
+@@ -49,6 +49,22 @@
+   readonly to: string;
+   /** Fully composed message body. Adapters must not log this. */
+   readonly body: string;
++  /**
++   * The plaintext OTP MedSphere already generated, exposed as a discrete
++   * field alongside `body` -- never embedded-only. Some providers (e.g.
++   * MSG91's DLT-approved template/Flow delivery, required for Indian
++   * transactional SMS) cannot accept an arbitrary free-text `body` at
++   * all: they require the OTP as a single bounded template variable
++   * matching a pre-approved template, and reject anything else. Adapters
++   * for such providers use this field and ignore `body`; adapters for a
++   * free-text-capable channel may ignore this and use `body` alone. This
++   * is an additive, backward-compatible extension of the existing
++   * contract (see ADR-024) -- not a redesign: MedSphere remains the sole
++   * OTP generator/authority, and this field only lets a template-based
++   * provider deliver the same value `body` already describes in prose.
++   * Adapters must not log this.
++   */
++  readonly otpCode?: string;
+ }
+ 
+ export interface SmsProviderResult {
+diff --git a/apps/auth-service/src/verification/otp/sms-provider-registry.factory.spec.ts b/apps/auth-service/src/verification/otp/sms-provider-registry.factory.spec.ts
+new file mode 100644
+--- /dev/null
++++ b/apps/auth-service/src/verification/otp/sms-provider-registry.factory.spec.ts
+@@ -0,0 +1,109 @@
++import { MSG91_PROVIDER_KEY } from './msg91-sms-provider.adapter';
++import { createSmsProviderRegistry } from './sms-provider-registry.factory';
++
++const VALID_ENV = {
++  OTP_SMS_PROVIDER_ENABLED: 'true',
++  OTP_SMS_PROVIDER_KEY: MSG91_PROVIDER_KEY,
++  OTP_SMS_PROVIDER_CREDENTIAL_REFERENCE: 'TEST_MSG91_AUTH_KEY',
++  OTP_SMS_PROVIDER_TIMEOUT_MS: '5000',
++  TEST_MSG91_AUTH_KEY: 'factory-test-auth-key',
++  MSG91_FLOW_ID: 'flow-factory-123',
++  MSG91_SENDER_ID: 'MSGTST',
++} as const;
++
++function successResponse(): Response {
++  return new Response(JSON.stringify({ type: 'success', message: 'factory-request-id' }), {
++    status: 200,
++    headers: { 'content-type': 'application/json' },
++  });
++}
++
++describe('createSmsProviderRegistry', () => {
++  it('keeps SMS disabled by default', () => {
++    const registry = createSmsProviderRegistry({});
++    expect(registry.health()).toEqual({ state: 'DISABLED' });
++    expect(() => registry.provider()).toThrow();
++  });
++
++  it('activates MSG91 only when explicitly configured', () => {
++    const registry = createSmsProviderRegistry(VALID_ENV);
++    expect(registry.health()).toEqual({ state: 'READY', providerKey: MSG91_PROVIDER_KEY });
++    expect(registry.provider().providerKey).toBe(MSG91_PROVIDER_KEY);
++  });
++
++  it.each([
++    ['auth key', 'TEST_MSG91_AUTH_KEY'],
++    ['Flow ID', 'MSG91_FLOW_ID'],
++    ['sender ID', 'MSG91_SENDER_ID'],
++  ] as const)('fails bootstrap closed when %s is missing', (_label: string, missingKey: string) => {
++    const environment: Record<string, string | undefined> = { ...VALID_ENV };
++    delete environment[missingKey];
++    expect(() => createSmsProviderRegistry(environment)).toThrow(/Missing required environment variable/);
++  });
++
++  it('fails closed for an unsupported provider without any fallback adapter', () => {
++    const registry = createSmsProviderRegistry({
++      OTP_SMS_PROVIDER_ENABLED: 'true',
++      OTP_SMS_PROVIDER_KEY: 'unsupported-vendor',
++      OTP_SMS_PROVIDER_CREDENTIAL_REFERENCE: 'TEST_SMS_SECRET',
++    });
++    expect(registry.health()).toMatchObject({ state: 'UNAVAILABLE', providerKey: 'unsupported-vendor' });
++    expect(() => registry.provider()).toThrow();
++  });
++
++  it.each(['mock', 'test', 'fake'])('never treats %s as a production fallback provider', (providerKey: string) => {
++    const registry = createSmsProviderRegistry({
++      OTP_SMS_PROVIDER_ENABLED: 'true',
++      OTP_SMS_PROVIDER_KEY: providerKey,
++      OTP_SMS_PROVIDER_CREDENTIAL_REFERENCE: 'TEST_SMS_SECRET',
++      TEST_SMS_SECRET: 'not-used',
++    });
++    expect(registry.health().state).toBe('UNAVAILABLE');
++    expect(() => registry.provider()).toThrow();
++  });
++
++  it('resolves the auth key through the configured credential reference', async () => {
++    const fetchMock = jest.fn().mockResolvedValue(successResponse());
++    const registry = createSmsProviderRegistry(
++      {
++        ...VALID_ENV,
++        OTP_SMS_PROVIDER_CREDENTIAL_REFERENCE: 'ALTERNATE_MSG91_SECRET',
++        TEST_MSG91_AUTH_KEY: undefined,
++        ALTERNATE_MSG91_SECRET: 'indirect-auth-key',
++      },
++      { fetchImpl: fetchMock as unknown as typeof fetch },
++    );
++
++    await registry.provider().deliver({ to: '+919876543210', body: 'private body', otpCode: '123456' });
++    expect(fetchMock.mock.calls[0][1].headers.authkey).toBe('indirect-auth-key');
++  });
++
++  it('defaults the OTP Flow variable safely to OTP', async () => {
++    const fetchMock = jest.fn().mockResolvedValue(successResponse());
++    const registry = createSmsProviderRegistry(VALID_ENV, {
++      fetchImpl: fetchMock as unknown as typeof fetch,
++    });
++
++    await registry.provider().deliver({ to: '+919876543210', body: 'private body', otpCode: '123456' });
++    const requestBody = JSON.parse(fetchMock.mock.calls[0][1].body);
++    expect(requestBody.recipients[0]).toEqual({ mobiles: '919876543210', OTP: '123456' });
++  });
++
++  it('uses an explicitly configured OTP Flow variable', async () => {
++    const fetchMock = jest.fn().mockResolvedValue(successResponse());
++    const registry = createSmsProviderRegistry(
++      { ...VALID_ENV, MSG91_OTP_FLOW_VARIABLE_NAME: 'LOGIN_OTP' },
++      { fetchImpl: fetchMock as unknown as typeof fetch },
++    );
++
++    await registry.provider().deliver({ to: '+919876543210', body: 'private body', otpCode: '654321' });
++    const requestBody = JSON.parse(fetchMock.mock.calls[0][1].body);
++    expect(requestBody.recipients[0]).toEqual({ mobiles: '919876543210', LOGIN_OTP: '654321' });
++  });
++
++  it('fails closed for an explicitly empty OTP Flow variable', () => {
++    expect(() =>
++      createSmsProviderRegistry({ ...VALID_ENV, MSG91_OTP_FLOW_VARIABLE_NAME: '' }),
++    ).toThrow();
++  });
++});
+diff --git a/apps/auth-service/src/verification/otp/sms-provider-registry.factory.ts b/apps/auth-service/src/verification/otp/sms-provider-registry.factory.ts
+--- a/apps/auth-service/src/verification/otp/sms-provider-registry.factory.ts
++++ b/apps/auth-service/src/verification/otp/sms-provider-registry.factory.ts
+@@ -1,25 +1,50 @@
++import { loadEnv } from '@medsphere/config';
+ import {
+   ContractSmsProviderRegistry,
+   parseSmsProviderActivationEnvironment,
+ } from './sms-provider-activation.contracts';
++import { MSG91_PROVIDER_KEY, Msg91SmsProviderAdapter } from './msg91-sms-provider.adapter';
++
++export interface SmsProviderRegistryFactoryDependencies {
++  /** Test seam only. Production omits this and uses the platform fetch. */
++  readonly fetchImpl?: typeof fetch;
++}
+ 
+ /**
+- * Reads real activation configuration from the process environment. No
+- * commercial SMS vendor adapter exists in this repository -- selecting one
+- * is a separate deployment/business decision (see ADR-023). Until that
+- * decision is made and an adapter is added here (mirroring
+- * SmtpNotificationProviderAdapter's role for EMAIL), this factory can only
+- * ever construct a registry with no adapter, which fails every OTP
+- * dispatch closed with PROVIDER_UNAVAILABLE via the accepted
+- * provider()/health() contract logic -- the same fail-closed default the
+- * EMAIL channel had before PR #66.
++ * Creates the existing ADR-023 fail-closed SMS registry. MSG91 is wired only
++ * when SMS delivery is explicitly enabled with provider key "msg91".
++ * Unsupported keys receive no adapter, so they cannot silently become a
++ * mock/test production fallback.
+  */
+ export function createSmsProviderRegistry(
+   environment: Readonly<Record<string, string | undefined>> = process.env,
++  dependencies: SmsProviderRegistryFactoryDependencies = {},
+ ): ContractSmsProviderRegistry {
+   const activation = parseSmsProviderActivationEnvironment(environment);
+-  // No adapter is ever constructed here: no vendor implementation exists
+-  // yet. A future change wires a real adapter the same way
+-  // notification-provider-registry.factory.ts does for SMTP.
+-  return new ContractSmsProviderRegistry(activation);
++  if (!activation.enabled || activation.providerKey !== MSG91_PROVIDER_KEY) {
++    return new ContractSmsProviderRegistry(activation);
++  }
++
++  const credentialReference = activation.credentialReference;
++  if (!credentialReference) {
++    // parseSmsProviderActivationEnvironment already fails closed here; this
++    // branch is a defensive type/runtime boundary and exposes no secret data.
++    throw new Error('SMS provider credential configuration is invalid');
++  }
++
++  const configuration = loadEnv(
++    [credentialReference, 'MSG91_FLOW_ID', 'MSG91_SENDER_ID'] as const,
++    environment,
++  );
++  const adapter = new Msg91SmsProviderAdapter(
++    {
++      authKey: configuration[credentialReference],
++      flowId: configuration.MSG91_FLOW_ID,
++      senderId: configuration.MSG91_SENDER_ID,
++      otpVariableName: environment.MSG91_OTP_FLOW_VARIABLE_NAME,
++      timeoutMs: activation.timeoutMs,
++    },
++    dependencies.fetchImpl,
++  );
++  return new ContractSmsProviderRegistry(activation, adapter);
+ }
+diff --git a/docs/adr/0024-msg91-sms-provider-adapter.md b/docs/adr/0024-msg91-sms-provider-adapter.md
+new file mode 100644
+--- /dev/null
++++ b/docs/adr/0024-msg91-sms-provider-adapter.md
+@@ -0,0 +1,105 @@
++# ADR-024 — MSG91 SMS Provider Adapter for Phone OTP Delivery
++
++- Status: Proposed
++- Date: 2026-08-27
++- Scope: Task 0005 only; production-capable delivery adapter behind ADR-023.
++
++## Context
++
++ADR-023 made MedSphere the sole phone-OTP authority and established a
++provider-neutral, fail-closed SMS delivery boundary. MedSphere owns OTP
++generation, hashing, expiration, verification, resend limits, attempt limits,
++Redis throttling, destination binding/phone normalization, challenge lifecycle,
++and account-activation policy. A provider adapter must not duplicate any of
++those responsibilities.
++
++MSG91 exposes a Flow API for sending messages from an existing Flow and also
++separate provider-managed OTP products. Task 0005 uses only the Flow endpoint:
++`POST https://api.msg91.com/api/v5/flow/`. MSG91 receives the OTP MedSphere
++already generated as a named Flow variable. The adapter does not call MSG91
++SendOTP, Verify OTP, or any provider-side OTP verification/state-machine API.
++
++## Flow ID and DLT Template ID are different concepts
++
++`MSG91_FLOW_ID` is the MSG91 Flow identifier placed in the API payload as
++`flow_id`. It is the runtime identifier this adapter needs.
++
++An Indian DLT Template ID is a telecom/DLT regulatory identifier associated
++with approved message content. It is configured/mapped through the provider
++and DLT process where applicable; it is not the `flow_id`, and Task 0005 does
++not introduce an unused `MSG91_DLT_TEMPLATE_ID` setting. The sender/header
++(`MSG91_SENDER_ID`) must likewise be configured and DLT-approved where
++applicable before live Indian transactional SMS is activated.
++
++## Decision
++
++1. `SmsProviderDeliveryInput` gains the additive optional `otpCode` field.
++   `PhoneOtpService` passes the exact code it generated alongside the existing
++   composed body. MSG91 uses only `otpCode`; it never parses the body to recover
++   security-sensitive state.
++2. `Msg91SmsProviderAdapter` sends only to the centralized HTTPS Flow endpoint
++   `https://api.msg91.com/api/v5/flow/`. The endpoint is not user-configurable.
++3. The request contains `flow_id: config.flowId`, `sender`, one normalized
++   recipient, and one bounded Flow variable containing MedSphere's six-digit
++   OTP. The auth key is sent only in the `authkey` header, never in a URL.
++4. The adapter performs a final fail-closed boundary check using MedSphere's
++   existing E.164 validator and OTP-format validator. This does not duplicate
++   phone normalization or change OTP generation policy.
++5. Configuration is validated before network I/O. Empty auth key, Flow ID, or
++   sender ID; invalid/empty Flow variable name; and timeout values outside
++   ADR-023's existing 250–10,000 ms bound are rejected without exposing secret
++   values. The OTP Flow variable defaults to `OTP` only when it is absent.
++6. `OTP_SMS_PROVIDER_CREDENTIAL_REFERENCE` remains indirection to a deployment
++   secret/config key. The factory resolves that reference using the existing
++   `@medsphere/config` `loadEnv` pattern. No credential is committed.
++7. SMS remains disabled by default. Only explicit provider key `msg91` can wire
++   this adapter. Unsupported, `mock`, `test`, and `fake` keys receive no adapter
++   and fail closed; there is no synthetic production fallback.
++
++## Failure classification and retry boundary
++
++MedSphere keeps retry/challenge policy outside MSG91. The adapter classifies
++only the delivery attempt:
++
++- network/DNS error or timeout: `TRANSIENT`
++- HTTP 429: `TRANSIENT`
++- HTTP 5xx: `TRANSIENT`
++- HTTP 400/401/403/422: `TERMINAL`
++- unexpected HTTP 3xx: `TERMINAL` and redirects are not followed
++- functional MSG91 `type: "error"`: `TERMINAL`
++- malformed 2xx JSON, missing/empty/non-string provider reference, or otherwise
++  malformed success payload: `TERMINAL`
++
++A successful call returns only `{ acknowledgement: "ACCEPTED",
++providerReference: <opaque request id> }`. Raw MSG91 bodies are never returned.
++
++## Privacy and logging boundary
++
++The adapter adds no logging. Auth key, destination phone number, plaintext OTP,
++composed SMS body, request headers, and raw MSG91 response payloads must never
++appear in thrown errors, logs, returned provider results, or the request URL.
++Normalized provider/error codes are the only failure details surfaced.
++
++## Security consequences
++
++Task 0005 does not change tenant isolation, RBAC, authentication, account
++activation, audit behavior, OTP challenge persistence, retry/resend/attempt
++limits, Redis throttling, phone normalization, or verification semantics.
++The SMS provider cannot mark a phone verified. Only MedSphere's existing
++`PhoneOtpService.verifyOtp` path can consume a valid challenge and delegate to
++`AccountVerificationService.applyPhoneVerified`.
++
++## External production activation still required
++
++Repository code completeness does **not** mean live SMS is activated. External
++work still requires all of the following before production use:
++
++- a real MSG91 account
++- a real MSG91 auth key stored in deployment secrets
++- DLT entity/header/template approval and mapping where required
++- a configured MSG91 Flow and real `MSG91_FLOW_ID`
++- correct deployment configuration/secrets for sender and Flow variable
++- a controlled live SMS test using real credentials
++- deployment and exact-head GitHub CI in the real environment
++
++None of those external steps are claimed complete by this ADR or Task 0005.
+diff --git a/docs/adr/README.md b/docs/adr/README.md
+--- a/docs/adr/README.md
++++ b/docs/adr/README.md
+@@ -36,3 +36,4 @@ Every ADR includes decision, reason/context, alternatives, consequences, impleme
+ | [ADR-017](0017-reservation-notification-recipient-resolution.md)     | Reservation notification recipient resolution    | Accepted | 2026-08-15 |
+ | [ADR-018](0018-reservation-notification-composition.md)              | Reservation notification composition             | Proposed | 2026-08-16 |
+ | [ADR-023](0023-phone-otp-verification-and-sms-provider-boundary.md)  | Phone OTP verification and SMS provider boundary | Proposed | 2026-08-26 |
++| [ADR-024](0024-msg91-sms-provider-adapter.md)                        | MSG91 SMS provider adapter for phone OTP delivery | Proposed | 2026-08-27 |
