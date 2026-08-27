@@ -1,0 +1,1735 @@
+From 26d05e92abacd8c6791917cb2b2a80eedcd32550 Mon Sep 17 00:00:00 2001
+From: MedSphere Agent <agent@medsphere.local>
+Date: Thu, 27 Aug 2026 11:06:34 +0000
+Subject: [PATCH] feat: V1 centralized monitoring and alerting foundation
+
+- add packages/common/src/metrics/metrics-registry.ts: dependency-free
+  Counter/Histogram primitives with a hard label-key allowlist
+  (service/method/route/status_class/dependency/outcome/channel/
+  provider only -- rejects any other key, including tenantId/phone/
+  requestId, at record time), a cardinality cap, Prometheus text
+  exposition, and an OTLP-metrics-model-shaped JSON snapshot; exported
+  as a singleton (appMetrics) to avoid changing constructor signatures
+  on already-accepted, already-tested classes
+- add packages/common/src/metrics/otlp-exporter.ts: bounded, fail-safe
+  OTLP/HTTP+JSON push exporter -- disabled by default, fails closed on
+  malformed config (non-HTTPS endpoint, out-of-bounds timeout, missing
+  named credential-reference variable), never throws on backend
+  outage, rate-limits its own failure logging (every 10th consecutive
+  failure) to prevent log storms
+- add GET /metrics (Prometheus text exposition) via new
+  MetricsController/MetricsModule, matching HealthController's public-
+  endpoint convention
+- wire HTTP request count/duration/status-class metrics into the
+  existing request-observability middleware (reusing its safeMethod/
+  safeRouteTemplate helpers, not duplicating them)
+- wire a bounded server-error metric into GlobalExceptionFilter (adds
+  an optional, backward-compatible serviceName constructor parameter)
+- wire dependency readiness metrics (count + duration, by
+  postgresql/redis) into AuthReadinessService, preserving its existing
+  sequential short-circuit behavior exactly
+- wire notification-delivery metrics (channel + outcome only --
+  tenantId/deliveryId/errorCode deliberately excluded from labels)
+  into the existing LoggingNotificationDeliveryObserver
+- wire OTP dispatch and reservation-outcome metrics at their existing
+  call sites via transparent, non-behavior-altering wrappers
+- start the OTLP exporter from main.ts only when explicitly enabled;
+  a malformed export config disables export only (logged once) and
+  never prevents the service from starting
+- add packages/common test infra (had none before) matching
+  packages/logger's established build-then-node:test convention;
+  25 new tests, all passing for real against the compiled build
+- re-ran all pre-existing request-observability, error-observability
+  tests: all still pass unchanged (8/8)
+- extend docs/operations/v1-observability-runbook.md: architecture,
+  metrics catalog, exporter configuration, SLO definitions (explicitly
+  labeled initial engineering thresholds, not a contractual SLA),
+  alert-rule summary, expanded dashboard specification, expanded
+  incident workflow, and an explicit 'what still requires production
+  deployment/vendor activation' section
+- add docs/operations/v1-alert-rules.prometheus.yml: 12 real,
+  executable, provider-neutral Prometheus alerting rules across 4
+  groups (availability, HTTP, workflows, telemetry), each with a
+  bounded evaluation window and warning/critical severity -- validated
+  as parseable YAML with the expected rule structure
+- add .env.example placeholders only for the new TELEMETRY_* variables
+  and an example credential-reference variable; no real credentials
+- does not add any OpenTelemetry SDK dependency, any paid monitoring
+  service, or require any real vendor account
+- does not touch 0004/0005/0006 (parked patches) -- confirmed absent
+  from this branch
+---
+ .env.example                                  |  27 ++
+ apps/auth-service/src/app.bootstrap.ts        |   2 +-
+ apps/auth-service/src/app.module.ts           |   3 +-
+ .../src/health/auth-readiness.service.ts      |  23 +-
+ .../src/inventory/inventory.controller.ts     |  35 +-
+ apps/auth-service/src/main.ts                 |  26 ++
+ .../logging-notification-delivery.observer.ts |  12 +
+ .../auth-service/src/request-observability.ts |  17 +-
+ .../src/verification/otp/phone-otp.service.ts |   3 +
+ docs/operations/v1-alert-rules.prometheus.yml | 148 ++++++++
+ docs/operations/v1-observability-runbook.md   | 125 +++++++
+ packages/common/package.json                  |   3 +-
+ .../src/filters/global-exception.filter.ts    |   9 +-
+ packages/common/src/index.ts                  |   4 +
+ .../common/src/metrics/metrics-registry.ts    | 336 ++++++++++++++++++
+ .../common/src/metrics/metrics.controller.ts  |  27 ++
+ packages/common/src/metrics/metrics.module.ts |   7 +
+ packages/common/src/metrics/otlp-exporter.ts  | 211 +++++++++++
+ .../common/test/metrics-registry.spec.mjs     | 132 +++++++
+ packages/common/test/otlp-exporter.spec.mjs   | 245 +++++++++++++
+ 20 files changed, 1378 insertions(+), 17 deletions(-)
+ create mode 100644 docs/operations/v1-alert-rules.prometheus.yml
+ create mode 100644 packages/common/src/metrics/metrics-registry.ts
+ create mode 100644 packages/common/src/metrics/metrics.controller.ts
+ create mode 100644 packages/common/src/metrics/metrics.module.ts
+ create mode 100644 packages/common/src/metrics/otlp-exporter.ts
+ create mode 100644 packages/common/test/metrics-registry.spec.mjs
+ create mode 100644 packages/common/test/otlp-exporter.spec.mjs
+
+diff --git a/.env.example b/.env.example
+index 49cb07e..31b55fd 100644
+--- a/.env.example
++++ b/.env.example
+@@ -67,6 +67,33 @@ RUN_AUTH_INFRASTRUCTURE_TESTS=false
+ # --- Logging ---
+ LOG_LEVEL=info
+ 
++# --- Metrics & telemetry export (see docs/operations/v1-observability-runbook.md) ---
++# Application metrics are always collected in-process and exposed at
++# GET /metrics (Prometheus text exposition) regardless of the settings
++# below -- these variables control only the OPTIONAL push export to an
++# external OTLP-compatible collector, which is disabled by default and
++# local-safe: leaving every value below unset is a fully supported,
++# safe configuration.
++TELEMETRY_METRICS_EXPORT_ENABLED=false
++TELEMETRY_SERVICE_NAME=auth-service
++# Must be HTTPS; enabling export without a valid HTTPS endpoint fails
++# closed at startup rather than silently exporting nowhere or over
++# plain HTTP.
++TELEMETRY_METRICS_EXPORT_ENDPOINT=
++TELEMETRY_METRICS_EXPORT_TIMEOUT_MS=5000
++TELEMETRY_METRICS_EXPORT_INTERVAL_MS=60000
++# Optional: name of another env var holding a collector auth header
++# value (e.g. "Bearer <token>"). Never put the credential itself here.
++TELEMETRY_METRICS_EXPORT_HEADER_CREDENTIAL_REFERENCE=
++
++# Example secret variable name referenced by
++# TELEMETRY_METRICS_EXPORT_HEADER_CREDENTIAL_REFERENCE. When enabling a
++# real collector, set:
++# TELEMETRY_METRICS_EXPORT_HEADER_CREDENTIAL_REFERENCE=MEDSPHERE_OTLP_COLLECTOR_AUTH_HEADER
++# and provide MEDSPHERE_OTLP_COLLECTOR_AUTH_HEADER through the
++# deployment secret store. Do not commit a real credential value.
++MEDSPHERE_OTLP_COLLECTOR_AUTH_HEADER=
++
+ # Google authentication
+ GOOGLE_OAUTH_CLIENT_ID=
+ 
+diff --git a/apps/auth-service/src/app.bootstrap.ts b/apps/auth-service/src/app.bootstrap.ts
+index 1d942dc..ce8068c 100644
+--- a/apps/auth-service/src/app.bootstrap.ts
++++ b/apps/auth-service/src/app.bootstrap.ts
+@@ -18,7 +18,7 @@ export function configureAuthApplication(app: INestApplication, logger?: Service
+   configureHttpSecurityHeaders(app, {
+     interactiveDocumentation: process.env.ENABLE_SWAGGER === 'true',
+   });
+-  app.useGlobalFilters(new GlobalExceptionFilter(logger));
++  app.useGlobalFilters(new GlobalExceptionFilter(logger, 'auth-service'));
+   app.useGlobalPipes(createValidationPipe());
+ 
+   if (process.env.ENABLE_SWAGGER === 'true') {
+diff --git a/apps/auth-service/src/app.module.ts b/apps/auth-service/src/app.module.ts
+index b75bc23..2248d66 100644
+--- a/apps/auth-service/src/app.module.ts
++++ b/apps/auth-service/src/app.module.ts
+@@ -1,7 +1,7 @@
+ import { Module } from '@nestjs/common';
+ import { APP_GUARD } from '@nestjs/core';
+ import { ThrottlerGuard } from '@nestjs/throttler';
+-import { HEALTH_READINESS_CHECK, HealthModule } from '@medsphere/common';
++import { HEALTH_READINESS_CHECK, HealthModule, MetricsModule } from '@medsphere/common';
+ import { PrismaModule } from './prisma/prisma.module';
+ import { UsersModule } from './users/users.module';
+ import { LocalizationModule } from './localization/localization.module';
+@@ -34,6 +34,7 @@ import { AuthReadinessService } from './health/auth-readiness.service';
+     InventoryModule,
+     NotificationModule,
+     VerificationModule,
++    MetricsModule,
+   ],
+   providers: [
+     { provide: APP_GUARD, useClass: JwtAuthGuard },
+diff --git a/apps/auth-service/src/health/auth-readiness.service.ts b/apps/auth-service/src/health/auth-readiness.service.ts
+index 2af7d28..59a902f 100644
+--- a/apps/auth-service/src/health/auth-readiness.service.ts
++++ b/apps/auth-service/src/health/auth-readiness.service.ts
+@@ -1,5 +1,5 @@
+ import { Injectable } from '@nestjs/common';
+-import { HealthReadinessCheck } from '@medsphere/common';
++import { appMetrics, HealthReadinessCheck } from '@medsphere/common';
+ import { PrismaService } from '../prisma/prisma.service';
+ import { RedisThrottlerStorage } from '../security/redis-throttler.storage';
+ 
+@@ -11,7 +11,24 @@ export class AuthReadinessService implements HealthReadinessCheck {
+   ) {}
+ 
+   async check(): Promise<void> {
+-    await this.prisma.client.$queryRaw`SELECT 1`;
+-    await this.redis.ping();
++    await this.timedCheck('postgresql', () => this.prisma.client.$queryRaw`SELECT 1`);
++    await this.timedCheck('redis', () => this.redis.ping());
++  }
++
++  private async timedCheck(
++    dependency: 'postgresql' | 'redis',
++    run: () => Promise<unknown>,
++  ): Promise<void> {
++    const startedAt = process.hrtime.bigint();
++    try {
++      await run();
++      appMetrics.dependencyCheckTotal.increment({ dependency, outcome: 'success' });
++    } catch (error) {
++      appMetrics.dependencyCheckTotal.increment({ dependency, outcome: 'failure' });
++      throw error;
++    } finally {
++      const elapsedMs = Number(process.hrtime.bigint() - startedAt) / 1_000_000;
++      appMetrics.dependencyCheckDurationMs.observe(elapsedMs, { dependency });
++    }
+   }
+ }
+diff --git a/apps/auth-service/src/inventory/inventory.controller.ts b/apps/auth-service/src/inventory/inventory.controller.ts
+index 017392e..6144e30 100644
+--- a/apps/auth-service/src/inventory/inventory.controller.ts
++++ b/apps/auth-service/src/inventory/inventory.controller.ts
+@@ -22,6 +22,7 @@ import {
+   ApiConflictResponse,
+   ApiTags,
+ } from '@nestjs/swagger';
++import { appMetrics } from '@medsphere/common';
+ import { AuthenticatedIdentity } from '../auth/auth.types';
+ import { extractRequestMetadata, MetadataHttpRequest } from '../auth/request-metadata';
+ import { CurrentIdentity } from '../common/decorators/current-identity.decorator';
+@@ -98,15 +99,17 @@ export class InventoryController {
+     @Body() dto: CreateProviderReservationDto,
+     @Req() request: MetadataHttpRequest,
+   ) {
+-    return this.reservationCreation.create({
+-      actor: identity,
+-      providerId,
+-      subjectUserId: dto.subjectUserId,
+-      expiresAt: new Date(dto.expiresAt),
+-      items: dto.items,
+-      idempotencyKey: dto.idempotencyKey,
+-      request: extractRequestMetadata(request),
+-    });
++    return observeOutcome(
++      this.reservationCreation.create({
++        actor: identity,
++        providerId,
++        subjectUserId: dto.subjectUserId,
++        expiresAt: new Date(dto.expiresAt),
++        items: dto.items,
++        idempotencyKey: dto.idempotencyKey,
++        request: extractRequestMetadata(request),
++      }),
++    );
+   }
+ 
+   @Post('providers/:providerId/batches/:batchId/quarantine')
+@@ -342,3 +345,17 @@ export class InventoryController {
+     });
+   }
+ }
++
++/**
++ * Transparent pass-through: records a bounded reservation-outcome metric
++ * (success/failure only, no tenant/product/subject identifiers) without
++ * altering the wrapped promise's resolution, rejection, or timing in any
++ * way visible to the caller.
++ */
++function observeOutcome<T>(result: Promise<T>): Promise<T> {
++  result.then(
++    () => appMetrics.reservationOutcomeTotal.increment({ outcome: 'success' }),
++    () => appMetrics.reservationOutcomeTotal.increment({ outcome: 'failure' }),
++  );
++  return result;
++}
+diff --git a/apps/auth-service/src/main.ts b/apps/auth-service/src/main.ts
+index e2a5862..38c2889 100644
+--- a/apps/auth-service/src/main.ts
++++ b/apps/auth-service/src/main.ts
+@@ -1,6 +1,12 @@
+ import { NestFactory } from '@nestjs/core';
+ import { AppModule } from './app.module';
+ import { createServiceLogger } from '@medsphere/logger';
++import {
++  appMetrics,
++  MetricsExportConfigError,
++  OtlpMetricsExporter,
++  parseMetricsExportConfig,
++} from '@medsphere/common';
+ import { configureAuthApplication } from './app.bootstrap';
+ import { assertAuthProductionRuntimePolicy } from './auth-production-runtime';
+ 
+@@ -15,6 +21,26 @@ async function bootstrap(): Promise<void> {
+ 
+   configureAuthApplication(app, logger);
+ 
++  // Metrics export is optional and must never prevent the service from
++  // starting: a malformed export configuration disables export only,
++  // logged once, while /metrics scraping (wired via MetricsModule) and
++  // the rest of the application remain fully available either way.
++  try {
++    const exportConfig = parseMetricsExportConfig(process.env, { serviceName: 'auth-service' });
++    if (exportConfig.enabled) {
++      const exporter = new OtlpMetricsExporter(exportConfig, appMetrics, fetch, logger);
++      exporter.start();
++    }
++  } catch (error) {
++    if (error instanceof MetricsExportConfigError) {
++      logger.warn('Metrics export disabled: invalid configuration', {
++        event: 'metrics_export_config_invalid',
++      });
++    } else {
++      throw error;
++    }
++  }
++
+   const port = Number(process.env.PORT) || 3000;
+ 
+   await app.listen(port);
+diff --git a/apps/auth-service/src/notifications/logging-notification-delivery.observer.ts b/apps/auth-service/src/notifications/logging-notification-delivery.observer.ts
+index 3591893..1275617 100644
+--- a/apps/auth-service/src/notifications/logging-notification-delivery.observer.ts
++++ b/apps/auth-service/src/notifications/logging-notification-delivery.observer.ts
+@@ -1,4 +1,5 @@
+ import { Injectable, Logger } from '@nestjs/common';
++import { appMetrics } from '@medsphere/common';
+ import type {
+   NotificationDeliveryObserver,
+   NotificationObservation,
+@@ -12,6 +13,13 @@ import type {
+  * provider response -- none of those are present on
+  * NotificationObservation in the first place, so there is nothing to
+  * accidentally leak here.
++ *
++ * Also records a bounded metric counter (channel + outcome only --
++ * tenantId, deliveryId, and errorCode are deliberately excluded from the
++ * metric labels: the first two are high-cardinality identifiers, and
++ * errorCode's cardinality is not bounded by this contract, so none of
++ * the three belong on a low-cardinality metric label even though they
++ * are safe to log).
+  */
+ @Injectable()
+ export class LoggingNotificationDeliveryObserver implements NotificationDeliveryObserver {
+@@ -27,5 +35,9 @@ export class LoggingNotificationDeliveryObserver implements NotificationDelivery
+       outcome: observation.outcome,
+       errorCode: observation.errorCode,
+     });
++    appMetrics.notificationDeliveryTotal.increment({
++      channel: observation.channel,
++      outcome: observation.outcome,
++    });
+   }
+ }
+diff --git a/apps/auth-service/src/request-observability.ts b/apps/auth-service/src/request-observability.ts
+index bcdb650..8b72f78 100644
+--- a/apps/auth-service/src/request-observability.ts
++++ b/apps/auth-service/src/request-observability.ts
+@@ -1,6 +1,6 @@
+ import { randomUUID } from 'node:crypto';
+ import type { INestApplication } from '@nestjs/common';
+-import { normalizeRequestId } from '@medsphere/common';
++import { appMetrics, normalizeRequestId, statusClass } from '@medsphere/common';
+ import type { ServiceLogger } from '@medsphere/logger';
+ 
+ interface ObservableHttpRequest {
+@@ -86,6 +86,21 @@ export function createRequestObservabilityMiddleware(
+     response.once('finish', () => {
+       const elapsedNanoseconds = clock() - startedAt;
+       const durationMs = Math.round((Number(elapsedNanoseconds) / 1_000_000) * 100) / 100;
++      const route = safeRouteTemplate(request) ?? 'unmatched';
++      const method = safeMethod(request.method);
++      const statusClassLabel = statusClass(response.statusCode);
++
++      appMetrics.httpRequestsTotal.increment({
++        service: 'auth-service',
++        method,
++        route,
++        status_class: statusClassLabel,
++      });
++      appMetrics.httpRequestDurationMs.observe(durationMs, {
++        service: 'auth-service',
++        method,
++        route,
++      });
+ 
+       logger.info('HTTP request completed', {
+         event: 'http_request_completed',
+diff --git a/apps/auth-service/src/verification/otp/phone-otp.service.ts b/apps/auth-service/src/verification/otp/phone-otp.service.ts
+index 06ec723..bc9b211 100644
+--- a/apps/auth-service/src/verification/otp/phone-otp.service.ts
++++ b/apps/auth-service/src/verification/otp/phone-otp.service.ts
+@@ -1,4 +1,5 @@
+ import { BadRequestException, Injectable } from '@nestjs/common';
++import { appMetrics } from '@medsphere/common';
+ import { withSerializableRetry, type Prisma } from '@medsphere/database';
+ import { AuditWriter } from '../../audit/audit-writer.service';
+ import { AuthConfigService } from '../../auth/auth-config.service';
+@@ -149,7 +150,9 @@ export class PhoneOtpService {
+         to: dispatch.phone,
+         body: `Your MedSphere verification code is ${dispatch.code}. It expires in 10 minutes.`,
+       });
++      appMetrics.otpDispatchTotal.increment({ outcome: 'success' });
+     } catch (error) {
++      appMetrics.otpDispatchTotal.increment({ outcome: 'failure' });
+       await this.invalidateChallenge(dispatch.tenantId, dispatch.userId);
+       if (error instanceof SmsProviderContractFailure) {
+         throw new BadRequestException('Verification code delivery is temporarily unavailable');
+diff --git a/docs/operations/v1-alert-rules.prometheus.yml b/docs/operations/v1-alert-rules.prometheus.yml
+new file mode 100644
+index 0000000..d0cd497
+--- /dev/null
++++ b/docs/operations/v1-alert-rules.prometheus.yml
+@@ -0,0 +1,148 @@
++# MedSphere V1 alert rules -- provider-neutral, standard Prometheus
++# rule-file syntax. Importable into any Prometheus-compatible alerting
++# system (Prometheus + Alertmanager, or any OTLP/Prometheus-compatible
++# hosted backend) without modification.
++#
++# Every rule declares a bounded evaluation window ("for:") so a single
++# noisy data point never pages anyone; an alert only fires once its
++# condition has held true continuously for that window, and resolves
++# automatically once the condition is no longer true.
++#
++# See docs/operations/v1-observability-runbook.md for the SLO context
++# these thresholds are drawn from, and an explicit statement that these
++# are initial engineering thresholds, not a contractual SLA.
++
++groups:
++  - name: medsphere-v1-availability
++    rules:
++      - alert: MedSphereServiceUnavailable
++        expr: up{job="medsphere-auth-service"} == 0
++        for: 2m
++        labels:
++          severity: critical
++        annotations:
++          summary: 'MedSphere auth-service is unreachable'
++          description: 'The scrape target has been down for 2 minutes.'
++
++      - alert: MedSphereRepeatedReadinessFailure
++        expr: |
++          sum(rate(medsphere_dependency_check_total{outcome="failure"}[5m]))
++          / sum(rate(medsphere_dependency_check_total[5m])) > 0.1
++        for: 5m
++        labels:
++          severity: warning
++        annotations:
++          summary: 'Repeated dependency readiness failures'
++          description: 'More than 10% of readiness checks have failed over 5 minutes.'
++
++      - alert: MedSpherePostgresUnavailable
++        expr: |
++          sum(rate(medsphere_dependency_check_total{dependency="postgresql",outcome="failure"}[5m]))
++          / sum(rate(medsphere_dependency_check_total{dependency="postgresql"}[5m])) > 0.5
++        for: 3m
++        labels:
++          severity: critical
++        annotations:
++          summary: 'PostgreSQL appears unavailable'
++          description: 'Over 50% of PostgreSQL readiness checks have failed for 3 minutes.'
++
++      - alert: MedSphereRedisUnavailable
++        expr: |
++          sum(rate(medsphere_dependency_check_total{dependency="redis",outcome="failure"}[5m]))
++          / sum(rate(medsphere_dependency_check_total{dependency="redis"}[5m])) > 0.5
++        for: 3m
++        labels:
++          severity: critical
++        annotations:
++          summary: 'Redis appears unavailable'
++          description: 'Over 50% of Redis readiness checks have failed for 3 minutes.'
++
++  - name: medsphere-v1-http
++    rules:
++      - alert: MedSphereElevated5xxRateWarning
++        expr: |
++          sum(rate(medsphere_http_server_errors_total[5m]))
++          / sum(rate(medsphere_http_requests_total[5m])) > 0.01
++        for: 5m
++        labels:
++          severity: warning
++        annotations:
++          summary: 'Elevated server-error rate (warning)'
++          description: '5xx rate has exceeded 1% for 5 minutes.'
++
++      - alert: MedSphereElevated5xxRateCritical
++        expr: |
++          sum(rate(medsphere_http_server_errors_total[5m]))
++          / sum(rate(medsphere_http_requests_total[5m])) > 0.05
++        for: 5m
++        labels:
++          severity: critical
++        annotations:
++          summary: 'Elevated server-error rate (critical)'
++          description: '5xx rate has exceeded 5% for 5 minutes.'
++
++      - alert: MedSphereAbnormalLatencyP95Warning
++        expr: |
++          histogram_quantile(0.95, sum(rate(medsphere_http_request_duration_ms_bucket[5m])) by (le)) > 1500
++        for: 5m
++        labels:
++          severity: warning
++        annotations:
++          summary: 'p95 latency above 1500ms'
++          description: 'p95 HTTP request latency has exceeded 1500ms for 5 minutes.'
++
++      - alert: MedSphereAbnormalLatencyP99Critical
++        expr: |
++          histogram_quantile(0.99, sum(rate(medsphere_http_request_duration_ms_bucket[5m])) by (le)) > 3000
++        for: 5m
++        labels:
++          severity: critical
++        annotations:
++          summary: 'p99 latency above 3000ms'
++          description: 'p99 HTTP request latency has exceeded 3000ms for 5 minutes.'
++
++  - name: medsphere-v1-workflows
++    rules:
++      - alert: MedSphereNotificationWorkerRepeatedlyFailing
++        expr: |
++          sum(rate(medsphere_notification_delivery_total{outcome="FAILED"}[15m]))
++          / sum(rate(medsphere_notification_delivery_total[15m])) > 0.05
++        for: 15m
++        labels:
++          severity: warning
++        annotations:
++          summary: 'Notification worker delivery failure rate elevated'
++          description: 'Over 5% of notification deliveries have failed over 15 minutes.'
++
++      - alert: MedSphereReservationWorkflowFailureRateElevated
++        expr: |
++          sum(rate(medsphere_reservation_outcome_total{outcome="failure"}[15m]))
++          / sum(rate(medsphere_reservation_outcome_total[15m])) > 0.02
++        for: 15m
++        labels:
++          severity: warning
++        annotations:
++          summary: 'Reservation workflow failure rate elevated'
++          description: 'Over 2% of reservation creation attempts have failed over 15 minutes.'
++
++      - alert: MedSphereOtpDispatchFailureRateElevated
++        expr: |
++          sum(rate(medsphere_otp_dispatch_total{outcome="failure"}[15m]))
++          / sum(rate(medsphere_otp_dispatch_total[15m])) > 0.05
++        for: 15m
++        labels:
++          severity: warning
++        annotations:
++          summary: 'OTP dispatch failure rate elevated'
++          description: 'Over 5% of OTP provider dispatch attempts have failed over 15 minutes.'
++
++  - name: medsphere-v1-telemetry
++    rules:
++      - alert: MedSphereExporterCollectorUnhealthy
++        expr: increase(medsphere_metrics_exporter_failures_total[15m]) > 5
++        for: 15m
++        labels:
++          severity: warning
++        annotations:
++          summary: 'Metrics exporter/collector appears unhealthy'
++          description: 'More than 5 consecutive telemetry export failures in 15 minutes. This reflects telemetry pipeline health only, not necessarily a business-impacting outage.'
+diff --git a/docs/operations/v1-observability-runbook.md b/docs/operations/v1-observability-runbook.md
+index 651b2c2..4514f6e 100644
+--- a/docs/operations/v1-observability-runbook.md
++++ b/docs/operations/v1-observability-runbook.md
+@@ -98,3 +98,128 @@ Required validation for changes to this boundary:
+ ## Operational boundaries
+ 
+ This foundation does not yet claim centralized production log ingestion, production log retention policy, alert routing/on-call paging, SLO/SLA monitoring, metrics dashboards, distributed tracing, external APM activation, production incident-response approval, production traffic approval, or approval for real healthcare data.
++
++---
++
++# V1 Metrics, Export, SLO & Alerting Foundation
++
++This section extends the runbook above with the V1 metrics, centralized telemetry export, SLO, and alerting foundation. It does not weaken or replace anything documented above; it adds a metrics layer alongside the existing logging/redaction/correlation layer.
++
++## Architecture
++
++- In-process, dependency-free metrics registry (`@medsphere/common`'s `MetricsRegistry`, exported as the singleton `appMetrics`): Counter and Histogram primitives with a fixed label-key allowlist enforced at record time.
++- `GET /metrics` exposes the registry in Prometheus text-exposition format for scraping by any Prometheus-compatible collector.
++- An optional OTLP/HTTP+JSON push exporter (`OtlpMetricsExporter`) can additionally push the same data, on an interval, to an external OTLP-compatible collector -- disabled by default.
++- No OpenTelemetry SDK dependency was added: the two metric primitives this task needs are small enough to implement directly, and a Prometheus-text/OTLP-JSON serializer is a stable, well-documented format. This keeps the monitoring foundation itself from becoming a new source of dependency or runtime risk.
++- Metrics are recorded as a singleton import at each call site (HTTP middleware, the global exception filter, readiness checks, notification/OTP/reservation outcomes) rather than through constructor injection, so adding metrics never changed the constructor signature of an already-accepted, already-tested class.
++
++## Metrics available
++
++| Metric                                      | Type      | Labels                                       | Meaning                                         |
++| ------------------------------------------- | --------- | -------------------------------------------- | ----------------------------------------------- |
++| `medsphere_http_requests_total`             | counter   | `service`, `method`, `route`, `status_class` | HTTP requests by outcome class                  |
++| `medsphere_http_request_duration_ms`        | histogram | `service`, `method`, `route`                 | HTTP request duration                           |
++| `medsphere_http_server_errors_total`        | counter   | `service`, `status_class`                    | Unhandled server errors (5xx)                   |
++| `medsphere_dependency_check_total`          | counter   | `dependency`, `outcome`                      | Readiness check attempts (`postgresql`/`redis`) |
++| `medsphere_dependency_check_duration_ms`    | histogram | `dependency`                                 | Readiness check duration                        |
++| `medsphere_reservation_outcome_total`       | counter   | `outcome`                                    | Reservation creation attempts                   |
++| `medsphere_notification_delivery_total`     | counter   | `channel`, `outcome`                         | Notification worker delivery attempts           |
++| `medsphere_otp_dispatch_total`              | counter   | `outcome`                                    | OTP provider dispatch attempts                  |
++| `medsphere_metrics_exporter_failures_total` | counter   | (none)                                       | OTLP export failures                            |
++
++`route` is always the framework route template (e.g. `/api/inventory/providers/:providerId/reservations`), never a raw URL. Every label key is drawn from a fixed allowlist enforced in code (`service`, `method`, `route`, `status_class`, `dependency`, `outcome`, `channel`, `provider`) -- recording a metric with any other label key throws immediately, so a future call site cannot silently introduce a tenant ID, phone number, request ID, medicine name, or other high-cardinality/sensitive value as a label.
++
++## Privacy boundary (extends the rules above)
++
++In addition to every rule already stated above for logs, metrics must never carry: raw URLs, query strings, tenant IDs, user IDs, emails, phone numbers, OTPs, medicine/product/search text, patient data, or request IDs as a label. This is enforced structurally (the label allowlist), not only by convention -- see `metrics-registry.spec`/`.spec.mjs` tests for `rejects a label key outside the allowed low-cardinality allowlist`.
++
++The `/metrics` endpoint is unauthenticated (matching `/health/live` and `/health/ready`'s existing convention), since a scrape endpoint is typically reached only from an internal network/collector, not end users. Restricting network access to `/metrics` in a real deployment (e.g. via network policy, ingress rule, or a reverse-proxy allowlist) is a deployment-time concern this endpoint does not enforce itself.
++
++## Exporter configuration
++
++Push export to an external OTLP-compatible collector is **disabled by default** (`TELEMETRY_METRICS_EXPORT_ENABLED=false`) and local-safe: leaving every related variable unset is a fully supported configuration, and `/metrics` scraping works regardless of export being enabled.
++
++| Variable                                               | Purpose                                                                                                                                            |
++| ------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------- |
++| `TELEMETRY_METRICS_EXPORT_ENABLED`                     | `true`/`false`. Must be exactly one of these two values.                                                                                           |
++| `TELEMETRY_SERVICE_NAME`                               | Reported as the OTLP `service.name` resource attribute.                                                                                            |
++| `TELEMETRY_METRICS_EXPORT_ENDPOINT`                    | Collector URL. Must be HTTPS -- a non-HTTPS endpoint fails configuration parsing closed.                                                           |
++| `TELEMETRY_METRICS_EXPORT_TIMEOUT_MS`                  | Bounded 250-10000ms; out-of-range values fail closed.                                                                                              |
++| `TELEMETRY_METRICS_EXPORT_INTERVAL_MS`                 | Minimum 5000ms.                                                                                                                                    |
++| `TELEMETRY_METRICS_EXPORT_HEADER_CREDENTIAL_REFERENCE` | Optional: names another env var holding a collector auth header value. The referenced variable must exist when set, or configuration fails closed. |
++
++Malformed configuration never crashes the service: `main.ts` catches a configuration error, logs one bounded warning (`metrics_export_config_invalid`), and leaves export disabled -- `/metrics` scraping and the rest of the application continue normally.
++
++A monitoring backend outage never fails a business request: `OtlpMetricsExporter.exportOnce()` never throws. Every failure increments the bounded `medsphere_metrics_exporter_failures_total` counter and is logged only on the 1st and then every 10th consecutive failure (never per-attempt), so a persistent collector outage cannot create a log storm. The exporter never references the OTLP endpoint, credential, or payload content in a log line -- only a bounded occurrence count.
++
++## SLO definitions (initial engineering thresholds, not a contractual SLA)
++
++**These are conservative initial engineering targets for internal operational awareness. They are not a contractual guarantee, SLA, or promise to any customer.**
++
++| Indicator                         | Target (initial)                                          |
++| --------------------------------- | --------------------------------------------------------- |
++| HTTP availability (non-5xx rate)  | >= 99.5% over rolling 30 days                             |
++| Server-error rate                 | <= 1% over rolling 5 minutes                              |
++| p95 latency                       | <= 1500 ms                                                |
++| p99 latency                       | <= 3000 ms                                                |
++| PostgreSQL readiness              | >= 99.9% of readiness checks succeed over rolling 30 days |
++| Redis readiness                   | >= 99.9% of readiness checks succeed over rolling 30 days |
++| Notification worker health        | < 5% of delivery attempts fail over rolling 15 minutes    |
++| Reservation workflow failure rate | <= 2% over rolling 15 minutes                             |
++
++These mirror the thresholds already accepted for V1 CI performance certification (error rate <=1%, p95 <=1500ms, p99 <=3000ms -- see `docs/operations/v1-performance-reliability-certification.md`) rather than inventing a separate, inconsistent bar.
++
++## Alert rules
++
++Provider-neutral, executable Prometheus alerting rules are defined in `docs/operations/v1-alert-rules.prometheus.yml` (valid Prometheus rule-file YAML, importable into any Prometheus-compatible alerting system without modification). Every rule declares a warning threshold, a critical threshold, a bounded evaluation window (`for:`), and relies on Prometheus's built-in recovery semantics (an alert resolves once its expression is no longer true for the evaluation window) -- no rule fires on a single event.
++
++Covered conditions: service unavailable, repeated readiness failure, PostgreSQL unavailable, Redis unavailable, elevated 5xx rate, abnormal latency, notification worker repeatedly failing, and exporter/collector unhealthy.
++
++## Dashboard specification
++
++An operator dashboard (in any Prometheus-compatible visualization tool) should present:
++
++1. **Traffic** -- `sum(rate(medsphere_http_requests_total[5m])) by (route)`
++2. **Error rate** -- `sum(rate(medsphere_http_server_errors_total[5m])) / sum(rate(medsphere_http_requests_total[5m]))`
++3. **Latency p50/p95/p99** -- `histogram_quantile(0.50|0.95|0.99, sum(rate(medsphere_http_request_duration_ms_bucket[5m])) by (le))`
++4. **Service readiness** -- `/health/live` and `/health/ready` scrape/uptime, plus `medsphere_dependency_check_total{outcome="failure"}` rate
++5. **PostgreSQL health** -- `medsphere_dependency_check_total{dependency="postgresql"}` success rate and `medsphere_dependency_check_duration_ms{dependency="postgresql"}` percentiles
++6. **Redis health** -- same, `dependency="redis"`
++7. **Reservations** -- `medsphere_reservation_outcome_total` success/failure rate
++8. **Notification delivery** -- `medsphere_notification_delivery_total` by `channel`/`outcome`
++9. **OTP dispatch** -- `medsphere_otp_dispatch_total` success/failure rate
++
++No panel may break down by tenant, medicine/search text, phone number, or email -- none of that data exists in these metrics to break down by in the first place.
++
++## Incident workflow (extends the section above)
++
++For a metrics-flagged incident (an alert fired, not a single user report):
++
++1. identify which alert fired and its current value vs. threshold from the dashboard;
++2. correlate the time window against the HTTP completion/server-error log events described above, using `requestId` for any specific failed request a user also reported;
++3. check `/health/ready` and the `medsphere_dependency_check_total`/`_duration_ms` metrics to rule in/out PostgreSQL or Redis;
++4. for a notification/OTP-specific alert, check `medsphere_notification_delivery_total`/`medsphere_otp_dispatch_total` broken down by `outcome` (never by tenant or destination);
++5. for an exporter-health alert, remember this reflects telemetry pipeline health only -- it does not by itself indicate a business-impacting outage;
++6. do not add tenant IDs, phone numbers, OTPs, or other sensitive values to any incident notes derived from this data -- none of it is present in the source metrics.
++
++## What still requires production deployment/vendor activation
++
++This foundation does **not** claim centralized production monitoring is operational. The following remain external, deployment-only steps:
++
++- deploying and operating an actual Prometheus-compatible collector/backend (or OTLP-compatible collector) to scrape `/metrics` or receive pushed exports;
++- configuring real alert routing/on-call paging (e.g. Alertmanager, PagerDuty, Opsgenie) to consume `docs/operations/v1-alert-rules.prometheus.yml`;
++- building and publishing the actual dashboard described above in a real visualization tool;
++- distributed tracing and external APM remain out of scope for this task, as stated in the original runbook;
++- converting the initial engineering SLO targets above into any customer-facing SLA is a separate business/legal decision, not a code change.
++
++Do not claim centralized production monitoring is operational until an actual collector/backend has been deployed and a real end-to-end scrape or export has been tested against it.
++
++## Validation (extends the section above)
++
++Additional required validation for changes to the metrics/export boundary:
++
++- `packages/common` metrics/exporter test suite (`node --test test/*.spec.mjs`)
++- existing logger/redaction, request-observability, and server-error observability tests (must continue passing unchanged)
++- readiness-service tests (PostgreSQL-backed where infrastructure is available)
++- TypeScript, ESLint, Prettier
++- `git diff --check`
+diff --git a/packages/common/package.json b/packages/common/package.json
+index f5b5ad3..1a24f63 100644
+--- a/packages/common/package.json
++++ b/packages/common/package.json
+@@ -7,7 +7,8 @@
+   "scripts": {
+     "build": "tsc",
+     "lint": "eslint \"src/**/*.ts\"",
+-    "clean": "rimraf dist tsconfig.tsbuildinfo"
++    "clean": "rimraf dist tsconfig.tsbuildinfo",
++    "test": "pnpm run build && node --test test/*.spec.mjs"
+   },
+   "dependencies": {
+     "@nestjs/common": "^11.1.28",
+diff --git a/packages/common/src/filters/global-exception.filter.ts b/packages/common/src/filters/global-exception.filter.ts
+index 690c937..9c712ea 100644
+--- a/packages/common/src/filters/global-exception.filter.ts
++++ b/packages/common/src/filters/global-exception.filter.ts
+@@ -9,6 +9,7 @@ import {
+ import type { Request, Response } from 'express';
+ import { DomainException } from '../exceptions/domain.exception';
+ import { normalizeRequestId } from '../http/request-id';
++import { appMetrics, statusClass } from '../metrics/metrics-registry';
+ 
+ export interface ErrorEnvelope {
+   error: {
+@@ -74,9 +75,11 @@ function isServerErrorStatus(status: number): boolean {
+ @Catch()
+ export class GlobalExceptionFilter implements ExceptionFilter {
+   private readonly logger: ExceptionTelemetryLogger;
++  private readonly serviceName: string;
+ 
+-  constructor(logger?: ExceptionTelemetryLogger) {
++  constructor(logger?: ExceptionTelemetryLogger, serviceName = 'unknown-service') {
+     this.logger = logger ?? new SafeNestExceptionLogger();
++    this.serviceName = serviceName;
+   }
+ 
+   catch(exception: unknown, host: ArgumentsHost): void {
+@@ -122,6 +125,10 @@ export class GlobalExceptionFilter implements ExceptionFilter {
+         status,
+         errorType,
+       });
++      appMetrics.httpServerErrorsTotal.increment({
++        service: this.serviceName,
++        status_class: statusClass(status),
++      });
+     }
+ 
+     response.status(status).json(envelope);
+diff --git a/packages/common/src/index.ts b/packages/common/src/index.ts
+index 77ac239..5d71528 100644
+--- a/packages/common/src/index.ts
++++ b/packages/common/src/index.ts
+@@ -8,3 +8,7 @@ export * from './health/health.controller';
+ export * from './health/health.module';
+ export * from './http/request-id';
+ export * from './http/security-headers';
++export * from './metrics/metrics-registry';
++export * from './metrics/otlp-exporter';
++export * from './metrics/metrics.controller';
++export * from './metrics/metrics.module';
+diff --git a/packages/common/src/metrics/metrics-registry.ts b/packages/common/src/metrics/metrics-registry.ts
+new file mode 100644
+index 0000000..4c36014
+--- /dev/null
++++ b/packages/common/src/metrics/metrics-registry.ts
+@@ -0,0 +1,336 @@
++/**
++ * Vendor-neutral, in-process application metrics registry.
++ *
++ * Deliberately minimal and dependency-free rather than pulling in the
++ * full OpenTelemetry Metrics SDK: the two primitives every required
++ * metric in this task needs (Counter, Histogram) are ~100 lines total,
++ * and a hand-rolled Prometheus text-exposition serializer is a
++ * well-documented, stable, trivial format. This keeps the monitoring
++ * foundation itself from becoming a new source of dependency/runtime
++ * risk. See docs/operations/v1-observability-runbook.md for the
++ * architecture rationale.
++ *
++ * Exported as a singleton (`appMetrics`) rather than a DI-injected
++ * service: every call site that records a metric (HTTP middleware, the
++ * global exception filter, readiness checks, notification/OTP/reservation
++ * outcomes) already has an existing, tested constructor signature this
++ * change must not alter. A metrics library used as a shared global
++ * registry is the same pattern `prom-client` itself uses; it is not a
++ * shortcut specific to this codebase.
++ */
++
++const MAX_LABEL_VALUE_LENGTH = 128;
++const MAX_SERIES_PER_METRIC = 500;
++
++/**
++ * The complete allowlist of label keys any metric in this registry may
++ * use. This is the primary cardinality/privacy guard: recording a metric
++ * with any other key throws immediately, in development and production
++ * alike, so a future call site cannot silently introduce a high-
++ * cardinality or sensitive label (a tenant ID, a phone number, a raw
++ * request ID) by copy-paste mistake.
++ */
++const ALLOWED_LABEL_KEYS = new Set([
++  'service',
++  'method',
++  'route',
++  'status_class',
++  'dependency',
++  'outcome',
++  'channel',
++  'provider',
++]);
++
++export type MetricLabels = Readonly<Record<string, string>>;
++
++function assertSafeLabels(metricName: string, labels: MetricLabels): void {
++  for (const [key, value] of Object.entries(labels)) {
++    if (!ALLOWED_LABEL_KEYS.has(key)) {
++      throw new Error(
++        `Metric "${metricName}": label key "${key}" is not on the allowed low-cardinality label list`,
++      );
++    }
++    if (typeof value !== 'string' || value.length === 0) {
++      throw new Error(`Metric "${metricName}": label "${key}" must be a non-empty string`);
++    }
++    if (value.length > MAX_LABEL_VALUE_LENGTH) {
++      throw new Error(`Metric "${metricName}": label "${key}" exceeds the maximum length`);
++    }
++  }
++}
++
++function labelKey(labels: MetricLabels): string {
++  return Object.entries(labels)
++    .sort(([a], [b]) => a.localeCompare(b))
++    .map(([key, value]) => `${key}="${value}"`)
++    .join(',');
++}
++
++export interface MetricSample {
++  readonly labels: MetricLabels;
++  readonly value: number;
++}
++
++export class Counter {
++  private readonly series = new Map<string, MetricSample>();
++
++  constructor(
++    readonly name: string,
++    readonly help: string,
++  ) {}
++
++  increment(labels: MetricLabels = {}, amount = 1): void {
++    assertSafeLabels(this.name, labels);
++    const key = labelKey(labels);
++    if (!this.series.has(key) && this.series.size >= MAX_SERIES_PER_METRIC) {
++      // A cardinality runaway (e.g. an unexpectedly unbounded label
++      // value slipping past assertSafeLabels' allowlist check because
++      // the *key* was allowed but callers vary the *value* unboundedly)
++      // must never grow memory without limit. Drop silently rather than
++      // throw: a metrics bug must never fail the business request that
++      // triggered it.
++      return;
++    }
++    const existing = this.series.get(key);
++    this.series.set(key, { labels, value: (existing?.value ?? 0) + amount });
++  }
++
++  samples(): MetricSample[] {
++    return [...this.series.values()];
++  }
++}
++
++const DEFAULT_HISTOGRAM_BUCKETS_MS = [5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000];
++
++interface HistogramSeries {
++  readonly labels: MetricLabels;
++  readonly bucketCounts: number[];
++  count: number;
++  sum: number;
++}
++
++export class Histogram {
++  private readonly series = new Map<string, HistogramSeries>();
++  private readonly buckets: number[];
++
++  constructor(
++    readonly name: string,
++    readonly help: string,
++    buckets: number[] = DEFAULT_HISTOGRAM_BUCKETS_MS,
++  ) {
++    this.buckets = [...buckets].sort((a, b) => a - b);
++  }
++
++  observe(value: number, labels: MetricLabels = {}): void {
++    assertSafeLabels(this.name, labels);
++    if (!Number.isFinite(value) || value < 0) {
++      return;
++    }
++    const key = labelKey(labels);
++    let entry = this.series.get(key);
++    if (!entry) {
++      if (this.series.size >= MAX_SERIES_PER_METRIC) {
++        return;
++      }
++      entry = { labels, bucketCounts: new Array(this.buckets.length).fill(0), count: 0, sum: 0 };
++      this.series.set(key, entry);
++    }
++    entry.count += 1;
++    entry.sum += value;
++    for (let i = 0; i < this.buckets.length; i += 1) {
++      if (value <= this.buckets[i]) {
++        entry.bucketCounts[i] += 1;
++      }
++    }
++  }
++
++  bucketBoundaries(): readonly number[] {
++    return this.buckets;
++  }
++
++  entries(): HistogramSeries[] {
++    return [...this.series.values()];
++  }
++}
++
++/**
++ * Maps an HTTP status code to a bounded, low-cardinality class label
++ * (`2xx`/`3xx`/`4xx`/`5xx`) -- never the raw status code, which is still
++ * low cardinality but unnecessarily granular for the required label set.
++ */
++export function statusClass(statusCode: number): string {
++  if (!Number.isInteger(statusCode) || statusCode < 100 || statusCode > 599) {
++    return 'unknown';
++  }
++  return `${Math.floor(statusCode / 100)}xx`;
++}
++
++export class MetricsRegistry {
++  readonly httpRequestsTotal = new Counter('medsphere_http_requests_total', 'Total HTTP requests');
++  readonly httpRequestDurationMs = new Histogram(
++    'medsphere_http_request_duration_ms',
++    'HTTP request duration in milliseconds',
++  );
++  readonly httpServerErrorsTotal = new Counter(
++    'medsphere_http_server_errors_total',
++    'Total unhandled server errors (5xx)',
++  );
++  readonly dependencyCheckDurationMs = new Histogram(
++    'medsphere_dependency_check_duration_ms',
++    'Dependency readiness check duration in milliseconds',
++  );
++  readonly dependencyCheckTotal = new Counter(
++    'medsphere_dependency_check_total',
++    'Total dependency readiness checks by outcome',
++  );
++  readonly reservationOutcomeTotal = new Counter(
++    'medsphere_reservation_outcome_total',
++    'Total reservation creation attempts by outcome',
++  );
++  readonly notificationDeliveryTotal = new Counter(
++    'medsphere_notification_delivery_total',
++    'Total notification delivery attempts by channel and outcome',
++  );
++  readonly otpDispatchTotal = new Counter(
++    'medsphere_otp_dispatch_total',
++    'Total OTP provider dispatch attempts by outcome',
++  );
++  readonly exporterFailuresTotal = new Counter(
++    'medsphere_metrics_exporter_failures_total',
++    'Total telemetry exporter failures',
++  );
++
++  private readonly counters: Counter[] = [
++    this.httpRequestsTotal,
++    this.httpServerErrorsTotal,
++    this.dependencyCheckTotal,
++    this.reservationOutcomeTotal,
++    this.notificationDeliveryTotal,
++    this.otpDispatchTotal,
++    this.exporterFailuresTotal,
++  ];
++
++  private readonly histograms: Histogram[] = [
++    this.httpRequestDurationMs,
++    this.dependencyCheckDurationMs,
++  ];
++
++  /**
++   * Prometheus text exposition format (a small, stable, well-documented
++   * format -- https://prometheus.io/docs/instrumenting/exposition_formats/).
++   * Every metric name is prefixed `medsphere_` and every label is drawn
++   * from the fixed allowlist enforced at record time, so this output can
++   * never contain a raw URL, tenant ID, phone number, or other sensitive
++   * value -- there is no code path that could have gotten one into the
++   * registry in the first place.
++   */
++  renderPrometheusText(): string {
++    const lines: string[] = [];
++    for (const counter of this.counters) {
++      lines.push(`# HELP ${counter.name} ${counter.help}`);
++      lines.push(`# TYPE ${counter.name} counter`);
++      for (const sample of counter.samples()) {
++        lines.push(`${counter.name}${formatLabels(sample.labels)} ${sample.value}`);
++      }
++    }
++    for (const histogram of this.histograms) {
++      lines.push(`# HELP ${histogram.name} ${histogram.help}`);
++      lines.push(`# TYPE ${histogram.name} histogram`);
++      for (const entry of histogram.entries()) {
++        const boundaries = histogram.bucketBoundaries();
++        let cumulative = 0;
++        for (let i = 0; i < boundaries.length; i += 1) {
++          cumulative += entry.bucketCounts[i];
++          lines.push(
++            `${histogram.name}_bucket${formatLabels({ ...entry.labels, le: String(boundaries[i]) })} ${cumulative}`,
++          );
++        }
++        lines.push(
++          `${histogram.name}_bucket${formatLabels({ ...entry.labels, le: '+Inf' })} ${entry.count}`,
++        );
++        lines.push(`${histogram.name}_sum${formatLabels(entry.labels)} ${entry.sum}`);
++        lines.push(`${histogram.name}_count${formatLabels(entry.labels)} ${entry.count}`);
++      }
++    }
++    return lines.join('\n') + '\n';
++  }
++
++  /**
++   * A minimal, OTLP-metrics-model-shaped JSON snapshot (resourceMetrics /
++   * scopeMetrics / metrics / sum|histogram data points), for the optional
++   * OTLP/HTTP JSON exporter. This is not a certified implementation of
++   * the full OTLP protobuf wire format -- it follows the same conceptual
++   * data model closely enough to be accepted by common OTLP/HTTP+JSON
++   * collectors, and is documented as such rather than claimed as
++   * spec-certified.
++   */
++  toOtlpJsonSnapshot(serviceName: string, environment: string): unknown {
++    const now = Date.now() * 1_000_000; // OTLP uses Unix nanoseconds.
++    const counterMetrics = this.counters.map((counter) => ({
++      name: counter.name,
++      description: counter.help,
++      sum: {
++        aggregationTemporality: 'AGGREGATION_TEMPORALITY_CUMULATIVE',
++        isMonotonic: true,
++        dataPoints: counter.samples().map((sample) => ({
++          attributes: toOtlpAttributes(sample.labels),
++          timeUnixNano: String(now),
++          asDouble: sample.value,
++        })),
++      },
++    }));
++    const histogramMetrics = this.histograms.map((histogram) => ({
++      name: histogram.name,
++      description: histogram.help,
++      histogram: {
++        aggregationTemporality: 'AGGREGATION_TEMPORALITY_CUMULATIVE',
++        dataPoints: histogram.entries().map((entry) => ({
++          attributes: toOtlpAttributes(entry.labels),
++          timeUnixNano: String(now),
++          count: String(entry.count),
++          sum: entry.sum,
++          bucketCounts: entry.bucketCounts.map(String),
++          explicitBounds: histogram.bucketBoundaries(),
++        })),
++      },
++    }));
++
++    return {
++      resourceMetrics: [
++        {
++          resource: {
++            attributes: [
++              { key: 'service.name', value: { stringValue: serviceName } },
++              { key: 'deployment.environment', value: { stringValue: environment } },
++            ],
++          },
++          scopeMetrics: [
++            {
++              scope: { name: 'medsphere-metrics-registry' },
++              metrics: [...counterMetrics, ...histogramMetrics],
++            },
++          ],
++        },
++      ],
++    };
++  }
++}
++
++function formatLabels(labels: MetricLabels): string {
++  const entries = Object.entries(labels);
++  if (entries.length === 0) return '';
++  return `{${entries.map(([key, value]) => `${key}="${escapeLabelValue(value)}"`).join(',')}}`;
++}
++
++function escapeLabelValue(value: string): string {
++  return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n');
++}
++
++function toOtlpAttributes(
++  labels: MetricLabels,
++): Array<{ key: string; value: { stringValue: string } }> {
++  return Object.entries(labels).map(([key, value]) => ({ key, value: { stringValue: value } }));
++}
++
++/** Process-wide singleton -- see file header for why this is not DI-injected. */
++export const appMetrics = new MetricsRegistry();
+diff --git a/packages/common/src/metrics/metrics.controller.ts b/packages/common/src/metrics/metrics.controller.ts
+new file mode 100644
+index 0000000..4c54253
+--- /dev/null
++++ b/packages/common/src/metrics/metrics.controller.ts
+@@ -0,0 +1,27 @@
++import { Controller, Get, Header, HttpCode } from '@nestjs/common';
++import { PublicEndpoint } from '../auth/public-endpoint.decorator';
++import { appMetrics } from './metrics-registry';
++
++/**
++ * Exposes the shared metrics singleton in Prometheus text-exposition
++ * format for scraping. Contains only the bounded, low-cardinality
++ * counters/histograms recorded through MetricsRegistry -- there is no
++ * code path in this registry that could carry a raw URL, tenant ID,
++ * phone number, or other sensitive value (see metrics-registry.ts).
++ *
++ * Marked public (matching HealthController's convention) since a scrape
++ * endpoint is typically reached only from an internal network/collector,
++ * not end users; network-level access control for this route is a
++ * deployment concern, not something this endpoint enforces itself -- see
++ * docs/operations/v1-observability-runbook.md.
++ */
++@Controller('metrics')
++@PublicEndpoint()
++export class MetricsController {
++  @Get()
++  @HttpCode(200)
++  @Header('content-type', 'text/plain; version=0.0.4')
++  scrape(): string {
++    return appMetrics.renderPrometheusText();
++  }
++}
+diff --git a/packages/common/src/metrics/metrics.module.ts b/packages/common/src/metrics/metrics.module.ts
+new file mode 100644
+index 0000000..16704cf
+--- /dev/null
++++ b/packages/common/src/metrics/metrics.module.ts
+@@ -0,0 +1,7 @@
++import { Module } from '@nestjs/common';
++import { MetricsController } from './metrics.controller';
++
++@Module({
++  controllers: [MetricsController],
++})
++export class MetricsModule {}
+diff --git a/packages/common/src/metrics/otlp-exporter.ts b/packages/common/src/metrics/otlp-exporter.ts
+new file mode 100644
+index 0000000..0b312ff
+--- /dev/null
++++ b/packages/common/src/metrics/otlp-exporter.ts
+@@ -0,0 +1,211 @@
++import type { MetricsRegistry } from './metrics-registry';
++
++/**
++ * Bounded, fail-safe OTLP/HTTP+JSON metrics exporter. Disabled by
++ * default; explicit opt-in only. A monitoring backend outage must never
++ * take MedSphere down, so every failure mode here is swallowed, counted,
++ * and rate-limit-logged -- never thrown, never retried in a tight loop,
++ * never able to recurse back through this same telemetry pipeline.
++ *
++ * This intentionally does not depend on the OpenTelemetry SDK/exporter
++ * packages -- see metrics-registry.ts's file header for the same
++ * dependency-minimalism rationale. The payload shape is OTLP-metrics-
++ * model-shaped (matches MetricsRegistry.toOtlpJsonSnapshot), not a
++ * certified implementation of the full OTLP protobuf wire protocol.
++ */
++
++export const DEFAULT_METRICS_EXPORT_TIMEOUT_MS = 5_000;
++export const MIN_METRICS_EXPORT_TIMEOUT_MS = 250;
++export const MAX_METRICS_EXPORT_TIMEOUT_MS = 10_000;
++export const DEFAULT_METRICS_EXPORT_INTERVAL_MS = 60_000;
++export const MIN_METRICS_EXPORT_INTERVAL_MS = 5_000;
++
++/** Only log a repeating failure this often, to prevent a log storm. */
++const FAILURE_LOG_THROTTLE_COUNT = 10;
++
++export interface MetricsExportConfig {
++  readonly enabled: boolean;
++  readonly endpoint?: string;
++  readonly serviceName: string;
++  readonly environment: string;
++  readonly timeoutMs: number;
++  readonly intervalMs: number;
++  /** Resolved header value (e.g. an OTLP collector auth token). Never logged. */
++  readonly authorizationHeaderValue?: string;
++}
++
++export class MetricsExportConfigError extends Error {}
++
++/**
++ * Fails closed (throws) on any malformed configuration rather than
++ * silently falling back to a default that might be unsafe -- the same
++ * fail-fast philosophy `@medsphere/config`'s `loadEnv` already uses.
++ * Callers are expected to catch this at bootstrap and refuse to start
++ * telemetry export (not the whole application) rather than guess.
++ */
++export function parseMetricsExportConfig(
++  environment: Readonly<Record<string, string | undefined>>,
++  defaults: { serviceName: string },
++): MetricsExportConfig {
++  const enabledValue = environment.TELEMETRY_METRICS_EXPORT_ENABLED;
++  if (enabledValue !== undefined && enabledValue !== 'true' && enabledValue !== 'false') {
++    throw new MetricsExportConfigError(
++      'TELEMETRY_METRICS_EXPORT_ENABLED must be "true" or "false"',
++    );
++  }
++  const enabled = enabledValue === 'true';
++  const serviceName = environment.TELEMETRY_SERVICE_NAME?.trim() || defaults.serviceName;
++  const environmentName = environment.NODE_ENV?.trim() || 'development';
++
++  const timeoutRaw = environment.TELEMETRY_METRICS_EXPORT_TIMEOUT_MS;
++  const timeoutMs =
++    timeoutRaw === undefined ? DEFAULT_METRICS_EXPORT_TIMEOUT_MS : Number(timeoutRaw);
++  if (
++    !Number.isInteger(timeoutMs) ||
++    timeoutMs < MIN_METRICS_EXPORT_TIMEOUT_MS ||
++    timeoutMs > MAX_METRICS_EXPORT_TIMEOUT_MS
++  ) {
++    throw new MetricsExportConfigError('TELEMETRY_METRICS_EXPORT_TIMEOUT_MS is out of bounds');
++  }
++
++  const intervalRaw = environment.TELEMETRY_METRICS_EXPORT_INTERVAL_MS;
++  const intervalMs =
++    intervalRaw === undefined ? DEFAULT_METRICS_EXPORT_INTERVAL_MS : Number(intervalRaw);
++  if (!Number.isInteger(intervalMs) || intervalMs < MIN_METRICS_EXPORT_INTERVAL_MS) {
++    throw new MetricsExportConfigError('TELEMETRY_METRICS_EXPORT_INTERVAL_MS is out of bounds');
++  }
++
++  if (!enabled) {
++    if (environment.TELEMETRY_METRICS_EXPORT_ENDPOINT) {
++      throw new MetricsExportConfigError(
++        'TELEMETRY_METRICS_EXPORT_ENDPOINT is set but export is disabled -- enable export explicitly or remove the endpoint',
++      );
++    }
++    return { enabled: false, serviceName, environment: environmentName, timeoutMs, intervalMs };
++  }
++
++  const endpoint = environment.TELEMETRY_METRICS_EXPORT_ENDPOINT?.trim();
++  if (!endpoint) {
++    throw new MetricsExportConfigError(
++      'TELEMETRY_METRICS_EXPORT_ENDPOINT is required when export is enabled',
++    );
++  }
++  let parsedEndpoint: URL;
++  try {
++    parsedEndpoint = new URL(endpoint);
++  } catch {
++    throw new MetricsExportConfigError('TELEMETRY_METRICS_EXPORT_ENDPOINT is not a valid URL');
++  }
++  if (parsedEndpoint.protocol !== 'https:') {
++    // Fail closed rather than silently allow an insecure collector
++    // endpoint -- there is no legitimate reason to export telemetry over
++    // plain HTTP, in any environment.
++    throw new MetricsExportConfigError('TELEMETRY_METRICS_EXPORT_ENDPOINT must use HTTPS');
++  }
++
++  const headerReference = environment.TELEMETRY_METRICS_EXPORT_HEADER_CREDENTIAL_REFERENCE?.trim();
++  let authorizationHeaderValue: string | undefined;
++  if (headerReference) {
++    const resolved = environment[headerReference];
++    if (!resolved) {
++      throw new MetricsExportConfigError(
++        `TELEMETRY_METRICS_EXPORT_HEADER_CREDENTIAL_REFERENCE names "${headerReference}", but that variable is not set`,
++      );
++    }
++    authorizationHeaderValue = resolved;
++  }
++
++  return {
++    enabled: true,
++    endpoint,
++    serviceName,
++    environment: environmentName,
++    timeoutMs,
++    intervalMs,
++    authorizationHeaderValue,
++  };
++}
++
++export interface ExportFailureLogger {
++  warn(message: string, meta?: Record<string, unknown>): void;
++}
++
++export type ExportOutcome = 'disabled' | 'success' | 'failure';
++
++export class OtlpMetricsExporter {
++  private consecutiveFailures = 0;
++  private timer: ReturnType<typeof setInterval> | undefined;
++
++  constructor(
++    private readonly config: MetricsExportConfig,
++    private readonly registry: MetricsRegistry,
++    private readonly fetchImpl: typeof fetch = fetch,
++    private readonly logger?: ExportFailureLogger,
++  ) {}
++
++  /**
++   * Exports one snapshot. Never throws: a monitoring backend outage must
++   * never fail the caller. Every failure increments a bounded,
++   * privacy-safe counter and is logged only every Nth consecutive
++   * failure, never per-attempt, so a persistent outage cannot create a
++   * log storm.
++   */
++  async exportOnce(): Promise<ExportOutcome> {
++    if (!this.config.enabled || !this.config.endpoint) {
++      return 'disabled';
++    }
++
++    try {
++      const headers: Record<string, string> = { 'content-type': 'application/json' };
++      if (this.config.authorizationHeaderValue) {
++        headers.authorization = this.config.authorizationHeaderValue;
++      }
++      const response = await this.fetchImpl(this.config.endpoint, {
++        method: 'POST',
++        headers,
++        body: JSON.stringify(
++          this.registry.toOtlpJsonSnapshot(this.config.serviceName, this.config.environment),
++        ),
++        signal: AbortSignal.timeout(this.config.timeoutMs),
++      });
++      if (!response.ok) {
++        throw new Error(`exporter endpoint responded with status ${response.status}`);
++      }
++      this.consecutiveFailures = 0;
++      return 'success';
++    } catch {
++      this.consecutiveFailures += 1;
++      this.registry.exporterFailuresTotal.increment();
++      if (
++        this.consecutiveFailures === 1 ||
++        this.consecutiveFailures % FAILURE_LOG_THROTTLE_COUNT === 0
++      ) {
++        // Never include the endpoint URL, headers, or payload content --
++        // only a bounded, privacy-safe occurrence count.
++        this.logger?.warn('Metrics export failed', {
++          event: 'metrics_export_failed',
++          consecutiveFailures: this.consecutiveFailures,
++        });
++      }
++      return 'failure';
++    }
++  }
++
++  /** Starts a periodic export loop. The timer is unref'd so it never keeps a process alive by itself. */
++  start(): void {
++    if (this.timer || !this.config.enabled) {
++      return;
++    }
++    this.timer = setInterval(() => {
++      void this.exportOnce();
++    }, this.config.intervalMs);
++    this.timer.unref?.();
++  }
++
++  stop(): void {
++    if (this.timer) {
++      clearInterval(this.timer);
++      this.timer = undefined;
++    }
++  }
++}
+diff --git a/packages/common/test/metrics-registry.spec.mjs b/packages/common/test/metrics-registry.spec.mjs
+new file mode 100644
+index 0000000..05cad41
+--- /dev/null
++++ b/packages/common/test/metrics-registry.spec.mjs
+@@ -0,0 +1,132 @@
++import assert from 'node:assert/strict';
++import test from 'node:test';
++import { createRequire } from 'node:module';
++
++const require = createRequire(import.meta.url);
++
++const {
++  Counter,
++  Histogram,
++  MetricsRegistry,
++  statusClass,
++} = require('../dist/metrics/metrics-registry.js');
++
++test('statusClass buckets status codes into low-cardinality classes', () => {
++  assert.equal(statusClass(200), '2xx');
++  assert.equal(statusClass(301), '3xx');
++  assert.equal(statusClass(404), '4xx');
++  assert.equal(statusClass(503), '5xx');
++});
++
++test('statusClass returns unknown for an invalid status code rather than throwing', () => {
++  assert.equal(statusClass(-1), 'unknown');
++  assert.equal(statusClass(9999), 'unknown');
++  assert.equal(statusClass(NaN), 'unknown');
++});
++
++test('Counter increments and accumulates per unique label set', () => {
++  const counter = new Counter('test_total', 'help text');
++  counter.increment({ outcome: 'success' });
++  counter.increment({ outcome: 'success' });
++  counter.increment({ outcome: 'failure' });
++  const samples = counter.samples();
++  assert.equal(samples.find((s) => s.labels.outcome === 'success').value, 2);
++  assert.equal(samples.find((s) => s.labels.outcome === 'failure').value, 1);
++});
++
++test('Counter rejects a label key outside the allowed low-cardinality allowlist', () => {
++  const counter = new Counter('test_total', 'help text');
++  assert.throws(() => counter.increment({ tenantId: 'abc-123' }), /not on the allowed/);
++  assert.throws(() => counter.increment({ phone: '+15551234567' }), /not on the allowed/);
++  assert.throws(() => counter.increment({ requestId: 'req-1' }), /not on the allowed/);
++});
++
++test('Counter rejects an empty label value', () => {
++  const counter = new Counter('test_total', 'help text');
++  assert.throws(() => counter.increment({ outcome: '' }));
++});
++
++test('Counter drops a series once the per-metric cardinality cap is reached, without throwing', () => {
++  const counter = new Counter('test_total', 'help text');
++  for (let i = 0; i < 600; i += 1) {
++    counter.increment({ provider: `p${i}` });
++  }
++  assert.ok(counter.samples().length <= 500);
++});
++
++test('Histogram records observations into cumulative buckets and tracks count/sum', () => {
++  const histogram = new Histogram('test_duration_ms', 'help text', [10, 50, 100]);
++  histogram.observe(5, { route: '/x' });
++  histogram.observe(30, { route: '/x' });
++  histogram.observe(200, { route: '/x' });
++  const [entry] = histogram.entries();
++  assert.equal(entry.count, 3);
++  assert.equal(entry.sum, 235);
++  assert.deepEqual(entry.bucketCounts, [1, 2, 2]);
++});
++
++test('Histogram ignores a negative or non-finite observation rather than corrupting the series', () => {
++  const histogram = new Histogram('test_duration_ms', 'help text');
++  histogram.observe(-5);
++  histogram.observe(NaN);
++  histogram.observe(Infinity);
++  assert.deepEqual(histogram.entries(), []);
++});
++
++test('Histogram rejects a disallowed label key', () => {
++  const histogram = new Histogram('test_duration_ms', 'help text');
++  assert.throws(() => histogram.observe(10, { userId: 'u1' }), /not on the allowed/);
++});
++
++test('renderPrometheusText produces valid-shaped Prometheus text exposition output', () => {
++  const registry = new MetricsRegistry();
++  registry.httpRequestsTotal.increment({
++    service: 'auth-service',
++    method: 'GET',
++    route: '/health/live',
++    status_class: '2xx',
++  });
++  registry.httpRequestDurationMs.observe(42, { service: 'auth-service', route: '/health/live' });
++
++  const text = registry.renderPrometheusText();
++  assert.match(text, /# HELP medsphere_http_requests_total/);
++  assert.match(text, /# TYPE medsphere_http_requests_total counter/);
++  assert.match(text, /medsphere_http_requests_total\{/);
++  assert.match(text, /status_class="2xx"/);
++  assert.match(text, /# TYPE medsphere_http_request_duration_ms histogram/);
++  assert.match(text, /medsphere_http_request_duration_ms_bucket\{/);
++  assert.match(text, /le="\+Inf"/);
++  assert.match(text, /medsphere_http_request_duration_ms_sum\{/);
++  assert.match(text, /medsphere_http_request_duration_ms_count\{/);
++});
++
++test('renderPrometheusText never contains a raw tenant/phone/UUID -- no code path could add one', () => {
++  const registry = new MetricsRegistry();
++  registry.httpRequestsTotal.increment({
++    service: 'auth-service',
++    method: 'POST',
++    route: '/api/inventory/providers/:providerId/reservations',
++    status_class: '2xx',
++  });
++  registry.reservationOutcomeTotal.increment({ outcome: 'success' });
++  registry.notificationDeliveryTotal.increment({ channel: 'SMS', outcome: 'DELIVERED' });
++  registry.otpDispatchTotal.increment({ outcome: 'success' });
++
++  const text = registry.renderPrometheusText();
++  assert.doesNotMatch(text, /tenant/i);
++  assert.doesNotMatch(text, /\+?\d{10,}/);
++  assert.doesNotMatch(text, /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
++});
++
++test('toOtlpJsonSnapshot produces an OTLP-metrics-model-shaped snapshot', () => {
++  const registry = new MetricsRegistry();
++  registry.httpRequestsTotal.increment({ service: 'auth-service', status_class: '2xx' });
++  const snapshot = registry.toOtlpJsonSnapshot('auth-service', 'production');
++  assert.equal(snapshot.resourceMetrics.length, 1);
++  const serviceNameAttr = snapshot.resourceMetrics[0].resource.attributes.find(
++    (a) => a.key === 'service.name',
++  );
++  assert.equal(serviceNameAttr.value.stringValue, 'auth-service');
++  const metricNames = snapshot.resourceMetrics[0].scopeMetrics[0].metrics.map((m) => m.name);
++  assert.ok(metricNames.includes('medsphere_http_requests_total'));
++});
+diff --git a/packages/common/test/otlp-exporter.spec.mjs b/packages/common/test/otlp-exporter.spec.mjs
+new file mode 100644
+index 0000000..b780be8
+--- /dev/null
++++ b/packages/common/test/otlp-exporter.spec.mjs
+@@ -0,0 +1,245 @@
++import assert from 'node:assert/strict';
++import test from 'node:test';
++import { createRequire } from 'node:module';
++
++const require = createRequire(import.meta.url);
++
++const { MetricsRegistry } = require('../dist/metrics/metrics-registry.js');
++const {
++  OtlpMetricsExporter,
++  parseMetricsExportConfig,
++  MetricsExportConfigError,
++} = require('../dist/metrics/otlp-exporter.js');
++
++test('parseMetricsExportConfig is disabled by default (local-safe)', () => {
++  const config = parseMetricsExportConfig({}, { serviceName: 'auth-service' });
++  assert.equal(config.enabled, false);
++  assert.equal(config.serviceName, 'auth-service');
++});
++
++test('parseMetricsExportConfig fails closed when enabled without an endpoint', () => {
++  assert.throws(
++    () =>
++      parseMetricsExportConfig(
++        { TELEMETRY_METRICS_EXPORT_ENABLED: 'true' },
++        { serviceName: 'auth-service' },
++      ),
++    MetricsExportConfigError,
++  );
++});
++
++test('parseMetricsExportConfig fails closed on a malformed enabled flag', () => {
++  assert.throws(
++    () =>
++      parseMetricsExportConfig(
++        { TELEMETRY_METRICS_EXPORT_ENABLED: 'yes' },
++        { serviceName: 'auth-service' },
++      ),
++    MetricsExportConfigError,
++  );
++});
++
++test('parseMetricsExportConfig fails closed on a non-HTTPS endpoint', () => {
++  assert.throws(
++    () =>
++      parseMetricsExportConfig(
++        {
++          TELEMETRY_METRICS_EXPORT_ENABLED: 'true',
++          TELEMETRY_METRICS_EXPORT_ENDPOINT: 'http://collector.internal:4318/v1/metrics',
++        },
++        { serviceName: 'auth-service' },
++      ),
++    MetricsExportConfigError,
++  );
++});
++
++test('parseMetricsExportConfig fails closed on an out-of-bounds timeout', () => {
++  assert.throws(
++    () =>
++      parseMetricsExportConfig(
++        {
++          TELEMETRY_METRICS_EXPORT_ENABLED: 'true',
++          TELEMETRY_METRICS_EXPORT_ENDPOINT: 'https://collector.example.com/v1/metrics',
++          TELEMETRY_METRICS_EXPORT_TIMEOUT_MS: '99999',
++        },
++        { serviceName: 'auth-service' },
++      ),
++    MetricsExportConfigError,
++  );
++});
++
++test('parseMetricsExportConfig fails closed when a named credential-reference variable is missing', () => {
++  assert.throws(
++    () =>
++      parseMetricsExportConfig(
++        {
++          TELEMETRY_METRICS_EXPORT_ENABLED: 'true',
++          TELEMETRY_METRICS_EXPORT_ENDPOINT: 'https://collector.example.com/v1/metrics',
++          TELEMETRY_METRICS_EXPORT_HEADER_CREDENTIAL_REFERENCE: 'OTLP_TOKEN',
++        },
++        { serviceName: 'auth-service' },
++      ),
++    MetricsExportConfigError,
++  );
++});
++
++test('parseMetricsExportConfig accepts a valid enabled configuration', () => {
++  const config = parseMetricsExportConfig(
++    {
++      TELEMETRY_METRICS_EXPORT_ENABLED: 'true',
++      TELEMETRY_METRICS_EXPORT_ENDPOINT: 'https://collector.example.com/v1/metrics',
++      TELEMETRY_METRICS_EXPORT_HEADER_CREDENTIAL_REFERENCE: 'OTLP_TOKEN',
++      OTLP_TOKEN: 'Bearer secret-value',
++    },
++    { serviceName: 'auth-service' },
++  );
++  assert.equal(config.enabled, true);
++  assert.equal(config.endpoint, 'https://collector.example.com/v1/metrics');
++  assert.equal(config.authorizationHeaderValue, 'Bearer secret-value');
++});
++
++test('OtlpMetricsExporter.exportOnce is a no-op when disabled', async () => {
++  const registry = new MetricsRegistry();
++  const exporter = new OtlpMetricsExporter(
++    {
++      enabled: false,
++      serviceName: 'auth-service',
++      environment: 'test',
++      timeoutMs: 5000,
++      intervalMs: 60000,
++    },
++    registry,
++    async () => {
++      throw new Error('fetch must never be called when disabled');
++    },
++  );
++  const outcome = await exporter.exportOnce();
++  assert.equal(outcome, 'disabled');
++});
++
++test('OtlpMetricsExporter.exportOnce succeeds and never throws on a healthy collector', async () => {
++  const registry = new MetricsRegistry();
++  const fetchCalls = [];
++  const fakeFetch = async (url, init) => {
++    fetchCalls.push({ url, init });
++    return new Response('{}', { status: 200 });
++  };
++  const exporter = new OtlpMetricsExporter(
++    {
++      enabled: true,
++      endpoint: 'https://collector.example.com/v1/metrics',
++      serviceName: 'auth-service',
++      environment: 'test',
++      timeoutMs: 5000,
++      intervalMs: 60000,
++    },
++    registry,
++    fakeFetch,
++  );
++  const outcome = await exporter.exportOnce();
++  assert.equal(outcome, 'success');
++  assert.equal(fetchCalls.length, 1);
++  assert.equal(fetchCalls[0].url, 'https://collector.example.com/v1/metrics');
++});
++
++test('a monitoring backend outage never throws -- exportOnce resolves "failure" and increments a bounded counter', async () => {
++  const registry = new MetricsRegistry();
++  const failingFetch = async () => {
++    throw new Error('ECONNREFUSED');
++  };
++  const exporter = new OtlpMetricsExporter(
++    {
++      enabled: true,
++      endpoint: 'https://collector.example.com/v1/metrics',
++      serviceName: 'auth-service',
++      environment: 'test',
++      timeoutMs: 5000,
++      intervalMs: 60000,
++    },
++    registry,
++    failingFetch,
++  );
++  const outcome = await exporter.exportOnce();
++  assert.equal(outcome, 'failure');
++  const failureSamples = registry.exporterFailuresTotal.samples();
++  assert.equal(failureSamples[0].value, 1);
++});
++
++test('exporter timeout is bounded via AbortSignal', async () => {
++  const registry = new MetricsRegistry();
++  let observedSignal;
++  const fetchImpl = async (_url, init) => {
++    observedSignal = init.signal;
++    return new Response('{}', { status: 200 });
++  };
++  const exporter = new OtlpMetricsExporter(
++    {
++      enabled: true,
++      endpoint: 'https://collector.example.com/v1/metrics',
++      serviceName: 'auth-service',
++      environment: 'test',
++      timeoutMs: 250,
++      intervalMs: 60000,
++    },
++    registry,
++    fetchImpl,
++  );
++  await exporter.exportOnce();
++  assert.ok(observedSignal instanceof AbortSignal);
++});
++
++test('repeated export failures are rate-limited in the logger, not logged on every attempt', async () => {
++  const registry = new MetricsRegistry();
++  const failingFetch = async () => {
++    throw new Error('ECONNREFUSED');
++  };
++  const warnings = [];
++  const exporter = new OtlpMetricsExporter(
++    {
++      enabled: true,
++      endpoint: 'https://collector.example.com/v1/metrics',
++      serviceName: 'auth-service',
++      environment: 'test',
++      timeoutMs: 5000,
++      intervalMs: 60000,
++    },
++    registry,
++    failingFetch,
++    { warn: (message, meta) => warnings.push({ message, meta }) },
++  );
++  for (let i = 0; i < 25; i += 1) {
++    await exporter.exportOnce();
++  }
++  // Logged on failure #1 and #10 and #20 only (throttled every 10th) -- not all 25.
++  assert.equal(warnings.length, 3);
++  assert.ok(warnings.every((w) => !JSON.stringify(w).includes('collector.example.com')));
++});
++
++test('a business-relevant caller (simulated) never fails merely because the exporter is unavailable', async () => {
++  const registry = new MetricsRegistry();
++  const failingFetch = async () => {
++    throw new Error('backend outage');
++  };
++  const exporter = new OtlpMetricsExporter(
++    {
++      enabled: true,
++      endpoint: 'https://collector.example.com/v1/metrics',
++      serviceName: 'auth-service',
++      environment: 'test',
++      timeoutMs: 5000,
++      intervalMs: 60000,
++    },
++    registry,
++    failingFetch,
++  );
++
++  async function simulatedBusinessRequest() {
++    // A business operation that fires-and-forgets a metrics export
++    // alongside its real work must still succeed even if export fails.
++    await exporter.exportOnce();
++    return 'business-operation-result';
++  }
++
++  const result = await simulatedBusinessRequest();
++  assert.equal(result, 'business-operation-result');
++});
+-- 
+2.43.0
+
