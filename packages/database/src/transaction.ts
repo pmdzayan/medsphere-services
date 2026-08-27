@@ -1,6 +1,8 @@
 import { Prisma } from '@prisma/client';
 
 const DEFAULT_SERIALIZABLE_ATTEMPTS = 3;
+const BASE_SERIALIZABLE_BACKOFF_MS = 10;
+const MAX_SERIALIZABLE_BACKOFF_MS = 100;
 
 export class SerializableRetryError extends Error {
   public readonly code = 'P2034';
@@ -27,6 +29,19 @@ export function hasPrismaCode(error: unknown, code: string): boolean {
   );
 }
 
+async function waitBeforeSerializableRetry(attempt: number): Promise<void> {
+  const exponentialDelay = Math.min(
+    BASE_SERIALIZABLE_BACKOFF_MS * 2 ** (attempt - 1),
+    MAX_SERIALIZABLE_BACKOFF_MS,
+  );
+
+  const jitter = Math.floor(Math.random() * exponentialDelay);
+
+  await new Promise<void>((resolve) => {
+    setTimeout(resolve, exponentialDelay + jitter);
+  });
+}
+
 export async function withSerializableRetry<T>(
   client: TransactionHost,
   operation: (transaction: Prisma.TransactionClient) => Promise<T>,
@@ -43,6 +58,8 @@ export async function withSerializableRetry<T>(
       if (!hasPrismaCode(error, 'P2034') || attempt === maximumAttempts) {
         throw error;
       }
+
+      await waitBeforeSerializableRetry(attempt);
     }
   }
 

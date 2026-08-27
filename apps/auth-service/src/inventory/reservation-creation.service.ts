@@ -24,6 +24,7 @@ import type {
 
 const MAX_DATABASE_INTEGER = 2_147_483_647;
 const MAX_ITEMS = 20;
+const RESERVATION_SERIALIZABLE_ATTEMPTS = 10;
 
 @Injectable()
 export class ReservationCreationService {
@@ -246,7 +247,7 @@ export class ReservationCreationService {
           totalQuantity,
           replayed: false,
         };
-      });
+      }, RESERVATION_SERIALIZABLE_ATTEMPTS);
     } catch (error) {
       if (hasPrismaCode(error, 'P2034')) {
         throw new ConflictException('Concurrent reservation stock allocation detected');
@@ -262,7 +263,7 @@ export class ReservationCreationService {
         );
         if (!replay) throw error;
         return replay;
-      });
+      }, RESERVATION_SERIALIZABLE_ATTEMPTS);
     }
   }
 

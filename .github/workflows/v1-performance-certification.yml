@@ -1,0 +1,184 @@
+name: MedSphere V1 Performance & Reliability Certification
+
+# Certifies that the accepted V1 runtime chain (Frontend BFF -> auth-service
+# -> PostgreSQL -> Redis) stays stable under controlled, genuinely
+# concurrent synthetic traffic. Reuses the exact accepted HTTP contracts and
+# direct-SQL synthetic-fixture bootstrap pattern already proven by
+# scripts/task5-smoke-test.mjs -- this is a second, narrowly-scoped tool
+# (concurrency + timing + percentiles), not a second competing
+# functional-correctness harness. Does not touch backup/restore
+# certification files.
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - cto/v1-performance-reliability-certification
+  pull_request:
+    branches:
+      - feature/database-architecture
+
+concurrency:
+  group: v1-performance-reliability-cert-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  performance-reliability:
+    name: V1 performance & reliability certification
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      DATABASE_URL: postgresql://medsphere_ci:medsphere_ci@localhost:5432/medsphere_ci?schema=public
+      REDIS_CLUSTER_URL: redis://localhost:6379
+      ENABLE_UNACCEPTED_PROTOTYPE_SERVICES: 'false'
+      AUTH_JWT_ISSUER: https://auth.local.medsphere.test
+      AUTH_JWT_AUDIENCE: medsphere-api
+      AUTH_JWT_KEY_ID: local-development-key
+      AUTH_ACCESS_TOKEN_TTL_SECONDS: '900'
+      AUTH_REFRESH_IDLE_TTL_SECONDS: '604800'
+      AUTH_REFRESH_ABSOLUTE_TTL_SECONDS: '2592000'
+      AUTH_ARGON2_MEMORY_KIB: '19456'
+      AUTH_ARGON2_TIME_COST: '2'
+      AUTH_ARGON2_PARALLELISM: '1'
+      PORT: '3000'
+      FRONTEND_URL: http://localhost:3001
+      BACKEND_URL: http://localhost:3000
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: medsphere_ci
+          POSTGRES_PASSWORD: medsphere_ci
+          POSTGRES_DB: medsphere_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U medsphere_ci -d medsphere_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install PNPM
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+          run_install: false
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.12.0
+          cache: pnpm
+
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client
+
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run negative-test suite for the certification's own logic
+        run: node --test scripts/v1-performance-certification.spec.mjs
+
+      - name: Generate synthetic JWT keys and refresh/OTP pepper
+        run: |
+          node -e '
+            const fs = require("node:fs");
+            const crypto = require("node:crypto");
+            const { generateDevKeyMaterial } = require("./scripts/generate-dev-keys.js");
+            const material = generateDevKeyMaterial();
+            const required = {
+              AUTH_JWT_PRIVATE_KEY_BASE64: material.privateKeyBase64,
+              AUTH_JWT_PUBLIC_KEY_BASE64: material.publicKeyBase64,
+              AUTH_REFRESH_TOKEN_PEPPER: material.refreshPepperBase64,
+              AUTH_OTP_PEPPER: material.otpPepperBase64,
+            };
+            for (const [name, value] of Object.entries(required)) {
+              if (!value) throw new Error(`Missing generated value: ${name}`);
+              console.log(`::add-mask::${value}`);
+              const delimiter = `EOF_${crypto.randomBytes(8).toString("hex")}`;
+              fs.appendFileSync(process.env.GITHUB_ENV, `${name}<<${delimiter}\n${value}\n${delimiter}\n`, "utf8");
+            }
+          '
+
+      - name: Verify database migration and drift
+        run: pnpm db:verify
+
+      - name: Build backend
+        run: pnpm exec turbo run build --filter=@medsphere/auth-service
+
+      - name: Build frontend
+        run: pnpm --filter @medsphere/web build
+
+      - name: Start backend
+        run: |
+          nohup node apps/auth-service/dist/main.js > /tmp/backend.log 2>&1 &
+          echo $! > /tmp/backend.pid
+
+      - name: Start frontend
+        run: |
+          runtime_host="$(hostname)"
+          export AUTH_API_URL="http://${runtime_host}:3000"
+          nohup pnpm --filter @medsphere/web exec next start -p 3001 > /tmp/frontend.log 2>&1 &
+          echo $! > /tmp/frontend.pid
+
+      - name: Run V1 performance & reliability certification
+        shell: bash
+        run: |
+          set +e
+          node scripts/v1-performance-certification.mjs 2>&1 | tee /tmp/v1-performance-cert.log
+          cert_exit=${PIPESTATUS[0]}
+          set -e
+
+          if ! grep -Fq 'V1 PERFORMANCE RELIABILITY CERTIFICATION: PASS' /tmp/v1-performance-cert.log; then
+            echo 'V1 performance & reliability certification did not report an explicit PASS verdict.'
+            exit 1
+          fi
+
+          if [ "$cert_exit" -ne 0 ]; then
+            echo 'V1 performance & reliability certification script exited non-zero despite a PASS line; failing closed.'
+            exit 1
+          fi
+
+      - name: Show backend log on failure
+        if: failure()
+        run: cat /tmp/backend.log || true
+
+      - name: Show frontend log on failure
+        if: failure()
+        run: cat /tmp/frontend.log || true
+
+      - name: Upload certification evidence (text log only)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v1-performance-reliability-certification-evidence
+          path: |
+            /tmp/backend.log
+            /tmp/frontend.log
+            /tmp/v1-performance-cert.log
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Stop background processes
+        if: always()
+        run: |
+          [ -f /tmp/backend.pid ] && kill "$(cat /tmp/backend.pid)" 2>/dev/null || true
+          [ -f /tmp/frontend.pid ] && kill "$(cat /tmp/frontend.pid)" 2>/dev/null || true
+          exit 0
