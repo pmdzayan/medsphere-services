@@ -364,6 +364,7 @@ describe('InventoryCommandService', () => {
   });
 
   it('rejects a lost optimistic update and leaves movement/audit unwritten', async () => {
+    jest.useRealTimers();
     const harness = createHarness();
     harness.transaction.membershipProviderAccess.findFirst.mockResolvedValue({ id: 'access-1' });
     harness.transaction.stockMovement.findUnique.mockResolvedValue(null);
