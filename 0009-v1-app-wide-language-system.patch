@@ -1,0 +1,1320 @@
+From 7e9364f6cca54f3e88126d331cce352ed94d7bd0 Mon Sep 17 00:00:00 2001
+From: MedSphere Agent <agent@medsphere.local>
+Date: Thu, 27 Aug 2026 16:34:42 +0000
+Subject: [PATCH] feat: unify app-wide language system with completeness gating
+ (Task 0009, partial)
+
+Core fix: closes the disconnection between the two existing language
+mechanisms -- the top-nav LanguageSelector (23-locale frontend catalog,
+updated the UI but only persisted to localStorage) and the Settings
+Language panel (backend-persisted via the already-correct, self-only
+PATCH /users/me/language, but never updated the rendered UI). Neither
+restored a preference across devices.
+
+- add isLocaleComplete()/enabledLocaleOptions to lib/i18n.ts: computed
+  live from the actual catalog (every key in englishMessages must have
+  a real override), not a hand-maintained flag. Measured finding: only
+  en and ta had genuine 100% coverage; the other 21 locales (including
+  all 3 RTL ones) silently fell back to English for registration text
+  while still being exposed in the selector
+- complete Urdu's translation in full (registration.* keys added,
+  matching Tamil's coverage) so there is one genuine, complete,
+  RTL-enabled locale to actually support -- not just a theoretical dir
+  flag with no complete content behind it
+- gate LanguageSelector to enabledLocaleOptions only; update the two
+  pre-existing tests that encoded the old "expose all 23" behavior
+- packages/i18n: add ENABLED_UI_LANGUAGES = [en, ta, ur] as the
+  narrower "complete enough to be a whole-app UI preference" set,
+  kept distinct from the broader SupportedLanguage set used for
+  backend-generated system strings (hi/te/kn keep their existing
+  backend translations for that separate, smaller purpose); narrow
+  update-language.dto.ts's validator and the /localization/languages
+  metadata endpoint to this set; add a ur.json placeholder (English
+  fallback covers it, matching the service's existing fallback design)
+- add preferredLanguage through the entire login chain: Prisma select
+  (both password and Google login identity queries) -> LoginIdentity
+  type -> response construction -> LoginResponseDto -> frontend
+  AuthenticatedUser contract -- closes the "another device restores
+  preference" gap, since nothing previously carried this value to the
+  client at all
+- LanguageProvider: implement the documented precedence (authenticated
+  profile > local storage > browser locale > default), and make
+  setLocale fire a best-effort, fire-and-forget PATCH to persist for
+  authenticated users -- safe to call unconditionally from any page
+  since the underlying route already no-ops on no session
+- root layout reads the session server-side and passes it down as
+  initialLocale
+- SettingsWorkspace now calls useLanguage().setLocale() after a
+  successful save, so choosing a language in Settings updates the live
+  UI immediately instead of only taking effect after a future reload
+  (direct fix for the core bug, with a dedicated regression test)
+- add packages/i18n test infra (had none before) matching
+  packages/logger's established build-then-node:test convention
+
+Tests: 15 (i18n completeness/RTL) + 7 (language-provider precedence/
+persistence) + 7 (packages/i18n enabled-set) + updated
+language-selector (5) + settings-workspace (6, incl. 1 new) + 6 other
+files' fixtures updated for the new required AuthenticatedUser field
+(25 tests, all still passing, confirming zero regressions from the
+type change) = 58 tests total, all passing.
+
+No schema/migration change: preferredLanguage already existed as a
+User column; only its exposure/validation surface changed.
+
+TypeScript, ESLint, Prettier: clean across every changed file in
+apps/web, apps/auth-service, and packages/i18n.
+
+Explicitly NOT done in this pass (task scope vastly exceeds what a
+single implementation session can respectably cover to production
+quality): the full per-screen hardcoded-string audit beyond what was
+directly touched; translating the remaining 20 locales' registration/
+OTP/dashboard/navigation/inventory/reservation/settings/validation
+copy; RTL layout-sensitive component behavior beyond the dir attribute
+(navigation alignment, icon mirroring, dialogs, tables); notification-
+content locale-awareness; validation/backend error-code-to-localized-
+copy mapping; workstation-lock/re-authentication screen localization.
+These remain genuinely incomplete and are reported as such rather than
+claimed done.
+---
+ apps/auth-service/src/auth/auth.service.ts    |   1 +
+ apps/auth-service/src/auth/auth.types.ts      |   1 +
+ .../src/auth/dto/login-response.dto.ts        |   3 +
+ .../localization/dto/update-language.dto.ts   |   8 +-
+ .../src/users/users.repository.ts             |   2 +
+ .../src/app/api/auth/refresh/route.test.ts    |   1 +
+ .../app/api/inventory/providers/route.test.ts |   8 +-
+ apps/web/src/app/layout.tsx                   |  18 ++-
+ .../web/src/app/login/google-sign-in.test.tsx |   1 +
+ apps/web/src/app/login/login-form.test.tsx    |   8 +-
+ .../src/components/language-provider.test.tsx | 141 +++++++++++++++++
+ apps/web/src/components/language-provider.tsx |  86 +++++++++-
+ .../src/components/language-selector.test.tsx |  28 +++-
+ apps/web/src/components/language-selector.tsx |   4 +-
+ .../components/platform/app-shell.test.tsx    |   8 +-
+ .../settings/settings-workspace.test.tsx      |  34 +++-
+ .../features/settings/settings-workspace.tsx  |  10 ++
+ apps/web/src/lib/auth-contract.ts             |   1 +
+ apps/web/src/lib/i18n.test.ts                 | 110 +++++++++++++
+ apps/web/src/lib/i18n.ts                      | 147 ++++++++++++++----
+ apps/web/src/lib/session-profile.test.ts      |   1 +
+ apps/web/src/lib/settings-contract.ts         |   7 +-
+ packages/i18n/package.json                    |   3 +-
+ packages/i18n/src/i18n.service.ts             |  13 +-
+ packages/i18n/src/index.ts                    |   2 +
+ packages/i18n/src/language.enum.ts            |  21 +++
+ packages/i18n/src/locales/ur.json             |   1 +
+ packages/i18n/test/language.enum.spec.mjs     |  73 +++++++++
+ 28 files changed, 680 insertions(+), 61 deletions(-)
+ create mode 100644 apps/web/src/components/language-provider.test.tsx
+ create mode 100644 apps/web/src/lib/i18n.test.ts
+ create mode 100644 packages/i18n/src/locales/ur.json
+ create mode 100644 packages/i18n/test/language.enum.spec.mjs
+
+diff --git a/apps/auth-service/src/auth/auth.service.ts b/apps/auth-service/src/auth/auth.service.ts
+index f31649b..872791b 100644
+--- a/apps/auth-service/src/auth/auth.service.ts
++++ b/apps/auth-service/src/auth/auth.service.ts
+@@ -173,6 +173,7 @@ export class AuthService {
+         email: loginIdentity.user.email,
+         firstName: loginIdentity.user.firstName,
+         lastName: loginIdentity.user.lastName,
++        preferredLanguage: loginIdentity.user.preferredLanguage,
+       },
+       context: {
+         membershipId: loginIdentity.membershipId,
+diff --git a/apps/auth-service/src/auth/auth.types.ts b/apps/auth-service/src/auth/auth.types.ts
+index a2daa44..561075f 100644
+--- a/apps/auth-service/src/auth/auth.types.ts
++++ b/apps/auth-service/src/auth/auth.types.ts
+@@ -56,6 +56,7 @@ export interface LoginIdentity {
+     readonly passwordHash: string | null;
+     readonly firstName: string;
+     readonly lastName: string;
++    readonly preferredLanguage: string;
+   };
+   readonly membershipId: string;
+   readonly tenantId: string;
+diff --git a/apps/auth-service/src/auth/dto/login-response.dto.ts b/apps/auth-service/src/auth/dto/login-response.dto.ts
+index ad85d53..0ebfa96 100644
+--- a/apps/auth-service/src/auth/dto/login-response.dto.ts
++++ b/apps/auth-service/src/auth/dto/login-response.dto.ts
+@@ -12,6 +12,9 @@ export class AuthenticatedUserResponseDto {
+ 
+   @ApiProperty()
+   lastName!: string;
++
++  @ApiProperty({ example: 'en', description: 'Persisted whole-app UI language preference' })
++  preferredLanguage!: string;
+ }
+ 
+ export class TenantContextResponseDto {
+diff --git a/apps/auth-service/src/localization/dto/update-language.dto.ts b/apps/auth-service/src/localization/dto/update-language.dto.ts
+index 2823301..f527525 100644
+--- a/apps/auth-service/src/localization/dto/update-language.dto.ts
++++ b/apps/auth-service/src/localization/dto/update-language.dto.ts
+@@ -1,12 +1,12 @@
+ import { IsString, IsIn } from 'class-validator';
+-import { SUPPORTED_LANGUAGES } from '@medsphere/i18n';
++import { ENABLED_UI_LANGUAGES } from '@medsphere/i18n';
+ import { ApiProperty } from '@nestjs/swagger';
+ 
+ export class UpdateLanguageDto {
+-  @ApiProperty({ example: 'en', enum: SUPPORTED_LANGUAGES })
++  @ApiProperty({ example: 'en', enum: ENABLED_UI_LANGUAGES })
+   @IsString()
+-  @IsIn(SUPPORTED_LANGUAGES as unknown as string[], {
+-    message: `Language must be one of: ${SUPPORTED_LANGUAGES.join(', ')}`,
++  @IsIn(ENABLED_UI_LANGUAGES as unknown as string[], {
++    message: `Language must be one of: ${ENABLED_UI_LANGUAGES.join(', ')}`,
+   })
+   preferredLanguage!: string;
+ }
+diff --git a/apps/auth-service/src/users/users.repository.ts b/apps/auth-service/src/users/users.repository.ts
+index bf7193f..22c056e 100644
+--- a/apps/auth-service/src/users/users.repository.ts
++++ b/apps/auth-service/src/users/users.repository.ts
+@@ -41,6 +41,7 @@ export class UsersRepository {
+             passwordHash: true,
+             firstName: true,
+             lastName: true,
++            preferredLanguage: true,
+           },
+         },
+       },
+@@ -83,6 +84,7 @@ export class UsersRepository {
+             passwordHash: true,
+             firstName: true,
+             lastName: true,
++            preferredLanguage: true,
+           },
+         },
+       },
+diff --git a/apps/web/src/app/api/auth/refresh/route.test.ts b/apps/web/src/app/api/auth/refresh/route.test.ts
+index 6f49fb9..f386018 100644
+--- a/apps/web/src/app/api/auth/refresh/route.test.ts
++++ b/apps/web/src/app/api/auth/refresh/route.test.ts
+@@ -13,6 +13,7 @@ const profile: SessionProfile = {
+     email: 'admin@example.com',
+     firstName: 'Aisha',
+     lastName: 'Zahra',
++    preferredLanguage: 'en',
+   },
+   context: { membershipId: 'membership-id', tenantId: 'tenant-id' },
+ };
+diff --git a/apps/web/src/app/api/inventory/providers/route.test.ts b/apps/web/src/app/api/inventory/providers/route.test.ts
+index 3c53692..5891046 100644
+--- a/apps/web/src/app/api/inventory/providers/route.test.ts
++++ b/apps/web/src/app/api/inventory/providers/route.test.ts
+@@ -11,7 +11,13 @@ const profile = sealSessionProfile(
+   {
+     tenantSlug: 'central-pharmacy',
+     expiresIn: 900,
+-    user: { id: 'user-id', email: 'user@example.com', firstName: 'Test', lastName: 'User' },
++    user: {
++      id: 'user-id',
++      email: 'user@example.com',
++      firstName: 'Test',
++      lastName: 'User',
++      preferredLanguage: 'en',
++    },
+     context: { membershipId: validProviders[0].membershipId, tenantId: 'tenant-id' },
+   },
+   refreshToken,
+diff --git a/apps/web/src/app/layout.tsx b/apps/web/src/app/layout.tsx
+index 85f4770..b376d36 100644
+--- a/apps/web/src/app/layout.tsx
++++ b/apps/web/src/app/layout.tsx
+@@ -1,5 +1,7 @@
+ import type { Metadata } from 'next';
++import { cookies } from 'next/headers';
+ import { LanguageProvider } from '@/components/language-provider';
++import { PROFILE_COOKIE, REFRESH_COOKIE, readSessionProfile } from '@/lib/session-profile';
+ import './globals.css';
+ 
+ export const metadata: Metadata = {
+@@ -10,11 +12,23 @@ export const metadata: Metadata = {
+   description: 'One connected healthcare operating system.',
+ };
+ 
+-export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
++export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
++  // Best-effort only: an authenticated session's persisted language
++  // preference takes precedence over local storage (see
++  // LanguageProvider's documented precedence order). A signed-out
++  // visitor, an expired session, or any read failure here simply falls
++  // through to LanguageProvider's existing local-storage/browser-locale
++  // behavior -- this never blocks rendering or redirects.
++  const cookieStore = await cookies();
++  const refreshToken = cookieStore.get(REFRESH_COOKIE)?.value;
++  const session = readSessionProfile(cookieStore.get(PROFILE_COOKIE)?.value, refreshToken);
++
+   return (
+     <html lang="en">
+       <body className="font-[var(--font-body)]">
+-        <LanguageProvider>{children}</LanguageProvider>
++        <LanguageProvider initialLocale={session?.user.preferredLanguage ?? null}>
++          {children}
++        </LanguageProvider>
+       </body>
+     </html>
+   );
+diff --git a/apps/web/src/app/login/google-sign-in.test.tsx b/apps/web/src/app/login/google-sign-in.test.tsx
+index 9355d05..c33fd32 100644
+--- a/apps/web/src/app/login/google-sign-in.test.tsx
++++ b/apps/web/src/app/login/google-sign-in.test.tsx
+@@ -97,6 +97,7 @@ describe('GoogleSignIn', () => {
+         email: 'user@example.com',
+         firstName: 'Test',
+         lastName: 'User',
++        preferredLanguage: 'en',
+       },
+       context: {
+         membershipId: 'membership-1',
+diff --git a/apps/web/src/app/login/login-form.test.tsx b/apps/web/src/app/login/login-form.test.tsx
+index 30332c0..62f3f4e 100644
+--- a/apps/web/src/app/login/login-form.test.tsx
++++ b/apps/web/src/app/login/login-form.test.tsx
+@@ -20,7 +20,13 @@ beforeEach(() => {
+   window.localStorage.clear();
+   vi.mocked(login).mockResolvedValue({
+     expiresIn: 3600,
+-    user: { id: 'user-1', email: 'operator@example.com', firstName: 'Mira', lastName: 'Patel' },
++    user: {
++      id: 'user-1',
++      email: 'operator@example.com',
++      firstName: 'Mira',
++      lastName: 'Patel',
++      preferredLanguage: 'en',
++    },
+     context: { membershipId: '93b31836-6a84-4db9-a935-1c55960c25da', tenantId: 'tenant-1' },
+   });
+ });
+diff --git a/apps/web/src/components/language-provider.test.tsx b/apps/web/src/components/language-provider.test.tsx
+new file mode 100644
+index 0000000..a21b5b3
+--- /dev/null
++++ b/apps/web/src/components/language-provider.test.tsx
+@@ -0,0 +1,141 @@
++import { cleanup, render, screen, waitFor } from '@testing-library/react';
++import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
++import { LanguageProvider, useLanguage } from '@/components/language-provider';
++
++beforeEach(() => {
++  window.localStorage.clear();
++  document.documentElement.lang = 'en';
++  document.documentElement.dir = 'ltr';
++});
++
++afterEach(() => {
++  cleanup();
++  vi.restoreAllMocks();
++});
++
++function LocaleProbe() {
++  const { locale } = useLanguage();
++  return <span data-testid="locale">{locale}</span>;
++}
++
++function Setter() {
++  const { setLocale } = useLanguage();
++  return <button onClick={() => setLocale('ur')}>switch</button>;
++}
++
++function HindiSetter() {
++  const { setLocale } = useLanguage();
++  return <button onClick={() => setLocale('hi')}>switch-hi</button>;
++}
++
++describe('LanguageProvider precedence', () => {
++  it('an authenticated profile preference takes precedence over local storage', async () => {
++    window.localStorage.setItem('medsphere.locale', 'ta');
++
++    render(
++      <LanguageProvider initialLocale="ur">
++        <LocaleProbe />
++      </LanguageProvider>,
++    );
++
++    await waitFor(() => expect(screen.getByTestId('locale')).toHaveTextContent('ur'));
++    expect(document.documentElement.dir).toBe('rtl');
++  });
++
++  it('falls back to local storage when no authenticated preference is present', async () => {
++    window.localStorage.setItem('medsphere.locale', 'ta');
++
++    render(
++      <LanguageProvider initialLocale={null}>
++        <LocaleProbe />
++      </LanguageProvider>,
++    );
++
++    await waitFor(() => expect(screen.getByTestId('locale')).toHaveTextContent('ta'));
++  });
++
++  it('ignores an incomplete authenticated preference and falls through to local storage', async () => {
++    window.localStorage.setItem('medsphere.locale', 'ta');
++
++    render(
++      // 'bn' is a known but currently incomplete locale -- must never be
++      // silently applied even if somehow persisted as a stale profile value.
++      <LanguageProvider initialLocale="bn">
++        <LocaleProbe />
++      </LanguageProvider>,
++    );
++
++    await waitFor(() => expect(screen.getByTestId('locale')).toHaveTextContent('ta'));
++  });
++
++  it('defaults to English when nothing else is available', async () => {
++    render(
++      <LanguageProvider initialLocale={null}>
++        <LocaleProbe />
++      </LanguageProvider>,
++    );
++
++    await waitFor(() => expect(screen.getByTestId('locale')).toHaveTextContent('en'));
++  });
++});
++
++describe('LanguageProvider persistence', () => {
++  it('fires a best-effort PATCH to persist an enabled locale choice', async () => {
++    const fetchSpy = vi
++      .spyOn(globalThis, 'fetch')
++      .mockResolvedValue(new Response('{}', { status: 200 }));
++
++    render(
++      <LanguageProvider initialLocale={null}>
++        <Setter />
++      </LanguageProvider>,
++    );
++
++    screen.getByText('switch').click();
++
++    await waitFor(() =>
++      expect(fetchSpy).toHaveBeenCalledWith(
++        '/api/settings/language',
++        expect.objectContaining({ method: 'PATCH' }),
++      ),
++    );
++    const [, init] = fetchSpy.mock.calls[0];
++    expect(JSON.parse(init!.body as string)).toEqual({ preferredLanguage: 'ur' });
++  });
++
++  it('never blocks or reverts the local UI change when persistence fails', async () => {
++    vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('network down'));
++
++    render(
++      <LanguageProvider initialLocale={null}>
++        <LocaleProbe />
++        <Setter />
++      </LanguageProvider>,
++    );
++
++    screen.getByText('switch').click();
++
++    await waitFor(() => expect(screen.getByTestId('locale')).toHaveTextContent('ur'));
++    expect(document.documentElement.lang).toBe('ur');
++  });
++
++  it('does not attempt to persist a locale the backend cannot yet accept', async () => {
++    const fetchSpy = vi
++      .spyOn(globalThis, 'fetch')
++      .mockResolvedValue(new Response('{}', { status: 200 }));
++
++    // 'hi' is complete enough to render (hypothetically, for this test) but
++    // not part of the backend-accepted persistence set -- setLocale should
++    // still update the UI without firing a PATCH doomed to a 400.
++    render(
++      <LanguageProvider initialLocale={null}>
++        <LocaleProbe />
++        <HindiSetter />
++      </LanguageProvider>,
++    );
++
++    screen.getByText('switch-hi').click();
++    await waitFor(() => expect(screen.getByTestId('locale')).toHaveTextContent('hi'));
++    expect(fetchSpy).not.toHaveBeenCalled();
++  });
++});
+diff --git a/apps/web/src/components/language-provider.tsx b/apps/web/src/components/language-provider.tsx
+index 0699a78..f75c474 100644
+--- a/apps/web/src/components/language-provider.tsx
++++ b/apps/web/src/components/language-provider.tsx
+@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useMemo, useState } from 'react';
+ import {
+   getLocaleDirection,
+   isLocale,
++  isLocaleComplete,
+   translate,
+   type Locale,
+   type TranslationKey,
+@@ -24,23 +25,89 @@ function applyDocumentLocale(locale: Locale) {
+   document.documentElement.dir = getLocaleDirection(locale);
+ }
+ 
+-export function LanguageProvider({ children }: Readonly<{ children: React.ReactNode }>) {
++/** Best-effort match of the browser's locale against a complete, enabled MedSphere locale. */
++function detectBrowserLocale(): Locale | null {
++  if (typeof navigator === 'undefined') return null;
++  const candidates = navigator.languages ?? [navigator.language];
++  for (const candidate of candidates) {
++    const code = candidate?.split('-')[0];
++    if (code && isLocale(code) && isLocaleComplete(code)) {
++      return code;
++    }
++  }
++  return null;
++}
++
++export interface LanguageProviderProps {
++  children: React.ReactNode;
++  /**
++   * The authenticated user's server-persisted language preference, when
++   * one is available (read from the session by a Server Component --
++   * see app/layout.tsx). Precedence when this is present and valid:
++   * authenticated profile preference > locally persisted preference >
++   * supported browser locale > default locale. When absent (no session,
++   * or a signed-out visitor), precedence falls through to local
++   * storage, then browser locale, then the default.
++   */
++  initialLocale?: string | null;
++}
++
++export function LanguageProvider({ children, initialLocale }: Readonly<LanguageProviderProps>) {
+   const [locale, setLocaleState] = useState<Locale>('en');
++  const resolvedInitialLocale = initialLocale ?? null;
+ 
+   useEffect(() => {
++    if (isLocale(resolvedInitialLocale) && isLocaleComplete(resolvedInitialLocale)) {
++      setLocaleState(resolvedInitialLocale);
++      applyDocumentLocale(resolvedInitialLocale);
++      // Keep local storage in sync so a subsequent signed-out visit (or
++      // an offline reload before the profile reloads) still sees the
++      // most recently known-authoritative choice.
++      window.localStorage.setItem(LANGUAGE_STORAGE_KEY, resolvedInitialLocale);
++      return;
++    }
++
+     const storedLocale = window.localStorage.getItem(LANGUAGE_STORAGE_KEY);
+-    if (isLocale(storedLocale)) {
++    if (isLocale(storedLocale) && isLocaleComplete(storedLocale)) {
+       setLocaleState(storedLocale);
+       applyDocumentLocale(storedLocale);
+       return;
+     }
++
++    const browserLocale = detectBrowserLocale();
++    if (browserLocale) {
++      setLocaleState(browserLocale);
++      applyDocumentLocale(browserLocale);
++      return;
++    }
++
+     applyDocumentLocale('en');
+-  }, []);
++    // eslint-disable-next-line react-hooks/exhaustive-deps
++  }, [resolvedInitialLocale]);
+ 
+   function setLocale(nextLocale: Locale) {
+     setLocaleState(nextLocale);
+     window.localStorage.setItem(LANGUAGE_STORAGE_KEY, nextLocale);
+     applyDocumentLocale(nextLocale);
++
++    // Best-effort, fire-and-forget persistence for an authenticated
++    // session. The underlying route already checks for a session cookie
++    // and safely no-ops (401) when signed out, so this is safe to call
++    // unconditionally from any page, including public login/registration
++    // screens, without this component needing its own auth-state
++    // plumbing. A failure here never blocks or reverts the immediate,
++    // already-applied local UI change.
++    if (isEnabledLocaleForPersistence(nextLocale)) {
++      fetch('/api/settings/language', {
++        method: 'PATCH',
++        headers: { 'content-type': 'application/json' },
++        body: JSON.stringify({ preferredLanguage: nextLocale }),
++      }).catch(() => {
++        // Deliberately ignored: language preference persistence must
++        // never surface an error to the user or block the (already
++        // applied) local language switch.
++      });
++    }
+   }
+ 
+   const value = useMemo<LanguageContextValue>(
+@@ -55,6 +122,19 @@ export function LanguageProvider({ children }: Readonly<{ children: React.ReactN
+   return <LanguageContext.Provider value={value}>{children}</LanguageContext.Provider>;
+ }
+ 
++/**
++ * The backend only accepts a fixed, narrow set of whole-app UI language
++ * codes for a persisted preference (see
++ * apps/auth-service/src/localization/dto/update-language.dto.ts's
++ * ENABLED_UI_LANGUAGES) -- currently a subset of this frontend's own
++ * complete-locale set. Skipping the PATCH entirely for a locale outside
++ * that backend-accepted set avoids a guaranteed, noisy 400 for a
++ * combination that cannot yet be persisted server-side.
++ */
++function isEnabledLocaleForPersistence(locale: Locale): boolean {
++  return locale === 'en' || locale === 'ta' || locale === 'ur';
++}
++
+ export function useLanguage(): LanguageContextValue {
+   const value = useContext(LanguageContext);
+   if (!value) {
+diff --git a/apps/web/src/components/language-selector.test.tsx b/apps/web/src/components/language-selector.test.tsx
+index e6f11fa..c5f947a 100644
+--- a/apps/web/src/components/language-selector.test.tsx
++++ b/apps/web/src/components/language-selector.test.tsx
+@@ -2,7 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
+ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+ import { LanguageProvider, useLanguage } from '@/components/language-provider';
+ import { LanguageSelector } from '@/components/language-selector';
+-import { localeOptions } from '@/lib/i18n';
++import { enabledLocaleOptions, localeOptions } from '@/lib/i18n';
+ 
+ beforeEach(() => {
+   window.localStorage.clear();
+@@ -13,15 +13,33 @@ beforeEach(() => {
+ afterEach(() => cleanup());
+ 
+ describe('LanguageSelector', () => {
+-  it('lists English plus all 22 Eighth Schedule languages', () => {
++  it('lists only translation-complete locales, not every known locale code', () => {
+     render(
+       <LanguageProvider>
+         <LanguageSelector />
+       </LanguageProvider>,
+     );
+ 
+-    expect(screen.getAllByRole('option')).toHaveLength(23);
+-    expect(localeOptions).toHaveLength(23);
++    // The Eighth Schedule locale catalog currently has 23 known codes,
++    // but only translation-complete ones may appear in a production
++    // selector -- see lib/i18n.ts's isLocaleComplete/enabledLocaleOptions.
++    expect(localeOptions.length).toBeGreaterThan(enabledLocaleOptions.length);
++    expect(screen.getAllByRole('option')).toHaveLength(enabledLocaleOptions.length);
++  });
++
++  it('never renders an option for a known-incomplete locale', () => {
++    render(
++      <LanguageProvider>
++        <LanguageSelector />
++      </LanguageProvider>,
++    );
++
++    const optionValues = screen
++      .getAllByRole('option')
++      .map((option) => option.getAttribute('value'));
++    expect(optionValues).not.toContain('bn');
++    expect(optionValues).not.toContain('sd');
++    expect(optionValues).not.toContain('ks');
+   });
+ 
+   it('switches to Tamil, persists the choice, and updates document language', () => {
+@@ -40,7 +58,7 @@ describe('LanguageSelector', () => {
+     expect(document.documentElement.dir).toBe('ltr');
+   });
+ 
+-  it('applies right-to-left direction for Urdu', () => {
++  it('applies right-to-left direction for Urdu (a complete, enabled RTL locale)', () => {
+     render(
+       <LanguageProvider>
+         <LanguageSelector />
+diff --git a/apps/web/src/components/language-selector.tsx b/apps/web/src/components/language-selector.tsx
+index 1db4105..ef808d7 100644
+--- a/apps/web/src/components/language-selector.tsx
++++ b/apps/web/src/components/language-selector.tsx
+@@ -1,7 +1,7 @@
+ 'use client';
+ 
+ import { useLanguage } from '@/components/language-provider';
+-import { localeOptions, type Locale } from '@/lib/i18n';
++import { enabledLocaleOptions, type Locale } from '@/lib/i18n';
+ 
+ export function LanguageSelector() {
+   const { locale, setLocale, t } = useLanguage();
+@@ -15,7 +15,7 @@ export function LanguageSelector() {
+         aria-label={t('language.label')}
+         className="max-w-44 rounded-lg border border-[#10201c]/[.1] bg-[#fbfaf5] px-2.5 py-1.5 text-xs font-bold text-[#10201c] outline-none focus:border-emerald-600"
+       >
+-        {localeOptions.map((option) => (
++        {enabledLocaleOptions.map((option) => (
+           <option key={option.code} value={option.code}>
+             {option.label}
+           </option>
+diff --git a/apps/web/src/components/platform/app-shell.test.tsx b/apps/web/src/components/platform/app-shell.test.tsx
+index 214d90d..f512fce 100644
+--- a/apps/web/src/components/platform/app-shell.test.tsx
++++ b/apps/web/src/components/platform/app-shell.test.tsx
+@@ -11,7 +11,13 @@ vi.mock('next/navigation', () => ({
+ afterEach(() => cleanup());
+ 
+ const session: SessionProfile = {
+-  user: { id: 'user-1', email: 'mira@example.test', firstName: 'Mira', lastName: 'Patel' },
++  user: {
++    id: 'user-1',
++    email: 'mira@example.test',
++    firstName: 'Mira',
++    lastName: 'Patel',
++    preferredLanguage: 'en',
++  },
+   context: {
+     membershipId: '93b31836-6a84-4db9-a935-1c55960c25da',
+     tenantId: '2f96df49-54a0-4fac-a3fd-e796cb1f1d3d',
+diff --git a/apps/web/src/features/settings/settings-workspace.test.tsx b/apps/web/src/features/settings/settings-workspace.test.tsx
+index f0ff906..a633029 100644
+--- a/apps/web/src/features/settings/settings-workspace.test.tsx
++++ b/apps/web/src/features/settings/settings-workspace.test.tsx
+@@ -1,5 +1,6 @@
+ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
++import { LanguageProvider } from '@/components/language-provider';
+ import {
+   getPrivacyPreferences,
+   getSupportedLanguages,
+@@ -8,6 +9,14 @@ import {
+ } from '@/lib/api-client';
+ import { SettingsWorkspace } from './settings-workspace';
+ 
++function renderWorkspace(identity: Parameters<typeof SettingsWorkspace>[0]['identity']) {
++  return render(
++    <LanguageProvider initialLocale={null}>
++      <SettingsWorkspace identity={identity} />
++    </LanguageProvider>,
++  );
++}
++
+ vi.mock('@/lib/api-client', async () => {
+   const actual = await vi.importActual<typeof import('@/lib/api-client')>('@/lib/api-client');
+   return {
+@@ -55,7 +64,7 @@ afterEach(() => cleanup());
+ 
+ describe('SettingsWorkspace interactions', () => {
+   it('renders connected preferences and signed identity context', async () => {
+-    render(<SettingsWorkspace identity={identity} />);
++    renderWorkspace(identity);
+ 
+     expect(await screen.findByText('Preference controls')).toBeVisible();
+     expect(screen.getByText('Mira Patel')).toBeVisible();
+@@ -68,7 +77,7 @@ describe('SettingsWorkspace interactions', () => {
+   });
+ 
+   it('sends only changed privacy preferences', async () => {
+-    render(<SettingsWorkspace identity={identity} />);
++    renderWorkspace(identity);
+ 
+     fireEvent.click(await screen.findByRole('switch', { name: 'Private medicine pickup' }));
+     fireEvent.click(screen.getByRole('button', { name: 'Save preferences' }));
+@@ -80,7 +89,7 @@ describe('SettingsWorkspace interactions', () => {
+   });
+ 
+   it('resets unsaved privacy changes without a mutation', async () => {
+-    render(<SettingsWorkspace identity={identity} />);
++    renderWorkspace(identity);
+ 
+     fireEvent.click(await screen.findByRole('switch', { name: 'Share email' }));
+     expect(screen.getByText('Unsaved changes')).toBeVisible();
+@@ -95,7 +104,7 @@ describe('SettingsWorkspace interactions', () => {
+   });
+ 
+   it('updates a reviewed supported language without guessing the current value', async () => {
+-    render(<SettingsWorkspace identity={identity} />);
++    renderWorkspace(identity);
+ 
+     fireEvent.change(await screen.findByLabelText('Preferred language'), {
+       target: { value: 'ta' },
+@@ -108,10 +117,25 @@ describe('SettingsWorkspace interactions', () => {
+     expect(await screen.findByText('Language updated')).toBeVisible();
+   });
+ 
++  it('updates the live rendered UI immediately, not only after a future reload', async () => {
++    // This is the exact bug this task closes: saving a language in
++    // Settings previously persisted server-side but never touched the
++    // document's own lang/dir, unlike the top-navigation LanguageSelector.
++    renderWorkspace(identity);
++
++    fireEvent.change(await screen.findByLabelText('Preferred language'), {
++      target: { value: 'ta' },
++    });
++    fireEvent.click(screen.getByRole('button', { name: 'Update language' }));
++
++    await waitFor(() => expect(updatePreferredLanguage).toHaveBeenCalled());
++    await waitFor(() => expect(document.documentElement.lang).toBe('ta'));
++  });
++
+   it('fails closed when initial settings cannot be loaded', async () => {
+     vi.mocked(getPrivacyPreferences).mockRejectedValue(new Error('Session expired'));
+ 
+-    render(<SettingsWorkspace identity={identity} />);
++    renderWorkspace(identity);
+ 
+     expect(await screen.findByRole('alert')).toHaveTextContent('Session expired');
+     expect(screen.queryByText('Preference controls')).not.toBeInTheDocument();
+diff --git a/apps/web/src/features/settings/settings-workspace.tsx b/apps/web/src/features/settings/settings-workspace.tsx
+index a5976dc..d186099 100644
+--- a/apps/web/src/features/settings/settings-workspace.tsx
++++ b/apps/web/src/features/settings/settings-workspace.tsx
+@@ -3,6 +3,8 @@
+ import { useCallback, useEffect, useMemo, useState } from 'react';
+ import { Icon } from '@/components/platform/icon';
+ import { MetricCard, SectionCard, StatusBadge } from '@/components/platform/dashboard-primitives';
++import { useLanguage } from '@/components/language-provider';
++import { isLocale } from '@/lib/i18n';
+ import {
+   getPrivacyPreferences,
+   getSupportedLanguages,
+@@ -63,6 +65,7 @@ const privacyOptions: Array<{
+ ];
+ 
+ export function SettingsWorkspace({ identity }: { identity: SettingsIdentity }) {
++  const { setLocale } = useLanguage();
+   const [privacy, setPrivacy] = useState<PrivacyPreferences | null>(null);
+   const [privacyDraft, setPrivacyDraft] = useState<PrivacyPreferences | null>(null);
+   const [languages, setLanguages] = useState<SupportedLanguage[]>([]);
+@@ -133,6 +136,13 @@ export function SettingsWorkspace({ identity }: { identity: SettingsIdentity })
+     try {
+       const response = await updatePreferredLanguage({ preferredLanguage: selectedLanguage });
+       setLanguageNotice(response.message);
++      // The Settings panel persists the preference server-side; it must
++      // also update the live, rendered UI immediately (the same
++      // requirement the top-navigation LanguageSelector already meets),
++      // not only take effect after a future page reload.
++      if (isLocale(selectedLanguage)) {
++        setLocale(selectedLanguage);
++      }
+     } catch (saveError) {
+       setLanguageNotice(
+         saveError instanceof Error ? saveError.message : 'Unable to update language.',
+diff --git a/apps/web/src/lib/auth-contract.ts b/apps/web/src/lib/auth-contract.ts
+index 0cae4be..1efd623 100644
+--- a/apps/web/src/lib/auth-contract.ts
++++ b/apps/web/src/lib/auth-contract.ts
+@@ -38,6 +38,7 @@ export interface AuthenticatedUser {
+   email: string;
+   firstName: string;
+   lastName: string;
++  preferredLanguage: string;
+ }
+ 
+ export interface LoginResponse {
+diff --git a/apps/web/src/lib/i18n.test.ts b/apps/web/src/lib/i18n.test.ts
+new file mode 100644
+index 0000000..9709aa4
+--- /dev/null
++++ b/apps/web/src/lib/i18n.test.ts
+@@ -0,0 +1,110 @@
++import { describe, expect, it } from 'vitest';
++import {
++  enabledLocaleOptions,
++  getLocaleDirection,
++  isLocale,
++  isLocaleComplete,
++  localeOptions,
++  translate,
++} from './i18n';
++
++describe('isLocaleComplete', () => {
++  it('treats English as always complete (it is the source of truth)', () => {
++    expect(isLocaleComplete('en')).toBe(true);
++  });
++
++  it('treats Tamil as complete -- it has a full manual override for every key', () => {
++    expect(isLocaleComplete('ta')).toBe(true);
++  });
++
++  it('treats Urdu as complete -- it has a full manual override for every key, including RTL support', () => {
++    expect(isLocaleComplete('ur')).toBe(true);
++  });
++
++  it('treats a locale with only shell-key overrides as incomplete', () => {
++    // Hindi, Bengali, Kannada, etc. currently only override navigation
++    // shell keys, not the full critical-screen key set (e.g.
++    // registration.*) -- they must not be reported complete.
++    expect(isLocaleComplete('hi')).toBe(false);
++    expect(isLocaleComplete('bn')).toBe(false);
++    expect(isLocaleComplete('kn')).toBe(false);
++  });
++
++  it('is computed from the live catalog, not a hardcoded allowlist', () => {
++    // Every locale that is not 'en', 'ta', or 'ur' should currently be
++    // incomplete, given today's real translation coverage. This
++    // assertion is intentionally derived from the actual data rather
++    // than naming each locale, so it keeps testing the real invariant
++    // even as the catalog grows.
++    const incomplete = localeOptions.filter(
++      (option) =>
++        option.code !== 'en' &&
++        option.code !== 'ta' &&
++        option.code !== 'ur' &&
++        !isLocaleComplete(option.code),
++    );
++    expect(incomplete.length).toBe(localeOptions.length - 3);
++  });
++});
++
++describe('enabledLocaleOptions (production selector gate)', () => {
++  it('never includes an incomplete locale', () => {
++    for (const option of enabledLocaleOptions) {
++      expect(isLocaleComplete(option.code)).toBe(true);
++    }
++  });
++
++  it('includes every locale that is actually complete', () => {
++    const codes = enabledLocaleOptions.map((option) => option.code);
++    expect(codes).toContain('en');
++    expect(codes).toContain('ta');
++    expect(codes).toContain('ur');
++  });
++
++  it('excludes a known-incomplete locale from the production selector', () => {
++    const codes = enabledLocaleOptions.map((option) => option.code);
++    expect(codes).not.toContain('bn');
++    expect(codes).not.toContain('sd');
++    expect(codes).not.toContain('ks');
++  });
++});
++
++describe('RTL direction', () => {
++  it('reports rtl for Urdu, Sindhi, and Kashmiri', () => {
++    expect(getLocaleDirection('ur')).toBe('rtl');
++    expect(getLocaleDirection('sd')).toBe('rtl');
++    expect(getLocaleDirection('ks')).toBe('rtl');
++  });
++
++  it('reports ltr for English and Tamil', () => {
++    expect(getLocaleDirection('en')).toBe('ltr');
++    expect(getLocaleDirection('ta')).toBe('ltr');
++  });
++
++  it('includes at least one complete, enabled RTL locale (Urdu)', () => {
++    const enabledRtl = enabledLocaleOptions.filter((option) => option.dir === 'rtl');
++    expect(enabledRtl.map((option) => option.code)).toContain('ur');
++  });
++});
++
++describe('translate', () => {
++  it('falls back to English when the target locale has no override for a key', () => {
++    expect(translate('bn', 'registration.title')).toBe('Request onboarding.');
++  });
++
++  it('returns the localized value when a complete override exists', () => {
++    expect(translate('ta', 'shell.settings')).not.toBe('Settings');
++  });
++});
++
++describe('isLocale', () => {
++  it('accepts any known locale code, complete or not (rendering fallback still applies)', () => {
++    expect(isLocale('bn')).toBe(true);
++    expect(isLocale('en')).toBe(true);
++  });
++
++  it('rejects an unknown code', () => {
++    expect(isLocale('xx')).toBe(false);
++    expect(isLocale(null)).toBe(false);
++  });
++});
+diff --git a/apps/web/src/lib/i18n.ts b/apps/web/src/lib/i18n.ts
+index abff20c..381d1a7 100644
+--- a/apps/web/src/lib/i18n.ts
++++ b/apps/web/src/lib/i18n.ts
+@@ -244,6 +244,89 @@ function shell(values: readonly string[]): MessageOverrides {
+   );
+ }
+ 
++const urduMessages: MessageOverrides = {
++  'language.label': 'زبان',
++  'shell.skipToContent': 'مواد پر جائیں',
++  'shell.closeNavigation': 'نیویگیشن بند کریں',
++  'shell.openNavigation': 'نیویگیشن کھولیں',
++  'shell.openAccountMenu': 'اکاؤنٹ مینو کھولیں',
++  'shell.protectedWorkspace': 'محفوظ ورک اسپیس',
++  'shell.tenantScopedAccess': 'ادارے تک محدود رسائی',
++  'shell.secureSession': 'محفوظ سیشن',
++  'shell.authenticatedMember': 'تصدیق شدہ رکن',
++  'shell.signingOut': 'سائن آؤٹ ہو رہا ہے…',
++  'shell.signOutSecurely': 'محفوظ طریقے سے سائن آؤٹ',
++  'shell.mobileNavigation': 'موبائل نیویگیشن',
++  'shell.moreNavigation': 'مزید نیویگیشن، ٹیم اور سیٹنگز',
++  'shell.more': 'مزید',
++  'shell.workspace': 'ورک اسپیس',
++  'shell.organization': 'ادارہ',
++  'shell.overview': 'جائزہ',
++  'shell.inventory': 'انوینٹری',
++  'shell.reservations': 'ریزرویشن',
++  'shell.billing': 'بلنگ',
++  'shell.documents': 'دستاویزات',
++  'shell.teamAccess': 'ٹیم اور رسائی',
++  'shell.auditTrail': 'آڈٹ ٹریل',
++  'shell.settings': 'سیٹنگز',
++  'shell.soon': 'جلد',
++  'shell.availableWhenConnected': 'منظور شدہ بیک اینڈ API جڑنے پر دستیاب',
++  'shell.needHelp': 'مدد چاہیے؟',
++  'shell.helpText': 'آپریشن گائیڈ پڑھیں یا سپورٹ سے رابطہ کریں۔',
++  'shell.tenant': 'ادارہ',
++  'registration.trustedOnboarding': 'قابلِ اعتماد اندراج',
++  'registration.heroPrefix': 'رسائی کا آغاز',
++  'registration.heroAccent': 'تصدیق شدہ سیاق و سباق سے ہوتا ہے۔',
++  'registration.heroDescription':
++    'اس ادارے کے لیے زیرِالتوا رکنیت کی درخواست دیں جس نے عوامی اندراج کو واضح طور پر فعال کیا ہو۔ منظوری اور فعالیت ادارے کی پالیسی کے تحت رہتی ہے۔',
++  'registration.safeguardPolicyTitle': 'پالیسی کے تحت کنٹرول شدہ',
++  'registration.safeguardPolicyDescription': 'ادارے کو خود اندراج کی واضح اجازت دینی ہوگی۔',
++  'registration.safeguardPendingTitle': 'بطورِ ڈیفالٹ زیرِالتوا',
++  'registration.safeguardPendingDescription': 'درخواست فعال ادارہ رکنیت پیدا نہیں کرتی۔',
++  'registration.safeguardPrivacyTitle': 'رازداری کا تحفظ',
++  'registration.safeguardPrivacyDescription':
++    'جواب کبھی بھی موجودہ اکاؤنٹس یا اداروں کو ظاہر نہیں کرتا۔',
++  'registration.identityMembershipTenant': 'شناخت · رکنیت · ادارہ',
++  'registration.signInInstead': 'اس کے بجائے سائن ان کریں ↗',
++  'registration.sectionLabel': 'ادارے تک رسائی',
++  'registration.title': 'اندراج کی درخواست دیں۔',
++  'registration.description':
++    'یہ فارم ایک زیرِالتوا درخواست جمع کرتا ہے۔ یہ اکاؤنٹ کی تخلیق، ادارہ رکنیت، یا فوری رسائی کی ضمانت نہیں دیتا۔',
++  'registration.firstName': 'پہلا نام',
++  'registration.lastName': 'آخری نام',
++  'registration.organizationSlug': 'ادارے کا سلگ',
++  'registration.organizationSlugDescription': 'ادارے کے منتظم کی فراہم کردہ درست سلگ استعمال کریں۔',
++  'registration.workEmail': 'دفتری ای میل',
++  'registration.phone': 'فون نمبر',
++  'registration.phoneDescription': 'ملکی کوڈ شامل کریں، مثال کے طور پر +91 98765 43210۔',
++  'registration.createPassword': 'پاس ورڈ بنائیں',
++  'registration.passwordDescription':
++    '15–128 حروف استعمال کریں۔ کسی دوسری سروس کا پاس ورڈ دوبارہ استعمال نہ کریں۔',
++  'registration.confirmPassword': 'پاس ورڈ کی تصدیق کریں',
++  'registration.showPassword': 'پاس ورڈ دکھائیں',
++  'registration.submitting': 'محفوظ طریقے سے جمع کیا جا رہا ہے…',
++  'registration.requestAccess': 'ادارے تک رسائی کی درخواست دیں',
++  'registration.alreadyMember': 'کیا آپ کے پاس پہلے سے فعال رکنیت ہے؟',
++  'registration.signIn': 'سائن ان کریں',
++  'registration.requestReceived': 'درخواست موصول ہو گئی',
++  'registration.queuedTitle': 'آپ کی درخواست محفوظ طریقے سے قطار میں لگا دی گئی ہے۔',
++  'registration.confirmationMessage': 'اگر اندراج دستیاب ہے، تو اندراج کی ہدایات بھیج دی جائیں گی۔',
++  'registration.privacyConfirmation':
++    'رازداری کے لیے، یہ تصدیق ظاہر نہیں کرتی کہ ادارہ یا ای میل پہلے سے موجود ہے یا نہیں۔ رسائی صرف اس وقت دستیاب ہوگی جب ادارے کی اندراج پالیسی پوری ہو جائے۔',
++  'registration.returnSignIn': 'سائن ان پر واپس جائیں',
++  'registration.submitAnother': 'ایک اور درخواست جمع کریں',
++  'registration.testDataNotice':
++    'صرف ٹیسٹ شناختیں استعمال کریں۔ یہ استحکام کا ماحول حقیقی مریض، ملازم، یا طبی ڈیٹا کے لیے منظور شدہ نہیں ہے۔',
++  'registration.errorTenant': 'اپنے منتظم کی فراہم کردہ ادارے کی سلگ استعمال کریں۔',
++  'registration.errorEmail': 'ایک درست ای میل پتہ درج کریں۔',
++  'registration.errorPhone': 'ملکی کوڈ سمیت ایک درست فون نمبر درج کریں۔',
++  'registration.errorPassword': 'پاس ورڈ 15 سے 128 حروف کے درمیان ہونا چاہیے۔',
++  'registration.errorFirstName': '1 سے 100 حروف کے درمیان پہلا نام درج کریں۔',
++  'registration.errorLastName': '1 سے 100 حروف کے درمیان آخری نام درج کریں۔',
++  'registration.errorConfirmPassword': 'پاس ورڈز مماثل نہیں ہیں۔',
++  'registration.errorGeneric': 'اندراج کی درخواست پر کارروائی کرنے سے قاصر۔',
++};
++
+ const localeMessages: Partial<Record<Locale, MessageOverrides>> = {
+   as: shell([
+     'ভাষা',
+@@ -835,6 +918,7 @@ const localeMessages: Partial<Record<Locale, MessageOverrides>> = {
+     'ادارو',
+   ]),
+   ta: tamilMessages,
++  ur: urduMessages,
+   te: shell([
+     'భాష',
+     'విషయానికి వెళ్లండి',
+@@ -866,37 +950,6 @@ const localeMessages: Partial<Record<Locale, MessageOverrides>> = {
+     'ఆపరేషన్స్ గైడ్ చదవండి లేదా సపోర్ట్‌ను సంప్రదించండి.',
+     'సంస్థ',
+   ]),
+-  ur: shell([
+-    'زبان',
+-    'مواد پر جائیں',
+-    'نیویگیشن بند کریں',
+-    'نیویگیشن کھولیں',
+-    'اکاؤنٹ مینو کھولیں',
+-    'محفوظ ورک اسپیس',
+-    'ادارے تک محدود رسائی',
+-    'محفوظ سیشن',
+-    'تصدیق شدہ رکن',
+-    'سائن آؤٹ ہو رہا ہے…',
+-    'محفوظ طریقے سے سائن آؤٹ',
+-    'موبائل نیویگیشن',
+-    'مزید نیویگیشن، ٹیم اور سیٹنگز',
+-    'مزید',
+-    'ورک اسپیس',
+-    'ادارہ',
+-    'جائزہ',
+-    'انوینٹری',
+-    'ریزرویشن',
+-    'بلنگ',
+-    'دستاویزات',
+-    'ٹیم اور رسائی',
+-    'آڈٹ ٹریل',
+-    'سیٹنگز',
+-    'جلد',
+-    'منظور شدہ بیک اینڈ API جڑنے پر دستیاب',
+-    'مدد چاہیے؟',
+-    'آپریشن گائیڈ پڑھیں یا سپورٹ سے رابطہ کریں۔',
+-    'ادارہ',
+-  ]),
+ };
+ 
+ export function isLocale(value: string | null): value is Locale {
+@@ -910,3 +963,35 @@ export function getLocaleDirection(locale: Locale): LocaleDirection {
+ export function translate(locale: Locale, key: TranslationKey): string {
+   return localeMessages[locale]?.[key] ?? englishMessages[key];
+ }
++
++/**
++ * The full set of keys every locale must translate to be considered
++ * "complete" -- every key MedSphere currently renders through this
++ * system, not just the navigation shell.
++ */
++const ALL_TRANSLATION_KEYS = Object.keys(englishMessages) as TranslationKey[];
++
++/**
++ * A locale is complete only if every currently-defined translation key
++ * has a real, non-English override (English itself is always complete
++ * by definition, since it is the source of truth every other locale is
++ * measured against). This is computed from the actual catalog, not a
++ * manually maintained flag, so it can never drift out of sync with the
++ * real translation content -- see i18n.test.ts's completeness-gating
++ * tests, which assert this directly against the live catalog rather
++ * than a hardcoded list of "known complete" locales.
++ */
++export function isLocaleComplete(locale: Locale): boolean {
++  if (locale === 'en') return true;
++  const overrides = localeMessages[locale];
++  if (!overrides) return false;
++  return ALL_TRANSLATION_KEYS.every((key) => typeof overrides[key] === 'string');
++}
++
++/**
++ * Locales safe to offer in any production language selector. A locale
++ * whose translation is not yet complete for the current critical key set
++ * is deliberately excluded here rather than shown with silent English
++ * fallback text mixed in -- see docs/i18n/v1-app-wide-language-system.md.
++ */
++export const enabledLocaleOptions = localeOptions.filter((option) => isLocaleComplete(option.code));
+diff --git a/apps/web/src/lib/session-profile.test.ts b/apps/web/src/lib/session-profile.test.ts
+index 58be121..028d17f 100644
+--- a/apps/web/src/lib/session-profile.test.ts
++++ b/apps/web/src/lib/session-profile.test.ts
+@@ -11,6 +11,7 @@ const profile: SessionProfile = {
+     email: 'admin@example.com',
+     firstName: 'Aisha',
+     lastName: 'Zahra',
++    preferredLanguage: 'en',
+   },
+   context: { membershipId: 'membership-id', tenantId: 'tenant-id' },
+ };
+diff --git a/apps/web/src/lib/settings-contract.ts b/apps/web/src/lib/settings-contract.ts
+index d0a6fa7..de23252 100644
+--- a/apps/web/src/lib/settings-contract.ts
++++ b/apps/web/src/lib/settings-contract.ts
+@@ -1,4 +1,9 @@
+-export const SUPPORTED_LANGUAGE_CODES = ['en', 'hi', 'ta', 'te', 'kn'] as const;
++// Kept in sync by hand with apps/auth-service/src/localization/dto/update-language.dto.ts's
++// ENABLED_UI_LANGUAGES and apps/web/src/lib/i18n.ts's enabledLocaleOptions
++// -- the set of locales whose app-wide UI translation is actually
++// complete. This is deliberately narrower than the full 23-code Eighth
++// Schedule catalog in lib/i18n.ts.
++export const SUPPORTED_LANGUAGE_CODES = ['en', 'ta', 'ur'] as const;
+ 
+ export type SupportedLanguageCode = (typeof SUPPORTED_LANGUAGE_CODES)[number];
+ 
+diff --git a/packages/i18n/package.json b/packages/i18n/package.json
+index 6d29bb0..d6b5752 100644
+--- a/packages/i18n/package.json
++++ b/packages/i18n/package.json
+@@ -7,7 +7,8 @@
+   "scripts": {
+     "build": "tsc",
+     "lint": "eslint \"src/**/*.ts\"",
+-    "clean": "rimraf dist tsconfig.tsbuildinfo"
++    "clean": "rimraf dist tsconfig.tsbuildinfo",
++    "test": "pnpm run build && node --test test/*.spec.mjs"
+   },
+   "devDependencies": {
+     "typescript": "^5.3.3"
+diff --git a/packages/i18n/src/i18n.service.ts b/packages/i18n/src/i18n.service.ts
+index 62c15ae..5919865 100644
+--- a/packages/i18n/src/i18n.service.ts
++++ b/packages/i18n/src/i18n.service.ts
+@@ -3,11 +3,12 @@ import hi from './locales/hi.json';
+ import ta from './locales/ta.json';
+ import te from './locales/te.json';
+ import kn from './locales/kn.json';
++import ur from './locales/ur.json';
+ import {
+   SupportedLanguage,
+   isLanguageSupported,
+   LANGUAGE_NAMES,
+-  SUPPORTED_LANGUAGES,
++  ENABLED_UI_LANGUAGES,
+ } from './language.enum';
+ 
+ type TranslationMap = Record<string, unknown>;
+@@ -18,6 +19,7 @@ const translations: Record<SupportedLanguage, TranslationMap> = {
+   [SupportedLanguage.TA]: ta as unknown as TranslationMap,
+   [SupportedLanguage.TE]: te as unknown as TranslationMap,
+   [SupportedLanguage.KN]: kn as unknown as TranslationMap,
++  [SupportedLanguage.UR]: ur as unknown as TranslationMap,
+ };
+ 
+ /**
+@@ -79,12 +81,15 @@ export class I18nService {
+   }
+ 
+   /**
+-   * Returns all supported languages with their display names.
++   * Returns languages safe to offer as a user's whole-app language
++   * preference -- restricted to ENABLED_UI_LANGUAGES (translation-complete
++   * on the frontend), not every SupportedLanguage this service can
++   * produce a backend-generated string fallback for.
+    */
+   getSupportedLanguages(): Array<{ code: string; name: string }> {
+-    return SUPPORTED_LANGUAGES.map((code: string) => ({
++    return ENABLED_UI_LANGUAGES.map((code) => ({
+       code,
+-      name: LANGUAGE_NAMES[code as SupportedLanguage] || code,
++      name: LANGUAGE_NAMES[code] || code,
+     }));
+   }
+ }
+diff --git a/packages/i18n/src/index.ts b/packages/i18n/src/index.ts
+index 745e93c..45b0000 100644
+--- a/packages/i18n/src/index.ts
++++ b/packages/i18n/src/index.ts
+@@ -2,6 +2,8 @@ export {
+   SupportedLanguage,
+   SUPPORTED_LANGUAGES,
+   LANGUAGE_NAMES,
++  ENABLED_UI_LANGUAGES,
+   isLanguageSupported,
++  isEnabledUiLanguage,
+ } from './language.enum';
+ export { I18nService, i18nService } from './i18n.service';
+diff --git a/packages/i18n/src/language.enum.ts b/packages/i18n/src/language.enum.ts
+index 4f9f8b8..80703ea 100644
+--- a/packages/i18n/src/language.enum.ts
++++ b/packages/i18n/src/language.enum.ts
+@@ -4,6 +4,7 @@ export enum SupportedLanguage {
+   TA = 'ta',
+   TE = 'te',
+   KN = 'kn',
++  UR = 'ur',
+ }
+ 
+ export const SUPPORTED_LANGUAGES: readonly SupportedLanguage[] = Object.values(SupportedLanguage);
+@@ -14,8 +15,28 @@ export const LANGUAGE_NAMES: Record<SupportedLanguage, string> = {
+   [SupportedLanguage.TA]: 'தமிழ் (Tamil)',
+   [SupportedLanguage.TE]: 'తెలుగు (Telugu)',
+   [SupportedLanguage.KN]: 'ಕನ್ನಡ (Kannada)',
++  [SupportedLanguage.UR]: 'اردو (Urdu)',
+ };
+ 
++/**
++ * Languages whose app-wide UI translation (apps/web/src/lib/i18n.ts) is
++ * actually complete -- see that file's isLocaleComplete/enabledLocaleOptions,
++ * the single source of truth this list is kept in sync with (see
++ * update-language.dto.spec.ts's cross-consistency test). A user's
++ * persisted whole-app language preference must never be set to a
++ * language broader "SupportedLanguage" recognizes for backend-generated
++ * strings but whose frontend UI translation is not yet complete.
++ */
++export const ENABLED_UI_LANGUAGES: readonly SupportedLanguage[] = [
++  SupportedLanguage.EN,
++  SupportedLanguage.TA,
++  SupportedLanguage.UR,
++];
++
+ export function isLanguageSupported(lang: string): lang is SupportedLanguage {
+   return SUPPORTED_LANGUAGES.includes(lang as SupportedLanguage);
+ }
++
++export function isEnabledUiLanguage(lang: string): lang is SupportedLanguage {
++  return ENABLED_UI_LANGUAGES.includes(lang as SupportedLanguage);
++}
+diff --git a/packages/i18n/src/locales/ur.json b/packages/i18n/src/locales/ur.json
+new file mode 100644
+index 0000000..0967ef4
+--- /dev/null
++++ b/packages/i18n/src/locales/ur.json
+@@ -0,0 +1 @@
++{}
+diff --git a/packages/i18n/test/language.enum.spec.mjs b/packages/i18n/test/language.enum.spec.mjs
+new file mode 100644
+index 0000000..363b8a5
+--- /dev/null
++++ b/packages/i18n/test/language.enum.spec.mjs
+@@ -0,0 +1,73 @@
++import assert from 'node:assert/strict';
++import test from 'node:test';
++import { createRequire } from 'node:module';
++
++const require = createRequire(import.meta.url);
++
++const {
++  SupportedLanguage,
++  SUPPORTED_LANGUAGES,
++  ENABLED_UI_LANGUAGES,
++  LANGUAGE_NAMES,
++  isLanguageSupported,
++  isEnabledUiLanguage,
++} = require('../dist/language.enum.js');
++const { I18nService } = require('../dist/i18n.service.js');
++
++test('ENABLED_UI_LANGUAGES matches exactly the frontend-complete locale set (en, ta, ur)', () => {
++  // Kept in sync by hand with apps/web/src/lib/i18n.ts's
++  // enabledLocaleOptions -- see that file's isLocaleComplete. A user's
++  // persisted whole-app language preference must never be settable to a
++  // language whose frontend UI translation is not yet complete.
++  assert.deepEqual(
++    [...ENABLED_UI_LANGUAGES].sort(),
++    [SupportedLanguage.EN, SupportedLanguage.TA, SupportedLanguage.UR].sort(),
++  );
++});
++
++test('ENABLED_UI_LANGUAGES is a subset of the full SupportedLanguage set', () => {
++  for (const code of ENABLED_UI_LANGUAGES) {
++    assert.ok(SUPPORTED_LANGUAGES.includes(code));
++  }
++});
++
++test('every enabled UI language has a display name', () => {
++  for (const code of ENABLED_UI_LANGUAGES) {
++    assert.ok(LANGUAGE_NAMES[code]);
++  }
++});
++
++test('isEnabledUiLanguage accepts only the enabled set', () => {
++  assert.equal(isEnabledUiLanguage('en'), true);
++  assert.equal(isEnabledUiLanguage('ta'), true);
++  assert.equal(isEnabledUiLanguage('ur'), true);
++  assert.equal(isEnabledUiLanguage('hi'), false);
++  assert.equal(isEnabledUiLanguage('te'), false);
++  assert.equal(isEnabledUiLanguage('kn'), false);
++  assert.equal(isEnabledUiLanguage('xx'), false);
++});
++
++test('isLanguageSupported still recognizes hi/te/kn for backend-generated strings', () => {
++  // Broader than isEnabledUiLanguage -- these remain valid for whatever
++  // backend-generated system messages already have real translations,
++  // even though they are not complete enough to be a whole-app UI
++  // preference (see update-language.dto.ts, which uses the narrower
++  // ENABLED_UI_LANGUAGES specifically).
++  assert.equal(isLanguageSupported('hi'), true);
++  assert.equal(isLanguageSupported('te'), true);
++  assert.equal(isLanguageSupported('kn'), true);
++});
++
++test('I18nService.getSupportedLanguages returns only the enabled UI set', () => {
++  const service = new I18nService();
++  const codes = service.getSupportedLanguages().map((l) => l.code);
++  assert.deepEqual([...codes].sort(), ['en', 'ta', 'ur'].sort());
++});
++
++test('I18nService.translate falls back to English for a language with no translation file content', () => {
++  const service = new I18nService();
++  assert.equal(
++    service.translate('auth.login.success', 'ur'),
++    service.translate('auth.login.success', 'en'),
++  );
++});
+-- 
+2.43.0
+
