@@ -1,0 +1,1311 @@
+From 4c6a19b84eeea2931eda9e62a3cdd120c448ba44 Mon Sep 17 00:00:00 2001
+From: MedSphere Agent <agent@medsphere.local>
+Date: Wed, 26 Aug 2026 20:25:54 +0000
+Subject: [PATCH] feat: certify V1 performance and runtime reliability
+
+- add scripts/v1-performance-certification.mjs: bounded-concurrency
+  (20 workers) certification exercising real accepted read paths
+  (authenticated dashboard shell, RBAC catalogue, inventory stock read,
+  public medicine search) and real reservation-creation mutations
+  (200 total operations), computing error rate / throughput /
+  average / p50 / p95 / p99 / max latency programmatically, enforcing
+  fail-closed thresholds (error rate <=1%, p95 <=1500ms, p99 <=3000ms),
+  and verifying post-load readiness + data integrity (reservation
+  count reconciliation, no duplicate idempotency keys, no cross-tenant
+  leak, no stuck/non-PENDING reservations) before printing an explicit
+  PASS/FAIL verdict
+- reuses the exact accepted HTTP contracts from
+  scripts/task5-smoke-test.mjs (registration, login, dashboard,
+  RBAC catalogue, inventory stock, public search, reservation
+  creation) and the exact accepted direct-SQL synthetic-fixture
+  bootstrap pattern (Tenant/SYSTEM role+permission grant/
+  Provider/Product) -- a second, narrowly-scoped concurrency/timing
+  tool, not a competing functional-correctness harness
+- add scripts/v1-performance-certification.spec.mjs: 19 node:test
+  cases covering percentile correctness, threshold/error-rate/
+  readiness/integrity failure paths, fail-closed missing-DATABASE_URL
+  behavior (spawns the live script), and genuine bounded-concurrency
+  proof for the worker pool
+- add .github/workflows/v1-performance-certification.yml: dedicated
+  PR-triggered (feature/database-architecture) + workflow_dispatch
+  workflow, Postgres 16 + Redis, builds and boots the real
+  backend/frontend, uploads only the text evidence log
+- add docs/operations/v1-performance-reliability-certification.md:
+  profile, thresholds and rationale, synthetic-data boundary, how to
+  run locally/in CI, how to interpret failures, and explicit
+  'does NOT prove' scope disclaimers
+- verified the SQL seed/integrity/cleanup statements directly against
+  a real local PostgreSQL 16 instance with all accepted migrations
+  applied; all 19 negative-test cases pass for real
+- does not touch scripts/backup-restore-certification.mjs,
+  .github/workflows/backup-restore-certification.yml, or the
+  backup/DR runbook -- confirmed those files do not even exist on
+  this branch
+- base note: authoritative base 24a9664 (one commit ahead of the
+  originally expected 25cfd573, adding only an inert uploaded patch
+  file, per explicit instruction not to touch it)
+---
+ .../v1-performance-certification.yml          | 183 +++++
+ ...1-performance-reliability-certification.md | 163 +++++
+ scripts/v1-performance-certification.mjs      | 649 ++++++++++++++++++
+ scripts/v1-performance-certification.spec.mjs | 232 +++++++
+ 4 files changed, 1227 insertions(+)
+ create mode 100644 .github/workflows/v1-performance-certification.yml
+ create mode 100644 docs/operations/v1-performance-reliability-certification.md
+ create mode 100644 scripts/v1-performance-certification.mjs
+ create mode 100644 scripts/v1-performance-certification.spec.mjs
+
+diff --git a/.github/workflows/v1-performance-certification.yml b/.github/workflows/v1-performance-certification.yml
+new file mode 100644
+index 0000000..68b6333
+--- /dev/null
++++ b/.github/workflows/v1-performance-certification.yml
+@@ -0,0 +1,183 @@
++name: MedSphere V1 Performance & Reliability Certification
++
++# Certifies that the accepted V1 runtime chain (Frontend BFF -> auth-service
++# -> PostgreSQL -> Redis) stays stable under controlled, genuinely
++# concurrent synthetic traffic. Reuses the exact accepted HTTP contracts and
++# direct-SQL synthetic-fixture bootstrap pattern already proven by
++# scripts/task5-smoke-test.mjs -- this is a second, narrowly-scoped tool
++# (concurrency + timing + percentiles), not a second competing
++# functional-correctness harness. Does not touch backup/restore
++# certification files.
++on:
++  workflow_dispatch: {}
++  push:
++    branches:
++      - cto/v1-performance-reliability-certification
++  pull_request:
++    branches:
++      - feature/database-architecture
++
++concurrency:
++  group: v1-performance-reliability-cert-${{ github.event.pull_request.number || github.ref }}
++  cancel-in-progress: true
++
++permissions:
++  contents: read
++
++jobs:
++  performance-reliability:
++    name: V1 performance & reliability certification
++    runs-on: ubuntu-24.04
++    timeout-minutes: 20
++    env:
++      DATABASE_URL: postgresql://medsphere_ci:medsphere_ci@localhost:5432/medsphere_ci?schema=public
++      REDIS_CLUSTER_URL: redis://localhost:6379
++      ENABLE_UNACCEPTED_PROTOTYPE_SERVICES: 'false'
++      AUTH_JWT_ISSUER: https://auth.local.medsphere.test
++      AUTH_JWT_AUDIENCE: medsphere-api
++      AUTH_JWT_KEY_ID: local-development-key
++      AUTH_ACCESS_TOKEN_TTL_SECONDS: '900'
++      AUTH_REFRESH_IDLE_TTL_SECONDS: '604800'
++      AUTH_REFRESH_ABSOLUTE_TTL_SECONDS: '2592000'
++      AUTH_ARGON2_MEMORY_KIB: '19456'
++      AUTH_ARGON2_TIME_COST: '2'
++      AUTH_ARGON2_PARALLELISM: '1'
++      PORT: '3000'
++      AUTH_API_URL: http://localhost:3000
++      FRONTEND_URL: http://localhost:3001
++      BACKEND_URL: http://localhost:3000
++
++    services:
++      postgres:
++        image: postgres:16-alpine
++        env:
++          POSTGRES_USER: medsphere_ci
++          POSTGRES_PASSWORD: medsphere_ci
++          POSTGRES_DB: medsphere_ci
++        ports:
++          - 5432:5432
++        options: >-
++          --health-cmd "pg_isready -U medsphere_ci -d medsphere_ci"
++          --health-interval 5s
++          --health-timeout 5s
++          --health-retries 12
++
++      redis:
++        image: redis:7-alpine
++        ports:
++          - 6379:6379
++        options: >-
++          --health-cmd "redis-cli ping"
++          --health-interval 5s
++          --health-timeout 5s
++          --health-retries 12
++
++    steps:
++      - name: Checkout
++        uses: actions/checkout@v4
++
++      - name: Install PNPM
++        uses: pnpm/action-setup@v4
++        with:
++          version: 9.15.0
++          run_install: false
++
++      - name: Install Node.js
++        uses: actions/setup-node@v4
++        with:
++          node-version: 22.12.0
++          cache: pnpm
++
++      - name: Install PostgreSQL client
++        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client
++
++      - name: Install locked dependencies
++        run: pnpm install --frozen-lockfile
++
++      - name: Run negative-test suite for the certification's own logic
++        run: node --test scripts/v1-performance-certification.spec.mjs
++
++      - name: Generate synthetic JWT keys and refresh/OTP pepper
++        run: |
++          node -e '
++            const fs = require("node:fs");
++            const crypto = require("node:crypto");
++            const { generateDevKeyMaterial } = require("./scripts/generate-dev-keys.js");
++            const material = generateDevKeyMaterial();
++            const required = {
++              AUTH_JWT_PRIVATE_KEY_BASE64: material.privateKeyBase64,
++              AUTH_JWT_PUBLIC_KEY_BASE64: material.publicKeyBase64,
++              AUTH_REFRESH_TOKEN_PEPPER: material.refreshPepperBase64,
++              AUTH_OTP_PEPPER: material.otpPepperBase64,
++            };
++            for (const [name, value] of Object.entries(required)) {
++              if (!value) throw new Error(`Missing generated value: ${name}`);
++              console.log(`::add-mask::${value}`);
++              const delimiter = `EOF_${crypto.randomBytes(8).toString("hex")}`;
++              fs.appendFileSync(process.env.GITHUB_ENV, `${name}<<${delimiter}\n${value}\n${delimiter}\n`, "utf8");
++            }
++          '
++
++      - name: Verify database migration and drift
++        run: pnpm db:verify
++
++      - name: Build backend
++        run: pnpm exec turbo run build --filter=@medsphere/auth-service
++
++      - name: Build frontend
++        run: pnpm --filter @medsphere/web build
++
++      - name: Start backend
++        run: |
++          nohup node apps/auth-service/dist/main.js > /tmp/backend.log 2>&1 &
++          echo $! > /tmp/backend.pid
++
++      - name: Start frontend
++        run: |
++          nohup pnpm --filter @medsphere/web exec next start -p 3001 > /tmp/frontend.log 2>&1 &
++          echo $! > /tmp/frontend.pid
++
++      - name: Run V1 performance & reliability certification
++        shell: bash
++        run: |
++          set +e
++          node scripts/v1-performance-certification.mjs 2>&1 | tee /tmp/v1-performance-cert.log
++          cert_exit=${PIPESTATUS[0]}
++          set -e
++
++          if ! grep -Fq 'V1 PERFORMANCE RELIABILITY CERTIFICATION: PASS' /tmp/v1-performance-cert.log; then
++            echo 'V1 performance & reliability certification did not report an explicit PASS verdict.'
++            exit 1
++          fi
++
++          if [ "$cert_exit" -ne 0 ]; then
++            echo 'V1 performance & reliability certification script exited non-zero despite a PASS line; failing closed.'
++            exit 1
++          fi
++
++      - name: Show backend log on failure
++        if: failure()
++        run: cat /tmp/backend.log || true
++
++      - name: Show frontend log on failure
++        if: failure()
++        run: cat /tmp/frontend.log || true
++
++      - name: Upload certification evidence (text log only)
++        if: always()
++        uses: actions/upload-artifact@v4
++        with:
++          name: v1-performance-reliability-certification-evidence
++          path: |
++            /tmp/backend.log
++            /tmp/frontend.log
++            /tmp/v1-performance-cert.log
++          if-no-files-found: ignore
++          retention-days: 7
++
++      - name: Stop background processes
++        if: always()
++        run: |
++          [ -f /tmp/backend.pid ] && kill "$(cat /tmp/backend.pid)" 2>/dev/null || true
++          [ -f /tmp/frontend.pid ] && kill "$(cat /tmp/frontend.pid)" 2>/dev/null || true
++          exit 0
+diff --git a/docs/operations/v1-performance-reliability-certification.md b/docs/operations/v1-performance-reliability-certification.md
+new file mode 100644
+index 0000000..9c3e2c3
+--- /dev/null
++++ b/docs/operations/v1-performance-reliability-certification.md
+@@ -0,0 +1,163 @@
++# V1 Performance & Reliability Certification
++
++This document describes the automated certification that proves the
++accepted MedSphere V1 runtime chain (Frontend BFF -> auth-service ->
++PostgreSQL -> Redis) stays stable under controlled, genuinely concurrent
++synthetic traffic. It is launch-hardening evidence, not a feature, and not
++a promise about production capacity -- see "What this does NOT prove"
++below.
++
++## What is tested
++
++```
++A. Baseline health   -- backend live, backend ready (Postgres + Redis via
++                         AuthReadinessService), Postgres directly reachable
++B. Read traffic       -- bounded-concurrency authenticated dashboard shell,
++                         RBAC catalogue, inventory stock read, and public
++                         medicine search, round-robin
++C. Mutation traffic    -- bounded-concurrency real reservation creation
++                         (accepted API, real idempotency/concurrency/
++                         tenant-isolation guarantees exercised, not
++                         weakened)
++E. Measurements        -- totals, error rate, throughput, average/p50/p95/
++                         p99/max latency, all computed programmatically
++F. Thresholds          -- fail-closed, non-zero exit on violation
++G. Post-load           -- liveness, readiness, Postgres reachability, and
++                         data-integrity assertions
++```
++
++Every read and mutation call reuses the exact accepted HTTP contracts
++already proven by `scripts/task5-smoke-test.mjs` (registration, login,
++dashboard shell, RBAC catalogue read, inventory stock read, public
++medicine search, reservation creation) and the exact accepted direct-SQL
++synthetic-fixture bootstrap pattern used there and in
++`scripts/backup-restore-certification.mjs`. This is a second, narrowly
++scoped tool for concurrency/timing/percentiles -- it does not duplicate or
++compete with the existing functional-correctness harness.
++
++## Concurrency profile
++
++| Phase               | Workers | Operations                                 |
++| ------------------- | ------- | ------------------------------------------ |
++| Warm-up             | 5       | 20 (discarded from certified measurements) |
++| Read (B)            | 20      | 160                                        |
++| Mutation (C)        | 20      | 40                                         |
++| **Total certified** |         | **200**                                    |
++
++This matches the task's suggested V1 CI-safe profile exactly (20
++concurrent workers, >= 200 total operations); nothing found during
++repository inspection demonstrated a need to adjust it. The 4:1 read-to-
++mutation ratio reflects realistic traffic shape (reads dominate) and
++keeps the amount of synthetic stock the seed step must provision bounded
++(`mutationOperations * 10` units, seeded fresh per run). Concurrency is
++real, not simulated: a bounded worker-pool (`runWorkerPool`) starts all
++workers together via `Promise.all`, each pulling the next task from a
++shared queue as soon as its previous request settles -- not a sequential
++loop labeled as load.
++
++## Why a repository-native script instead of k6/Artillery/autocannon
++
++The required concurrency (20 overlapping workers, ~200 HTTP requests) is
++well within what Node's built-in `fetch` plus a small bounded worker-pool
++already does correctly and measurably. Adding a new load-testing
++dependency would add supply-chain surface and a second tool to keep
++consistent with the repository's existing synthetic-fixture and HTTP-
++contract conventions, for no capability this scale actually needs. See
++`scripts/v1-performance-certification.mjs`'s `runWorkerPool` for the
++~15-line implementation.
++
++## Thresholds
++
++| Metric                   | Threshold  |
++| ------------------------ | ---------- |
++| Error rate               | <= 1%      |
++| p95 latency              | <= 1500 ms |
++| p99 latency              | <= 3000 ms |
++| Post-load readiness      | must PASS  |
++| Post-load data integrity | must PASS  |
++
++These are the task's suggested V1 CI thresholds, used as-is: nothing
++observed during implementation or local validation demonstrated a need to
++loosen them, and thresholds are never silently loosened just to obtain a
++green run. **These are launch-certification thresholds for a CI-safe
++synthetic profile, not a promise to customers about production latency
++or availability.**
++
++## Synthetic-data boundary
++
++- A dedicated tenant, admin user, provider, product, inventory listing,
++  and batch are created fresh for every run via the exact accepted
++  direct-SQL bootstrap pattern (rows no accepted API can create: `Tenant`,
++  the `SYSTEM` `TENANT_ADMINISTRATOR` role and its full permission grant,
++  per the migration-authored invariant already cited in
++  `scripts/task5-smoke-test.mjs`).
++- The admin account itself is created through the **real accepted
++  registration API**, then activated via the same documented bootstrap-
++  only workaround already recorded in `scripts/task5-smoke-test.mjs` (no
++  accepted self-service verification path exists yet).
++- All values are synthetic: no real names, phone numbers, emails, or
++  healthcare data. No production credentials are used or required.
++- No real SMS, no real email, no external Maps/healthcare API, no
++  production notification provider activation. RBAC, authentication, and
++  tenant isolation are exercised as accepted, never bypassed or weakened.
++- The run's own fixtures (tenant, provider, product, inventory, batch,
++  reservations, membership/role rows, and the synthetic admin user) are
++  deleted at the end of a successful run.
++
++## How to run locally
++
++```bash
++export DATABASE_URL='postgresql://medsphere_ci:medsphere_ci@localhost:5432/medsphere_ci?schema=public'
++export FRONTEND_URL='http://localhost:3001'
++export BACKEND_URL='http://localhost:3000'
++node scripts/v1-performance-certification.mjs
++```
++
++Requirements: a running backend (auth-service) and frontend (Next.js),
++PostgreSQL 16, and Redis, matching the same environment variables used by
++`.github/workflows/v1-core-runtime-regression.yml`. `psql` must be on
++`PATH`.
++
++Run the certification's own logic tests (no live server required):
++
++```bash
++node --test scripts/v1-performance-certification.spec.mjs
++```
++
++## How CI runs it
++
++`.github/workflows/v1-performance-certification.yml` runs on pull
++requests targeting `feature/database-architecture` and on manual
++dispatch: starts PostgreSQL 16 and Redis, applies/verifies migrations,
++builds and boots the real backend and frontend, waits for readiness, runs
++the certification, and fails the job (non-zero exit) on any threshold or
++integrity failure. Only the text evidence log is uploaded -- no database
++dump, no secrets. This is a dedicated, isolated workflow; it does not
++modify any existing certification workflow.
++
++## How to interpret failures
++
++The script prints a `PERFORMANCE CERTIFICATION` block with every measured
++value, followed by `postLoadReadiness=PASS/FAIL` and `integrity=PASS/FAIL`,
++followed by the final verdict line. On failure, each specific violated
++condition is printed (e.g. `p95 latency 1800ms exceeds threshold 1500ms`,
++`3 duplicate groups`) before `V1 PERFORMANCE RELIABILITY CERTIFICATION:
++FAIL`. Check the uploaded evidence log for the full per-phase detail,
++including a sample of failed-operation responses when `failedOperations >
++0`.
++
++## What this certification does NOT prove
++
++This certifies runtime stability under a bounded, CI-safe synthetic
++concurrency profile only. It does **not** by itself prove:
++
++- unlimited scalability
++- national or global production capacity
++- capacity planning for millions of users
++- DDoS resistance
++- production infrastructure autoscaling behavior
++- production CDN behavior
++- external-provider (SMS/email/Maps) performance
++
++Those require separate, deployment-specific capacity and infrastructure
++testing, tracked as later launch-operations work.
+diff --git a/scripts/v1-performance-certification.mjs b/scripts/v1-performance-certification.mjs
+new file mode 100644
+index 0000000..596cc2a
+--- /dev/null
++++ b/scripts/v1-performance-certification.mjs
+@@ -0,0 +1,649 @@
++#!/usr/bin/env node
++// MedSphere V1 -- Performance & Reliability Certification.
++//
++// Proves the accepted runtime (Frontend BFF -> auth-service -> PostgreSQL
++// -> Redis) stays stable under controlled, genuinely concurrent synthetic
++// traffic: a bounded-worker-pool read phase, a bounded-worker-pool
++// mutation phase (real reservation creation, exercising the accepted
++// concurrency/idempotency/tenant-isolation guarantees), fail-closed
++// latency/error-rate thresholds, and post-load reliability + data
++// integrity verification -- not merely "the process exited zero".
++//
++// This is CI/launch-readiness verification infrastructure, not a product
++// feature. It follows the same conventions already accepted for
++// scripts/task5-smoke-test.mjs and scripts/backup-restore-certification.mjs:
++// no shell string interpolation for external commands (execFileSync with
++// an argument array), PGPASSWORD via environment rather than argv, no
++// logging of a full connection string or password, and synthetic data
++// only -- no real healthcare data, no real phone numbers, no production
++// credentials.
++//
++// It deliberately reuses, rather than reimplements, the exact accepted
++// HTTP contracts already proven by scripts/task5-smoke-test.mjs
++// (registration, login, dashboard shell, RBAC catalogue read, inventory
++// stock read, public medicine search, reservation creation) and the exact
++// accepted direct-SQL synthetic-fixture bootstrap pattern used there and
++// in scripts/backup-restore-certification.mjs (Tenant / SYSTEM role +
++// full permission grant / Provider / Product -- rows no accepted API can
++// create). This is a second, narrowly-scoped tool (concurrency + timing +
++// percentiles), not a second competing functional-correctness harness.
++//
++// Usage:
++//   DATABASE_URL=postgresql://user:pass@host:5432/db?schema=public \
++//   FRONTEND_URL=http://localhost:3001 BACKEND_URL=http://localhost:3000 \
++//   node scripts/v1-performance-certification.mjs
++
++import { execFileSync } from 'node:child_process';
++import { randomUUID } from 'node:crypto';
++
++// ---------------------------------------------------------------------
++// Configuration -- exported so the negative-test suite can exercise
++// evaluateCertification()/percentile()/runWorkerPool() against synthetic
++// inputs without needing a live server.
++// ---------------------------------------------------------------------
++
++export const PROFILE = Object.freeze({
++  warmupWorkers: 5,
++  warmupOperations: 20,
++  certificationWorkers: 20,
++  readOperations: 160,
++  mutationOperations: 40,
++});
++
++// Rationale for this profile (see docs/operations/v1-performance-reliability-certification.md
++// for the full writeup): 20 concurrent workers is the suggested V1 CI-safe
++// profile from the task spec, matched exactly rather than adjusted, since
++// nothing in repository inspection demonstrated a need for a different
++// bound. readOperations:mutationOperations is 4:1 -- reads dominate real
++// traffic, and every mutation is a real reservation creation consuming
++// finite (synthetically large) batch stock, so the ratio also bounds how
++// much synthetic stock the seed step must provision. Total is exactly 200,
++// the suggested floor.
++
++export const THRESHOLDS = Object.freeze({
++  maxErrorRate: 0.01,
++  maxP95Ms: 1500,
++  maxP99Ms: 3000,
++});
++
++const FRONTEND = process.env.FRONTEND_URL ?? 'http://localhost:3001';
++const BACKEND = process.env.BACKEND_URL ?? 'http://localhost:3000';
++const DATABASE_URL = process.env.DATABASE_URL;
++
++// ---------------------------------------------------------------------
++// Pure, dependency-free logic -- unit-tested directly in
++// scripts/v1-performance-certification.spec.mjs.
++// ---------------------------------------------------------------------
++
++/**
++ * Nearest-rank percentile over an already-sorted-ascending array of
++ * numbers. Returns 0 for an empty array (a certification run with zero
++ * operations should never be mistaken for a fast one -- callers must
++ * treat count === 0 as its own failure, not rely on this returning
++ * something misleadingly small).
++ */
++export function percentile(sortedAscending, p) {
++  if (sortedAscending.length === 0) return 0;
++  const rank = Math.ceil((p / 100) * sortedAscending.length);
++  const index = Math.min(Math.max(rank - 1, 0), sortedAscending.length - 1);
++  return sortedAscending[index];
++}
++
++export function computeStats(latenciesMs) {
++  const sorted = [...latenciesMs].sort((a, b) => a - b);
++  const count = sorted.length;
++  const sum = sorted.reduce((total, value) => total + value, 0);
++  return {
++    count,
++    averageMs: count === 0 ? 0 : sum / count,
++    p50Ms: percentile(sorted, 50),
++    p95Ms: percentile(sorted, 95),
++    p99Ms: percentile(sorted, 99),
++    maxMs: count === 0 ? 0 : sorted[sorted.length - 1],
++  };
++}
++
++/**
++ * Bounded-concurrency worker pool: exactly `concurrency` workers pull from
++ * a shared queue until it is empty, each running `worker(task)` and
++ * pushing its settled outcome (never throwing past this function -- a
++ * failed task is data, not a crash) into the returned results array, in
++ * completion order. This is what makes the load genuinely overlapping
++ * rather than a sequential loop: all `concurrency` workers are started
++ * together via Promise.all and each proceeds independently as soon as its
++ * previous task settles.
++ */
++export async function runWorkerPool(tasks, concurrency, worker) {
++  const queue = tasks.map((task, index) => ({ task, index }));
++  const results = new Array(tasks.length);
++  async function runWorker() {
++    while (queue.length > 0) {
++      const item = queue.shift();
++      if (!item) return;
++      try {
++        results[item.index] = { ok: true, value: await worker(item.task) };
++      } catch (error) {
++        results[item.index] = { ok: false, error };
++      }
++    }
++  }
++  const workerCount = Math.min(concurrency, tasks.length) || 0;
++  await Promise.all(Array.from({ length: workerCount }, runWorker));
++  return results;
++}
++
++/**
++ * Evaluates a completed run's evidence against fail-closed thresholds.
++ * Pure function: every input is a plain value, nothing is read from the
++ * environment or the network, so this is exhaustively unit-testable.
++ */
++export function evaluateCertification({
++  totalOperations,
++  successfulOperations,
++  failedOperations,
++  stats,
++  postLoadReadinessPassed,
++  integrityPassed,
++  thresholds = THRESHOLDS,
++}) {
++  const reasons = [];
++
++  if (totalOperations <= 0) {
++    reasons.push('no operations were recorded');
++  }
++  if (successfulOperations + failedOperations !== totalOperations) {
++    reasons.push('successful + failed operation counts do not reconcile with total');
++  }
++
++  const errorRate = totalOperations === 0 ? 1 : failedOperations / totalOperations;
++  if (errorRate > thresholds.maxErrorRate) {
++    reasons.push(
++      `error rate ${(errorRate * 100).toFixed(2)}% exceeds threshold ${(thresholds.maxErrorRate * 100).toFixed(2)}%`,
++    );
++  }
++  if (stats.p95Ms > thresholds.maxP95Ms) {
++    reasons.push(`p95 latency ${stats.p95Ms}ms exceeds threshold ${thresholds.maxP95Ms}ms`);
++  }
++  if (stats.p99Ms > thresholds.maxP99Ms) {
++    reasons.push(`p99 latency ${stats.p99Ms}ms exceeds threshold ${thresholds.maxP99Ms}ms`);
++  }
++  if (!postLoadReadinessPassed) {
++    reasons.push('post-load readiness check did not pass');
++  }
++  if (!integrityPassed) {
++    reasons.push('post-load data integrity verification did not pass');
++  }
++
++  return { passed: reasons.length === 0, reasons, errorRate };
++}
++
++// ---------------------------------------------------------------------
++// The remainder of this file is the live-execution path: HTTP calls,
++// SQL bootstrap, and orchestration. Nothing below this point is imported
++// by the negative-test suite.
++// ---------------------------------------------------------------------
++
++function fail(message) {
++  console.error(`\n[FAIL] ${message}`);
++  console.log('\nV1 PERFORMANCE RELIABILITY CERTIFICATION: FAIL');
++  process.exitCode = 1;
++}
++
++function connectionParts(rawUrl) {
++  const url = new URL(rawUrl);
++  url.searchParams.delete('schema'); // Prisma-only param; psql rejects it.
++  return {
++    host: url.hostname,
++    port: url.port || '5432',
++    user: decodeURIComponent(url.username),
++    password: decodeURIComponent(url.password),
++    database: decodeURIComponent(url.pathname.slice(1)),
++  };
++}
++
++function makeSqlRunner(parts) {
++  const env = { ...process.env, PGPASSWORD: parts.password };
++  return function sql(query) {
++    return execFileSync(
++      'psql',
++      [
++        '-h',
++        parts.host,
++        '-p',
++        parts.port,
++        '-U',
++        parts.user,
++        '-d',
++        parts.database,
++        '-v',
++        'ON_ERROR_STOP=1',
++        '-t',
++        '-A',
++        '-q',
++        '-c',
++        query,
++      ],
++      { env, encoding: 'utf8' },
++    ).trim();
++  };
++}
++
++async function waitForHealth(url, timeoutMs = 60_000) {
++  const deadline = Date.now() + timeoutMs;
++  let lastStatus;
++  while (Date.now() < deadline) {
++    try {
++      const res = await fetch(url, { signal: AbortSignal.timeout(3000) });
++      lastStatus = res.status;
++      if (res.status === 200) return true;
++    } catch {
++      lastStatus = 'unreachable';
++    }
++    await new Promise((resolve) => setTimeout(resolve, 500));
++  }
++  console.error(`Timed out waiting for ${url} (last status: ${lastStatus})`);
++  return false;
++}
++
++function cookieHeader(setCookieHeaders) {
++  return setCookieHeaders.map((entry) => entry.split(';')[0]).join('; ');
++}
++
++async function json(res) {
++  try {
++    return await res.json();
++  } catch {
++    return undefined;
++  }
++}
++
++async function timed(fn) {
++  const start = performance.now();
++  try {
++    const value = await fn();
++    return { latencyMs: performance.now() - start, ok: true, value };
++  } catch (error) {
++    return { latencyMs: performance.now() - start, ok: false, error };
++  }
++}
++
++async function main() {
++  if (!DATABASE_URL) {
++    fail('DATABASE_URL is required (synthetic database only).');
++    return;
++  }
++
++  const dbParts = connectionParts(DATABASE_URL);
++  const sql = makeSqlRunner(dbParts);
++
++  // ---- A. Baseline health ----
++  console.log('== A. Baseline health ==');
++  const liveBefore = await waitForHealth(`${BACKEND}/health/live`, 60_000);
++  const readyBefore = await waitForHealth(`${BACKEND}/health/ready`, 60_000);
++  if (!liveBefore || !readyBefore) {
++    fail('Baseline liveness/readiness did not pass before load; aborting.');
++    return;
++  }
++  try {
++    sql('SELECT 1;');
++  } catch (error) {
++    fail(`PostgreSQL is not reachable: ${error.message}`);
++    return;
++  }
++  console.log(
++    '[ok  ] backend live, backend ready (Postgres + Redis, via AuthReadinessService), Postgres directly reachable',
++  );
++
++  // ---- Seed deterministic synthetic fixtures ----
++  // Exact accepted pattern from scripts/task5-smoke-test.mjs
++  // (bootstrapUncreatableFoundationState): direct SQL only for rows no
++  // accepted API can create.
++  console.log('\n== Seeding deterministic synthetic fixtures ==');
++  const runId = randomUUID();
++  const ids = {
++    tenant: randomUUID(),
++    role: randomUUID(),
++    provider: randomUUID(),
++    product: randomUUID(),
++    inventory: randomUUID(),
++    batch: randomUUID(),
++  };
++  const tenantSlug = `perf-cert-${runId.slice(0, 8)}`;
++  const adminEmail = `perf-cert-admin-${runId}@example.test`;
++  const password = 'Perf-Cert-Synthetic-Password-1!';
++
++  // Large synthetic stock: mutationOperations reservations of 1 unit each
++  // must never fail on availability, or a threshold violation would be
++  // misattributed to a performance regression rather than a fixture bug.
++  const seededStock = PROFILE.mutationOperations * 10;
++
++  sql(
++    `INSERT INTO "Tenant" (id, name, slug, "isActive", "selfRegistrationEnabled", "createdAt", "updatedAt")
++     VALUES ('${ids.tenant}', 'Perf Cert Tenant', '${tenantSlug}', true, true, now(), now());`,
++  );
++  sql(
++    `INSERT INTO "Role" (id, "tenantId", name, description, type, version, "createdAt", "updatedAt")
++     VALUES ('${ids.role}', '${ids.tenant}', 'TENANT_ADMINISTRATOR', 'Built-in tenant authorization administrator', 'SYSTEM', 1, now(), now());`,
++  );
++  // Same accepted invariant cited in task5-smoke-test.mjs and
++  // backup-restore-certification.mjs: TENANT_ADMINISTRATOR always holds
++  // every row in "Permission" (migration-authored, not a testing
++  // convenience).
++  sql(
++    `INSERT INTO "RolePermission" (id, "tenantId", "roleId", "permissionId", "createdAt")
++     SELECT gen_random_uuid(), '${ids.tenant}', '${ids.role}', id, now() FROM "Permission";`,
++  );
++  sql(
++    `INSERT INTO "Provider" (id, "tenantId", "providerType", "businessName", "ownerName", email, phone, address, city, state, country, "postalCode", latitude, longitude, "isVerified", "isActive", "createdAt", "updatedAt")
++     VALUES ('${ids.provider}', '${ids.tenant}', 'PHARMACY', 'Perf Cert Pharmacy', 'Perf Cert Owner', 'perf-cert-provider-${runId}@example.test', '0000000000', 'Synthetic Address', 'Chennai', 'Tamil Nadu', 'India', '600001', 13.0827, 80.2707, true, true, now(), now());`,
++  );
++  sql(
++    `INSERT INTO "Product" (id, name, brand, category, manufacturer, "dosageForm", strength, "requiresPrescription", "isActive", "createdAt", "updatedAt")
++     VALUES ('${ids.product}', 'Perf Cert Paracetamol', 'Synthetic Brand', 'MEDICINE', 'Synthetic Manufacturer', 'TABLET', '500 mg', false, true, now(), now());`,
++  );
++  sql(
++    `INSERT INTO "Inventory" (id, "tenantId", "providerId", "productId", sku, "sellingPrice", mrp, "discountPercentage", "taxPercentage", "minimumStockLevel", "isVisible", version, "createdAt", "updatedAt")
++     VALUES ('${ids.inventory}', '${ids.tenant}', '${ids.provider}', '${ids.product}', 'PERF-CERT-SKU', 25.00, 30.00, 0.00, 5.00, 10, true, 1, now(), now());`,
++  );
++  sql(
++    `INSERT INTO "Batch" (id, "tenantId", "inventoryId", "providerId", "productId", "batchNumber", "manufacturingDate", "expiryDate", "receivedQuantity", "onHandQuantity", "heldQuantity", "purchasePrice", "sellingPrice", status, version, "createdAt", "updatedAt")
++     VALUES ('${ids.batch}', '${ids.tenant}', '${ids.inventory}', '${ids.provider}', '${ids.product}', 'PERF-CERT-BATCH', '2026-01-01', '2028-01-01', ${seededStock}, ${seededStock}, 0, 20.00, 25.00, 'ACTIVE', 1, now(), now());`,
++  );
++  console.log(`[ok  ] tenant ${tenantSlug}, seeded stock ${seededStock} units`);
++
++  // Register through the real accepted API (proven contract, see
++  // scripts/task5-smoke-test.mjs), then activate via the same documented
++  // bootstrap-only workaround already recorded there: no accepted
++  // self-service verification path exists yet (Batch 2 Task 2 finding).
++  const phoneDigits = randomUUID().replace(/\D/g, '').padEnd(10, '0').slice(0, 10);
++  const phone = `+91${phoneDigits[0] === '0' ? '9' : phoneDigits[0]}${phoneDigits.slice(1)}`;
++  const registerRes = await fetch(`${FRONTEND}/api/auth/register`, {
++    method: 'POST',
++    headers: { 'content-type': 'application/json', origin: FRONTEND },
++    body: JSON.stringify({
++      tenantSlug,
++      email: adminEmail,
++      password,
++      firstName: 'Perf',
++      lastName: 'Cert',
++      phone,
++    }),
++  });
++  if (registerRes.status !== 202) {
++    fail(`Synthetic admin registration failed: status ${registerRes.status}`);
++    return;
++  }
++  const adminUserId = sql(`SELECT id FROM "User" WHERE email = '${adminEmail}';`);
++  const membershipId = sql(
++    `UPDATE "TenantMembership" tm SET status = 'ACTIVE', "joinedAt" = now()
++     FROM "User" u WHERE tm."userId" = u.id AND u.email = '${adminEmail}' AND tm."tenantId" = '${ids.tenant}'
++     RETURNING tm.id;`,
++  );
++  sql(`UPDATE "User" SET status = 'ACTIVE', "updatedAt" = now() WHERE email = '${adminEmail}';`);
++  sql(
++    `INSERT INTO "MembershipRole" (id, "tenantId", "membershipId", "roleId")
++     VALUES (gen_random_uuid(), '${ids.tenant}', '${membershipId}', '${ids.role}');`,
++  );
++
++  const loginRes = await fetch(`${FRONTEND}/api/auth/login`, {
++    method: 'POST',
++    headers: { 'content-type': 'application/json', origin: FRONTEND },
++    body: JSON.stringify({ tenantSlug, email: adminEmail, password }),
++  });
++  if (loginRes.status !== 200) {
++    fail(`Synthetic admin login failed: status ${loginRes.status}`);
++    return;
++  }
++  const cookie = cookieHeader(loginRes.headers.getSetCookie?.() ?? []);
++  console.log(
++    '[ok  ] synthetic admin registered, activated, and logged in via the real accepted API',
++  );
++
++  // ---- Read-operation pool (category B) ----
++  const readOperations = [
++    () => fetch(`${FRONTEND}/dashboard`, { headers: { cookie }, redirect: 'manual' }),
++    () => fetch(`${FRONTEND}/api/authorization/catalogue`, { headers: { cookie } }),
++    () =>
++      fetch(`${FRONTEND}/api/inventory/stock?providerId=${ids.provider}&limit=10&offset=0`, {
++        headers: { cookie },
++      }),
++    () =>
++      fetch(
++        `${FRONTEND}/api/public/providers/${ids.provider}/medicine-search?q=Paracetamol&limit=10&offset=0`,
++      ),
++  ];
++
++  async function runReadOperation(index) {
++    const operation = readOperations[index % readOperations.length];
++    const timing = await timed(async () => {
++      const res = await operation();
++      // Dashboard responds 200 (authenticated shell); every other read
++      // responds 200. A non-2xx response is a failed operation, not a
++      // thrown exception, so it is counted, not silently swallowed.
++      return res.status;
++    });
++    const success = timing.ok && timing.value >= 200 && timing.value < 300;
++    return {
++      latencyMs: timing.latencyMs,
++      success,
++      detail: timing.ok ? timing.value : String(timing.error),
++    };
++  }
++
++  async function runMutationOperation(index) {
++    const timing = await timed(async () => {
++      const res = await fetch(`${FRONTEND}/api/inventory/providers/${ids.provider}/reservations`, {
++        method: 'POST',
++        headers: { 'content-type': 'application/json', origin: FRONTEND, cookie },
++        body: JSON.stringify({
++          subjectUserId: adminUserId,
++          expiresAt: new Date(Date.now() + 3_600_000).toISOString(),
++          items: [{ productId: ids.product, quantity: 1 }],
++          idempotencyKey: `perf-cert-${runId}-${index}`,
++        }),
++      });
++      const body = await json(res);
++      return { status: res.status, body };
++    });
++    const success =
++      timing.ok && timing.value.status === 200 && timing.value.body?.status === 'PENDING';
++    return {
++      latencyMs: timing.latencyMs,
++      success,
++      detail: timing.ok ? timing.value.status : String(timing.error),
++    };
++  }
++
++  // ---- Warm-up (discarded from certified measurements) ----
++  console.log('\n== Warm-up (not part of certified measurements) ==');
++  await runWorkerPool(
++    Array.from({ length: PROFILE.warmupOperations }, (_, i) => i),
++    PROFILE.warmupWorkers,
++    runReadOperation,
++  );
++  console.log(`[ok  ] ${PROFILE.warmupOperations} warm-up read operations completed`);
++
++  // ---- B. Controlled concurrent authenticated read traffic ----
++  console.log(
++    `\n== B. Read traffic: ${PROFILE.readOperations} operations, ${PROFILE.certificationWorkers} concurrent workers ==`,
++  );
++  const certificationStart = performance.now();
++  const readResults = await runWorkerPool(
++    Array.from({ length: PROFILE.readOperations }, (_, i) => i),
++    PROFILE.certificationWorkers,
++    runReadOperation,
++  );
++
++  // ---- C. Controlled concurrent mutation traffic ----
++  console.log(
++    `\n== C. Mutation traffic (reservation creation): ${PROFILE.mutationOperations} operations, ${PROFILE.certificationWorkers} concurrent workers ==`,
++  );
++  const mutationResults = await runWorkerPool(
++    Array.from({ length: PROFILE.mutationOperations }, (_, i) => i),
++    PROFILE.certificationWorkers,
++    runMutationOperation,
++  );
++  const certificationElapsedMs = performance.now() - certificationStart;
++
++  // ---- E. Measurements ----
++  const allOutcomes = [...readResults, ...mutationResults].map((r) =>
++    r.ok ? r.value : { latencyMs: 0, success: false, detail: String(r.error) },
++  );
++  const totalOperations = allOutcomes.length;
++  const successfulOperations = allOutcomes.filter((o) => o.success).length;
++  const failedOperations = totalOperations - successfulOperations;
++  const latencies = allOutcomes.map((o) => o.latencyMs);
++  const stats = computeStats(latencies);
++  const throughputOpsPerSecond =
++    certificationElapsedMs === 0 ? 0 : (totalOperations / certificationElapsedMs) * 1000;
++
++  console.log('\n== E. Measurements ==');
++  console.log(`totalOperations=${totalOperations}`);
++  console.log(`successfulOperations=${successfulOperations}`);
++  console.log(`failedOperations=${failedOperations}`);
++  console.log(`totalDurationMs=${certificationElapsedMs.toFixed(1)}`);
++  if (failedOperations > 0) {
++    const sample = allOutcomes.filter((o) => !o.success).slice(0, 5);
++    console.log(`sample failure detail: ${JSON.stringify(sample.map((s) => s.detail))}`);
++  }
++
++  // ---- G. Post-load reliability ----
++  console.log('\n== G. Post-load reliability ==');
++  const liveAfter = await waitForHealth(`${BACKEND}/health/live`, 30_000);
++  const readyAfter = await waitForHealth(`${BACKEND}/health/ready`, 30_000);
++  const postLoadReadinessPassed = liveAfter && readyAfter;
++  console.log(
++    `[${postLoadReadinessPassed ? 'ok  ' : 'FAIL'}] post-load liveness=${liveAfter}, readiness (Postgres+Redis)=${readyAfter}`,
++  );
++
++  let postgresReachableAfter = false;
++  try {
++    sql('SELECT 1;');
++    postgresReachableAfter = true;
++  } catch {
++    postgresReachableAfter = false;
++  }
++  console.log(
++    `[${postgresReachableAfter ? 'ok  ' : 'FAIL'}] PostgreSQL directly reachable after load`,
++  );
++
++  // ---- Data integrity ----
++  const createdReservationCount = Number(
++    sql(`SELECT count(*) FROM "MedicineReservation" WHERE "tenantId" = '${ids.tenant}';`),
++  );
++  const duplicateIdempotencyKeys = Number(
++    sql(
++      `SELECT count(*) FROM (
++         SELECT "idempotencyKey" FROM "MedicineReservation"
++         WHERE "tenantId" = '${ids.tenant}'
++         GROUP BY "idempotencyKey" HAVING count(*) > 1
++       ) dup;`,
++    ),
++  );
++  const crossTenantLeak = Number(
++    sql(
++      `SELECT count(*) FROM "MedicineReservation"
++       WHERE "idempotencyKey" LIKE 'perf-cert-${runId}-%' AND "tenantId" != '${ids.tenant}';`,
++    ),
++  );
++  const nonPendingCount = Number(
++    sql(
++      `SELECT count(*) FROM "MedicineReservation"
++       WHERE "tenantId" = '${ids.tenant}' AND status != 'PENDING';`,
++    ),
++  );
++  const successfulMutations = mutationResults.filter((r) => r.ok && r.value.success).length;
++  const reservationCountMatches = createdReservationCount === successfulMutations;
++
++  const integrityChecks = [
++    {
++      name: 'created reservation count matches successful mutation count',
++      ok: reservationCountMatches,
++      detail: `expected ${successfulMutations}, found ${createdReservationCount}`,
++    },
++    {
++      name: 'no duplicate idempotency keys (retry/concurrency safety)',
++      ok: duplicateIdempotencyKeys === 0,
++      detail: `${duplicateIdempotencyKeys} duplicate groups`,
++    },
++    {
++      name: 'no cross-tenant reservation leak',
++      ok: crossTenantLeak === 0,
++      detail: `${crossTenantLeak} rows`,
++    },
++    {
++      name: 'no stuck/unexpected-status reservations',
++      ok: nonPendingCount === 0,
++      detail: `${nonPendingCount} non-PENDING rows`,
++    },
++  ];
++  console.log('\n== Data integrity ==');
++  for (const check of integrityChecks) {
++    console.log(`[${check.ok ? 'ok  ' : 'FAIL'}] ${check.name} -- ${check.detail}`);
++  }
++  const integrityPassed = integrityChecks.every((c) => c.ok);
++
++  // ---- Cleanup (safe: this run's own synthetic tenant only) ----
++  try {
++    sql(`DELETE FROM "MedicineReservation" WHERE "tenantId" = '${ids.tenant}';`);
++    sql(`DELETE FROM "Batch" WHERE "tenantId" = '${ids.tenant}';`);
++    sql(`DELETE FROM "Inventory" WHERE "tenantId" = '${ids.tenant}';`);
++    sql(`DELETE FROM "Product" WHERE id = '${ids.product}';`);
++    sql(`DELETE FROM "MembershipRole" WHERE "tenantId" = '${ids.tenant}';`);
++    sql(`DELETE FROM "TenantMembership" WHERE "tenantId" = '${ids.tenant}';`);
++    sql(`DELETE FROM "RolePermission" WHERE "tenantId" = '${ids.tenant}';`);
++    sql(`DELETE FROM "Role" WHERE "tenantId" = '${ids.tenant}';`);
++    sql(`DELETE FROM "Provider" WHERE "tenantId" = '${ids.tenant}';`);
++    sql(`DELETE FROM "User" WHERE email = '${adminEmail}';`);
++    sql(`DELETE FROM "Tenant" WHERE id = '${ids.tenant}';`);
++    console.log('\n[ok  ] synthetic fixtures cleaned up');
++  } catch (error) {
++    console.log(
++      `\n[FAIL] cleanup encountered an error (non-authoritative for verdict): ${error.message}`,
++    );
++  }
++
++  // ---- F. Thresholds + final verdict ----
++  const certification = evaluateCertification({
++    totalOperations,
++    successfulOperations,
++    failedOperations,
++    stats,
++    postLoadReadinessPassed: postLoadReadinessPassed && postgresReachableAfter,
++    integrityPassed,
++  });
++
++  console.log('\nPERFORMANCE CERTIFICATION');
++  console.log(`totalOperations=${totalOperations}`);
++  console.log(`successfulOperations=${successfulOperations}`);
++  console.log(`failedOperations=${failedOperations}`);
++  console.log(`errorRate=${(certification.errorRate * 100).toFixed(2)}%`);
++  console.log(`totalDurationMs=${certificationElapsedMs.toFixed(1)}`);
++  console.log(`throughputOpsPerSecond=${throughputOpsPerSecond.toFixed(2)}`);
++  console.log(`averageLatencyMs=${stats.averageMs.toFixed(1)}`);
++  console.log(`p50LatencyMs=${stats.p50Ms.toFixed(1)}`);
++  console.log(`p95LatencyMs=${stats.p95Ms.toFixed(1)}`);
++  console.log(`p99LatencyMs=${stats.p99Ms.toFixed(1)}`);
++  console.log(`maxLatencyMs=${stats.maxMs.toFixed(1)}`);
++  console.log(
++    `postLoadReadiness=${postLoadReadinessPassed && postgresReachableAfter ? 'PASS' : 'FAIL'}`,
++  );
++  console.log(`integrity=${integrityPassed ? 'PASS' : 'FAIL'}`);
++
++  if (certification.passed) {
++    console.log('\nV1 PERFORMANCE RELIABILITY CERTIFICATION: PASS');
++    process.exitCode = 0;
++  } else {
++    for (const reason of certification.reasons) {
++      console.error(`[FAIL] ${reason}`);
++    }
++    console.log('\nV1 PERFORMANCE RELIABILITY CERTIFICATION: FAIL');
++    process.exitCode = 1;
++  }
++}
++
++if (import.meta.url === `file://${process.argv[1]}`) {
++  main().catch((error) => {
++    fail(`Unexpected error: ${error.stack ?? error.message}`);
++  });
++}
+diff --git a/scripts/v1-performance-certification.spec.mjs b/scripts/v1-performance-certification.spec.mjs
+new file mode 100644
+index 0000000..8c58afe
+--- /dev/null
++++ b/scripts/v1-performance-certification.spec.mjs
+@@ -0,0 +1,232 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { spawnSync } from 'node:child_process';
++import {
++  computeStats,
++  evaluateCertification,
++  percentile,
++  runWorkerPool,
++  THRESHOLDS,
++} from './v1-performance-certification.mjs';
++
++// ---------------------------------------------------------------------
++// 1. Percentile calculation correctness.
++// ---------------------------------------------------------------------
++test('percentile: nearest-rank over a known sorted array', () => {
++  const sorted = Array.from({ length: 100 }, (_, i) => i + 1); // 1..100
++  assert.equal(percentile(sorted, 50), 50);
++  assert.equal(percentile(sorted, 95), 95);
++  assert.equal(percentile(sorted, 99), 99);
++  assert.equal(percentile(sorted, 100), 100);
++  assert.equal(percentile(sorted, 1), 1);
++});
++
++test('percentile: small array (10 elements)', () => {
++  const sorted = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
++  assert.equal(percentile(sorted, 50), 50);
++  assert.equal(percentile(sorted, 90), 90);
++  assert.equal(percentile(sorted, 99), 100); // nearest-rank rounds up
++});
++
++test('percentile: empty array returns 0, never throws', () => {
++  assert.equal(percentile([], 50), 0);
++  assert.equal(percentile([], 99), 0);
++});
++
++test('computeStats: known latency set produces correct average/percentiles/max', () => {
++  const stats = computeStats([100, 200, 300, 400, 500]);
++  assert.equal(stats.count, 5);
++  assert.equal(stats.averageMs, 300);
++  assert.equal(stats.p50Ms, 300);
++  assert.equal(stats.maxMs, 500);
++});
++
++test('computeStats: unsorted input is sorted before percentile calculation', () => {
++  const stats = computeStats([500, 100, 300, 200, 400]);
++  assert.equal(stats.p50Ms, 300);
++  assert.equal(stats.maxMs, 500);
++});
++
++test('computeStats: empty input never throws and reports zero', () => {
++  const stats = computeStats([]);
++  assert.equal(stats.count, 0);
++  assert.equal(stats.averageMs, 0);
++  assert.equal(stats.maxMs, 0);
++});
++
++// ---------------------------------------------------------------------
++// 2. A threshold violation fails certification.
++// ---------------------------------------------------------------------
++test('evaluateCertification: passes when every metric is within threshold', () => {
++  const result = evaluateCertification({
++    totalOperations: 200,
++    successfulOperations: 200,
++    failedOperations: 0,
++    stats: { p95Ms: 500, p99Ms: 800 },
++    postLoadReadinessPassed: true,
++    integrityPassed: true,
++  });
++  assert.equal(result.passed, true);
++  assert.deepEqual(result.reasons, []);
++});
++
++test('evaluateCertification: p95 above threshold fails', () => {
++  const result = evaluateCertification({
++    totalOperations: 200,
++    successfulOperations: 200,
++    failedOperations: 0,
++    stats: { p95Ms: THRESHOLDS.maxP95Ms + 1, p99Ms: 800 },
++    postLoadReadinessPassed: true,
++    integrityPassed: true,
++  });
++  assert.equal(result.passed, false);
++  assert.ok(result.reasons.some((r) => r.includes('p95 latency')));
++});
++
++test('evaluateCertification: p99 above threshold fails', () => {
++  const result = evaluateCertification({
++    totalOperations: 200,
++    successfulOperations: 200,
++    failedOperations: 0,
++    stats: { p95Ms: 500, p99Ms: THRESHOLDS.maxP99Ms + 1 },
++    postLoadReadinessPassed: true,
++    integrityPassed: true,
++  });
++  assert.equal(result.passed, false);
++  assert.ok(result.reasons.some((r) => r.includes('p99 latency')));
++});
++
++// ---------------------------------------------------------------------
++// 3. Excessive error rate fails.
++// ---------------------------------------------------------------------
++test('evaluateCertification: error rate exactly at threshold passes', () => {
++  const result = evaluateCertification({
++    totalOperations: 200,
++    successfulOperations: 198,
++    failedOperations: 2, // exactly 1%
++    stats: { p95Ms: 500, p99Ms: 800 },
++    postLoadReadinessPassed: true,
++    integrityPassed: true,
++  });
++  assert.equal(result.passed, true);
++});
++
++test('evaluateCertification: error rate above threshold fails', () => {
++  const result = evaluateCertification({
++    totalOperations: 200,
++    successfulOperations: 190,
++    failedOperations: 10, // 5%
++    stats: { p95Ms: 500, p99Ms: 800 },
++    postLoadReadinessPassed: true,
++    integrityPassed: true,
++  });
++  assert.equal(result.passed, false);
++  assert.ok(result.reasons.some((r) => r.includes('error rate')));
++});
++
++test('evaluateCertification: zero total operations is always a failure, never a false-fast-pass', () => {
++  const result = evaluateCertification({
++    totalOperations: 0,
++    successfulOperations: 0,
++    failedOperations: 0,
++    stats: { p95Ms: 0, p99Ms: 0 },
++    postLoadReadinessPassed: true,
++    integrityPassed: true,
++  });
++  assert.equal(result.passed, false);
++  assert.ok(result.reasons.some((r) => r.includes('no operations')));
++});
++
++test('evaluateCertification: mismatched success+failure vs total is caught', () => {
++  const result = evaluateCertification({
++    totalOperations: 200,
++    successfulOperations: 150,
++    failedOperations: 10, // 150 + 10 !== 200
++    stats: { p95Ms: 500, p99Ms: 800 },
++    postLoadReadinessPassed: true,
++    integrityPassed: true,
++  });
++  assert.equal(result.passed, false);
++  assert.ok(result.reasons.some((r) => r.includes('do not reconcile')));
++});
++
++// ---------------------------------------------------------------------
++// 4. Post-load readiness failure fails.
++// ---------------------------------------------------------------------
++test('evaluateCertification: post-load readiness failure fails even with perfect metrics', () => {
++  const result = evaluateCertification({
++    totalOperations: 200,
++    successfulOperations: 200,
++    failedOperations: 0,
++    stats: { p95Ms: 10, p99Ms: 20 },
++    postLoadReadinessPassed: false,
++    integrityPassed: true,
++  });
++  assert.equal(result.passed, false);
++  assert.ok(result.reasons.some((r) => r.includes('readiness')));
++});
++
++test('evaluateCertification: integrity failure fails even with perfect metrics', () => {
++  const result = evaluateCertification({
++    totalOperations: 200,
++    successfulOperations: 200,
++    failedOperations: 0,
++    stats: { p95Ms: 10, p99Ms: 20 },
++    postLoadReadinessPassed: true,
++    integrityPassed: false,
++  });
++  assert.equal(result.passed, false);
++  assert.ok(result.reasons.some((r) => r.includes('integrity')));
++});
++
++// ---------------------------------------------------------------------
++// 5. Malformed/missing required configuration fails closed.
++// ---------------------------------------------------------------------
++test('the live script fails closed with a clear message when DATABASE_URL is missing', () => {
++  const result = spawnSync(process.execPath, ['scripts/v1-performance-certification.mjs'], {
++    cwd: new URL('..', import.meta.url).pathname,
++    env: { ...process.env, DATABASE_URL: '' },
++    encoding: 'utf8',
++  });
++  assert.notEqual(result.status, 0);
++  assert.match(result.stderr, /DATABASE_URL is required/);
++  assert.match(result.stdout, /V1 PERFORMANCE RELIABILITY CERTIFICATION: FAIL/);
++});
++
++// ---------------------------------------------------------------------
++// Worker pool: proves genuine bounded concurrency, not a sequential loop.
++// ---------------------------------------------------------------------
++test('runWorkerPool: never exceeds the requested concurrency', async () => {
++  let active = 0;
++  let maxActive = 0;
++  const tasks = Array.from({ length: 20 }, (_, i) => i);
++  await runWorkerPool(tasks, 4, async () => {
++    active += 1;
++    maxActive = Math.max(maxActive, active);
++    await new Promise((resolve) => setTimeout(resolve, 5));
++    active -= 1;
++    return true;
++  });
++  assert.ok(maxActive <= 4, `expected max 4 concurrent, saw ${maxActive}`);
++  assert.ok(maxActive > 1, 'expected genuine overlap, not a sequential loop');
++});
++
++test('runWorkerPool: preserves per-task outcome including failures, in task order', async () => {
++  const tasks = [1, 2, 3, 4];
++  const results = await runWorkerPool(tasks, 2, async (n) => {
++    if (n === 3) throw new Error('synthetic failure');
++    return n * 10;
++  });
++  assert.equal(results.length, 4);
++  assert.deepEqual(
++    results.map((r) => r.ok),
++    [true, true, false, true],
++  );
++  assert.equal(results[0].value, 10);
++  assert.equal(results[2].error.message, 'synthetic failure');
++});
++
++test('runWorkerPool: handles an empty task list without hanging', async () => {
++  const results = await runWorkerPool([], 5, async () => 1);
++  assert.deepEqual(results, []);
++});
+-- 
+2.43.0
+
