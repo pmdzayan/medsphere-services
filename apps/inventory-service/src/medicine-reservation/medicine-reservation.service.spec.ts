@@ -200,7 +200,12 @@ describe('MedicineReservationService', () => {
     harness.transaction.medicineReservationItem.create.mockResolvedValue({ id: 'item-1' });
     harness.transaction.batch.updateMany.mockResolvedValue({ count: 0 });
 
-    await expect(harness.service.create(command)).rejects.toBeInstanceOf(SerializableRetryError);
+    const creation = expect(harness.service.create(command)).rejects.toBeInstanceOf(
+      SerializableRetryError,
+    );
+    await jest.runAllTimersAsync();
+    await creation;
+
     expect(harness.transaction.medicineReservationAllocation.create).not.toHaveBeenCalled();
     expect(harness.audit.appendTenantUser).not.toHaveBeenCalled();
   });
