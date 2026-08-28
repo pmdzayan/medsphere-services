@@ -21,6 +21,8 @@ export const AUDIT_EVENT_TYPES = [
   'authentication.otp.requested',
   'authentication.organization.join.requested',
   'authentication.organization.join.code.rejected',
+  'authentication.organization.join.code.issued',
+  'authentication.organization.join.code.revoked',
   'inventory.listing.configured',
   'inventory.batch.received',
   'inventory.stock.adjusted',
