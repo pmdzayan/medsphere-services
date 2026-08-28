@@ -111,6 +111,26 @@ Pharmacy profiles, licenses, staff, catalog operations, reservations, dispensing
 
 Hospital profiles, departments, branches, staff, beds, appointments, calendars, and dashboards.
 
+## Milestone 5A — Blood Bank and Live Blood Availability
+
+**Status:** Planned for V1; not implemented.
+
+**Purpose:** Build a clinically controlled hospital-to-blood-bank network for near-real-time blood-component availability. The feature is primarily B2B: an authorized hospital or clinician records a real blood requirement, MedSphere discovers verified provider availability, and authorized blood-bank staff control any hold, allocation, or release.
+
+**Primary users:** Hospital/clinical staff create and track blood requirements; blood-bank staff maintain inventory and respond to requests; doctors may initiate or confirm the clinical need under accepted policy. Patients/families receive only restricted discovery or emergency-assistance access and cannot directly reserve, allocate, select, or release a blood unit. Donor workflows are outside this V1 boundary.
+
+**Scope:** Verified blood-bank profiles; blood-component inventory; ABO/Rh classification; unit/bag identifiers inside the provider boundary; collection and expiry timestamps; auditable lifecycle states; clinically triggered blood-requirement records; hospital-to-blood-bank requests; near-real-time aggregate availability with freshness timestamps; authorized location-aware search; atomic provider-side holds; bounded emergency escalation; low-stock and urgent-request events; hospital and blood-bank dashboards; tenant isolation; RBAC; durable audit; concurrency and idempotency protections.
+
+**Reference flow:** Documented patient need → authorized hospital/doctor creates or confirms requirement → MedSphere searches verified aggregate availability → hospital sends request → blood bank confirms and may create an atomic hold → crossmatch/compatibility testing and final unit selection remain in the clinical/blood-bank workflow → authorized blood-bank release and lifecycle evidence are recorded.
+
+**Clinical/privacy boundary:** Public or patient-facing views expose safe aggregate availability and provider information only. Donor identity and sensitive unit-level clinical data are not exposed. A displayed availability count is not a guarantee of suitability for a specific patient. MedSphere does not determine transfusion compatibility or clinical release from ABO/Rh alone; crossmatch, compatibility testing, final unit selection, and transfusion authorization remain blood-bank/clinical responsibilities.
+
+**Dependencies:** Core inventory safety; compliance prerequisites; verified-provider authority; shared search/live-availability infrastructure; event delivery; notification platform; hospital/blood-bank frontend integration; restricted patient discovery/emergency assistance; production verification.
+
+**Completion gate:** Accepted schema and migrations; tenant-safe authorization; verified-provider authority; immutable inventory evidence; audit coverage; concurrency/idempotency tests; API contracts; real PostgreSQL integration evidence; hospital/blood-bank workflows; restricted patient-facing behavior; exact-head CI; security/privacy review; CTO acceptance.
+
+Detailed scope: [V1 Blood Bank and Live Blood Availability Scope](docs/sprints/V1-blood-bank-live-availability-scope.md).
+
 ## Milestone 6 — Doctor
 
 Registration, verification, profile, schedule, leave, appointments, prescriptions, medical notes, and dashboard.
@@ -125,11 +145,11 @@ Patient profile, consent-aware medical history, prescriptions, reports, reservat
 
 ## Milestone 9 — Platform Services
 
-Notification engine, analytics, exports/reporting, administrative controls, feature flags, and system settings. Each service is split into focused sprints rather than combined implementation tasks.
+Shared event delivery, notification engine, search/live-availability infrastructure, analytics, exports/reporting, administrative controls, feature flags, and system settings. Each service is split into focused sprints rather than combined implementation tasks.
 
 ## Milestone 10 — Frontend
 
-Authentication, responsive dashboards and workflows for accepted backend modules, accessibility, dark mode, and contract-tested API integration.
+Authentication, responsive dashboards and workflows for accepted backend modules, accessibility, dark mode, and contract-tested API integration. Blood availability frontend scope prioritizes hospital and blood-bank staff workflows. Patient-facing behavior, if enabled by policy, is limited to safe aggregate facility discovery, emergency assistance, and non-sensitive request status; patients do not directly reserve individual blood units.
 
 ## Milestone 11 — Verification and Production Release
 
@@ -139,7 +159,7 @@ Unit, integration, API, E2E, security, performance, and load testing; Docker; CI
 
 AI Pharmacist, Doctor Assistant, Laboratory Assistant, Hospital Assistant, Inventory Assistant, and AI Analytics.
 
-AI work requires accepted data governance, model-risk controls, prompt standards, evaluation, auditability, human approval rules, privacy controls, and rollback/disable mechanisms. AI may not independently diagnose, prescribe, or approve high-impact clinical actions.
+AI work requires accepted data governance, model-risk controls, prompt standards, evaluation, auditability, human approval rules, privacy controls, and rollback/disable mechanisms. AI may not independently diagnose, prescribe, approve high-impact clinical actions, or select blood products for transfusion.
 
 ## Milestone 13 — Global Governance & Regional Administration
 
@@ -181,6 +201,7 @@ Ordered scope:
 ## Future integrations
 
 - India: ABHA, ABDM, UHI, Health Facility Registry, Healthcare Professional Registry
+- Blood networks: national/state blood-network integrations require separate discovery, legal/compliance review, contracts, and operational authority
 - Global readiness: multi-country tenancy, configurable policy/retention, GDPR-aligned privacy controls, and HIPAA-aligned safeguards where applicable
 
 Every integration requires its own discovery, legal/compliance review, ADRs, threat model, and acceptance criteria. Roadmap placement is not a compliance claim.
