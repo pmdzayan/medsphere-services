@@ -1,0 +1,2376 @@
+From e5e4e82357317def9d2ed2c8757f5fa8748d61d5 Mon Sep 17 00:00:00 2001
+From: MedSphere Agent <agent@medsphere.local>
+Date: Fri, 28 Aug 2026 15:04:34 +0000
+Subject: [PATCH] feat: privacy, consent & device permission controls (Task
+ 0013)
+
+Neither Task 0010 nor Task 0012 is merged into this base; this change
+is fully self-contained and depends on neither.
+
+## Core gap found and fixed
+
+The existing nearby-medicine-search feature already had genuinely
+privacy-safe geolocation handling: location was only requested on an
+explicit "Find near me" click (never automatic), and coordinates were
+already used transiently and never persisted. But it went straight
+from that click to the browser's native permission prompt, with no
+app-controlled explanation first -- this task's central, explicit
+requirement. Fixed by inserting a mandatory explanation step, without
+rebuilding the underlying search feature.
+
+## New reusable primitives
+
+- lib/geolocation-permission.ts: SSR-safe hook. Distinguishes
+  "unsupported" (no Geolocation API) from "unknown" (Permissions API
+  itself unsupported, e.g. Safari) from "prompt"/"granted"/"denied".
+  Never calls the browser API on mount. requestLocation() resolves a
+  full, distinct outcome taxonomy (granted/denied/unavailable/timeout/
+  unsupported) rather than conflating denial with unavailability.
+- lib/notification-permission.ts: same SSR-safe pattern for
+  Notification.permission/requestPermission.
+- components/permission-explanation-dialog.tsx: the reusable app-
+  controlled explanation shown before any browser permission prompt.
+  Never hides the decline option, never makes Continue visually
+  deceptive, never auto-dismisses.
+
+## Nearby search integration (not rebuilt)
+
+public-medicine-search.tsx: "Find near me" now opens the explanation
+dialog; only its own "Use my location" click proceeds to
+requestLocation(). Updated the three existing tests that assumed the
+old immediate-prompt behavior (a legitimate behavioral fix, not a
+weakening -- verified each still asserts the same underlying
+guarantees) and added two new tests proving the browser API is never
+called before the explanation, and never called at all if declined.
+
+## Consent model (new)
+
+ConsentRecord (Prisma model + migration): append-only, enforced by a
+database trigger mirroring the existing StockMovement immutability
+convention exactly -- a withdrawal is always a NEW row with status
+WITHDRAWN, never an update/delete of the historical GRANTED row. The
+user's current effective consent for a category is always the single
+latest row for that (userId, category) pair; there is deliberately no
+separate "current state" table to drift out of sync with this log.
+Categories: LOCATION_USE, NOTIFICATIONS_RESERVATIONS,
+NOTIFICATIONS_OPERATIONAL.
+
+Migration cross-checked programmatically in both directions: the
+ConsentRecord schema fields exactly match the migration's CREATE TABLE
+columns, and the full audit-event type list in the migration's updated
+CHECK constraint exactly matches packages/database/src/audit.ts's
+TypeScript allowlist.
+
+New consent module (apps/auth-service/src/consent/): repository
+(append-only writes; latest-per-category reads), service (records
+GRANTED/WITHDRAWN events, audits each via the existing AuditWriter --
+metadata contains only the bounded category name, never the source
+string, never coordinates, never notification content), controller
+(GET/POST /users/me/consent, self-scoped via @CurrentIdentity() with
+no PermissionsGuard, matching the existing me/privacy convention
+exactly -- this is the caller's own preference data, not an action on
+another identity). Wired into AppModule.
+
+## App preference vs browser permission (kept distinct throughout)
+
+UserPrivacy gains two new MedSphere-preference fields
+(wantsReservationNotifications, wantsOperationalAlerts) -- these are
+never conflated with browser Notification.permission state anywhere:
+the new DevicePermissionsSection always reads and displays browser
+capability state separately from these preference toggles, and a
+granted app preference never implies the browser permission was
+granted (verified by test).
+
+## Settings UI
+
+- Two new preference toggles added to the existing, already-accessible
+  privacy toggle list (reused, not rebuilt).
+- New DevicePermissionsSection: shows browser-reported location/
+  notification permission state as read-only badges (StatusBadge,
+  reused), with a contextual "Enable notifications" action gated behind
+  the same explanation-dialog pattern used for location, and consent
+  grant/withdraw controls. A permanently denied permission shows only
+  "enable it from your browser/site settings" guidance -- never a fake
+  button that cannot work.
+
+## Validation
+
+- TypeScript: frontend tsc --noEmit clean (one confirmed pre-existing,
+  unrelated error in api-client.test.ts -- verified via git diff that
+  this file was never touched in this task, so it predates this work).
+  Backend clean except the same pre-existing, sandbox-wide
+  @medsphere/database resolution cascade seen throughout this whole
+  project (confirmed by checking every error in changed files
+  individually).
+- ESLint: 0 errors across every changed/new file, both apps.
+- Prettier: clean across every changed/new file.
+- Frontend tests: 339/339 passing across all 51 test files (genuinely
+  executed), including 8 new geolocation-hook tests (which caught and
+  fixed two real bugs during authoring: a test-setup flaw with
+  Object.defineProperty and a real hook/mount-effect race condition),
+  6 new notification-hook tests, 7 new DevicePermissionsSection tests,
+  2 new nearby-search dialog tests, and fixes to 3 pre-existing test
+  files whose privacy-preference fixtures needed the two new required
+  fields (settings-workspace, settings-contract, and the privacy BFF
+  route tests -- all confirmed passing again after the fix).
+- Backend tests: 4 new ConsentService tests written, matching this
+  codebase's established mocked-constructor style; type-checked clean
+  but could not execute -- confirmed via direct reproduction that
+  "@prisma/client did not initialize yet" at import time is the same
+  pre-existing sandbox-wide limitation seen on every task this session,
+  not something this change caused.
+- Production web build: succeeds cleanly end-to-end (next build),
+  confirming the new hooks and /api/settings/consent route are SSR-safe
+  and correctly registered -- no browser-only global is ever accessed
+  unsafely during server rendering.
+- Prisma validate: could not run -- this sandbox's network egress
+  blocks the query-engine binary fetch (403), the same constraint seen
+  throughout this whole project.
+- git diff --check: clean.
+
+## Known limitations / explicitly incomplete
+
+- New user-facing copy (dialog text, permission-state labels) is
+  currently hardcoded English, not yet routed through the existing i18n
+  key system -- localization integration is a real remaining gap.
+- No dedicated accessibility audit beyond the dialog's basic
+  role="dialog"/aria-modal/aria-labelledby/aria-describedby attributes
+  and the reused, already-accessible StatusBadge/toggle components --
+  a full keyboard-navigation and screen-reader pass was not performed.
+- No PostgreSQL-integration test for the consent flow exists (the
+  ConsentService unit tests are mocked; a real DB-backed test would hit
+  the same sandbox Prisma limitation as every other DB-touching test
+  this session).
+- Healthcare-employee privacy boundaries (organization admins seeing
+  only minimal required staff info) were not investigated or changed
+  in this pass -- genuinely incomplete, not merely deferred by choice.
+- Does not touch 0004-0012 or any other parked/other-lane patch --
+  confirmed via git status.
+---
+ apps/auth-service/src/app.module.ts           |   2 +
+ .../src/consent/consent-category.ts           |  44 +++++
+ .../src/consent/consent.controller.ts         |  53 +++++
+ .../src/consent/consent.module.ts             |  14 ++
+ .../src/consent/consent.repository.ts         |  48 +++++
+ .../src/consent/consent.service.spec.ts       | 162 +++++++++++++++
+ .../src/consent/consent.service.ts            |  66 +++++++
+ .../src/consent/dto/consent.dto.ts            |  38 ++++
+ .../auth-service/src/users/dto/privacy.dto.ts |  22 +++
+ .../src/users/privacy.repository.ts           |   2 +
+ apps/auth-service/src/users/users.service.ts  |   4 +
+ .../web/src/app/api/settings/consent/route.ts | 109 ++++++++++
+ .../app/api/settings/privacy/route.test.ts    |   2 +
+ .../permission-explanation-dialog.tsx         |  69 +++++++
+ .../public-medicine-search.test.tsx           |  51 +++++
+ .../public-search/public-medicine-search.tsx  | 101 ++++++----
+ .../device-permissions-section.test.tsx       | 154 +++++++++++++++
+ .../settings/device-permissions-section.tsx   | 186 ++++++++++++++++++
+ .../settings/settings-workspace.test.tsx      |   2 +
+ .../features/settings/settings-workspace.tsx  |  16 ++
+ apps/web/src/lib/api-client.ts                |  15 ++
+ .../src/lib/geolocation-permission.test.ts    | 166 ++++++++++++++++
+ apps/web/src/lib/geolocation-permission.ts    | 108 ++++++++++
+ .../src/lib/notification-permission.test.ts   |  93 +++++++++
+ apps/web/src/lib/notification-permission.ts   |  47 +++++
+ apps/web/src/lib/settings-contract.test.ts    |   2 +
+ apps/web/src/lib/settings-contract.ts         |  59 ++++++
+ .../migration.sql                             |  76 +++++++
+ packages/database/prisma/schema.prisma        |  56 ++++++
+ packages/database/src/audit.ts                |   6 +
+ 30 files changed, 1730 insertions(+), 43 deletions(-)
+ create mode 100644 apps/auth-service/src/consent/consent-category.ts
+ create mode 100644 apps/auth-service/src/consent/consent.controller.ts
+ create mode 100644 apps/auth-service/src/consent/consent.module.ts
+ create mode 100644 apps/auth-service/src/consent/consent.repository.ts
+ create mode 100644 apps/auth-service/src/consent/consent.service.spec.ts
+ create mode 100644 apps/auth-service/src/consent/consent.service.ts
+ create mode 100644 apps/auth-service/src/consent/dto/consent.dto.ts
+ create mode 100644 apps/web/src/app/api/settings/consent/route.ts
+ create mode 100644 apps/web/src/components/permission-explanation-dialog.tsx
+ create mode 100644 apps/web/src/features/settings/device-permissions-section.test.tsx
+ create mode 100644 apps/web/src/features/settings/device-permissions-section.tsx
+ create mode 100644 apps/web/src/lib/geolocation-permission.test.ts
+ create mode 100644 apps/web/src/lib/geolocation-permission.ts
+ create mode 100644 apps/web/src/lib/notification-permission.test.ts
+ create mode 100644 apps/web/src/lib/notification-permission.ts
+ create mode 100644 packages/database/prisma/migrations/20260828150000_privacy_consent_and_notification_preferences/migration.sql
+
+diff --git a/apps/auth-service/src/app.module.ts b/apps/auth-service/src/app.module.ts
+index 2248d66..bf8bba1 100644
+--- a/apps/auth-service/src/app.module.ts
++++ b/apps/auth-service/src/app.module.ts
+@@ -13,6 +13,7 @@ import { AuditModule } from './audit/audit.module';
+ import { InventoryModule } from './inventory/inventory.module';
+ import { NotificationModule } from './notifications/notification.module';
+ import { VerificationModule } from './verification/verification.module';
++import { ConsentModule } from './consent/consent.module';
+ import { AuthReadinessService } from './health/auth-readiness.service';
+ 
+ @Module({
+@@ -34,6 +35,7 @@ import { AuthReadinessService } from './health/auth-readiness.service';
+     InventoryModule,
+     NotificationModule,
+     VerificationModule,
++    ConsentModule,
+     MetricsModule,
+   ],
+   providers: [
+diff --git a/apps/auth-service/src/consent/consent-category.ts b/apps/auth-service/src/consent/consent-category.ts
+new file mode 100644
+index 0000000..e66b99d
+--- /dev/null
++++ b/apps/auth-service/src/consent/consent-category.ts
+@@ -0,0 +1,44 @@
++/**
++ * Bounded consent categories (Task 0013). Mirrors the Prisma
++ * ConsentCategory enum exactly, as a plain constant so DTO validation
++ * and the frontend do not need the generated Prisma client to reference
++ * these values -- same rationale as Task 0010/0012's hand-mirrored
++ * enums in this codebase.
++ */
++export const CONSENT_CATEGORIES = [
++  'LOCATION_USE',
++  'NOTIFICATIONS_RESERVATIONS',
++  'NOTIFICATIONS_OPERATIONAL',
++] as const;
++
++export type ConsentCategory = (typeof CONSENT_CATEGORIES)[number];
++
++export function isConsentCategory(value: string): value is ConsentCategory {
++  return (CONSENT_CATEGORIES as readonly string[]).includes(value);
++}
++
++export const CONSENT_STATUSES = ['GRANTED', 'WITHDRAWN'] as const;
++export type ConsentStatus = (typeof CONSENT_STATUSES)[number];
++
++export function isConsentStatus(value: string): value is ConsentStatus {
++  return (CONSENT_STATUSES as readonly string[]).includes(value);
++}
++
++/** Bounded, non-identifying source tags a consent event may be recorded from. */
++export const CONSENT_SOURCES = [
++  'settings_privacy_page',
++  'nearby_search_prompt',
++  'notification_prompt',
++] as const;
++export type ConsentSource = (typeof CONSENT_SOURCES)[number];
++
++export function isConsentSource(value: string): value is ConsentSource {
++  return (CONSENT_SOURCES as readonly string[]).includes(value);
++}
++
++/** Current disclosure-text version per category -- bump when a category's explanation copy materially changes. */
++export const CONSENT_CATEGORY_VERSION: Record<ConsentCategory, number> = {
++  LOCATION_USE: 1,
++  NOTIFICATIONS_RESERVATIONS: 1,
++  NOTIFICATIONS_OPERATIONAL: 1,
++};
+diff --git a/apps/auth-service/src/consent/consent.controller.ts b/apps/auth-service/src/consent/consent.controller.ts
+new file mode 100644
+index 0000000..760c091
+--- /dev/null
++++ b/apps/auth-service/src/consent/consent.controller.ts
+@@ -0,0 +1,53 @@
++import { Body, Controller, Get, Header, Post } from '@nestjs/common';
++import {
++  ApiBearerAuth,
++  ApiOkResponse,
++  ApiOperation,
++  ApiTags,
++  ApiUnauthorizedResponse,
++} from '@nestjs/swagger';
++import { CurrentIdentity } from '../common/decorators/current-identity.decorator';
++import { AuthenticatedIdentity } from '../auth/auth.types';
++import { ConsentService } from './consent.service';
++import {
++  ConsentStatusDto,
++  ConsentStatusListResponseDto,
++  RecordConsentDto,
++} from './dto/consent.dto';
++
++/**
++ * Task 0013: self-scoped consent endpoints, matching the existing
++ * users.controller.ts me/privacy convention exactly -- resolved
++ * entirely from the authenticated identity, never a client-supplied
++ * target user/tenant. No PermissionsGuard is applied here for the same
++ * reason it is not applied to me/privacy or me/language: this is the
++ * caller's own preference data, not an action on another identity, so
++ * there is no separate authorization decision to make beyond "is this
++ * a real, authenticated session" (already enforced upstream).
++ */
++@Controller('users/me/consent')
++@ApiTags('Current User')
++@ApiBearerAuth()
++@ApiUnauthorizedResponse({ description: 'Authentication required' })
++export class ConsentController {
++  constructor(private readonly consentService: ConsentService) {}
++
++  @Get()
++  @Header('cache-control', 'no-store')
++  @ApiOperation({ summary: 'Read the authenticated user current consent status per category' })
++  @ApiOkResponse({ type: ConsentStatusListResponseDto })
++  async getConsent(
++    @CurrentIdentity() identity: AuthenticatedIdentity,
++  ): Promise<ConsentStatusListResponseDto> {
++    const data = await this.consentService.getConsentStatus(identity.userId);
++    return { data };
++  }
++
++  @Post()
++  @Header('cache-control', 'no-store')
++  @ApiOperation({ summary: 'Record a new consent grant or withdrawal event (append-only)' })
++  @ApiOkResponse({ type: ConsentStatusDto })
++  recordConsent(@CurrentIdentity() identity: AuthenticatedIdentity, @Body() dto: RecordConsentDto) {
++    return this.consentService.recordConsent(identity, dto.category, dto.status, dto.source);
++  }
++}
+diff --git a/apps/auth-service/src/consent/consent.module.ts b/apps/auth-service/src/consent/consent.module.ts
+new file mode 100644
+index 0000000..7ab93f5
+--- /dev/null
++++ b/apps/auth-service/src/consent/consent.module.ts
+@@ -0,0 +1,14 @@
++import { Module } from '@nestjs/common';
++import { PrismaModule } from '../prisma/prisma.module';
++import { AuditPersistenceModule } from '../audit/audit-persistence.module';
++import { ConsentRepository } from './consent.repository';
++import { ConsentService } from './consent.service';
++import { ConsentController } from './consent.controller';
++
++@Module({
++  imports: [PrismaModule, AuditPersistenceModule],
++  controllers: [ConsentController],
++  providers: [ConsentRepository, ConsentService],
++  exports: [ConsentService],
++})
++export class ConsentModule {}
+diff --git a/apps/auth-service/src/consent/consent.repository.ts b/apps/auth-service/src/consent/consent.repository.ts
+new file mode 100644
+index 0000000..61f38a4
+--- /dev/null
++++ b/apps/auth-service/src/consent/consent.repository.ts
+@@ -0,0 +1,48 @@
++import { randomUUID } from 'node:crypto';
++import { Injectable } from '@nestjs/common';
++import { PrismaService } from '../prisma/prisma.service';
++import { CONSENT_CATEGORY_VERSION, ConsentCategory } from './consent-category';
++
++@Injectable()
++export class ConsentRepository {
++  constructor(private readonly prisma: PrismaService) {}
++
++  /**
++   * Always INSERTs a new row -- a ConsentRecord is append-only (also
++   * enforced at the database level by a trigger). A withdrawal is
++   * recorded the same way, as a new row with status WITHDRAWN; the
++   * prior GRANTED row is never touched.
++   */
++  async append(
++    userId: string,
++    category: ConsentCategory,
++    status: 'GRANTED' | 'WITHDRAWN',
++    source: string,
++  ) {
++    return this.prisma.client.consentRecord.create({
++      data: {
++        id: randomUUID(),
++        userId,
++        category,
++        status,
++        version: CONSENT_CATEGORY_VERSION[category],
++        source,
++      },
++    });
++  }
++
++  /** The single latest row per category for this user -- the current effective consent state. */
++  async findLatestPerCategory(userId: string) {
++    const records = await this.prisma.client.consentRecord.findMany({
++      where: { userId },
++      orderBy: { createdAt: 'desc' },
++    });
++    const latestByCategory = new Map<string, (typeof records)[number]>();
++    for (const record of records) {
++      if (!latestByCategory.has(record.category)) {
++        latestByCategory.set(record.category, record);
++      }
++    }
++    return latestByCategory;
++  }
++}
+diff --git a/apps/auth-service/src/consent/consent.service.spec.ts b/apps/auth-service/src/consent/consent.service.spec.ts
+new file mode 100644
+index 0000000..586945a
+--- /dev/null
++++ b/apps/auth-service/src/consent/consent.service.spec.ts
+@@ -0,0 +1,162 @@
++import { ConsentService } from './consent.service';
++
++const identity = {
++  userId: 'user-1',
++  tenantId: 'tenant-1',
++  membershipId: 'membership-1',
++  sessionId: 'session-1',
++  tokenId: 'token-1',
++};
++
++function buildService() {
++  const consentRepository = {
++    append: jest.fn(),
++    findLatestPerCategory: jest.fn(),
++  };
++  const audit = {
++    appendTenantUser: jest.fn().mockResolvedValue(undefined),
++  };
++  const prisma = { client: {} };
++
++  const service = new ConsentService(consentRepository as never, audit as never, prisma as never);
++
++  return { service, consentRepository, audit };
++}
++
++describe('ConsentService.recordConsent', () => {
++  it('always appends a new row rather than mutating a prior one -- never a database update call', async () => {
++    const { service, consentRepository } = buildService();
++    consentRepository.append.mockResolvedValue({
++      status: 'GRANTED',
++      createdAt: new Date('2026-01-01T00:00:00.000Z'),
++    });
++
++    const result = await service.recordConsent(
++      identity as never,
++      'LOCATION_USE',
++      'GRANTED',
++      'nearby_search_prompt',
++    );
++
++    expect(consentRepository.append).toHaveBeenCalledWith(
++      identity.userId,
++      'LOCATION_USE',
++      'GRANTED',
++      'nearby_search_prompt',
++    );
++    expect(result).toEqual({
++      category: 'LOCATION_USE',
++      status: 'GRANTED',
++      updatedAt: '2026-01-01T00:00:00.000Z',
++    });
++  });
++
++  it('records a withdrawal the same way -- as a new append, never a delete or update', async () => {
++    const { service, consentRepository } = buildService();
++    consentRepository.append.mockResolvedValue({
++      status: 'WITHDRAWN',
++      createdAt: new Date('2026-01-02T00:00:00.000Z'),
++    });
++
++    await service.recordConsent(
++      identity as never,
++      'NOTIFICATIONS_RESERVATIONS',
++      'WITHDRAWN',
++      'settings_privacy_page',
++    );
++
++    expect(consentRepository.append).toHaveBeenCalledWith(
++      identity.userId,
++      'NOTIFICATIONS_RESERVATIONS',
++      'WITHDRAWN',
++      'settings_privacy_page',
++    );
++  });
++
++  it('audits the event with only the bounded category -- never raw source text, coordinates, or notification content', async () => {
++    const { service, consentRepository, audit } = buildService();
++    consentRepository.append.mockResolvedValue({
++      status: 'GRANTED',
++      createdAt: new Date('2026-01-01T00:00:00.000Z'),
++    });
++
++    await service.recordConsent(
++      identity as never,
++      'LOCATION_USE',
++      'GRANTED',
++      'nearby_search_prompt',
++    );
++
++    expect(audit.appendTenantUser).toHaveBeenCalledWith(
++      expect.anything(),
++      expect.objectContaining({
++        eventType: 'privacy.consent.granted',
++        tenantId: identity.tenantId,
++        actorMembershipId: identity.membershipId,
++        metadata: { category: 'LOCATION_USE' },
++      }),
++    );
++    const [, auditInput] = audit.appendTenantUser.mock.calls[0];
++    const serialized = JSON.stringify(auditInput);
++    expect(serialized).not.toContain('nearby_search_prompt');
++  });
++
++  it('audits a withdrawal with the distinct privacy.consent.withdrawn event type', async () => {
++    const { service, consentRepository, audit } = buildService();
++    consentRepository.append.mockResolvedValue({
++      status: 'WITHDRAWN',
++      createdAt: new Date('2026-01-01T00:00:00.000Z'),
++    });
++
++    await service.recordConsent(
++      identity as never,
++      'NOTIFICATIONS_OPERATIONAL',
++      'WITHDRAWN',
++      'settings_privacy_page',
++    );
++
++    expect(audit.appendTenantUser).toHaveBeenCalledWith(
++      expect.anything(),
++      expect.objectContaining({ eventType: 'privacy.consent.withdrawn' }),
++    );
++  });
++});
++
++describe('ConsentService.getConsentStatus', () => {
++  it('returns null status for a category with no prior consent event, never a default of GRANTED', async () => {
++    const { service, consentRepository } = buildService();
++    consentRepository.findLatestPerCategory.mockResolvedValue(new Map());
++
++    const result = await service.getConsentStatus(identity.userId);
++
++    expect(result).toEqual([
++      { category: 'LOCATION_USE', status: null, updatedAt: null },
++      { category: 'NOTIFICATIONS_RESERVATIONS', status: null, updatedAt: null },
++      { category: 'NOTIFICATIONS_OPERATIONAL', status: null, updatedAt: null },
++    ]);
++  });
++
++  it('returns the latest recorded status per category', async () => {
++    const { service, consentRepository } = buildService();
++    consentRepository.findLatestPerCategory.mockResolvedValue(
++      new Map([
++        [
++          'LOCATION_USE',
++          {
++            category: 'LOCATION_USE',
++            status: 'GRANTED',
++            createdAt: new Date('2026-01-01T00:00:00.000Z'),
++          },
++        ],
++      ]),
++    );
++
++    const result = await service.getConsentStatus(identity.userId);
++
++    expect(result).toContainEqual({
++      category: 'LOCATION_USE',
++      status: 'GRANTED',
++      updatedAt: '2026-01-01T00:00:00.000Z',
++    });
++  });
++});
+diff --git a/apps/auth-service/src/consent/consent.service.ts b/apps/auth-service/src/consent/consent.service.ts
+new file mode 100644
+index 0000000..0311a75
+--- /dev/null
++++ b/apps/auth-service/src/consent/consent.service.ts
+@@ -0,0 +1,66 @@
++import { Injectable } from '@nestjs/common';
++import { PrismaService } from '../prisma/prisma.service';
++import { AuditWriter } from '../audit/audit-writer.service';
++import { AuthenticatedIdentity } from '../auth/auth.types';
++import { ConsentRepository } from './consent.repository';
++import { CONSENT_CATEGORIES, ConsentCategory, ConsentSource } from './consent-category';
++import { ConsentStatusDto } from './dto/consent.dto';
++
++@Injectable()
++export class ConsentService {
++  constructor(
++    private readonly consentRepository: ConsentRepository,
++    private readonly audit: AuditWriter,
++    private readonly prisma: PrismaService,
++  ) {}
++
++  /**
++   * Records a new consent event (grant or withdrawal) as an append-only
++   * row -- never an update of a prior row. Withdrawal only affects
++   * future behavior (the caller's next status read reflects it); it
++   * never deletes or rewrites the historical GRANTED row, preserving
++   * evidence of what was actually granted and when.
++   */
++  async recordConsent(
++    identity: AuthenticatedIdentity,
++    category: ConsentCategory,
++    status: 'GRANTED' | 'WITHDRAWN',
++    source: ConsentSource,
++  ): Promise<ConsentStatusDto> {
++    const record = await this.consentRepository.append(identity.userId, category, status, source);
++
++    await this.audit.appendTenantUser(this.prisma.client, {
++      eventType: status === 'GRANTED' ? 'privacy.consent.granted' : 'privacy.consent.withdrawn',
++      outcome: 'SUCCESS',
++      tenantId: identity.tenantId,
++      actorMembershipId: identity.membershipId,
++      // Only the bounded category name is recorded -- never the
++      // source string verbatim beyond what's already a fixed,
++      // non-identifying tag, and never any location/notification
++      // payload content, since none is ever collected here.
++      metadata: { category },
++    });
++
++    return {
++      category,
++      status: record.status as 'GRANTED' | 'WITHDRAWN',
++      updatedAt: record.createdAt.toISOString(),
++    };
++  }
++
++  /**
++   * Current effective consent per category -- the latest row for each,
++   * or null (never asked) when no row exists yet for that category.
++   */
++  async getConsentStatus(userId: string): Promise<ConsentStatusDto[]> {
++    const latestByCategory = await this.consentRepository.findLatestPerCategory(userId);
++    return CONSENT_CATEGORIES.map((category) => {
++      const record = latestByCategory.get(category);
++      return {
++        category,
++        status: record ? (record.status as 'GRANTED' | 'WITHDRAWN') : null,
++        updatedAt: record ? record.createdAt.toISOString() : null,
++      };
++    });
++  }
++}
+diff --git a/apps/auth-service/src/consent/dto/consent.dto.ts b/apps/auth-service/src/consent/dto/consent.dto.ts
+new file mode 100644
+index 0000000..d606084
+--- /dev/null
++++ b/apps/auth-service/src/consent/dto/consent.dto.ts
+@@ -0,0 +1,38 @@
++import { IsIn } from 'class-validator';
++import { ApiProperty } from '@nestjs/swagger';
++import {
++  CONSENT_CATEGORIES,
++  CONSENT_SOURCES,
++  ConsentCategory,
++  ConsentSource,
++} from '../consent-category';
++
++export class RecordConsentDto {
++  @ApiProperty({ enum: CONSENT_CATEGORIES })
++  @IsIn(CONSENT_CATEGORIES)
++  category!: ConsentCategory;
++
++  @ApiProperty({ enum: ['GRANTED', 'WITHDRAWN'] })
++  @IsIn(['GRANTED', 'WITHDRAWN'])
++  status!: 'GRANTED' | 'WITHDRAWN';
++
++  @ApiProperty({ enum: CONSENT_SOURCES })
++  @IsIn(CONSENT_SOURCES)
++  source!: ConsentSource;
++}
++
++export class ConsentStatusDto {
++  @ApiProperty({ enum: CONSENT_CATEGORIES })
++  category!: ConsentCategory;
++
++  @ApiProperty({ enum: ['GRANTED', 'WITHDRAWN'], nullable: true })
++  status!: 'GRANTED' | 'WITHDRAWN' | null;
++
++  @ApiProperty({ nullable: true })
++  updatedAt!: string | null;
++}
++
++export class ConsentStatusListResponseDto {
++  @ApiProperty({ type: [ConsentStatusDto] })
++  data!: ConsentStatusDto[];
++}
+diff --git a/apps/auth-service/src/users/dto/privacy.dto.ts b/apps/auth-service/src/users/dto/privacy.dto.ts
+index 4d1d456..3871a01 100644
+--- a/apps/auth-service/src/users/dto/privacy.dto.ts
++++ b/apps/auth-service/src/users/dto/privacy.dto.ts
+@@ -26,6 +26,22 @@ export class UpdatePrivacyDto {
+   @IsBoolean()
+   @IsOptional()
+   hideSensitiveNotifications?: boolean;
++
++  @ApiPropertyOptional({
++    description:
++      'MedSphere preference for reservation-update notifications (distinct from browser notification permission)',
++  })
++  @IsBoolean()
++  @IsOptional()
++  wantsReservationNotifications?: boolean;
++
++  @ApiPropertyOptional({
++    description:
++      'MedSphere preference for operational/expiry/stock alerts (distinct from browser notification permission)',
++  })
++  @IsBoolean()
++  @IsOptional()
++  wantsOperationalAlerts?: boolean;
+ }
+ 
+ export class PrivacyResponseDto {
+@@ -43,4 +59,10 @@ export class PrivacyResponseDto {
+ 
+   @ApiProperty()
+   hideSensitiveNotifications!: boolean;
++
++  @ApiProperty()
++  wantsReservationNotifications!: boolean;
++
++  @ApiProperty()
++  wantsOperationalAlerts!: boolean;
+ }
+diff --git a/apps/auth-service/src/users/privacy.repository.ts b/apps/auth-service/src/users/privacy.repository.ts
+index c163ea3..154805c 100644
+--- a/apps/auth-service/src/users/privacy.repository.ts
++++ b/apps/auth-service/src/users/privacy.repository.ts
+@@ -19,6 +19,8 @@ export class PrivacyRepository {
+       allowInAppChat?: boolean;
+       privatePickup?: boolean;
+       hideSensitiveNotifications?: boolean;
++      wantsReservationNotifications?: boolean;
++      wantsOperationalAlerts?: boolean;
+     },
+   ) {
+     return this.prisma.client.userPrivacy.upsert({
+diff --git a/apps/auth-service/src/users/users.service.ts b/apps/auth-service/src/users/users.service.ts
+index 65304d9..283c83b 100644
+--- a/apps/auth-service/src/users/users.service.ts
++++ b/apps/auth-service/src/users/users.service.ts
+@@ -27,6 +27,8 @@ export class UsersService {
+         allowInAppChat: true,
+         privatePickup: false,
+         hideSensitiveNotifications: true,
++        wantsReservationNotifications: false,
++        wantsOperationalAlerts: false,
+       };
+     }
+     return this.toPrivacyResponse(privacy);
+@@ -70,6 +72,8 @@ export class UsersService {
+       allowInAppChat: privacy.allowInAppChat,
+       privatePickup: privacy.privatePickup,
+       hideSensitiveNotifications: privacy.hideSensitiveNotifications,
++      wantsReservationNotifications: privacy.wantsReservationNotifications,
++      wantsOperationalAlerts: privacy.wantsOperationalAlerts,
+     };
+   }
+ }
+diff --git a/apps/web/src/app/api/settings/consent/route.ts b/apps/web/src/app/api/settings/consent/route.ts
+new file mode 100644
+index 0000000..be06bfd
+--- /dev/null
++++ b/apps/web/src/app/api/settings/consent/route.ts
+@@ -0,0 +1,109 @@
++import { NextRequest, NextResponse } from 'next/server';
++import {
++  authApiUrl,
++  boundedUpstreamMessage,
++  isSameOriginMutation,
++  publicUpstreamStatus,
++  upstreamHeaders,
++} from '@/lib/auth-api';
++import {
++  CONSENT_CATEGORIES,
++  CONSENT_SOURCES,
++  isConsentStatus,
++  isConsentStatusList,
++  type RecordConsentRequest,
++} from '@/lib/settings-contract';
++import { ACCESS_COOKIE } from '@/lib/session-profile';
++
++export const dynamic = 'force-dynamic';
++
++export async function GET(request: NextRequest): Promise<NextResponse> {
++  const accessToken = request.cookies.get(ACCESS_COOKIE)?.value;
++  if (!accessToken) return unauthenticated();
++
++  let upstream: Response;
++  try {
++    upstream = await fetch(authApiUrl('/users/me/consent'), {
++      headers: upstreamHeaders(request, accessToken),
++      cache: 'no-store',
++    });
++  } catch {
++    return noStore({ message: 'Consent service is unavailable.' }, 503);
++  }
++
++  if (!upstream.ok) return upstreamFailure(upstream, 'Unable to load consent status.');
++  try {
++    const payload: unknown = await upstream.json();
++    const data = (payload as { data?: unknown })?.data;
++    if (!isConsentStatusList(data)) throw new Error('Invalid consent response');
++    return noStore({ data }, 200);
++  } catch {
++    return noStore({ message: 'Consent service returned an invalid response.' }, 502);
++  }
++}
++
++export async function POST(request: NextRequest): Promise<NextResponse> {
++  if (!isSameOriginMutation(request)) {
++    return noStore({ message: 'Cross-origin request rejected.' }, 403);
++  }
++  const accessToken = request.cookies.get(ACCESS_COOKIE)?.value;
++  if (!accessToken) return unauthenticated();
++
++  let body: RecordConsentRequest;
++  try {
++    const payload: unknown = await request.json();
++    if (!isRecordConsentRequest(payload)) throw new Error('Invalid consent request');
++    body = payload;
++  } catch {
++    return noStore({ message: 'Invalid consent request.' }, 400);
++  }
++
++  let upstream: Response;
++  try {
++    const headers = upstreamHeaders(request, accessToken);
++    headers.set('content-type', 'application/json');
++    upstream = await fetch(authApiUrl('/users/me/consent'), {
++      method: 'POST',
++      headers,
++      body: JSON.stringify(body),
++      cache: 'no-store',
++    });
++  } catch {
++    return noStore({ message: 'Consent service is unavailable.' }, 503);
++  }
++
++  if (!upstream.ok) return upstreamFailure(upstream, 'Unable to record consent.');
++  try {
++    const payload: unknown = await upstream.json();
++    if (!isConsentStatus(payload)) throw new Error('Invalid consent response');
++    return noStore(payload, 200);
++  } catch {
++    return noStore({ message: 'Consent service returned an invalid response.' }, 502);
++  }
++}
++
++function isRecordConsentRequest(value: unknown): value is RecordConsentRequest {
++  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
++  const candidate = value as Record<string, unknown>;
++  return (
++    Object.keys(candidate).sort().join(',') === 'category,source,status' &&
++    typeof candidate.category === 'string' &&
++    (CONSENT_CATEGORIES as readonly string[]).includes(candidate.category) &&
++    (candidate.status === 'GRANTED' || candidate.status === 'WITHDRAWN') &&
++    typeof candidate.source === 'string' &&
++    (CONSENT_SOURCES as readonly string[]).includes(candidate.source)
++  );
++}
++
++async function upstreamFailure(upstream: Response, fallback: string): Promise<NextResponse> {
++  const message = await boundedUpstreamMessage(upstream, fallback);
++  return noStore({ message }, publicUpstreamStatus(upstream.status));
++}
++
++function unauthenticated(): NextResponse {
++  return noStore({ message: 'Your session has expired. Sign in again.' }, 401);
++}
++
++function noStore(body: unknown, status: number): NextResponse {
++  return NextResponse.json(body, { status, headers: { 'cache-control': 'no-store' } });
++}
+diff --git a/apps/web/src/app/api/settings/privacy/route.test.ts b/apps/web/src/app/api/settings/privacy/route.test.ts
+index a7fe5da..2d86ac0 100644
+--- a/apps/web/src/app/api/settings/privacy/route.test.ts
++++ b/apps/web/src/app/api/settings/privacy/route.test.ts
+@@ -10,6 +10,8 @@ const privacy = {
+   allowInAppChat: true,
+   privatePickup: false,
+   hideSensitiveNotifications: true,
++  wantsReservationNotifications: false,
++  wantsOperationalAlerts: false,
+ };
+ 
+ afterEach(() => vi.unstubAllGlobals());
+diff --git a/apps/web/src/components/permission-explanation-dialog.tsx b/apps/web/src/components/permission-explanation-dialog.tsx
+new file mode 100644
+index 0000000..88dd41a
+--- /dev/null
++++ b/apps/web/src/components/permission-explanation-dialog.tsx
+@@ -0,0 +1,69 @@
++'use client';
++
++/**
++ * Task 0013: the mandatory app-controlled explanation shown BEFORE any
++ * browser permission prompt fires -- for location and, separately, for
++ * notifications. Never auto-dismisses, never hides the decline option,
++ * never makes "Allow"/"Continue" visually deceptive (see the no-dark-
++ * patterns requirement). The caller is responsible for only invoking
++ * the real browser API's request function after onContinue fires.
++ */
++export interface PermissionExplanationDialogProps {
++  readonly open: boolean;
++  readonly title: string;
++  readonly description: string;
++  readonly continueLabel: string;
++  readonly declineLabel: string;
++  readonly onContinue: () => void;
++  readonly onDecline: () => void;
++}
++
++export function PermissionExplanationDialog({
++  open,
++  title,
++  description,
++  continueLabel,
++  declineLabel,
++  onContinue,
++  onDecline,
++}: PermissionExplanationDialogProps) {
++  if (!open) return null;
++
++  return (
++    <div
++      role="dialog"
++      aria-modal="true"
++      aria-labelledby="permission-explanation-title"
++      aria-describedby="permission-explanation-description"
++      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
++    >
++      <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl">
++        <h2 id="permission-explanation-title" className="text-base font-bold text-[#173128]">
++          {title}
++        </h2>
++        <p
++          id="permission-explanation-description"
++          className="mt-2 text-sm leading-6 text-[#536a62]"
++        >
++          {description}
++        </p>
++        <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
++          <button
++            type="button"
++            onClick={onDecline}
++            className="min-h-11 rounded-xl border border-[#17372e]/15 bg-white px-4 text-sm font-bold text-[#264b40] transition hover:border-emerald-700/30"
++          >
++            {declineLabel}
++          </button>
++          <button
++            type="button"
++            onClick={onContinue}
++            className="min-h-11 rounded-xl bg-[#0b2f28] px-4 text-sm font-bold text-white transition hover:bg-[#075f49]"
++          >
++            {continueLabel}
++          </button>
++        </div>
++      </div>
++    </div>
++  );
++}
+diff --git a/apps/web/src/features/public-search/public-medicine-search.test.tsx b/apps/web/src/features/public-search/public-medicine-search.test.tsx
+index 53d58d0..289c2ab 100644
+--- a/apps/web/src/features/public-search/public-medicine-search.test.tsx
++++ b/apps/web/src/features/public-search/public-medicine-search.test.tsx
+@@ -206,6 +206,9 @@ describe('PublicMedicineSearch', () => {
+     });
+ 
+     fireEvent.click(screen.getByRole('button', { name: 'Find near me' }));
++    // Task 0013: the browser permission API is only invoked after the
++    // app-controlled explanation's own Continue action.
++    fireEvent.click(await screen.findByRole('button', { name: 'Use my location' }));
+ 
+     expect(await screen.findByText('1.4 km away')).toBeVisible();
+ 
+@@ -231,6 +234,9 @@ describe('PublicMedicineSearch', () => {
+     });
+ 
+     fireEvent.click(screen.getByRole('button', { name: 'Find near me' }));
++    // Task 0013: the browser permission API is only invoked after the
++    // app-controlled explanation's own Continue action.
++    fireEvent.click(await screen.findByRole('button', { name: 'Use my location' }));
+ 
+     expect(
+       await screen.findByText(
+@@ -261,12 +267,57 @@ describe('PublicMedicineSearch', () => {
+     });
+ 
+     fireEvent.click(screen.getByRole('button', { name: 'Find near me' }));
++    // Task 0013: the browser permission API is only invoked after the
++    // app-controlled explanation's own Continue action.
++    fireEvent.click(await screen.findByRole('button', { name: 'Use my location' }));
+ 
+     await screen.findByText(/No matches/i);
+ 
+     expect(localStorageSpy).not.toHaveBeenCalled();
+     expect(sessionStorageSpy).not.toHaveBeenCalled();
+   });
++
++  it('shows the app-controlled explanation before ever calling the browser geolocation API', async () => {
++    const getCurrentPosition = vi.fn();
++    Object.defineProperty(navigator, 'geolocation', {
++      configurable: true,
++      value: { getCurrentPosition },
++    });
++
++    renderSearch();
++
++    fireEvent.change(screen.getByLabelText('Medicine name'), {
++      target: { value: 'paracetamol' },
++    });
++    fireEvent.click(screen.getByRole('button', { name: 'Find near me' }));
++
++    expect(
++      await screen.findByText(/MedSphere uses your location to find nearby healthcare services/i),
++    ).toBeVisible();
++    expect(getCurrentPosition).not.toHaveBeenCalled();
++  });
++
++  it('never calls the browser geolocation API when the explanation is declined', async () => {
++    const getCurrentPosition = vi.fn();
++    Object.defineProperty(navigator, 'geolocation', {
++      configurable: true,
++      value: { getCurrentPosition },
++    });
++
++    renderSearch();
++
++    fireEvent.change(screen.getByLabelText('Medicine name'), {
++      target: { value: 'paracetamol' },
++    });
++    fireEvent.click(screen.getByRole('button', { name: 'Find near me' }));
++    fireEvent.click(await screen.findByRole('button', { name: 'Not now' }));
++
++    expect(getCurrentPosition).not.toHaveBeenCalled();
++    expect(searchNearbyMedicine).not.toHaveBeenCalled();
++    expect(
++      screen.queryByText(/MedSphere uses your location to find nearby healthcare services/i),
++    ).not.toBeInTheDocument();
++  });
+ });
+ 
+ function deferred<T>() {
+diff --git a/apps/web/src/features/public-search/public-medicine-search.tsx b/apps/web/src/features/public-search/public-medicine-search.tsx
+index f06ff04..897ea29 100644
+--- a/apps/web/src/features/public-search/public-medicine-search.tsx
++++ b/apps/web/src/features/public-search/public-medicine-search.tsx
+@@ -4,6 +4,8 @@ import { FormEvent, useState } from 'react';
+ import { LanguageSelector } from '@/components/language-selector';
+ import { useLanguage } from '@/components/language-provider';
+ import { Badge, Button, Card, EmptyState, Input, Skeleton } from '@/components/platform/primitives';
++import { PermissionExplanationDialog } from '@/components/permission-explanation-dialog';
++import { useGeolocationPermission } from '@/lib/geolocation-permission';
+ import { ApiError, searchNearbyMedicine, searchPublicMedicine } from '@/lib/api-client';
+ import type {
+   PublicMedicineSearchResult,
+@@ -22,6 +24,7 @@ function hasDistance(result: SearchResult): result is PublicNearbyMedicineSearch
+ export function PublicMedicineSearch({ providerId }: { providerId: string }) {
+   const { locale } = useLanguage();
+   const copy = publicSearchCopy[locale];
++  const { requestLocation } = useGeolocationPermission();
+ 
+   const [term, setTerm] = useState('');
+   const [results, setResults] = useState<SearchResult[] | null>(null);
+@@ -29,6 +32,7 @@ export function PublicMedicineSearch({ providerId }: { providerId: string }) {
+   const [locating, setLocating] = useState(false);
+   const [error, setError] = useState<PublicError | null>(null);
+   const [searchedFor, setSearchedFor] = useState<string | null>(null);
++  const [showLocationExplanation, setShowLocationExplanation] = useState(false);
+ 
+   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+     event.preventDefault();
+@@ -51,29 +55,59 @@ export function PublicMedicineSearch({ providerId }: { providerId: string }) {
+     }
+   }
+ 
+-  async function handleNearbySearch() {
++  function handleNearbySearchClick() {
+     const query = term.trim();
+-
+     if (!query || loading || locating) return;
++    // Task 0013: never call the browser Geolocation API directly from a
++    // click. Show the app-controlled explanation first; only a further,
++    // explicit "Continue" click proceeds to the real permission
++    // request/lookup.
++    setShowLocationExplanation(true);
++  }
+ 
+-    if (!navigator.geolocation) {
+-      setResults(null);
+-      setError({
+-        message: 'Location services are not available in this browser.',
+-      });
+-      return;
+-    }
++  async function handleNearbySearchContinue() {
++    setShowLocationExplanation(false);
++    const query = term.trim();
++    if (!query) return;
+ 
+     setLocating(true);
+     setError(null);
+ 
+     try {
+-      const position = await getCurrentPosition();
++      const outcome = await requestLocation();
++
++      if (outcome.kind === 'unsupported') {
++        setResults(null);
++        setError({ message: 'Location services are not available in this browser.' });
++        return;
++      }
++      if (outcome.kind === 'denied') {
++        setResults(null);
++        setError({
++          message:
++            'Location permission was denied. Allow location access to search nearby pharmacies.',
++        });
++        return;
++      }
++      if (outcome.kind === 'timeout') {
++        setResults(null);
++        setError({ message: 'Finding your location took too long. Try again.' });
++        return;
++      }
++      if (outcome.kind === 'unavailable') {
++        setResults(null);
++        setError({ message: 'Your location could not be determined. Try again.' });
++        return;
++      }
+ 
++      // outcome.kind === 'granted': coordinates are used only for this
++      // one request and are never stored anywhere (no localStorage, no
++      // persisted field) -- see useGeolocationPermission's own doc
++      // comment for the same guarantee at the hook level.
+       const response = await searchNearbyMedicine({
+         q: query,
+-        latitude: position.coords.latitude,
+-        longitude: position.coords.longitude,
++        latitude: outcome.latitude,
++        longitude: outcome.longitude,
+         radiusKm: 10,
+         limit: 20,
+         offset: 0,
+@@ -83,17 +117,7 @@ export function PublicMedicineSearch({ providerId }: { providerId: string }) {
+       setSearchedFor(query);
+     } catch (thrown) {
+       setResults(null);
+-
+-      if (isGeolocationError(thrown)) {
+-        setError({
+-          message:
+-            thrown.code === 1
+-              ? 'Location permission was denied. Allow location access to search nearby pharmacies.'
+-              : 'Your location could not be determined. Try again.',
+-        });
+-      } else {
+-        setError(toPublicError(thrown, 'Nearby medicine search is unavailable right now.'));
+-      }
++      setError(toPublicError(thrown, 'Nearby medicine search is unavailable right now.'));
+     } finally {
+       setLocating(false);
+     }
+@@ -131,7 +155,7 @@ export function PublicMedicineSearch({ providerId }: { providerId: string }) {
+ 
+           <Button
+             type="button"
+-            onClick={handleNearbySearch}
++            onClick={handleNearbySearchClick}
+             loading={locating}
+             loadingLabel="Finding nearby pharmacies..."
+             disabled={!term.trim() || loading}
+@@ -206,26 +230,17 @@ export function PublicMedicineSearch({ providerId }: { providerId: string }) {
+           </ul>
+         ) : null}
+       </div>
+-    </div>
+-  );
+-}
+-
+-function getCurrentPosition(): Promise<GeolocationPosition> {
+-  return new Promise((resolve, reject) => {
+-    navigator.geolocation.getCurrentPosition(resolve, reject, {
+-      enableHighAccuracy: false,
+-      timeout: 10_000,
+-      maximumAge: 60_000,
+-    });
+-  });
+-}
+ 
+-function isGeolocationError(error: unknown): error is GeolocationPositionError {
+-  return (
+-    typeof error === 'object' &&
+-    error !== null &&
+-    'code' in error &&
+-    typeof (error as { code?: unknown }).code === 'number'
++      <PermissionExplanationDialog
++        open={showLocationExplanation}
++        title="Use your location?"
++        description="MedSphere uses your location to find nearby healthcare services or medicine availability. Your precise location is not stored unless an accepted workflow explicitly requires it."
++        continueLabel="Use my location"
++        declineLabel="Not now"
++        onContinue={handleNearbySearchContinue}
++        onDecline={() => setShowLocationExplanation(false)}
++      />
++    </div>
+   );
+ }
+ 
+diff --git a/apps/web/src/features/settings/device-permissions-section.test.tsx b/apps/web/src/features/settings/device-permissions-section.test.tsx
+new file mode 100644
+index 0000000..fa76bf7
+--- /dev/null
++++ b/apps/web/src/features/settings/device-permissions-section.test.tsx
+@@ -0,0 +1,154 @@
++import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
++import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
++import { getConsentStatus, recordConsent } from '@/lib/api-client';
++import { DevicePermissionsSection } from './device-permissions-section';
++
++vi.mock('@/lib/api-client', async () => {
++  const actual = await vi.importActual<typeof import('@/lib/api-client')>('@/lib/api-client');
++  return { ...actual, getConsentStatus: vi.fn(), recordConsent: vi.fn() };
++});
++
++const emptyConsent = [
++  { category: 'LOCATION_USE' as const, status: null, updatedAt: null },
++  { category: 'NOTIFICATIONS_RESERVATIONS' as const, status: null, updatedAt: null },
++  { category: 'NOTIFICATIONS_OPERATIONAL' as const, status: null, updatedAt: null },
++];
++
++function stubGeolocationPermissions(state: 'granted' | 'denied' | 'prompt') {
++  Object.defineProperty(navigator, 'geolocation', {
++    value: { getCurrentPosition: vi.fn() },
++    configurable: true,
++  });
++  Object.defineProperty(navigator, 'permissions', {
++    value: { query: vi.fn().mockResolvedValue({ state }) },
++    configurable: true,
++  });
++}
++
++function stubNotification(permission: NotificationPermission, requestPermission = vi.fn()) {
++  (globalThis as { Notification?: unknown }).Notification = { permission, requestPermission };
++}
++
++beforeEach(() => {
++  vi.clearAllMocks();
++  vi.mocked(getConsentStatus).mockResolvedValue(emptyConsent);
++});
++
++afterEach(() => {
++  cleanup();
++  delete (globalThis as { Notification?: unknown }).Notification;
++});
++
++describe('DevicePermissionsSection', () => {
++  it('shows the browser-reported location permission state, distinct from any app preference', async () => {
++    stubGeolocationPermissions('denied');
++    stubNotification('default');
++
++    render(<DevicePermissionsSection />);
++
++    expect(await screen.findAllByText('Blocked in this browser')).not.toHaveLength(0);
++    expect(screen.getByText(/Location permission is blocked in your browser/i)).toBeVisible();
++  });
++
++  it('never shows a fake "enable" button for a permanently denied permission', async () => {
++    stubGeolocationPermissions('denied');
++    stubNotification('denied');
++
++    render(<DevicePermissionsSection />);
++
++    await screen.findByText(/browser\/site settings/i);
++    expect(screen.queryByRole('button', { name: 'Enable notifications' })).not.toBeInTheDocument();
++  });
++
++  it('shows a contextual enable button only when notification permission has not yet been asked', async () => {
++    stubGeolocationPermissions('prompt');
++    stubNotification('default');
++
++    render(<DevicePermissionsSection />);
++
++    expect(await screen.findByRole('button', { name: 'Enable notifications' })).toBeVisible();
++  });
++
++  it('shows the app-controlled explanation before calling the browser notification API', async () => {
++    stubGeolocationPermissions('prompt');
++    const requestPermission = vi.fn().mockResolvedValue('granted');
++    stubNotification('default', requestPermission);
++
++    render(<DevicePermissionsSection />);
++
++    fireEvent.click(await screen.findByRole('button', { name: 'Enable notifications' }));
++
++    expect(await screen.findByText(/MedSphere can send you reservation updates/i)).toBeVisible();
++    expect(requestPermission).not.toHaveBeenCalled();
++  });
++
++  it('only calls the browser notification API after the explanation is continued, and records consent on grant', async () => {
++    stubGeolocationPermissions('prompt');
++    const requestPermission = vi.fn().mockResolvedValue('granted');
++    stubNotification('default', requestPermission);
++    vi.mocked(recordConsent).mockResolvedValue({
++      category: 'NOTIFICATIONS_RESERVATIONS',
++      status: 'GRANTED',
++      updatedAt: '2026-01-01T00:00:00.000Z',
++    });
++
++    render(<DevicePermissionsSection />);
++
++    fireEvent.click(await screen.findByRole('button', { name: 'Enable notifications' }));
++    const dialog = await screen.findByRole('dialog');
++    fireEvent.click(within(dialog).getByRole('button', { name: 'Enable notifications' }));
++
++    await waitFor(() => expect(requestPermission).toHaveBeenCalledTimes(1));
++    await waitFor(() =>
++      expect(recordConsent).toHaveBeenCalledWith({
++        category: 'NOTIFICATIONS_RESERVATIONS',
++        status: 'GRANTED',
++        source: 'settings_privacy_page',
++      }),
++    );
++  });
++
++  it('never calls the browser notification API when the explanation is declined', async () => {
++    stubGeolocationPermissions('prompt');
++    const requestPermission = vi.fn();
++    stubNotification('default', requestPermission);
++
++    render(<DevicePermissionsSection />);
++
++    fireEvent.click(await screen.findByRole('button', { name: 'Enable notifications' }));
++    fireEvent.click(await screen.findByRole('button', { name: 'Not now' }));
++
++    expect(requestPermission).not.toHaveBeenCalled();
++    expect(recordConsent).not.toHaveBeenCalled();
++  });
++
++  it('allows withdrawing a previously granted location consent', async () => {
++    stubGeolocationPermissions('granted');
++    stubNotification('default');
++    vi.mocked(getConsentStatus).mockResolvedValue([
++      { category: 'LOCATION_USE', status: 'GRANTED', updatedAt: '2026-01-01T00:00:00.000Z' },
++      { category: 'NOTIFICATIONS_RESERVATIONS', status: null, updatedAt: null },
++      { category: 'NOTIFICATIONS_OPERATIONAL', status: null, updatedAt: null },
++    ]);
++    vi.mocked(recordConsent).mockResolvedValue({
++      category: 'LOCATION_USE',
++      status: 'WITHDRAWN',
++      updatedAt: '2026-01-02T00:00:00.000Z',
++    });
++
++    render(<DevicePermissionsSection />);
++
++    const withdrawButton = await screen.findByRole('button', {
++      name: 'Withdraw location-use consent',
++    });
++    fireEvent.click(withdrawButton);
++
++    await waitFor(() =>
++      expect(recordConsent).toHaveBeenCalledWith({
++        category: 'LOCATION_USE',
++        status: 'WITHDRAWN',
++        source: 'settings_privacy_page',
++      }),
++    );
++  });
++});
+diff --git a/apps/web/src/features/settings/device-permissions-section.tsx b/apps/web/src/features/settings/device-permissions-section.tsx
+new file mode 100644
+index 0000000..7f0af1e
+--- /dev/null
++++ b/apps/web/src/features/settings/device-permissions-section.tsx
+@@ -0,0 +1,186 @@
++'use client';
++
++import { useEffect, useState } from 'react';
++import { SectionCard, StatusBadge } from '@/components/platform/dashboard-primitives';
++import { PermissionExplanationDialog } from '@/components/permission-explanation-dialog';
++import {
++  useGeolocationPermission,
++  type GeolocationPermissionState,
++} from '@/lib/geolocation-permission';
++import {
++  useNotificationPermission,
++  type NotificationPermissionState,
++} from '@/lib/notification-permission';
++import { getConsentStatus, recordConsent } from '@/lib/api-client';
++import type { ConsentCategory, ConsentStatus } from '@/lib/settings-contract';
++
++const geolocationBadgeTone: Record<GeolocationPermissionState, 'emerald' | 'amber' | 'cyan'> = {
++  granted: 'emerald',
++  denied: 'amber',
++  prompt: 'cyan',
++  unknown: 'cyan',
++  unsupported: 'amber',
++};
++
++const geolocationBadgeLabel: Record<GeolocationPermissionState, string> = {
++  granted: 'Allowed in this browser',
++  denied: 'Blocked in this browser',
++  prompt: 'Not yet asked',
++  unknown: 'Unknown (this browser cannot report this in advance)',
++  unsupported: 'Not supported by this browser',
++};
++
++const notificationBadgeTone: Record<NotificationPermissionState, 'emerald' | 'amber' | 'cyan'> = {
++  granted: 'emerald',
++  denied: 'amber',
++  default: 'cyan',
++  unsupported: 'amber',
++};
++
++const notificationBadgeLabel: Record<NotificationPermissionState, string> = {
++  granted: 'Allowed in this browser',
++  denied: 'Blocked in this browser',
++  default: 'Not yet asked',
++  unsupported: 'Not supported by this browser',
++};
++
++/**
++ * Task 0013: this section only ever *displays* current browser
++ * capability state (read via the Permissions/Notification APIs, never
++ * inferred) and offers a contextual way to invoke the real browser
++ * prompt for notifications specifically -- it never fakes a way to
++ * "re-open" a permission the browser has permanently denied (see the
++ * denied-state messaging below), and it never lets an app-level
++ * preference toggle imply the browser permission itself changed.
++ */
++export function DevicePermissionsSection() {
++  const { permissionState: locationState } = useGeolocationPermission();
++  const { permissionState: notificationState, requestPermission } = useNotificationPermission();
++  const [showNotificationExplanation, setShowNotificationExplanation] = useState(false);
++  const [consent, setConsent] = useState<ConsentStatus[] | null>(null);
++
++  useEffect(() => {
++    getConsentStatus()
++      .then(setConsent)
++      .catch(() => setConsent(null));
++  }, []);
++
++  async function handleConsentChange(category: ConsentCategory, next: 'GRANTED' | 'WITHDRAWN') {
++    try {
++      const updated = await recordConsent({
++        category,
++        status: next,
++        source: 'settings_privacy_page',
++      });
++      setConsent((prev) =>
++        prev ? prev.map((entry) => (entry.category === category ? updated : entry)) : [updated],
++      );
++    } catch {
++      // A failed consent write must never be silently assumed to have
++      // succeeded; leaving the prior displayed state in place is safer
++      // than optimistically flipping it.
++    }
++  }
++
++  async function handleNotificationContinue() {
++    setShowNotificationExplanation(false);
++    const result = await requestPermission();
++    if (result === 'granted') {
++      await handleConsentChange('NOTIFICATIONS_RESERVATIONS', 'GRANTED');
++    }
++  }
++
++  const locationConsent = consent?.find((entry) => entry.category === 'LOCATION_USE');
++  const reservationConsent = consent?.find(
++    (entry) => entry.category === 'NOTIFICATIONS_RESERVATIONS',
++  );
++
++  return (
++    <SectionCard className="p-6">
++      <h2 className="text-sm font-extrabold uppercase tracking-wide text-[#43524e]">
++        Location &amp; notification permissions
++      </h2>
++      <p className="mt-1 text-xs leading-5 text-[#71807b]">
++        These reflect your browser&apos;s own permission settings, which MedSphere cannot override.
++        Your MedSphere preferences (below) only take effect once the matching browser permission is
++        also granted.
++      </p>
++
++      <div className="mt-5 space-y-5">
++        <div>
++          <div className="flex items-center justify-between gap-3">
++            <p className="text-sm font-bold text-[#173128]">Location</p>
++            <StatusBadge tone={geolocationBadgeTone[locationState]}>
++              {geolocationBadgeLabel[locationState]}
++            </StatusBadge>
++          </div>
++          <p className="mt-1 text-xs leading-5 text-[#71807b]">
++            MedSphere only asks for your location when you use a feature that needs it, such as
++            finding nearby pharmacies. Your precise location is not stored unless an accepted
++            workflow explicitly requires it.
++          </p>
++          {locationState === 'denied' ? (
++            <p className="mt-2 text-xs font-semibold text-amber-800">
++              Location permission is blocked in your browser. Enable it from your browser/site
++              settings if you want to use nearby search.
++            </p>
++          ) : null}
++          {locationConsent?.status === 'GRANTED' ? (
++            <button
++              type="button"
++              onClick={() => handleConsentChange('LOCATION_USE', 'WITHDRAWN')}
++              className="mt-2 text-xs font-bold text-[#264b40] underline"
++            >
++              Withdraw location-use consent
++            </button>
++          ) : null}
++        </div>
++
++        <div>
++          <div className="flex items-center justify-between gap-3">
++            <p className="text-sm font-bold text-[#173128]">Notifications</p>
++            <StatusBadge tone={notificationBadgeTone[notificationState]}>
++              {notificationBadgeLabel[notificationState]}
++            </StatusBadge>
++          </div>
++          <p className="mt-1 text-xs leading-5 text-[#71807b]">
++            MedSphere can notify you about reservation updates and, for authorized staff,
++            operational alerts. You can keep using MedSphere if you decline.
++          </p>
++          {notificationState === 'denied' ? (
++            <p className="mt-2 text-xs font-semibold text-amber-800">
++              Notification permission is blocked in your browser. Enable it from your browser/site
++              settings if you want to receive alerts.
++            </p>
++          ) : notificationState === 'default' ? (
++            <button
++              type="button"
++              onClick={() => setShowNotificationExplanation(true)}
++              className="mt-2 rounded-lg border border-[#17372e]/15 bg-white px-3 py-1.5 text-xs font-bold text-[#264b40] transition hover:border-emerald-700/30"
++            >
++              Enable notifications
++            </button>
++          ) : notificationState === 'granted' && reservationConsent?.status === 'GRANTED' ? (
++            <button
++              type="button"
++              onClick={() => handleConsentChange('NOTIFICATIONS_RESERVATIONS', 'WITHDRAWN')}
++              className="mt-2 text-xs font-bold text-[#264b40] underline"
++            >
++              Withdraw notification consent
++            </button>
++          ) : null}
++        </div>
++      </div>
++
++      <PermissionExplanationDialog
++        open={showNotificationExplanation}
++        title="Enable notifications?"
++        description="MedSphere can send you reservation updates and, for authorized staff, operational alerts. You can continue using MedSphere if you decline, except where your organization's policy requires another notification channel."
++        continueLabel="Enable notifications"
++        declineLabel="Not now"
++        onContinue={handleNotificationContinue}
++        onDecline={() => setShowNotificationExplanation(false)}
++      />
++    </SectionCard>
++  );
++}
+diff --git a/apps/web/src/features/settings/settings-workspace.test.tsx b/apps/web/src/features/settings/settings-workspace.test.tsx
+index f0ff906..57d3551 100644
+--- a/apps/web/src/features/settings/settings-workspace.test.tsx
++++ b/apps/web/src/features/settings/settings-workspace.test.tsx
+@@ -25,6 +25,8 @@ const privacy = {
+   allowInAppChat: true,
+   privatePickup: false,
+   hideSensitiveNotifications: true,
++  wantsReservationNotifications: false,
++  wantsOperationalAlerts: false,
+ };
+ 
+ const languages = [
+diff --git a/apps/web/src/features/settings/settings-workspace.tsx b/apps/web/src/features/settings/settings-workspace.tsx
+index a5976dc..92060cc 100644
+--- a/apps/web/src/features/settings/settings-workspace.tsx
++++ b/apps/web/src/features/settings/settings-workspace.tsx
+@@ -15,6 +15,7 @@ import type {
+   SupportedLanguage,
+   SupportedLanguageCode,
+ } from '@/lib/settings-contract';
++import { DevicePermissionsSection } from './device-permissions-section';
+ 
+ interface SettingsIdentity {
+   readonly name: string;
+@@ -60,6 +61,20 @@ const privacyOptions: Array<{
+     description: 'Allow your phone number to be used when an accepted care workflow requests it.',
+     tone: 'amber',
+   },
++  {
++    key: 'wantsReservationNotifications',
++    title: 'Reservation update notifications',
++    description:
++      'Receive notifications about your reservation status, when your browser notification permission is also granted.',
++    tone: 'emerald',
++  },
++  {
++    key: 'wantsOperationalAlerts',
++    title: 'Operational alerts',
++    description:
++      'For authorized staff: receive expiry and stock alerts, when your browser notification permission is also granted.',
++    tone: 'cyan',
++  },
+ ];
+ 
+ export function SettingsWorkspace({ identity }: { identity: SettingsIdentity }) {
+@@ -236,6 +251,7 @@ export function SettingsWorkspace({ identity }: { identity: SettingsIdentity })
+               onSelect={setSelectedLanguage}
+               onSave={() => void saveLanguage()}
+             />
++            <DevicePermissionsSection />
+           </div>
+         </div>
+       ) : null}
+diff --git a/apps/web/src/lib/api-client.ts b/apps/web/src/lib/api-client.ts
+index 3a256e0..3cbc0e5 100644
+--- a/apps/web/src/lib/api-client.ts
++++ b/apps/web/src/lib/api-client.ts
+@@ -35,10 +35,12 @@ import {
+   type ProviderAccess,
+ } from './inventory-contract';
+ import type {
++  ConsentStatus,
+   LanguageUpdateRequest,
+   LanguageUpdateResponse,
+   PrivacyPreferences,
+   PrivacyPreferenceUpdate,
++  RecordConsentRequest,
+   SupportedLanguage,
+ } from './settings-contract';
+ import {
+@@ -333,6 +335,19 @@ export async function getSupportedLanguages(): Promise<SupportedLanguage[]> {
+   return requestJson<SupportedLanguage[]>('/api/settings/languages');
+ }
+ 
++export async function getConsentStatus(): Promise<ConsentStatus[]> {
++  const response = await requestJson<{ data: ConsentStatus[] }>('/api/settings/consent');
++  return response.data;
++}
++
++export async function recordConsent(request: RecordConsentRequest): Promise<ConsentStatus> {
++  return requestJson<ConsentStatus>('/api/settings/consent', {
++    method: 'POST',
++    headers: { 'content-type': 'application/json' },
++    body: JSON.stringify(request),
++  });
++}
++
+ export async function updatePreferredLanguage(
+   request: LanguageUpdateRequest,
+ ): Promise<LanguageUpdateResponse> {
+diff --git a/apps/web/src/lib/geolocation-permission.test.ts b/apps/web/src/lib/geolocation-permission.test.ts
+new file mode 100644
+index 0000000..7dc8cd1
+--- /dev/null
++++ b/apps/web/src/lib/geolocation-permission.test.ts
+@@ -0,0 +1,166 @@
++import { act, renderHook, waitFor } from '@testing-library/react';
++import { afterEach, describe, expect, it, vi } from 'vitest';
++import { useGeolocationPermission } from './geolocation-permission';
++
++const originalGeolocation = navigator.geolocation;
++const originalPermissions = navigator.permissions;
++
++afterEach(() => {
++  Object.defineProperty(navigator, 'geolocation', {
++    value: originalGeolocation,
++    configurable: true,
++  });
++  Object.defineProperty(navigator, 'permissions', {
++    value: originalPermissions,
++    configurable: true,
++  });
++  vi.restoreAllMocks();
++});
++
++function stubGeolocation(getCurrentPosition: typeof navigator.geolocation.getCurrentPosition) {
++  Object.defineProperty(navigator, 'geolocation', {
++    value: { getCurrentPosition },
++    configurable: true,
++  });
++}
++
++function stubPermissionsQuery(state: 'granted' | 'denied' | 'prompt') {
++  Object.defineProperty(navigator, 'permissions', {
++    value: { query: vi.fn().mockResolvedValue({ state }) },
++    configurable: true,
++  });
++}
++
++describe('useGeolocationPermission', () => {
++  it('reports unsupported when the browser has no Geolocation API, without ever calling it', async () => {
++    // @ts-expect-error -- intentionally simulating a browser where the
++    // property is truly absent, not merely undefined (defineProperty
++    // with value: undefined would still leave the key present, which
++    // 'geolocation' in navigator would incorrectly treat as supported).
++    delete navigator.geolocation;
++
++    const { result } = renderHook(() => useGeolocationPermission());
++    await waitFor(() => expect(result.current.permissionState).toBe('unsupported'));
++
++    let outcome!: Awaited<ReturnType<typeof result.current.requestLocation>>;
++    await act(async () => {
++      outcome = await result.current.requestLocation();
++    });
++    expect(outcome).toEqual({ kind: 'unsupported' });
++  });
++
++  it('never calls the browser geolocation API automatically on mount (no auto-prompt)', async () => {
++    const getCurrentPosition = vi.fn();
++    stubGeolocation(getCurrentPosition);
++    stubPermissionsQuery('prompt');
++
++    renderHook(() => useGeolocationPermission());
++    await new Promise((resolve) => setTimeout(resolve, 10));
++
++    expect(getCurrentPosition).not.toHaveBeenCalled();
++  });
++
++  it('reads the initial permission state via the Permissions API without prompting', async () => {
++    stubGeolocation(vi.fn());
++    stubPermissionsQuery('granted');
++
++    const { result } = renderHook(() => useGeolocationPermission());
++    await waitFor(() => expect(result.current.permissionState).toBe('granted'));
++  });
++
++  it('falls back to "unknown" when the Permissions API is unavailable (e.g. Safari)', async () => {
++    stubGeolocation(vi.fn());
++    Object.defineProperty(navigator, 'permissions', { value: undefined, configurable: true });
++
++    const { result } = renderHook(() => useGeolocationPermission());
++    await waitFor(() => expect(result.current.permissionState).toBe('unknown'));
++  });
++
++  it('resolves granted with transient coordinates only -- never persists them anywhere', async () => {
++    stubGeolocation((success) =>
++      success({ coords: { latitude: 12.34, longitude: 56.78 } } as GeolocationPosition),
++    );
++    stubPermissionsQuery('prompt');
++
++    const { result } = renderHook(() => useGeolocationPermission());
++    // Let the hook's own mount-time permission read settle first --
++    // otherwise its async resolution could race with, and clobber, the
++    // state update from the explicit request below (a test-ordering
++    // concern only; a real user's click always happens well after
++    // mount).
++    await waitFor(() => expect(result.current.permissionState).toBe('prompt'));
++
++    let outcome!: Awaited<ReturnType<typeof result.current.requestLocation>>;
++    await act(async () => {
++      outcome = await result.current.requestLocation();
++    });
++
++    expect(outcome).toEqual({ kind: 'granted', latitude: 12.34, longitude: 56.78 });
++    await waitFor(() => expect(result.current.permissionState).toBe('granted'));
++    expect(window.localStorage.getItem('latitude')).toBeNull();
++    expect(window.localStorage.getItem('longitude')).toBeNull();
++  });
++
++  it('resolves denied and updates permission state on PERMISSION_DENIED', async () => {
++    stubGeolocation((_success, error) =>
++      error?.({
++        code: 1,
++        PERMISSION_DENIED: 1,
++        POSITION_UNAVAILABLE: 2,
++        TIMEOUT: 3,
++      } as GeolocationPositionError),
++    );
++    stubPermissionsQuery('prompt');
++
++    const { result } = renderHook(() => useGeolocationPermission());
++    await waitFor(() => expect(result.current.permissionState).toBe('prompt'));
++
++    let outcome!: Awaited<ReturnType<typeof result.current.requestLocation>>;
++    await act(async () => {
++      outcome = await result.current.requestLocation();
++    });
++
++    expect(outcome).toEqual({ kind: 'denied' });
++    await waitFor(() => expect(result.current.permissionState).toBe('denied'));
++  });
++
++  it('resolves unavailable on POSITION_UNAVAILABLE, distinct from denial', async () => {
++    stubGeolocation((_success, error) =>
++      error?.({
++        code: 2,
++        PERMISSION_DENIED: 1,
++        POSITION_UNAVAILABLE: 2,
++        TIMEOUT: 3,
++      } as GeolocationPositionError),
++    );
++    stubPermissionsQuery('prompt');
++
++    const { result } = renderHook(() => useGeolocationPermission());
++    let outcome!: Awaited<ReturnType<typeof result.current.requestLocation>>;
++    await act(async () => {
++      outcome = await result.current.requestLocation();
++    });
++
++    expect(outcome).toEqual({ kind: 'unavailable' });
++  });
++
++  it('resolves timeout on TIMEOUT, distinct from denial and unavailability', async () => {
++    stubGeolocation((_success, error) =>
++      error?.({
++        code: 3,
++        PERMISSION_DENIED: 1,
++        POSITION_UNAVAILABLE: 2,
++        TIMEOUT: 3,
++      } as GeolocationPositionError),
++    );
++    stubPermissionsQuery('prompt');
++
++    const { result } = renderHook(() => useGeolocationPermission());
++    let outcome!: Awaited<ReturnType<typeof result.current.requestLocation>>;
++    await act(async () => {
++      outcome = await result.current.requestLocation();
++    });
++
++    expect(outcome).toEqual({ kind: 'timeout' });
++  });
++});
+diff --git a/apps/web/src/lib/geolocation-permission.ts b/apps/web/src/lib/geolocation-permission.ts
+new file mode 100644
+index 0000000..4f95070
+--- /dev/null
++++ b/apps/web/src/lib/geolocation-permission.ts
+@@ -0,0 +1,108 @@
++'use client';
++
++import { useCallback, useEffect, useState } from 'react';
++
++/**
++ * Browser/device capability state -- deliberately separate from any
++ * MedSphere preference (Task 0013 requirement #4). "prompt" means the
++ * browser has not yet been asked and would show its native dialog;
++ * "unsupported" means this browser/context has no Geolocation API at
++ * all (checked safely, never assumed available during SSR).
++ */
++export type GeolocationPermissionState =
++  'unknown' | 'unsupported' | 'prompt' | 'granted' | 'denied';
++
++export type GeolocationOutcome =
++  | { kind: 'granted'; latitude: number; longitude: number }
++  | { kind: 'denied' }
++  | { kind: 'unavailable' }
++  | { kind: 'timeout' }
++  | { kind: 'unsupported' };
++
++function isSupported(): boolean {
++  return typeof navigator !== 'undefined' && 'geolocation' in navigator;
++}
++
++/**
++ * Reads current browser permission state without ever triggering the
++ * native prompt. Uses the Permissions API where available (Chrome,
++ * Firefox, Edge); falls back to "unknown" where it is not (Safari does
++ * not support querying the 'geolocation' permission name), since there
++ * is no safe way to distinguish "not yet asked" from "denied" without
++ * it -- the UI must not guess.
++ */
++async function readPermissionState(): Promise<GeolocationPermissionState> {
++  if (!isSupported()) return 'unsupported';
++  if (typeof navigator.permissions?.query !== 'function') return 'unknown';
++  try {
++    const status = await navigator.permissions.query({
++      name: 'geolocation' as PermissionName,
++    });
++    if (status.state === 'granted') return 'granted';
++    if (status.state === 'denied') return 'denied';
++    return 'prompt';
++  } catch {
++    return 'unknown';
++  }
++}
++
++/**
++ * Task 0013: location permission is requested only when explicitly
++ * invoked by requestLocation() -- this hook never calls the browser
++ * geolocation API on mount or as a side effect of rendering. Coordinates
++ * returned by requestLocation are held only in the caller's own local
++ * state for the duration of one search/action; this hook itself never
++ * stores them anywhere (no localStorage, no server call) -- see the
++ * existing nearby-medicine-search feature for how a caller uses the
++ * result transiently.
++ */
++export function useGeolocationPermission() {
++  const [permissionState, setPermissionState] = useState<GeolocationPermissionState>('unknown');
++
++  useEffect(() => {
++    let cancelled = false;
++    readPermissionState().then((state) => {
++      if (!cancelled) setPermissionState(state);
++    });
++    return () => {
++      cancelled = true;
++    };
++  }, []);
++
++  const requestLocation = useCallback((): Promise<GeolocationOutcome> => {
++    if (!isSupported()) {
++      setPermissionState('unsupported');
++      return Promise.resolve({ kind: 'unsupported' });
++    }
++
++    return new Promise((resolve) => {
++      navigator.geolocation.getCurrentPosition(
++        (position) => {
++          setPermissionState('granted');
++          resolve({
++            kind: 'granted',
++            latitude: position.coords.latitude,
++            longitude: position.coords.longitude,
++          });
++        },
++        (error) => {
++          if (error.code === error.PERMISSION_DENIED) {
++            setPermissionState('denied');
++            resolve({ kind: 'denied' });
++          } else if (error.code === error.TIMEOUT) {
++            resolve({ kind: 'timeout' });
++          } else {
++            // POSITION_UNAVAILABLE: the browser/OS could not determine a
++            // location (no GPS, no network-based estimate, location
++            // services disabled at the OS level) -- distinct from the
++            // user having denied permission.
++            resolve({ kind: 'unavailable' });
++          }
++        },
++        { enableHighAccuracy: false, timeout: 10_000, maximumAge: 60_000 },
++      );
++    });
++  }, []);
++
++  return { permissionState, requestLocation };
++}
+diff --git a/apps/web/src/lib/notification-permission.test.ts b/apps/web/src/lib/notification-permission.test.ts
+new file mode 100644
+index 0000000..ebf96f0
+--- /dev/null
++++ b/apps/web/src/lib/notification-permission.test.ts
+@@ -0,0 +1,93 @@
++import { act, renderHook, waitFor } from '@testing-library/react';
++import { afterEach, describe, expect, it, vi } from 'vitest';
++import { useNotificationPermission } from './notification-permission';
++
++const originalNotification = (globalThis as { Notification?: unknown }).Notification;
++
++afterEach(() => {
++  if (originalNotification === undefined) {
++    delete (globalThis as { Notification?: unknown }).Notification;
++  } else {
++    (globalThis as { Notification?: unknown }).Notification = originalNotification;
++  }
++  vi.restoreAllMocks();
++});
++
++function stubNotification(
++  permission: NotificationPermission,
++  requestPermission: () => Promise<NotificationPermission>,
++) {
++  (globalThis as { Notification?: unknown }).Notification = { permission, requestPermission };
++}
++
++describe('useNotificationPermission', () => {
++  it('reports unsupported when the browser has no Notification API', async () => {
++    delete (globalThis as { Notification?: unknown }).Notification;
++
++    const { result } = renderHook(() => useNotificationPermission());
++    await waitFor(() => expect(result.current.permissionState).toBe('unsupported'));
++
++    let outcome: Awaited<ReturnType<typeof result.current.requestPermission>>;
++    await act(async () => {
++      outcome = await result.current.requestPermission();
++    });
++    expect(outcome!).toBe('unsupported');
++  });
++
++  it('reads the current default/not-asked state on mount without prompting', async () => {
++    const requestPermission = vi.fn();
++    stubNotification('default', requestPermission);
++
++    renderHook(() => useNotificationPermission());
++    await new Promise((resolve) => setTimeout(resolve, 10));
++
++    expect(requestPermission).not.toHaveBeenCalled();
++  });
++
++  it('reads an already-granted state on mount', async () => {
++    stubNotification('granted', vi.fn());
++
++    const { result } = renderHook(() => useNotificationPermission());
++    await waitFor(() => expect(result.current.permissionState).toBe('granted'));
++  });
++
++  it('reads an already-denied state on mount', async () => {
++    stubNotification('denied', vi.fn());
++
++    const { result } = renderHook(() => useNotificationPermission());
++    await waitFor(() => expect(result.current.permissionState).toBe('denied'));
++  });
++
++  it('only requests permission when explicitly invoked, and reflects the granted result', async () => {
++    stubNotification('default', vi.fn().mockResolvedValue('granted'));
++
++    const { result } = renderHook(() => useNotificationPermission());
++    await waitFor(() => expect(result.current.permissionState).toBe('default'));
++
++    let outcome: Awaited<ReturnType<typeof result.current.requestPermission>>;
++    await act(async () => {
++      outcome = await result.current.requestPermission();
++    });
++
++    expect(outcome!).toBe('granted');
++    await waitFor(() => expect(result.current.permissionState).toBe('granted'));
++  });
++
++  it('reflects a denied result without retrying or nagging', async () => {
++    const requestPermission = vi.fn().mockResolvedValue('denied');
++    stubNotification('default', requestPermission);
++
++    const { result } = renderHook(() => useNotificationPermission());
++    await waitFor(() => expect(result.current.permissionState).toBe('default'));
++
++    await act(async () => {
++      await result.current.requestPermission();
++    });
++    await waitFor(() => expect(result.current.permissionState).toBe('denied'));
++
++    // Calling requestPermission again is the caller's explicit choice
++    // (e.g. a second contextual prompt) -- the hook itself never calls
++    // it automatically or in a loop.
++    expect(requestPermission).toHaveBeenCalledTimes(1);
++  });
++});
+diff --git a/apps/web/src/lib/notification-permission.ts b/apps/web/src/lib/notification-permission.ts
+new file mode 100644
+index 0000000..2a74650
+--- /dev/null
++++ b/apps/web/src/lib/notification-permission.ts
+@@ -0,0 +1,47 @@
++'use client';
++
++import { useCallback, useEffect, useState } from 'react';
++
++/** Browser/device capability state -- never a MedSphere preference (see settings-contract.ts for that). */
++export type NotificationPermissionState = 'unsupported' | 'default' | 'granted' | 'denied';
++
++function isSupported(): boolean {
++  return typeof window !== 'undefined' && 'Notification' in window;
++}
++
++function readPermissionState(): NotificationPermissionState {
++  if (!isSupported()) return 'unsupported';
++  return Notification.permission;
++}
++
++/**
++ * Task 0013: never requests browser notification permission
++ * automatically. requestPermission() must only ever be called from a
++ * user-initiated action, after the caller has already shown an
++ * application-controlled explanation of why -- this hook does not show
++ * that explanation itself (see notification-permission-prompt.tsx),
++ * only wraps the browser API safely.
++ */
++export function useNotificationPermission() {
++  const [permissionState, setPermissionState] = useState<NotificationPermissionState>('default');
++
++  useEffect(() => {
++    setPermissionState(readPermissionState());
++  }, []);
++
++  const requestPermission = useCallback(async (): Promise<NotificationPermissionState> => {
++    if (!isSupported()) {
++      setPermissionState('unsupported');
++      return 'unsupported';
++    }
++    // Browsers ignore a repeated request once the user has already
++    // denied it (no re-prompt) -- reading the result back afterward,
++    // rather than assuming success, keeps this hook's state correct
++    // either way.
++    const result = await Notification.requestPermission();
++    setPermissionState(result);
++    return result;
++  }, []);
++
++  return { permissionState, requestPermission };
++}
+diff --git a/apps/web/src/lib/settings-contract.test.ts b/apps/web/src/lib/settings-contract.test.ts
+index da94550..be5d1d4 100644
+--- a/apps/web/src/lib/settings-contract.test.ts
++++ b/apps/web/src/lib/settings-contract.test.ts
+@@ -13,6 +13,8 @@ const privacy = {
+   allowInAppChat: true,
+   privatePickup: false,
+   hideSensitiveNotifications: true,
++  wantsReservationNotifications: false,
++  wantsOperationalAlerts: false,
+ };
+ 
+ describe('settings frontend contract', () => {
+diff --git a/apps/web/src/lib/settings-contract.ts b/apps/web/src/lib/settings-contract.ts
+index d0a6fa7..0d220b2 100644
+--- a/apps/web/src/lib/settings-contract.ts
++++ b/apps/web/src/lib/settings-contract.ts
+@@ -13,6 +13,9 @@ export interface PrivacyPreferences {
+   readonly allowInAppChat: boolean;
+   readonly privatePickup: boolean;
+   readonly hideSensitiveNotifications: boolean;
++  /** MedSphere preference only -- never overrides a browser notification-permission denial. */
++  readonly wantsReservationNotifications: boolean;
++  readonly wantsOperationalAlerts: boolean;
+ }
+ 
+ export type PrivacyPreferenceUpdate = {
+@@ -33,6 +36,8 @@ const privacyKeys = [
+   'allowInAppChat',
+   'privatePickup',
+   'hideSensitiveNotifications',
++  'wantsReservationNotifications',
++  'wantsOperationalAlerts',
+ ] as const;
+ 
+ const supportedLanguageCodes = new Set<string>(SUPPORTED_LANGUAGE_CODES);
+@@ -94,6 +99,60 @@ export function isLanguageUpdateResponse(value: unknown): value is LanguageUpdat
+   );
+ }
+ 
++export const CONSENT_CATEGORIES = [
++  'LOCATION_USE',
++  'NOTIFICATIONS_RESERVATIONS',
++  'NOTIFICATIONS_OPERATIONAL',
++] as const;
++export type ConsentCategory = (typeof CONSENT_CATEGORIES)[number];
++
++export const CONSENT_SOURCES = [
++  'settings_privacy_page',
++  'nearby_search_prompt',
++  'notification_prompt',
++] as const;
++export type ConsentSource = (typeof CONSENT_SOURCES)[number];
++
++export type ConsentStatusValue = 'GRANTED' | 'WITHDRAWN';
++
++export interface ConsentStatus {
++  readonly category: ConsentCategory;
++  readonly status: ConsentStatusValue | null;
++  readonly updatedAt: string | null;
++}
++
++export interface RecordConsentRequest {
++  readonly category: ConsentCategory;
++  readonly status: ConsentStatusValue;
++  readonly source: ConsentSource;
++}
++
++const consentCategorySet = new Set<string>(CONSENT_CATEGORIES);
++
++export function isConsentStatusList(value: unknown): value is ConsentStatus[] {
++  if (!Array.isArray(value)) return false;
++  return value.every(
++    (item) =>
++      isRecord(item) &&
++      hasExactKeys(item, ['category', 'status', 'updatedAt']) &&
++      typeof item.category === 'string' &&
++      consentCategorySet.has(item.category) &&
++      (item.status === 'GRANTED' || item.status === 'WITHDRAWN' || item.status === null) &&
++      (item.updatedAt === null || typeof item.updatedAt === 'string'),
++  );
++}
++
++export function isConsentStatus(value: unknown): value is ConsentStatus {
++  return (
++    isRecord(value) &&
++    hasExactKeys(value, ['category', 'status', 'updatedAt']) &&
++    typeof value.category === 'string' &&
++    consentCategorySet.has(value.category) &&
++    (value.status === 'GRANTED' || value.status === 'WITHDRAWN' || value.status === null) &&
++    (value.updatedAt === null || typeof value.updatedAt === 'string')
++  );
++}
++
+ function isRecord(value: unknown): value is Record<string, unknown> {
+   return typeof value === 'object' && value !== null && !Array.isArray(value);
+ }
+diff --git a/packages/database/prisma/migrations/20260828150000_privacy_consent_and_notification_preferences/migration.sql b/packages/database/prisma/migrations/20260828150000_privacy_consent_and_notification_preferences/migration.sql
+new file mode 100644
+index 0000000..cf5fa27
+--- /dev/null
++++ b/packages/database/prisma/migrations/20260828150000_privacy_consent_and_notification_preferences/migration.sql
+@@ -0,0 +1,76 @@
++-- Task 0013: privacy, consent & device permission controls.
++--
++-- 1. Adds two new MedSphere-preference fields to UserPrivacy
++--    (notification category opt-ins, distinct from browser permission
++--    state, which is never persisted here or anywhere else).
++-- 2. Adds an append-only ConsentRecord log: a withdrawal is always a
++--    new row, never an update/delete of a prior grant, so historical
++--    consent evidence is preserved even after withdrawal.
++
++ALTER TABLE "UserPrivacy"
++  ADD COLUMN "wantsReservationNotifications" BOOLEAN NOT NULL DEFAULT false,
++  ADD COLUMN "wantsOperationalAlerts" BOOLEAN NOT NULL DEFAULT false;
++
++CREATE TYPE "ConsentCategory" AS ENUM (
++  'LOCATION_USE',
++  'NOTIFICATIONS_RESERVATIONS',
++  'NOTIFICATIONS_OPERATIONAL'
++);
++
++CREATE TYPE "ConsentStatus" AS ENUM (
++  'GRANTED',
++  'WITHDRAWN'
++);
++
++CREATE TABLE "ConsentRecord" (
++  "id" UUID NOT NULL,
++  "userId" UUID NOT NULL,
++  "category" "ConsentCategory" NOT NULL,
++  "status" "ConsentStatus" NOT NULL,
++  "version" INTEGER NOT NULL DEFAULT 1,
++  "source" VARCHAR(64) NOT NULL,
++  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
++  CONSTRAINT "ConsentRecord_pkey" PRIMARY KEY ("id")
++);
++
++CREATE INDEX "ConsentRecord_userId_category_createdAt_idx"
++  ON "ConsentRecord"("userId", "category", "createdAt");
++
++ALTER TABLE "ConsentRecord"
++  ADD CONSTRAINT "ConsentRecord_userId_fkey"
++  FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
++
++-- Append-only enforcement at the database level, mirroring the existing
++-- StockMovement/AuditEvent/Permission tamper-protection convention: once
++-- written, a ConsentRecord can never be updated or deleted, even by a
++-- future application bug -- only ever superseded by a new row.
++CREATE OR REPLACE FUNCTION reject_consent_record_mutation()
++RETURNS trigger LANGUAGE plpgsql AS $$
++BEGIN
++  RAISE EXCEPTION 'ConsentRecord is append-only';
++END $$;
++CREATE TRIGGER "ConsentRecord_append_only"
++BEFORE UPDATE OR DELETE ON "ConsentRecord"
++FOR EACH ROW EXECUTE FUNCTION reject_consent_record_mutation();
++
++ALTER TABLE "AuditEvent" DROP CONSTRAINT "AuditEvent_event_type_check";
++ALTER TABLE "AuditEvent" ADD CONSTRAINT "AuditEvent_event_type_check" CHECK (
++  "eventType" IN (
++    'authorization.role.created', 'authorization.role.updated',
++    'authorization.role.deleted', 'authorization.assignment.added',
++    'authorization.assignment.removed', 'authorization.provider-access.added',
++    'authorization.provider-access.removed', 'authorization.permission.denied',
++    'authentication.session.created', 'authentication.session.refresh.succeeded',
++    'authentication.session.refresh.failed', 'authentication.session.refresh.replayed',
++    'authentication.session.logout.succeeded', 'authentication.sessions.logout.succeeded',
++    'authentication.verification.completed', 'authentication.account.activated',
++    'authentication.otp.requested',
++    'privacy.consent.granted', 'privacy.consent.withdrawn', 'privacy.preference.changed',
++    'inventory.listing.configured', 'inventory.batch.received',
++    'inventory.stock.adjusted', 'inventory.stock.transferred',
++    'inventory.stock.damaged', 'inventory.batch.expired', 'inventory.batch.quarantined',
++    'inventory.reservation.created', 'inventory.reservation.confirmed',
++    'inventory.reservation.ready', 'inventory.reservation.completed',
++    'inventory.reservation.cancelled', 'inventory.reservation.expired'
++  )
++);
+diff --git a/packages/database/prisma/schema.prisma b/packages/database/prisma/schema.prisma
+index 8946f31..7fa1105 100644
+--- a/packages/database/prisma/schema.prisma
++++ b/packages/database/prisma/schema.prisma
+@@ -272,6 +272,7 @@ model User {
+   verificationAttempts   AccountVerificationAttempt[]
+   externalAuthIdentities ExternalAuthIdentity[]
+   phoneOtpChallenges     PhoneOtpChallenge[]
++  consentRecords         ConsentRecord[]
+ }
+ 
+ model ExternalAuthIdentity {
+@@ -385,6 +386,50 @@ model TenantMembership {
+   @@index([tenantId, status])
+ }
+ 
++enum ConsentCategory {
++  LOCATION_USE
++  NOTIFICATIONS_RESERVATIONS
++  NOTIFICATIONS_OPERATIONAL
++}
++
++enum ConsentStatus {
++  GRANTED
++  WITHDRAWN
++}
++
++/**
++ * Append-only consent event log (Task 0013). Never updated or deleted --
++ * a withdrawal is a NEW row with status=WITHDRAWN, never a mutation of
++ * the granting row, so historical evidence of what was actually granted
++ * and when is preserved even after withdrawal. The user's *current*
++ * effective consent for a category is always the single latest row for
++ * that (userId, category) pair -- there is deliberately no separate
++ * "current state" table to keep out of sync with this log.
++ */
++model ConsentRecord {
++  id String @id @default(uuid()) @db.Uuid
++
++  userId String @db.Uuid
++  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
++
++  category ConsentCategory
++  status   ConsentStatus
++
++  /// Schema version of the consent category's disclosure text at the
++  /// time this event was recorded, so a future copy change can be
++  /// distinguished from a no-op re-confirmation.
++  version Int @default(1)
++
++  /// Bounded, non-identifying context string (e.g. "settings_privacy_page",
++  /// "nearby_search_prompt") -- never free-form user text, never a URL
++  /// with query parameters, never anything from request headers.
++  source String @db.VarChar(64)
++
++  createdAt DateTime @default(now())
++
++  @@index([userId, category, createdAt])
++}
++
+ model UserPrivacy {
+   id String @id @default(uuid()) @db.Uuid
+ 
+@@ -398,6 +443,17 @@ model UserPrivacy {
+   hideSensitiveNotifications Boolean @default(true)
+   preferredLanguage          String  @default("en")
+ 
++  /// Task 0013: MedSphere-preference (not browser permission) for
++  /// whether the person wants reservation-update notifications, when
++  /// their browser notification permission is separately granted. A
++  /// true value here never causes a notification to be sent if the
++  /// browser permission is denied/unsupported -- see the frontend
++  /// notification-permission hook, which always checks both states.
++  wantsReservationNotifications Boolean @default(false)
++  /// Same distinction, for operational/expiry/stock alerts aimed at
++  /// authorized staff.
++  wantsOperationalAlerts        Boolean @default(false)
++
+   version Int @default(1)
+ 
+   createdAt DateTime @default(now())
+diff --git a/packages/database/src/audit.ts b/packages/database/src/audit.ts
+index 7747165..569d252 100644
+--- a/packages/database/src/audit.ts
++++ b/packages/database/src/audit.ts
+@@ -19,6 +19,9 @@ export const AUDIT_EVENT_TYPES = [
+   'authentication.verification.completed',
+   'authentication.account.activated',
+   'authentication.otp.requested',
++  'privacy.consent.granted',
++  'privacy.consent.withdrawn',
++  'privacy.preference.changed',
+   'inventory.listing.configured',
+   'inventory.batch.received',
+   'inventory.stock.adjusted',
+@@ -58,6 +61,9 @@ export const AUDIT_METADATA_KEYS = {
+   'authentication.verification.completed': ['method', 'provider', 'status', 'age18Plus'],
+   'authentication.account.activated': ['verificationPolicy'],
+   'authentication.otp.requested': [],
++  'privacy.consent.granted': ['category'],
++  'privacy.consent.withdrawn': ['category'],
++  'privacy.preference.changed': ['preferenceKeys'],
+   'inventory.listing.configured': ['productId', 'version'],
+   'inventory.batch.received': ['productId', 'quantity'],
+   'inventory.stock.adjusted': ['productId', 'delta', 'onHandBefore', 'onHandAfter'],
+-- 
+2.43.0
+
