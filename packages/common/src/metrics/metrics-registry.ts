@@ -71,7 +71,9 @@ function assertSafeLabels(metricName: string, labels: MetricLabels): void {
       throw new Error(`Metric "${metricName}": label "${key}" resembles sensitive data`);
     }
     if (key === 'route' && (value.includes('?') || value.includes('#'))) {
-      throw new Error(`Metric "${metricName}": route labels must not contain query or fragment data`);
+      throw new Error(
+        `Metric "${metricName}": route labels must not contain query or fragment data`,
+      );
     }
   }
 }
