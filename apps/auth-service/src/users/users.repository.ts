@@ -158,7 +158,6 @@ export class UsersRepository {
         id: true,
         tenantId: true,
         tenant: { select: { name: true, organizationType: true } },
-        tenant: { select: { name: true, organizationType: true } },
       },
     });
     return memberships.map((membership) => ({
@@ -191,6 +190,7 @@ export class UsersRepository {
       select: {
         id: true,
         tenantId: true,
+        tenant: { select: { name: true, organizationType: true } },
         user: {
           select: {
             id: true,
@@ -211,6 +211,7 @@ export class UsersRepository {
       user: membership.user,
       membershipId: membership.id,
       tenantId: membership.tenantId,
+      tenant: membership.tenant,
     };
   }
 

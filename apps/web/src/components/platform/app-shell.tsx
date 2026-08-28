@@ -393,13 +393,6 @@ function tenantInitials(slug: string): string {
     .toUpperCase();
 }
 
-function formatTenantName(slug: string): string {
-  return slug
-    .split('-')
-    .map((part) => `${part[0]?.toUpperCase() ?? ''}${part.slice(1)}`)
-    .join(' ');
-}
-
 function abbreviateId(value: string): string {
   return value.length <= 12 ? value : `${value.slice(0, 8)}…`;
 }
