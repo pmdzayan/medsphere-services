@@ -13,11 +13,9 @@ import { expect, test } from '@playwright/test';
 // Required env vars (supplied by scripts/task5-smoke-test.mjs, which
 // seeds the synthetic tenant/admin this test logs in as):
 //   FRONTEND (also read by playwright.config.ts as baseURL)
-//   DASHBOARD_CERT_TENANT_SLUG
 //   DASHBOARD_CERT_ADMIN_EMAIL
 //   DASHBOARD_CERT_ADMIN_PASSWORD
 
-const tenantSlug = requireEnv('DASHBOARD_CERT_TENANT_SLUG');
 const adminEmail = requireEnv('DASHBOARD_CERT_ADMIN_EMAIL');
 const adminPassword = requireEnv('DASHBOARD_CERT_ADMIN_PASSWORD');
 
@@ -34,11 +32,10 @@ test('authenticated Dashboard completes the real provider-dependent read path in
 }) => {
   // Real login through the real form -- not an injected cookie. Field
   // labels are the same accessible, public labels a real user sees
-  // (Organization slug / Work email / Password), confirmed directly
+  // (Work email / Password), confirmed directly
   // against apps/web/src/app/login/login-form.tsx -- no test-only
   // hidden DOM was needed or added.
   await page.goto('/login');
-  await page.getByLabel('Organization slug').fill(tenantSlug);
   await page.getByLabel('Work email').fill(adminEmail);
   await page.getByLabel('Password').fill(adminPassword);
   await page.getByRole('button', { name: 'Sign in securely' }).click();
