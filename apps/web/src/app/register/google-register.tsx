@@ -5,9 +5,11 @@ import { useRef, useState } from 'react';
 
 import { googleRegister } from '@/lib/api-client';
 import { normalizeGoogleRegisterRequest, validateGoogleRegisterRequest } from '@/lib/auth-contract';
+import type { OrganizationType } from '@/lib/organization-types';
 
 interface GoogleRegisterProps {
-  tenantSlug: string;
+  organizationType: OrganizationType;
+  organizationCode: string;
   firstName: string;
   lastName: string;
   phone: string;
@@ -16,7 +18,8 @@ interface GoogleRegisterProps {
 }
 
 export function GoogleRegister({
-  tenantSlug,
+  organizationType,
+  organizationCode,
   firstName,
   lastName,
   phone,
@@ -42,7 +45,8 @@ export function GoogleRegister({
         }
 
         const request = normalizeGoogleRegisterRequest({
-          tenantSlug,
+          organizationType,
+          organizationCode: organizationType === 'NONE' ? undefined : organizationCode,
           idToken: credential,
           firstName,
           lastName,

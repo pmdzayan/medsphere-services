@@ -313,11 +313,13 @@ describe('authenticated API client', () => {
 describe('public onboarding API client', () => {
   it('submits only the accepted registration contract without starting a session', async () => {
     const request = {
-      tenantSlug: 'central-pharmacy',
+      organizationType: 'HOSPITAL' as const,
+      organizationCode: 'MED-X7P42-Q9K3R',
       email: 'operator@example.com',
       password: 'a-secure-password',
       firstName: 'Mira',
       lastName: 'Patel',
+      phone: '+919876543210',
     };
     const fetchMock = vi
       .fn()
@@ -351,11 +353,13 @@ describe('public onboarding API client', () => {
 
     await expect(
       register({
-        tenantSlug: 'central-pharmacy',
+        organizationType: 'HOSPITAL',
+        organizationCode: 'MED-X7P42-Q9K3R',
         email: 'operator@example.com',
         password: 'a-secure-password',
         firstName: 'Mira',
         lastName: 'Patel',
+        phone: '+919876543210',
       }),
     ).rejects.toMatchObject({
       message: 'Too many onboarding requests. Try again later.',

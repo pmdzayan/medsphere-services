@@ -15,9 +15,10 @@ const session: SessionProfile = {
   context: {
     membershipId: '93b31836-6a84-4db9-a935-1c55960c25da',
     tenantId: '2f96df49-54a0-4fac-a3fd-e796cb1f1d3d',
+    tenantName: 'Central Pharmacy',
+    organizationType: 'PHARMACY',
   },
   expiresIn: 3600,
-  tenantSlug: 'central-pharmacy',
 };
 
 function renderShell() {

@@ -48,7 +48,12 @@ describe('Google login session boundary', () => {
             firstName: 'Test',
             lastName: 'User',
           },
-          context: { membershipId: 'membership-id', tenantId: 'tenant-id' },
+          context: {
+            membershipId: 'membership-id',
+            tenantId: 'tenant-id',
+            tenantName: 'Central Pharmacy',
+            organizationType: 'PHARMACY',
+          },
         }),
       ),
     );
@@ -93,7 +98,12 @@ describe('Google login session boundary', () => {
             lastName: 'User',
             permissions: ['unsafe-upstream-field'],
           },
-          context: { membershipId: 'membership-id', tenantId: 'tenant-id' },
+          context: {
+            membershipId: 'membership-id',
+            tenantId: 'tenant-id',
+            tenantName: 'Central Pharmacy',
+            organizationType: 'PHARMACY',
+          },
         }),
       ),
     );

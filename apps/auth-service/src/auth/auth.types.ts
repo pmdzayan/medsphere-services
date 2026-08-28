@@ -59,4 +59,8 @@ export interface LoginIdentity {
   };
   readonly membershipId: string;
   readonly tenantId: string;
+  readonly tenant: {
+    readonly name: string;
+    readonly organizationType: string;
+  };
 }

@@ -20,7 +20,7 @@ export default async function SettingsPage() {
       identity={{
         name: `${session.user.firstName} ${session.user.lastName}`,
         email: session.user.email,
-        tenantSlug: session.tenantSlug,
+        tenantName: session.context.tenantName,
         tenantId: session.context.tenantId,
         membershipId: session.context.membershipId,
       }}

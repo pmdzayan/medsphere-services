@@ -4,15 +4,20 @@ import { Throttle } from '@nestjs/throttler';
 import {
   ApiAcceptedResponse,
   ApiBearerAuth,
+  ApiExtraModels,
   ApiOkResponse,
   ApiOperation,
   ApiTags,
   ApiTooManyRequestsResponse,
   ApiUnauthorizedResponse,
+  getSchemaPath,
 } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
+import { IdentifyLoginDto } from './dto/identify-login.dto';
+import { SelectOrganizationLoginDto } from './dto/select-organization-login.dto';
+import { OrganizationSelectionRequiredDto } from './dto/organization-selection-required.dto';
 import { GoogleLoginDto } from './dto/google-login.dto';
 import { GoogleRegisterDto } from './dto/google-register.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
@@ -71,6 +76,51 @@ export class AuthController {
   @ApiUnauthorizedResponse({ description: 'Invalid credentials' })
   login(@Body() loginDto: LoginDto, @Req() request: MetadataHttpRequest) {
     return this.authService.login(loginDto, extractRequestMetadata(request));
+  }
+
+  @Post('login/identify')
+  @PublicEndpoint()
+  @Throttle({
+    ip: { limit: 10, ttl: 60_000 },
+    account: { limit: 5, ttl: 60_000 },
+  })
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      'Slug-free login step 1: verify identity, then resolve the caller\u2019s own organization membership(s)',
+  })
+  @ApiOkResponse({
+    schema: {
+      oneOf: [
+        { $ref: getSchemaPath(LoginResponseDto) },
+        { $ref: getSchemaPath(OrganizationSelectionRequiredDto) },
+      ],
+    },
+  })
+  @ApiUnauthorizedResponse({ description: 'Invalid credentials' })
+  @ApiExtraModels(LoginResponseDto, OrganizationSelectionRequiredDto)
+  identifyLogin(@Body() identifyLoginDto: IdentifyLoginDto, @Req() request: MetadataHttpRequest) {
+    return this.authService.identifyLogin(identifyLoginDto, extractRequestMetadata(request));
+  }
+
+  @Post('login/select-organization')
+  @PublicEndpoint()
+  @Throttle({
+    ip: { limit: 10, ttl: 60_000 },
+    account: { limit: 5, ttl: 60_000 },
+  })
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      'Slug-free login step 2: complete login for a specific, previously-identified membership',
+  })
+  @ApiOkResponse({ type: LoginResponseDto })
+  @ApiUnauthorizedResponse({ description: 'Invalid credentials' })
+  selectOrganizationLogin(
+    @Body() dto: SelectOrganizationLoginDto,
+    @Req() request: MetadataHttpRequest,
+  ) {
+    return this.authService.selectOrganizationLogin(dto, extractRequestMetadata(request));
   }
 
   @Post('google')

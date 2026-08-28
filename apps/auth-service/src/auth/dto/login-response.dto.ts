@@ -20,6 +20,12 @@ export class TenantContextResponseDto {
 
   @ApiProperty({ format: 'uuid' })
   tenantId!: string;
+
+  @ApiProperty()
+  tenantName!: string;
+
+  @ApiProperty()
+  organizationType!: string;
 }
 
 export class LoginResponseDto {

@@ -6,7 +6,8 @@ import { REGISTRATION_CONFIRMATION_MESSAGE } from '@/lib/auth-contract';
 import { POST } from './route';
 
 const validRequest = {
-  tenantSlug: 'central-pharmacy',
+  organizationType: 'HOSPITAL',
+  organizationCode: 'MED-X7P42-Q9K3R',
   email: 'operator@example.com',
   password: 'a-secure-password',
   firstName: 'Mira',
@@ -50,7 +51,7 @@ describe('public onboarding BFF boundary', () => {
     const response = await POST(
       request({
         ...validRequest,
-        tenantSlug: '  Central-Pharmacy ',
+        organizationCode: ' med-x7p42-q9k3r ',
         email: ' OPERATOR@EXAMPLE.COM ',
         firstName: ' Mira ',
         lastName: ' Patel ',

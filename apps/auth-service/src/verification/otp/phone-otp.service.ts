@@ -23,12 +23,12 @@ import {
 type OtpTransaction = Prisma.TransactionClient;
 
 export interface RequestPhoneOtpInput {
-  readonly tenantSlug: string;
+  readonly tenantSlug?: string;
   readonly email: string;
 }
 
 export interface VerifyPhoneOtpInput {
-  readonly tenantSlug: string;
+  readonly tenantSlug?: string;
   readonly email: string;
   readonly code: string;
 }
@@ -60,7 +60,9 @@ export class PhoneOtpService {
   ) {}
 
   async requestOtp(input: RequestPhoneOtpInput): Promise<RequestPhoneOtpResult> {
-    const tenantSlug = normalizeAuthenticationLocator(input.tenantSlug);
+    const tenantSlug = input.tenantSlug
+      ? normalizeAuthenticationLocator(input.tenantSlug)
+      : undefined;
     const email = normalizeAuthenticationLocator(input.email);
     const genericResult: RequestPhoneOtpResult = {
       message: 'If eligible, a verification code has been sent.',
@@ -162,7 +164,9 @@ export class PhoneOtpService {
   }
 
   async verifyOtp(input: VerifyPhoneOtpInput): Promise<VerifyPhoneOtpResult> {
-    const tenantSlug = normalizeAuthenticationLocator(input.tenantSlug);
+    const tenantSlug = input.tenantSlug
+      ? normalizeAuthenticationLocator(input.tenantSlug)
+      : undefined;
     const email = normalizeAuthenticationLocator(input.email);
     const code = input.code.trim();
 
@@ -242,23 +246,39 @@ export class PhoneOtpService {
 
   private async findEligibleMembership(
     transaction: OtpTransaction,
-    tenantSlug: string,
+    tenantSlug: string | undefined,
     email: string,
   ) {
-    return transaction.tenantMembership.findFirst({
-      where: {
+    const where = {
+      deletedAt: null,
+      status: { in: ['PENDING', 'ACTIVE'] },
+      tenant: {
+        ...(tenantSlug ? { slug: tenantSlug } : {}),
+        isActive: true,
         deletedAt: null,
-        status: { in: ['PENDING', 'ACTIVE'] },
-        tenant: { slug: tenantSlug, isActive: true, deletedAt: null },
-        user: { email, deletedAt: null },
       },
-      select: {
-        id: true,
-        tenantId: true,
-        status: true,
-        user: { select: { id: true, phone: true } },
-      },
+      user: { email, deletedAt: null },
+    } satisfies Prisma.TenantMembershipWhereInput;
+    const select = {
+      id: true,
+      tenantId: true,
+      status: true,
+      user: { select: { id: true, phone: true } },
+    } satisfies Prisma.TenantMembershipSelect;
+
+    if (tenantSlug) {
+      return transaction.tenantMembership.findFirst({ where, select });
+    }
+
+    // New onboarding never asks a person to know an internal slug. Resolve
+    // only when the email has one eligible membership; ambiguity fails
+    // closed and produces the same generic public response.
+    const memberships = await transaction.tenantMembership.findMany({
+      where,
+      select,
+      take: 2,
     });
+    return memberships.length === 1 ? memberships[0] : null;
   }
 
   private async invalidateChallenge(tenantId: string, userId: string): Promise<void> {

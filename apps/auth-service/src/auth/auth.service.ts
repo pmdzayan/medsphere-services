@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 
 import { UsersRepository } from '../users/users.repository';
+import { OrganizationOnboardingService } from '../organization/organization-onboarding.service';
 import { PasswordService } from './password.service';
 import { RegistrationService } from './registration.service';
 import { TokenService } from './token.service';
@@ -13,6 +14,9 @@ import { AuthenticatedIdentity, LoginIdentity, RequestMetadata } from './auth.ty
 import { RegisterDto } from './dto/register.dto';
 import { GoogleRegisterDto } from './dto/google-register.dto';
 import { LoginDto } from './dto/login.dto';
+import { IdentifyLoginDto } from './dto/identify-login.dto';
+import { SelectOrganizationLoginDto } from './dto/select-organization-login.dto';
+import { OrganizationSelectionRequiredDto } from './dto/organization-selection-required.dto';
 import { LoginResponseDto } from './dto/login-response.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { RegistrationResponseDto } from './dto/registration-response.dto';
@@ -24,6 +28,7 @@ const INVALID_REFRESH_MESSAGE = 'Invalid refresh credential';
 export class AuthService {
   constructor(
     private readonly usersRepository: UsersRepository,
+    private readonly organizationOnboarding: OrganizationOnboardingService,
     private readonly passwordService: PasswordService,
     private readonly registrationService: RegistrationService,
     private readonly tokenService: TokenService,
@@ -45,13 +50,15 @@ export class AuthService {
   async googleRegister(googleRegisterDto: GoogleRegisterDto): Promise<RegistrationResponseDto> {
     const googleIdentity = await this.googleIdentityVerifier.verify(googleRegisterDto.idToken);
 
-    await this.usersRepository.createPendingGoogleRegistration({
-      tenantSlug: googleRegisterDto.tenantSlug,
+    await this.organizationOnboarding.registerWithGoogle({
+      organizationType: googleRegisterDto.organizationType,
+      organizationCode: googleRegisterDto.organizationCode,
       subject: googleIdentity.subject,
       email: googleIdentity.email,
       phone: googleRegisterDto.phone,
       firstName: googleRegisterDto.firstName,
       lastName: googleRegisterDto.lastName,
+      orgJoinCodePepper: this.authConfig.value.orgJoinCodePepper,
     });
 
     this.securityEvents.record('registration', {
@@ -92,6 +99,111 @@ export class AuthService {
     if (this.passwordService.needsRehash(loginIdentity.user.passwordHash)) {
       const passwordHash = await this.passwordService.hash(loginDto.password);
       await this.usersRepository.update(loginIdentity.user.id, { passwordHash });
+    }
+
+    return this.createAuthenticatedSession(loginIdentity, metadata);
+  }
+
+  /**
+   * Task 0010: slug-free login, step 1. Verifies the person's individual
+   * identity (email + password) with no organization context at all,
+   * then resolves only the memberships that belong to that now-verified
+   * identity -- never a tenant search. Exactly one active membership
+   * logs the person in directly, identically to the legacy tenantSlug
+   * flow's outcome; more than one requires an explicit follow-up
+   * selection (see selectOrganizationLogin); zero is treated identically
+   * to invalid credentials, so an attacker cannot use this endpoint to
+   * learn whether an email exists independently of its password.
+   */
+  async identifyLogin(
+    identifyLoginDto: IdentifyLoginDto,
+    metadata: RequestMetadata,
+  ): Promise<LoginResponseDto | OrganizationSelectionRequiredDto> {
+    const identity = await this.usersRepository.findGlobalIdentityByEmail(identifyLoginDto.email);
+
+    if (!identity || !identity.passwordHash) {
+      await this.passwordService.verifyAgainstDummy(identifyLoginDto.password);
+      this.recordInvalidLogin();
+      throw new UnauthorizedException(INVALID_CREDENTIALS_MESSAGE);
+    }
+
+    const passwordValid = await this.passwordService.verify(
+      identity.passwordHash,
+      identifyLoginDto.password,
+    );
+    if (!passwordValid) {
+      this.recordInvalidLogin();
+      throw new UnauthorizedException(INVALID_CREDENTIALS_MESSAGE);
+    }
+
+    if (this.passwordService.needsRehash(identity.passwordHash)) {
+      const passwordHash = await this.passwordService.hash(identifyLoginDto.password);
+      await this.usersRepository.update(identity.id, { passwordHash });
+    }
+
+    const memberships = await this.usersRepository.findActiveMembershipsForUser(identity.id);
+
+    if (memberships.length === 0) {
+      // A verified identity with no active organization membership is
+      // not distinguishable, from the outside, from a wrong password --
+      // both fail identically.
+      this.recordInvalidLogin();
+      throw new UnauthorizedException(INVALID_CREDENTIALS_MESSAGE);
+    }
+
+    if (memberships.length === 1) {
+      const loginIdentity = await this.usersRepository.findLoginIdentityByMembershipId(
+        identity.id,
+        memberships[0].membershipId,
+      );
+      if (!loginIdentity) {
+        this.recordInvalidLogin();
+        throw new UnauthorizedException(INVALID_CREDENTIALS_MESSAGE);
+      }
+      return this.createAuthenticatedSession(loginIdentity, metadata);
+    }
+
+    const response = new OrganizationSelectionRequiredDto();
+    response.organizations = memberships.map((membership) => ({
+      membershipId: membership.membershipId,
+      organizationName: membership.organizationName,
+      organizationType: membership.organizationType,
+    }));
+    return response;
+  }
+
+  /**
+   * Task 0010: slug-free login, step 2 (only reached when identifyLogin
+   * found more than one active membership). Re-verifies the password --
+   * a membershipId is never trusted alone -- then issues a session for
+   * that specific membership, scoped by both membershipId AND the
+   * verified userId so a membership belonging to a different account can
+   * never be selected.
+   */
+  async selectOrganizationLogin(
+    dto: SelectOrganizationLoginDto,
+    metadata: RequestMetadata,
+  ): Promise<LoginResponseDto> {
+    const identity = await this.usersRepository.findGlobalIdentityByEmail(dto.email);
+    if (!identity || !identity.passwordHash) {
+      await this.passwordService.verifyAgainstDummy(dto.password);
+      this.recordInvalidLogin();
+      throw new UnauthorizedException(INVALID_CREDENTIALS_MESSAGE);
+    }
+
+    const passwordValid = await this.passwordService.verify(identity.passwordHash, dto.password);
+    if (!passwordValid) {
+      this.recordInvalidLogin();
+      throw new UnauthorizedException(INVALID_CREDENTIALS_MESSAGE);
+    }
+
+    const loginIdentity = await this.usersRepository.findLoginIdentityByMembershipId(
+      identity.id,
+      dto.membershipId,
+    );
+    if (!loginIdentity) {
+      this.recordInvalidLogin();
+      throw new UnauthorizedException(INVALID_CREDENTIALS_MESSAGE);
     }
 
     return this.createAuthenticatedSession(loginIdentity, metadata);
@@ -177,6 +289,8 @@ export class AuthService {
       context: {
         membershipId: loginIdentity.membershipId,
         tenantId: loginIdentity.tenantId,
+        tenantName: loginIdentity.tenant.name,
+        organizationType: loginIdentity.tenant.organizationType,
       },
     };
   }

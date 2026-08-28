@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { LanguageProvider } from '@/components/language-provider';
-import { ApiError, login } from '@/lib/api-client';
+import { ApiError, identifyLogin, selectOrganizationLogin } from '@/lib/api-client';
 import { LoginForm } from './login-form';
 
 const replace = vi.fn();
@@ -12,17 +12,24 @@ vi.mock('next/navigation', () => ({
 
 vi.mock('@/lib/api-client', async () => {
   const actual = await vi.importActual<typeof import('@/lib/api-client')>('@/lib/api-client');
-  return { ...actual, login: vi.fn() };
+  return { ...actual, identifyLogin: vi.fn(), selectOrganizationLogin: vi.fn() };
 });
+
+const singleMembershipSession = {
+  expiresIn: 3600,
+  user: { id: 'user-1', email: 'operator@example.com', firstName: 'Mira', lastName: 'Patel' },
+  context: {
+    membershipId: '93b31836-6a84-4db9-a935-1c55960c25da',
+    tenantId: 'tenant-1',
+    tenantName: 'Central Hospital',
+    organizationType: 'HOSPITAL',
+  },
+};
 
 beforeEach(() => {
   vi.clearAllMocks();
   window.localStorage.clear();
-  vi.mocked(login).mockResolvedValue({
-    expiresIn: 3600,
-    user: { id: 'user-1', email: 'operator@example.com', firstName: 'Mira', lastName: 'Patel' },
-    context: { membershipId: '93b31836-6a84-4db9-a935-1c55960c25da', tenantId: 'tenant-1' },
-  });
+  vi.mocked(identifyLogin).mockResolvedValue(singleMembershipSession);
 });
 
 afterEach(() => cleanup());
@@ -36,19 +43,22 @@ function renderLoginForm() {
 }
 
 describe('LoginForm interactions', () => {
+  it('never renders an organization slug or tenant field of any kind', () => {
+    renderLoginForm();
+    expect(screen.queryByLabelText(/organization slug/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/tenant/i)).not.toBeInTheDocument();
+  });
+
   it('rejects invalid fields without calling the API', () => {
     renderLoginForm();
 
-    fill('Organization slug', 'Invalid Tenant');
     fill('Work email', 'invalid');
     fill('Password', 'too-short');
     fireEvent.click(screen.getByRole('button', { name: 'Sign in securely' }));
 
-    expect(
-      screen.getByText('Use the organization slug provided by your administrator.'),
-    ).toBeVisible();
     expect(screen.getByText('Enter a valid email address.')).toBeVisible();
-    expect(login).not.toHaveBeenCalled();
+    expect(screen.getByText('Password must be between 15 and 128 characters.')).toBeVisible();
+    expect(identifyLogin).not.toHaveBeenCalled();
   });
 
   it('announces field-level validation errors to assistive technology', () => {
@@ -61,31 +71,68 @@ describe('LoginForm interactions', () => {
     expect(alerts.some((el) => el.textContent === 'Enter a valid email address.')).toBe(true);
   });
 
-  it('submits the normalized request and navigates to the dashboard', async () => {
+  it('submits identity alone (no tenant slug) and navigates directly when exactly one membership exists', async () => {
     renderLoginForm();
 
-    fill('Organization slug', 'central-pharmacy');
     fill('Work email', ' OPERATOR@EXAMPLE.COM ');
     fill('Password', 'a-secure-password');
     fireEvent.click(screen.getByRole('button', { name: 'Sign in securely' }));
 
     await waitFor(() =>
-      expect(login).toHaveBeenCalledWith({
-        tenantSlug: 'central-pharmacy',
+      expect(identifyLogin).toHaveBeenCalledWith({
         email: 'operator@example.com',
         password: 'a-secure-password',
       }),
     );
     expect(replace).toHaveBeenCalledWith('/dashboard');
     expect(refresh).toHaveBeenCalled();
+    expect(selectOrganizationLogin).not.toHaveBeenCalled();
+  });
+
+  it('shows only bounded organization display info -- never a search -- when multiple memberships exist, then completes login on selection', async () => {
+    vi.mocked(identifyLogin).mockResolvedValue({
+      requiresOrganizationSelection: true,
+      organizations: [
+        {
+          membershipId: 'membership-1',
+          organizationName: 'Central Hospital',
+          organizationType: 'HOSPITAL',
+        },
+        {
+          membershipId: 'membership-2',
+          organizationName: 'Riverside Pharmacy',
+          organizationType: 'PHARMACY',
+        },
+      ],
+    });
+    vi.mocked(selectOrganizationLogin).mockResolvedValue(singleMembershipSession);
+
+    renderLoginForm();
+
+    fill('Work email', 'operator@example.com');
+    fill('Password', 'a-secure-password');
+    fireEvent.click(screen.getByRole('button', { name: 'Sign in securely' }));
+
+    expect(await screen.findByText('Central Hospital')).toBeVisible();
+    expect(screen.getByText('Riverside Pharmacy')).toBeVisible();
+
+    fireEvent.click(screen.getByText('Central Hospital'));
+
+    await waitFor(() =>
+      expect(selectOrganizationLogin).toHaveBeenCalledWith({
+        email: 'operator@example.com',
+        password: 'a-secure-password',
+        membershipId: 'membership-1',
+      }),
+    );
+    expect(replace).toHaveBeenCalledWith('/dashboard');
   });
 
   it('prevents duplicate submission while a request is pending, then recovers on error', async () => {
-    const pendingLogin = deferred<Awaited<ReturnType<typeof login>>>();
-    vi.mocked(login).mockReturnValueOnce(pendingLogin.promise);
+    const pendingLogin = deferred<Awaited<ReturnType<typeof identifyLogin>>>();
+    vi.mocked(identifyLogin).mockReturnValueOnce(pendingLogin.promise);
     renderLoginForm();
 
-    fill('Organization slug', 'central-pharmacy');
     fill('Work email', 'operator@example.com');
     fill('Password', 'a-secure-password');
     const submit = screen.getByRole('button', { name: 'Sign in securely' });
@@ -95,7 +142,7 @@ describe('LoginForm interactions', () => {
     expect(submit).toBeDisabled();
 
     fireEvent.click(submit);
-    expect(login).toHaveBeenCalledTimes(1);
+    expect(identifyLogin).toHaveBeenCalledTimes(1);
 
     pendingLogin.reject(new ApiError('Invalid credentials', 401));
 

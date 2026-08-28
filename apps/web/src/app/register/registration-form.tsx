@@ -3,12 +3,13 @@
 import Link from 'next/link';
 import { FormEvent, useState } from 'react';
 import { useLanguage } from '@/components/language-provider';
-import { register } from '@/lib/api-client';
+import { register, requestPhoneOtp, verifyPhoneOtp } from '@/lib/api-client';
 import {
   normalizeRegistrationRequest,
   type RegistrationRequest,
   validateRegistrationRequest,
 } from '@/lib/auth-contract';
+import { HEALTHCARE_ORGANIZATION_TYPES, type OrganizationType } from '@/lib/organization-types';
 import type { TranslationKey } from '@/lib/i18n';
 import { GoogleRegister } from './google-register';
 
@@ -16,12 +17,24 @@ type RegistrationField = keyof RegistrationRequest;
 type FormErrors = Partial<Record<RegistrationField | 'confirmPassword' | 'form', string>>;
 
 const validationMessageKeys: Record<string, TranslationKey> = {
-  'Use the organization slug provided by your administrator.': 'registration.errorTenant',
+  'Choose an organization type.': 'registration.errorOrganizationType',
+  'Enter the organization code provided by your administrator.':
+    'registration.errorOrganizationCode',
   'Enter a valid email address.': 'registration.errorEmail',
   'Enter a valid phone number including country code.': 'registration.errorPhone',
   'Password must be between 15 and 128 characters.': 'registration.errorPassword',
   'Enter a first name between 1 and 100 characters.': 'registration.errorFirstName',
   'Enter a last name between 1 and 100 characters.': 'registration.errorLastName',
+};
+
+const organizationTypeLabelKeys: Record<OrganizationType, TranslationKey> = {
+  PHARMACY: 'registration.orgType.pharmacy',
+  HOSPITAL: 'registration.orgType.hospital',
+  LABORATORY: 'registration.orgType.laboratory',
+  CLINIC: 'registration.orgType.clinic',
+  BLOOD_BANK: 'registration.orgType.bloodBank',
+  SUPPLIER: 'registration.orgType.supplier',
+  NONE: 'registration.orgType.none',
 };
 
 export function RegistrationForm() {
@@ -33,13 +46,24 @@ export function RegistrationForm() {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [phone, setPhone] = useState('');
-  const [tenantSlug, setTenantSlug] = useState('');
+  const [organizationType, setOrganizationType] = useState<OrganizationType | ''>('');
+  const [organizationCode, setOrganizationCode] = useState('');
+  const [verificationEmail, setVerificationEmail] = useState('');
+  const [verificationCode, setVerificationCode] = useState('');
+  const [verificationPending, setVerificationPending] = useState(false);
+  const [verificationComplete, setVerificationComplete] = useState(false);
+  const [verificationError, setVerificationError] = useState('');
+
+  const requiresOrganizationCode = organizationType !== '' && organizationType !== 'NONE';
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
+    const selectedType = (String(form.get('organizationType') ?? '') || 'NONE') as OrganizationType;
     const request = normalizeRegistrationRequest({
-      tenantSlug: String(form.get('tenantSlug') ?? ''),
+      organizationType: selectedType,
+      organizationCode:
+        selectedType === 'NONE' ? undefined : String(form.get('organizationCode') ?? ''),
       email: String(form.get('email') ?? ''),
       password: String(form.get('password') ?? ''),
       firstName: String(form.get('firstName') ?? ''),
@@ -64,11 +88,50 @@ export function RegistrationForm() {
     setErrors({});
     try {
       await register(request);
+      setVerificationEmail(request.email);
       setConfirmation(true);
+      setVerificationPending(true);
+      try {
+        await requestPhoneOtp({ email: request.email });
+      } catch {
+        setVerificationError(t('registration.verificationSendError'));
+      } finally {
+        setVerificationPending(false);
+      }
     } catch {
       setErrors({ form: t('registration.errorGeneric') });
     } finally {
       setPending(false);
+    }
+  }
+
+  async function handleVerification(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!/^\d{6}$/.test(verificationCode)) {
+      setVerificationError(t('registration.verificationCodeError'));
+      return;
+    }
+    setVerificationPending(true);
+    setVerificationError('');
+    try {
+      await verifyPhoneOtp({ email: verificationEmail, code: verificationCode });
+      setVerificationComplete(true);
+    } catch {
+      setVerificationError(t('registration.verificationCodeError'));
+    } finally {
+      setVerificationPending(false);
+    }
+  }
+
+  async function resendVerificationCode() {
+    setVerificationPending(true);
+    setVerificationError('');
+    try {
+      await requestPhoneOtp({ email: verificationEmail });
+    } catch {
+      setVerificationError(t('registration.verificationSendError'));
+    } finally {
+      setVerificationPending(false);
     }
   }
 
@@ -93,6 +156,54 @@ export function RegistrationForm() {
         <div className="mt-6 rounded-2xl border border-emerald-900/[.08] bg-white/70 p-4 text-xs leading-6 text-[#60736d]">
           {t('registration.privacyConfirmation')}
         </div>
+        {organizationType !== 'NONE' ? (
+          <div className="mt-4 rounded-2xl border border-emerald-900/[.08] bg-white/70 p-4 text-xs leading-6 text-[#60736d]">
+            {t('registration.pendingMembershipExplanation')}
+          </div>
+        ) : null}
+        {verificationComplete ? (
+          <div className="mt-4 rounded-2xl border border-emerald-700/20 bg-white p-4 text-sm font-semibold text-emerald-800">
+            {t('registration.verificationComplete')}
+          </div>
+        ) : (
+          <form className="mt-5 space-y-3" onSubmit={handleVerification} noValidate>
+            <label htmlFor="registration-verification-code" className="block text-xs font-bold text-[#43524e]">
+              {t('registration.verificationCode')}
+            </label>
+            <input
+              id="registration-verification-code"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              maxLength={6}
+              value={verificationCode}
+              onChange={(event) => setVerificationCode(event.target.value.replace(/\D/g, ''))}
+              className="w-full rounded-xl border border-[#10201c]/[.11] bg-white px-4 py-3.5 text-center text-lg tracking-[.35em] text-[#10201c]"
+              aria-invalid={Boolean(verificationError)}
+            />
+            {verificationError ? (
+              <p className="text-xs text-red-700" role="alert">{verificationError}</p>
+            ) : (
+              <p className="text-xs text-[#60736d]">{t('registration.verificationSent')}</p>
+            )}
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <button
+                type="submit"
+                disabled={verificationPending}
+                className="min-h-11 rounded-xl bg-emerald-700 px-5 text-sm font-bold text-white disabled:opacity-60"
+              >
+                {t('registration.verifyCode')}
+              </button>
+              <button
+                type="button"
+                disabled={verificationPending}
+                onClick={resendVerificationCode}
+                className="min-h-11 rounded-xl border border-emerald-900/10 bg-white px-5 text-sm font-bold text-[#264b40] disabled:opacity-60"
+              >
+                {t('registration.resendCode')}
+              </button>
+            </div>
+          </form>
+        )}
         <div className="mt-7 flex flex-col gap-3 sm:flex-row">
           <Link
             href="/login"
@@ -106,6 +217,9 @@ export function RegistrationForm() {
               setConfirmation(false);
               setErrors({});
               setShowPassword(false);
+              setVerificationCode('');
+              setVerificationComplete(false);
+              setVerificationError('');
             }}
             className="min-h-12 rounded-xl border border-[#17372e]/10 bg-white px-5 text-sm font-bold text-[#264b40] transition hover:border-emerald-700/25"
           >
@@ -138,17 +252,51 @@ export function RegistrationForm() {
           error={errors.lastName}
         />
       </div>
-      <Field
-        name="tenantSlug"
-        label={t('registration.organizationSlug')}
-        description={t('registration.organizationSlugDescription')}
-        placeholder="central-pharmacy"
-        autoComplete="organization"
-        maxLength={100}
-        value={tenantSlug}
-        onChange={(event) => setTenantSlug(event.target.value)}
-        error={errors.tenantSlug}
-      />
+      <div className="block">
+        <label
+          htmlFor="registration-organizationType"
+          className="mb-2 block text-xs font-bold text-[#43524e]"
+        >
+          {t('registration.organizationType')}
+        </label>
+        <select
+          id="registration-organizationType"
+          name="organizationType"
+          required
+          value={organizationType}
+          onChange={(event) => setOrganizationType(event.target.value as OrganizationType)}
+          aria-invalid={Boolean(errors.organizationType)}
+          className="w-full rounded-xl border border-[#10201c]/[.11] bg-[#fbfaf5] px-4 py-3.5 text-sm text-[#10201c] shadow-[0_1px_0_rgba(255,255,255,.8)_inset] transition hover:border-[#10201c]/25 focus:border-emerald-600 focus:bg-white"
+        >
+          <option value="" disabled>
+            {t('registration.organizationType')}
+          </option>
+          {HEALTHCARE_ORGANIZATION_TYPES.map((type) => (
+            <option key={type} value={type}>
+              {t(organizationTypeLabelKeys[type])}
+            </option>
+          ))}
+          <option value="NONE">{t(organizationTypeLabelKeys.NONE)}</option>
+        </select>
+        {errors.organizationType ? (
+          <span className="mt-2 block text-xs text-red-700" role="alert">
+            {errors.organizationType}
+          </span>
+        ) : null}
+      </div>
+      {requiresOrganizationCode ? (
+        <Field
+          name="organizationCode"
+          label={t('registration.organizationCode')}
+          description={t('registration.organizationCodeDescription')}
+          placeholder="MED-X7P42-Q9K3R"
+          autoComplete="off"
+          maxLength={40}
+          value={organizationCode}
+          onChange={(event) => setOrganizationCode(event.target.value)}
+          error={errors.organizationCode}
+        />
+      ) : null}
       <Field
         name="email"
         label={t('registration.workEmail')}
@@ -217,7 +365,8 @@ export function RegistrationForm() {
 
         <div className="flex justify-center">
           <GoogleRegister
-            tenantSlug={tenantSlug}
+            organizationType={organizationType || 'NONE'}
+            organizationCode={organizationCode}
             firstName={firstName}
             lastName={lastName}
             phone={phone}

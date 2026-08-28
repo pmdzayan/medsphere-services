@@ -8,6 +8,7 @@ export const PERMISSIONS = {
   assignmentsManage: 'authorization.assignments.manage',
   providerAccessRead: 'authorization.provider-access.read',
   providerAccessManage: 'authorization.provider-access.manage',
+  organizationJoinCodesManage: 'organization.join-codes.manage',
   auditEventsRead: 'audit.events.read',
   inventoryStockRead: 'inventory.stock.read',
   inventoryListingsManage: 'inventory.listings.manage',

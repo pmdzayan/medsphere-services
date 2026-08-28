@@ -12,6 +12,7 @@ export type AuthConfigFixtureKey =
   | 'AUTH_REFRESH_ABSOLUTE_TTL_SECONDS'
   | 'AUTH_REFRESH_TOKEN_PEPPER'
   | 'AUTH_OTP_PEPPER'
+  | 'ORG_JOIN_CODE_PEPPER'
   | 'AUTH_ARGON2_MEMORY_KIB'
   | 'AUTH_ARGON2_TIME_COST'
   | 'AUTH_ARGON2_PARALLELISM';
@@ -37,6 +38,7 @@ export function createAuthConfigFixture(
     AUTH_REFRESH_ABSOLUTE_TTL_SECONDS: '2592000',
     AUTH_REFRESH_TOKEN_PEPPER: randomBytes(32).toString('base64'),
     AUTH_OTP_PEPPER: randomBytes(32).toString('base64'),
+    ORG_JOIN_CODE_PEPPER: randomBytes(32).toString('base64'),
     AUTH_ARGON2_MEMORY_KIB: '19456',
     AUTH_ARGON2_TIME_COST: '2',
     AUTH_ARGON2_PARALLELISM: '1',
