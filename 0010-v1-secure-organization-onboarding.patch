@@ -1,0 +1,4037 @@
+From 26c12cabad43c247b5c04115ae69ff407b14af04 Mon Sep 17 00:00:00 2001
+From: MedSphere Agent <agent@medsphere.local>
+Date: Fri, 28 Aug 2026 06:48:33 +0000
+Subject: [PATCH] feat: secure organization-type + invitation onboarding (Task
+ 0010)
+
+Removes the user-facing tenant slug from registration and login,
+replacing it with a bounded organization-type selector and a secure,
+hashed organization join-code system. MedSphere remains the sole
+authority over membership status and role assignment -- a valid code
+only ever lets an onboarding request be associated with an
+organization, never a privilege grant.
+
+## Organization types
+
+- New bounded OrganizationType enum (PHARMACY/HOSPITAL/LABORATORY/
+  CLINIC/BLOOD_BANK/SUPPLIER/NONE) added to Tenant, mirrored as a
+  hand-kept-in-sync constant on both the backend
+  (organization/organization-type.ts) and frontend
+  (lib/organization-types.ts) since the frontend cannot import the
+  backend package. No free-form string is ever accepted.
+
+## Organization join codes
+
+- New OrganizationJoinCode model: reusable, revocable, admin-issued
+  codes (a single coherent V1 model, not per-invitee single-use
+  tokens) -- see organization-join-code.util.ts's doc comment for the
+  full rationale. High-entropy (MED-XXXXX-XXXXX, ~50 bits, safe
+  alphabet excluding ambiguous characters), never sequential, never
+  derived from organization name/slug/ID.
+- Only an HMAC-SHA256 hash (keyed by a new, dedicated
+  ORG_JOIN_CODE_PEPPER, mirroring the existing pattern for refresh
+  credentials and OTP codes) is ever persisted -- the plaintext code
+  is never stored.
+- Lifecycle: status (ACTIVE/REVOKED), optional expiry, redemption
+  counter for operator visibility (not single-use consumption).
+
+## OrganizationOnboardingService
+
+- Single redemption path shared by both password and Google
+  registration. Verifies code validity, status, expiry, tenant active
+  status, AND that the selected organization type matches the
+  organization's actual server-recorded type -- never trusted from the
+  client alone.
+- Every failure mode (nonexistent code, wrong type, expired, revoked,
+  malformed, already-registered email) produces an identical silent
+  no-op response, mirroring the existing accepted
+  createPendingRegistration anti-enumeration pattern exactly.
+- Creates only a PENDING membership for a real organization -- no
+  role, permission, or provider-access field is ever set at this
+  stage; role assignment remains entirely the existing RBAC
+  framework's responsibility, for a later task.
+- NONE (personal account): a dedicated, lazily-created,
+  non-healthcare tenant. The membership itself is ACTIVE (there is no
+  elevated privilege to gate for a non-organizational account), but
+  the User row is still PENDING_VERIFICATION like every other
+  registration -- phone/identity verification is never bypassed.
+- Google registration reuses this exact same service, preserving the
+  existing anti-auto-link checks (an existing email or Google subject
+  is never silently attached to another organization).
+
+## Slug-free login
+
+- New POST /auth/login/identify: verifies the person's individual
+  identity (email + password) alone, with no organization context.
+  Resolves only that identity's own active memberships -- never a
+  tenant search. Exactly one membership logs the person in directly;
+  zero is treated identically to invalid credentials.
+- New POST /auth/login/select-organization: used only when identify
+  found more than one active membership. Re-verifies the password
+  (never trusts a bare membershipId) before completing login for the
+  chosen membership, scoped to both membershipId and the verified
+  userId.
+- Both reuse the existing createAuthenticatedSession session-issuance
+  helper rather than duplicating it. The legacy tenantSlug-based
+  POST /auth/login endpoint is left unchanged and available.
+- Frontend LoginForm rewritten for the two-step flow: no tenant slug
+  field; a disambiguation screen shows only bounded organization
+  display information (name, type) the now-verified caller is already
+  authorized to see -- never a general organization search.
+- Known, explicitly scoped limitation: the two new BFF routes do not
+  yet thread a resolved tenant display name into the session cookie
+  (a wider, lower-priority follow-up -- see the final report). This
+  does not weaken any security property: no slug is collected from or
+  shown to the user either way.
+
+## Registration UI
+
+- RegistrationForm: organization slug field replaced with a fixed
+  organization-type selector; the organization-code field is shown
+  only for non-NONE types and hidden entirely for a personal account.
+  GoogleRegister updated identically.
+
+## Anti-enumeration, RBAC, isolation
+
+- No new organization-listing/search endpoint exists anywhere.
+- A code for tenant A can never resolve to tenant B; the lookup is by
+  codeHash alone, with no alternate resolution path accepting a
+  tenant identifier.
+- Rate limiting keys by email alone for the new slug-free requests
+  (existing infrastructure, extended, not replaced).
+
+## Audit
+
+- Two new privacy-safe audit event types: organization join requested
+  (tenant-scoped, records only organizationType) and join-code
+  rejected (records only a bounded, non-identifying reason string).
+  The raw code, its hash, and the password hash are never logged.
+
+## Tests
+
+- 20 join-code crypto tests (generation, normalization, keyed
+  hashing, constant-time verification).
+- 28 OrganizationOnboardingService tests (valid/invalid/expired/
+  revoked/wrong-type/malformed codes, pending-only membership with no
+  privilege fields, the personal-account path, Google parity,
+  anti-enumeration equivalence, cross-tenant isolation).
+- 9 new AuthService login-flow tests (single-membership direct login,
+  multi-membership disambiguation, zero-membership fail-closed,
+  cross-account membership guard). Found and fixed a real pre-existing
+  bug along the way: this spec file's AuthService constructor call and
+  Google-register fixtures were out of sync with an earlier
+  constructor change in this same task.
+- Frontend: 326/326 tests passing across the whole web app (48 test
+  files), including rewritten registration-form, google-register, and
+  login-form suites, and new BFF route tests for the two new login
+  endpoints.
+
+## Validation
+
+- TypeScript: zero errors across the entire frontend
+  (`tsc --noEmit`); backend type-checks clean except for one
+  pre-existing, sandbox-wide `@medsphere/database` cascade (51
+  occurrences, unchanged before/after this change -- confirmed by
+  checking that an already-accepted, untouched spec file fails
+  identically in this same sandbox state).
+- ESLint: 0 errors across every changed/new file in both apps and
+  packages/database.
+- Prettier: clean across every changed/new file.
+- Jest: 20/20 passing for the pure-logic join-code util suite
+  (genuinely executed); the Prisma-dependent suites (including the
+  new OrganizationOnboardingService and AuthService additions) could
+  not execute in this sandbox for the same pre-existing reason noted
+  above, verified instead via careful `tsc` review.
+- Prisma schema: `prisma validate` could not run (this sandbox's
+  network egress blocks the query-engine binary fetch, the same
+  constraint seen throughout this whole project). Cross-checked the
+  new OrganizationJoinCode model's fields against the migration SQL's
+  CREATE TABLE columns programmatically -- exact match.
+- git diff --check: clean.
+
+Does not touch 0004-0009 (parked/other-lane patches) -- confirmed
+absent from this branch.
+---
+ .env.example                                  |   3 +
+ .../src/auth/auth-config.service.ts           |  11 +
+ apps/auth-service/src/auth/auth.controller.ts |  50 ++
+ apps/auth-service/src/auth/auth.module.ts     |   2 +
+ .../src/auth/auth.service.spec.ts             | 205 ++++++-
+ apps/auth-service/src/auth/auth.service.ts    | 116 +++-
+ .../src/auth/dto/google-register.dto.ts       |  20 +-
+ .../src/auth/dto/identify-login.dto.ts        |  27 +
+ .../organization-selection-required.dto.ts    |  27 +
+ .../auth-service/src/auth/dto/register.dto.ts |  35 +-
+ .../auth/dto/select-organization-login.dto.ts |  33 ++
+ .../src/auth/registration.service.ts          |  15 +-
+ .../src/auth/testing/auth-config-fixture.ts   |   2 +
+ .../organization-join-code.util.spec.ts       | 121 ++++
+ .../organization-join-code.util.ts            |  85 +++
+ .../organization-onboarding.service.spec.ts   | 547 ++++++++++++++++++
+ .../organization-onboarding.service.ts        | 342 +++++++++++
+ .../src/organization/organization-type.ts     |  40 ++
+ .../src/organization/organization.module.ts   |  20 +
+ .../security/auth-rate-limit.module.spec.ts   |  20 +
+ .../src/security/auth-rate-limit.module.ts    |  10 +
+ .../src/users/users.repository.ts             | 103 ++++
+ .../api/auth/google/register/route.test.ts    |   6 +-
+ .../src/app/api/auth/login/identify/route.ts  | 105 ++++
+ .../auth/login/select-organization/route.ts   |  76 +++
+ .../src/app/api/auth/register/route.test.ts   |   5 +-
+ apps/web/src/app/login/login-form.test.tsx    |  82 ++-
+ apps/web/src/app/login/login-form.tsx         | 106 +++-
+ apps/web/src/app/register/google-register.tsx |  10 +-
+ .../app/register/registration-form.test.tsx   |  83 ++-
+ .../src/app/register/registration-form.tsx    |  89 ++-
+ apps/web/src/lib/api-client.test.ts           |   8 +-
+ apps/web/src/lib/api-client.ts                |  49 ++
+ apps/web/src/lib/auth-contract.test.ts        |  37 +-
+ apps/web/src/lib/auth-contract.ts             | 175 +++++-
+ apps/web/src/lib/i18n.ts                      |  39 +-
+ apps/web/src/lib/organization-types.ts        |  22 +
+ .../migration.sql                             |  94 +++
+ packages/database/prisma/schema.prisma        |  73 +++
+ packages/database/src/audit.ts                |   4 +
+ 40 files changed, 2757 insertions(+), 140 deletions(-)
+ create mode 100644 apps/auth-service/src/auth/dto/identify-login.dto.ts
+ create mode 100644 apps/auth-service/src/auth/dto/organization-selection-required.dto.ts
+ create mode 100644 apps/auth-service/src/auth/dto/select-organization-login.dto.ts
+ create mode 100644 apps/auth-service/src/organization/organization-join-code.util.spec.ts
+ create mode 100644 apps/auth-service/src/organization/organization-join-code.util.ts
+ create mode 100644 apps/auth-service/src/organization/organization-onboarding.service.spec.ts
+ create mode 100644 apps/auth-service/src/organization/organization-onboarding.service.ts
+ create mode 100644 apps/auth-service/src/organization/organization-type.ts
+ create mode 100644 apps/auth-service/src/organization/organization.module.ts
+ create mode 100644 apps/web/src/app/api/auth/login/identify/route.ts
+ create mode 100644 apps/web/src/app/api/auth/login/select-organization/route.ts
+ create mode 100644 apps/web/src/lib/organization-types.ts
+ create mode 100644 packages/database/prisma/migrations/20260828090000_organization_type_and_join_codes/migration.sql
+
+diff --git a/.env.example b/.env.example
+index 49cb07e..2e46b9a 100644
+--- a/.env.example
++++ b/.env.example
+@@ -40,6 +40,9 @@ AUTH_REFRESH_TOKEN_PEPPER=
+ # At least 32 cryptographically random bytes encoded as padded base64.
+ # Also generated by: node scripts/generate-dev-keys.js
+ AUTH_OTP_PEPPER=
++# At least 32 cryptographically random bytes encoded as padded base64.
++# Peppers the organization join-code hash (see Task 0010's ADR).
++ORG_JOIN_CODE_PEPPER=
+ AUTH_ARGON2_MEMORY_KIB=19456
+ AUTH_ARGON2_TIME_COST=2
+ AUTH_ARGON2_PARALLELISM=1
+diff --git a/apps/auth-service/src/auth/auth-config.service.ts b/apps/auth-service/src/auth/auth-config.service.ts
+index a9fd28a..d188e01 100644
+--- a/apps/auth-service/src/auth/auth-config.service.ts
++++ b/apps/auth-service/src/auth/auth-config.service.ts
+@@ -4,6 +4,7 @@ import { Injectable } from '@nestjs/common';
+ const MINIMUM_RSA_MODULUS_BITS = 2048;
+ const MINIMUM_REFRESH_PEPPER_BYTES = 32;
+ const MINIMUM_OTP_PEPPER_BYTES = 32;
++const MINIMUM_ORG_JOIN_CODE_PEPPER_BYTES = 32;
+ 
+ export interface AuthConfiguration {
+   readonly privateKeyPem: string;
+@@ -16,6 +17,7 @@ export interface AuthConfiguration {
+   readonly refreshAbsoluteTtlSeconds: number;
+   readonly refreshTokenPepper: Buffer;
+   readonly otpPepper: Buffer;
++  readonly orgJoinCodePepper: Buffer;
+   readonly argon2MemoryKiB: number;
+   readonly argon2TimeCost: number;
+   readonly argon2Parallelism: number;
+@@ -182,6 +184,14 @@ export function parseAuthEnvironment(environment: AuthEnvironment): AuthConfigur
+     throw new Error('AUTH_OTP_PEPPER must contain at least 32 random bytes');
+   }
+ 
++  const orgJoinCodePepper = decodeBase64(
++    'ORG_JOIN_CODE_PEPPER',
++    requireValue(environment, 'ORG_JOIN_CODE_PEPPER'),
++  );
++  if (orgJoinCodePepper.length < MINIMUM_ORG_JOIN_CODE_PEPPER_BYTES) {
++    throw new Error('ORG_JOIN_CODE_PEPPER must contain at least 32 random bytes');
++  }
++
+   return Object.freeze({
+     ...keys,
+     issuer: parseIssuer(environment),
+@@ -192,6 +202,7 @@ export function parseAuthEnvironment(environment: AuthEnvironment): AuthConfigur
+     refreshAbsoluteTtlSeconds,
+     refreshTokenPepper: Buffer.from(refreshTokenPepper),
+     otpPepper: Buffer.from(otpPepper),
++    orgJoinCodePepper: Buffer.from(orgJoinCodePepper),
+     argon2MemoryKiB: parseInteger(environment, 'AUTH_ARGON2_MEMORY_KIB', 19_456, 262_144),
+     argon2TimeCost: parseInteger(environment, 'AUTH_ARGON2_TIME_COST', 2, 10),
+     argon2Parallelism: parseInteger(environment, 'AUTH_ARGON2_PARALLELISM', 1, 8),
+diff --git a/apps/auth-service/src/auth/auth.controller.ts b/apps/auth-service/src/auth/auth.controller.ts
+index 3623928..fbd962b 100644
+--- a/apps/auth-service/src/auth/auth.controller.ts
++++ b/apps/auth-service/src/auth/auth.controller.ts
+@@ -4,15 +4,20 @@ import { Throttle } from '@nestjs/throttler';
+ import {
+   ApiAcceptedResponse,
+   ApiBearerAuth,
++  ApiExtraModels,
+   ApiOkResponse,
+   ApiOperation,
+   ApiTags,
+   ApiTooManyRequestsResponse,
+   ApiUnauthorizedResponse,
++  getSchemaPath,
+ } from '@nestjs/swagger';
+ import { AuthService } from './auth.service';
+ import { RegisterDto } from './dto/register.dto';
+ import { LoginDto } from './dto/login.dto';
++import { IdentifyLoginDto } from './dto/identify-login.dto';
++import { SelectOrganizationLoginDto } from './dto/select-organization-login.dto';
++import { OrganizationSelectionRequiredDto } from './dto/organization-selection-required.dto';
+ import { GoogleLoginDto } from './dto/google-login.dto';
+ import { GoogleRegisterDto } from './dto/google-register.dto';
+ import { RefreshTokenDto } from './dto/refresh-token.dto';
+@@ -73,6 +78,51 @@ export class AuthController {
+     return this.authService.login(loginDto, extractRequestMetadata(request));
+   }
+ 
++  @Post('login/identify')
++  @PublicEndpoint()
++  @Throttle({
++    ip: { limit: 10, ttl: 60_000 },
++    account: { limit: 5, ttl: 60_000 },
++  })
++  @HttpCode(HttpStatus.OK)
++  @ApiOperation({
++    summary:
++      'Slug-free login step 1: verify identity, then resolve the caller\u2019s own organization membership(s)',
++  })
++  @ApiOkResponse({
++    schema: {
++      oneOf: [
++        { $ref: getSchemaPath(LoginResponseDto) },
++        { $ref: getSchemaPath(OrganizationSelectionRequiredDto) },
++      ],
++    },
++  })
++  @ApiUnauthorizedResponse({ description: 'Invalid credentials' })
++  @ApiExtraModels(LoginResponseDto, OrganizationSelectionRequiredDto)
++  identifyLogin(@Body() identifyLoginDto: IdentifyLoginDto, @Req() request: MetadataHttpRequest) {
++    return this.authService.identifyLogin(identifyLoginDto, extractRequestMetadata(request));
++  }
++
++  @Post('login/select-organization')
++  @PublicEndpoint()
++  @Throttle({
++    ip: { limit: 10, ttl: 60_000 },
++    account: { limit: 5, ttl: 60_000 },
++  })
++  @HttpCode(HttpStatus.OK)
++  @ApiOperation({
++    summary:
++      'Slug-free login step 2: complete login for a specific, previously-identified membership',
++  })
++  @ApiOkResponse({ type: LoginResponseDto })
++  @ApiUnauthorizedResponse({ description: 'Invalid credentials' })
++  selectOrganizationLogin(
++    @Body() dto: SelectOrganizationLoginDto,
++    @Req() request: MetadataHttpRequest,
++  ) {
++    return this.authService.selectOrganizationLogin(dto, extractRequestMetadata(request));
++  }
++
+   @Post('google')
+   @PublicEndpoint()
+   @Throttle({
+diff --git a/apps/auth-service/src/auth/auth.module.ts b/apps/auth-service/src/auth/auth.module.ts
+index 96f667b..679a8ab 100644
+--- a/apps/auth-service/src/auth/auth.module.ts
++++ b/apps/auth-service/src/auth/auth.module.ts
+@@ -14,12 +14,14 @@ import { SessionRepository } from './session.repository';
+ import { TokenService } from './token.service';
+ import { PrismaModule } from '../prisma/prisma.module';
+ import { UsersModule } from '../users/users.module';
++import { OrganizationModule } from '../organization/organization.module';
+ import { AuditPersistenceModule } from '../audit/audit-persistence.module';
+ 
+ @Module({
+   imports: [
+     PrismaModule,
+     UsersModule,
++    OrganizationModule,
+     AuditPersistenceModule,
+     PassportModule.register({ defaultStrategy: 'jwt', session: false }),
+     JwtModule.register({}),
+diff --git a/apps/auth-service/src/auth/auth.service.spec.ts b/apps/auth-service/src/auth/auth.service.spec.ts
+index 8e54c6b..7e86563 100644
+--- a/apps/auth-service/src/auth/auth.service.spec.ts
++++ b/apps/auth-service/src/auth/auth.service.spec.ts
+@@ -4,6 +4,7 @@ import { AuthConfigService } from './auth-config.service';
+ import { AuthSecurityEventService } from './auth-security-event.service';
+ import { AuthService } from './auth.service';
+ import { GoogleIdentityVerifierService } from './google-identity-verifier.service';
++import { OrganizationOnboardingService } from '../organization/organization-onboarding.service';
+ import { PasswordService } from './password.service';
+ import { RegistrationService } from './registration.service';
+ import { SessionRepository } from './session.repository';
+@@ -36,6 +37,7 @@ describe('AuthService', () => {
+   };
+ 
+   let usersRepository: jest.Mocked<UsersRepository>;
++  let organizationOnboarding: jest.Mocked<OrganizationOnboardingService>;
+   let passwordService: jest.Mocked<PasswordService>;
+   let registrationService: jest.Mocked<RegistrationService>;
+   let tokenService: jest.Mocked<TokenService>;
+@@ -49,8 +51,15 @@ describe('AuthService', () => {
+       findLoginIdentity: jest.fn(),
+       findGoogleLoginIdentity: jest.fn(),
+       createPendingGoogleRegistration: jest.fn(),
++      findGlobalIdentityByEmail: jest.fn(),
++      findActiveMembershipsForUser: jest.fn(),
++      findLoginIdentityByMembershipId: jest.fn(),
+       update: jest.fn(),
+     } as unknown as jest.Mocked<UsersRepository>;
++    organizationOnboarding = {
++      registerWithPassword: jest.fn(),
++      registerWithGoogle: jest.fn(),
++    } as unknown as jest.Mocked<OrganizationOnboardingService>;
+     passwordService = {
+       verify: jest.fn(),
+       verifyAgainstDummy: jest.fn(),
+@@ -81,6 +90,7 @@ describe('AuthService', () => {
+ 
+     service = new AuthService(
+       usersRepository,
++      organizationOnboarding,
+       passwordService,
+       registrationService,
+       tokenService,
+@@ -89,6 +99,7 @@ describe('AuthService', () => {
+         value: {
+           refreshIdleTtlSeconds: 604800,
+           refreshAbsoluteTtlSeconds: 2592000,
++          orgJoinCodePepper: Buffer.from('a'.repeat(64), 'hex'),
+         },
+       } as unknown as AuthConfigService,
+       securityEvents,
+@@ -162,7 +173,8 @@ describe('AuthService', () => {
+     });
+ 
+     const response = await service.googleRegister({
+-      tenantSlug: 'central-pharmacy',
++      organizationType: 'HOSPITAL',
++      organizationCode: 'MED-X7P42-Q9K3R',
+       idToken: 'google-id-token',
+       phone: '+919876543210',
+       firstName: 'Asha',
+@@ -170,14 +182,17 @@ describe('AuthService', () => {
+     });
+ 
+     expect(googleIdentityVerifier.verify).toHaveBeenCalledWith('google-id-token');
+-    expect(usersRepository.createPendingGoogleRegistration).toHaveBeenCalledWith({
+-      tenantSlug: 'central-pharmacy',
+-      subject: 'google-subject-123',
+-      email: 'verified@example.com',
+-      phone: '+919876543210',
+-      firstName: 'Asha',
+-      lastName: 'Sharma',
+-    });
++    expect(organizationOnboarding.registerWithGoogle).toHaveBeenCalledWith(
++      expect.objectContaining({
++        organizationType: 'HOSPITAL',
++        organizationCode: 'MED-X7P42-Q9K3R',
++        subject: 'google-subject-123',
++        email: 'verified@example.com',
++        phone: '+919876543210',
++        firstName: 'Asha',
++        lastName: 'Sharma',
++      }),
++    );
+     expect(response.message).toBe(
+       'If registration is available, onboarding instructions will be sent.',
+     );
+@@ -191,7 +206,8 @@ describe('AuthService', () => {
+ 
+     await expect(
+       service.googleRegister({
+-        tenantSlug: 'central-pharmacy',
++        organizationType: 'HOSPITAL',
++        organizationCode: 'MED-X7P42-Q9K3R',
+         idToken: 'invalid-google-token',
+         phone: '+919876543210',
+         firstName: 'Asha',
+@@ -199,7 +215,7 @@ describe('AuthService', () => {
+       }),
+     ).rejects.toThrow(new UnauthorizedException('Invalid Google identity'));
+ 
+-    expect(usersRepository.createPendingGoogleRegistration).not.toHaveBeenCalled();
++    expect(organizationOnboarding.registerWithGoogle).not.toHaveBeenCalled();
+     expect(sessionRepository.createSession).not.toHaveBeenCalled();
+   });
+ 
+@@ -345,4 +361,171 @@ describe('AuthService', () => {
+     expect(sessionRepository.revokeCurrentFamily).toHaveBeenCalledWith(identity, {});
+     expect(sessionRepository.revokeAllForUser).toHaveBeenCalledWith(identity, {});
+   });
++
++  describe('identifyLogin (Task 0010 slug-free login, step 1)', () => {
++    const identifyDto = { email: loginDto.email, password: loginDto.password };
++    const globalIdentity = {
++      id: userId,
++      email: loginDto.email,
++      passwordHash: 'password-hash',
++      firstName: 'Test',
++      lastName: 'User',
++    };
++
++    beforeEach(() => {
++      passwordService.verify.mockResolvedValue(true);
++      passwordService.needsRehash.mockReturnValue(false);
++      tokenService.issueRefreshCredential.mockReturnValue({
++        value: 'opaque-refresh',
++        hash: 'a'.repeat(64),
++        sessionId,
++      });
++      tokenService.issueAccessToken.mockReturnValue({
++        value: 'access-token',
++        expiresIn: 900,
++        tokenId,
++      });
++    });
++
++    it('never collects or requires a tenant slug', () => {
++      expect(identifyDto).not.toHaveProperty('tenantSlug');
++    });
++
++    it('logs the person in directly when exactly one active membership exists', async () => {
++      usersRepository.findGlobalIdentityByEmail.mockResolvedValue(globalIdentity);
++      usersRepository.findActiveMembershipsForUser.mockResolvedValue([
++        {
++          membershipId,
++          tenantId,
++          organizationName: 'Central Hospital',
++          organizationType: 'HOSPITAL',
++        },
++      ]);
++      usersRepository.findLoginIdentityByMembershipId.mockResolvedValue(loginIdentity);
++
++      const result = await service.identifyLogin(identifyDto, metadata);
++
++      expect(result).not.toHaveProperty('requiresOrganizationSelection');
++      expect((result as { context: unknown }).context).toEqual({ membershipId, tenantId });
++    });
++
++    it('returns only bounded organization display info -- never a general org search -- when multiple memberships exist', async () => {
++      usersRepository.findGlobalIdentityByEmail.mockResolvedValue(globalIdentity);
++      usersRepository.findActiveMembershipsForUser.mockResolvedValue([
++        {
++          membershipId,
++          tenantId,
++          organizationName: 'Central Hospital',
++          organizationType: 'HOSPITAL',
++        },
++        {
++          membershipId: 'membership-2',
++          tenantId: 'tenant-2',
++          organizationName: 'Riverside Pharmacy',
++          organizationType: 'PHARMACY',
++        },
++      ]);
++
++      const result = await service.identifyLogin(identifyDto, metadata);
++
++      expect(result).toMatchObject({
++        requiresOrganizationSelection: true,
++        organizations: [
++          { membershipId, organizationName: 'Central Hospital', organizationType: 'HOSPITAL' },
++          {
++            membershipId: 'membership-2',
++            organizationName: 'Riverside Pharmacy',
++            organizationType: 'PHARMACY',
++          },
++        ],
++      });
++      expect(usersRepository.findLoginIdentityByMembershipId).not.toHaveBeenCalled();
++    });
++
++    it('fails with one generic message for an unknown email, identically to a wrong password', async () => {
++      usersRepository.findGlobalIdentityByEmail.mockResolvedValue(null);
++
++      await expect(service.identifyLogin(identifyDto, metadata)).rejects.toThrow(
++        UnauthorizedException,
++      );
++      expect(passwordService.verifyAgainstDummy).toHaveBeenCalledWith(identifyDto.password);
++    });
++
++    it('fails with the same generic message for a verified identity with zero active memberships', async () => {
++      usersRepository.findGlobalIdentityByEmail.mockResolvedValue(globalIdentity);
++      usersRepository.findActiveMembershipsForUser.mockResolvedValue([]);
++
++      await expect(service.identifyLogin(identifyDto, metadata)).rejects.toThrow(
++        UnauthorizedException,
++      );
++    });
++
++    it('fails for an incorrect password without revealing whether the email exists', async () => {
++      usersRepository.findGlobalIdentityByEmail.mockResolvedValue(globalIdentity);
++      passwordService.verify.mockResolvedValue(false);
++
++      await expect(service.identifyLogin(identifyDto, metadata)).rejects.toThrow(
++        UnauthorizedException,
++      );
++      expect(usersRepository.findActiveMembershipsForUser).not.toHaveBeenCalled();
++    });
++  });
++
++  describe('selectOrganizationLogin (Task 0010 slug-free login, step 2)', () => {
++    const selectDto = { email: loginDto.email, password: loginDto.password, membershipId };
++    const globalIdentity = {
++      id: userId,
++      email: loginDto.email,
++      passwordHash: 'password-hash',
++      firstName: 'Test',
++      lastName: 'User',
++    };
++
++    beforeEach(() => {
++      tokenService.issueRefreshCredential.mockReturnValue({
++        value: 'opaque-refresh',
++        hash: 'a'.repeat(64),
++        sessionId,
++      });
++      tokenService.issueAccessToken.mockReturnValue({
++        value: 'access-token',
++        expiresIn: 900,
++        tokenId,
++      });
++    });
++
++    it('re-verifies the password rather than trusting a bare membershipId', async () => {
++      usersRepository.findGlobalIdentityByEmail.mockResolvedValue(globalIdentity);
++      passwordService.verify.mockResolvedValue(false);
++
++      await expect(service.selectOrganizationLogin(selectDto, metadata)).rejects.toThrow(
++        UnauthorizedException,
++      );
++      expect(usersRepository.findLoginIdentityByMembershipId).not.toHaveBeenCalled();
++    });
++
++    it('issues a session only for a membership that resolves to the verified userId', async () => {
++      usersRepository.findGlobalIdentityByEmail.mockResolvedValue(globalIdentity);
++      passwordService.verify.mockResolvedValue(true);
++      usersRepository.findLoginIdentityByMembershipId.mockResolvedValue(loginIdentity);
++
++      const result = await service.selectOrganizationLogin(selectDto, metadata);
++
++      expect(usersRepository.findLoginIdentityByMembershipId).toHaveBeenCalledWith(
++        userId,
++        membershipId,
++      );
++      expect(result.context).toEqual({ membershipId, tenantId });
++    });
++
++    it('fails closed when the membership does not belong to the verified user (cross-account guard)', async () => {
++      usersRepository.findGlobalIdentityByEmail.mockResolvedValue(globalIdentity);
++      passwordService.verify.mockResolvedValue(true);
++      usersRepository.findLoginIdentityByMembershipId.mockResolvedValue(null);
++
++      await expect(service.selectOrganizationLogin(selectDto, metadata)).rejects.toThrow(
++        UnauthorizedException,
++      );
++    });
++  });
+ });
+diff --git a/apps/auth-service/src/auth/auth.service.ts b/apps/auth-service/src/auth/auth.service.ts
+index f31649b..c8b5b6a 100644
+--- a/apps/auth-service/src/auth/auth.service.ts
++++ b/apps/auth-service/src/auth/auth.service.ts
+@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
+ import { Injectable, UnauthorizedException } from '@nestjs/common';
+ 
+ import { UsersRepository } from '../users/users.repository';
++import { OrganizationOnboardingService } from '../organization/organization-onboarding.service';
+ import { PasswordService } from './password.service';
+ import { RegistrationService } from './registration.service';
+ import { TokenService } from './token.service';
+@@ -13,6 +14,9 @@ import { AuthenticatedIdentity, LoginIdentity, RequestMetadata } from './auth.ty
+ import { RegisterDto } from './dto/register.dto';
+ import { GoogleRegisterDto } from './dto/google-register.dto';
+ import { LoginDto } from './dto/login.dto';
++import { IdentifyLoginDto } from './dto/identify-login.dto';
++import { SelectOrganizationLoginDto } from './dto/select-organization-login.dto';
++import { OrganizationSelectionRequiredDto } from './dto/organization-selection-required.dto';
+ import { LoginResponseDto } from './dto/login-response.dto';
+ import { RefreshTokenDto } from './dto/refresh-token.dto';
+ import { RegistrationResponseDto } from './dto/registration-response.dto';
+@@ -24,6 +28,7 @@ const INVALID_REFRESH_MESSAGE = 'Invalid refresh credential';
+ export class AuthService {
+   constructor(
+     private readonly usersRepository: UsersRepository,
++    private readonly organizationOnboarding: OrganizationOnboardingService,
+     private readonly passwordService: PasswordService,
+     private readonly registrationService: RegistrationService,
+     private readonly tokenService: TokenService,
+@@ -45,13 +50,15 @@ export class AuthService {
+   async googleRegister(googleRegisterDto: GoogleRegisterDto): Promise<RegistrationResponseDto> {
+     const googleIdentity = await this.googleIdentityVerifier.verify(googleRegisterDto.idToken);
+ 
+-    await this.usersRepository.createPendingGoogleRegistration({
+-      tenantSlug: googleRegisterDto.tenantSlug,
++    await this.organizationOnboarding.registerWithGoogle({
++      organizationType: googleRegisterDto.organizationType,
++      organizationCode: googleRegisterDto.organizationCode,
+       subject: googleIdentity.subject,
+       email: googleIdentity.email,
+       phone: googleRegisterDto.phone,
+       firstName: googleRegisterDto.firstName,
+       lastName: googleRegisterDto.lastName,
++      orgJoinCodePepper: this.authConfig.value.orgJoinCodePepper,
+     });
+ 
+     this.securityEvents.record('registration', {
+@@ -97,6 +104,111 @@ export class AuthService {
+     return this.createAuthenticatedSession(loginIdentity, metadata);
+   }
+ 
++  /**
++   * Task 0010: slug-free login, step 1. Verifies the person's individual
++   * identity (email + password) with no organization context at all,
++   * then resolves only the memberships that belong to that now-verified
++   * identity -- never a tenant search. Exactly one active membership
++   * logs the person in directly, identically to the legacy tenantSlug
++   * flow's outcome; more than one requires an explicit follow-up
++   * selection (see selectOrganizationLogin); zero is treated identically
++   * to invalid credentials, so an attacker cannot use this endpoint to
++   * learn whether an email exists independently of its password.
++   */
++  async identifyLogin(
++    identifyLoginDto: IdentifyLoginDto,
++    metadata: RequestMetadata,
++  ): Promise<LoginResponseDto | OrganizationSelectionRequiredDto> {
++    const identity = await this.usersRepository.findGlobalIdentityByEmail(identifyLoginDto.email);
++
++    if (!identity || !identity.passwordHash) {
++      await this.passwordService.verifyAgainstDummy(identifyLoginDto.password);
++      this.recordInvalidLogin();
++      throw new UnauthorizedException(INVALID_CREDENTIALS_MESSAGE);
++    }
++
++    const passwordValid = await this.passwordService.verify(
++      identity.passwordHash,
++      identifyLoginDto.password,
++    );
++    if (!passwordValid) {
++      this.recordInvalidLogin();
++      throw new UnauthorizedException(INVALID_CREDENTIALS_MESSAGE);
++    }
++
++    if (this.passwordService.needsRehash(identity.passwordHash)) {
++      const passwordHash = await this.passwordService.hash(identifyLoginDto.password);
++      await this.usersRepository.update(identity.id, { passwordHash });
++    }
++
++    const memberships = await this.usersRepository.findActiveMembershipsForUser(identity.id);
++
++    if (memberships.length === 0) {
++      // A verified identity with no active organization membership is
++      // not distinguishable, from the outside, from a wrong password --
++      // both fail identically.
++      this.recordInvalidLogin();
++      throw new UnauthorizedException(INVALID_CREDENTIALS_MESSAGE);
++    }
++
++    if (memberships.length === 1) {
++      const loginIdentity = await this.usersRepository.findLoginIdentityByMembershipId(
++        identity.id,
++        memberships[0].membershipId,
++      );
++      if (!loginIdentity) {
++        this.recordInvalidLogin();
++        throw new UnauthorizedException(INVALID_CREDENTIALS_MESSAGE);
++      }
++      return this.createAuthenticatedSession(loginIdentity, metadata);
++    }
++
++    const response = new OrganizationSelectionRequiredDto();
++    response.organizations = memberships.map((membership) => ({
++      membershipId: membership.membershipId,
++      organizationName: membership.organizationName,
++      organizationType: membership.organizationType,
++    }));
++    return response;
++  }
++
++  /**
++   * Task 0010: slug-free login, step 2 (only reached when identifyLogin
++   * found more than one active membership). Re-verifies the password --
++   * a membershipId is never trusted alone -- then issues a session for
++   * that specific membership, scoped by both membershipId AND the
++   * verified userId so a membership belonging to a different account can
++   * never be selected.
++   */
++  async selectOrganizationLogin(
++    dto: SelectOrganizationLoginDto,
++    metadata: RequestMetadata,
++  ): Promise<LoginResponseDto> {
++    const identity = await this.usersRepository.findGlobalIdentityByEmail(dto.email);
++    if (!identity || !identity.passwordHash) {
++      await this.passwordService.verifyAgainstDummy(dto.password);
++      this.recordInvalidLogin();
++      throw new UnauthorizedException(INVALID_CREDENTIALS_MESSAGE);
++    }
++
++    const passwordValid = await this.passwordService.verify(identity.passwordHash, dto.password);
++    if (!passwordValid) {
++      this.recordInvalidLogin();
++      throw new UnauthorizedException(INVALID_CREDENTIALS_MESSAGE);
++    }
++
++    const loginIdentity = await this.usersRepository.findLoginIdentityByMembershipId(
++      identity.id,
++      dto.membershipId,
++    );
++    if (!loginIdentity) {
++      this.recordInvalidLogin();
++      throw new UnauthorizedException(INVALID_CREDENTIALS_MESSAGE);
++    }
++
++    return this.createAuthenticatedSession(loginIdentity, metadata);
++  }
++
+   async googleLogin(
+     tenantSlug: string,
+     idToken: string,
+diff --git a/apps/auth-service/src/auth/dto/google-register.dto.ts b/apps/auth-service/src/auth/dto/google-register.dto.ts
+index 4a732b0..bea37f3 100644
+--- a/apps/auth-service/src/auth/dto/google-register.dto.ts
++++ b/apps/auth-service/src/auth/dto/google-register.dto.ts
+@@ -1,19 +1,21 @@
+ import { Transform } from 'class-transformer';
+-import { IsString, Matches, MaxLength, MinLength } from 'class-validator';
++import { IsIn, IsString, Matches, MaxLength, MinLength, ValidateIf } from 'class-validator';
+ import { ApiProperty } from '@nestjs/swagger';
+ 
+-import { normalizeAuthenticationLocator } from '../auth-normalization';
+ import { normalizePhoneNumber } from '../../verification/otp/phone-normalization';
++import { ORGANIZATION_TYPES, type OrganizationType } from '../../organization/organization-type';
+ 
+ export class GoogleRegisterDto {
+-  @ApiProperty({ example: 'central-pharmacy', maxLength: 100 })
+-  @Transform(({ value }) =>
+-    typeof value === 'string' ? normalizeAuthenticationLocator(value) : value,
+-  )
++  @ApiProperty({ example: 'HOSPITAL', enum: ORGANIZATION_TYPES })
+   @IsString()
+-  @MaxLength(100)
+-  @Matches(/^[a-z0-9]+(?:-[a-z0-9]+)*$/)
+-  tenantSlug!: string;
++  @IsIn(ORGANIZATION_TYPES)
++  organizationType!: OrganizationType;
++
++  @ApiProperty({ example: 'MED-X7P42-Q9K3R', required: false, maxLength: 40 })
++  @ValidateIf((dto: GoogleRegisterDto) => dto.organizationType !== 'NONE')
++  @IsString()
++  @MaxLength(40)
++  organizationCode?: string;
+ 
+   @ApiProperty({ example: '+919876543210', maxLength: 20 })
+   @Transform(({ value }) => (typeof value === 'string' ? normalizePhoneNumber(value) : value))
+diff --git a/apps/auth-service/src/auth/dto/identify-login.dto.ts b/apps/auth-service/src/auth/dto/identify-login.dto.ts
+new file mode 100644
+index 0000000..5215ac9
+--- /dev/null
++++ b/apps/auth-service/src/auth/dto/identify-login.dto.ts
+@@ -0,0 +1,27 @@
++import { Transform } from 'class-transformer';
++import { IsEmail, IsString, MaxLength, MinLength } from 'class-validator';
++import { ApiProperty } from '@nestjs/swagger';
++import { normalizeAuthenticationLocator } from '../auth-normalization';
++
++/**
++ * Task 0010: the slug-free login entry point. A normal user's individual
++ * identity (email + password) is verified first and in isolation from
++ * any organization context -- no tenant slug, ID, or name is ever
++ * collected or required here. See AuthService.identifyLogin for how the
++ * resulting membership set is resolved and disambiguated.
++ */
++export class IdentifyLoginDto {
++  @ApiProperty({ example: 'user@example.com', maxLength: 254 })
++  @Transform(({ value }) =>
++    typeof value === 'string' ? normalizeAuthenticationLocator(value) : value,
++  )
++  @IsEmail()
++  @MaxLength(254)
++  email!: string;
++
++  @ApiProperty({ minLength: 15, maxLength: 128, format: 'password' })
++  @IsString()
++  @MinLength(15)
++  @MaxLength(128)
++  password!: string;
++}
+diff --git a/apps/auth-service/src/auth/dto/organization-selection-required.dto.ts b/apps/auth-service/src/auth/dto/organization-selection-required.dto.ts
+new file mode 100644
+index 0000000..d1cd522
+--- /dev/null
++++ b/apps/auth-service/src/auth/dto/organization-selection-required.dto.ts
+@@ -0,0 +1,27 @@
++import { ApiProperty } from '@nestjs/swagger';
++
++export class OrganizationChoiceDto {
++  @ApiProperty({ format: 'uuid' })
++  membershipId!: string;
++
++  @ApiProperty()
++  organizationName!: string;
++
++  @ApiProperty()
++  organizationType!: string;
++}
++
++/**
++ * Returned by the identify-login step instead of a LoginResponseDto when
++ * the person's individual identity resolves to more than one active
++ * membership. Contains only organization display information the
++ * now-password-verified caller is already authorized to know about
++ * their own memberships -- never a general organization search/listing.
++ */
++export class OrganizationSelectionRequiredDto {
++  @ApiProperty({ example: true })
++  requiresOrganizationSelection = true as const;
++
++  @ApiProperty({ type: [OrganizationChoiceDto] })
++  organizations!: OrganizationChoiceDto[];
++}
+diff --git a/apps/auth-service/src/auth/dto/register.dto.ts b/apps/auth-service/src/auth/dto/register.dto.ts
+index 9658558..5cf5f4f 100644
+--- a/apps/auth-service/src/auth/dto/register.dto.ts
++++ b/apps/auth-service/src/auth/dto/register.dto.ts
+@@ -1,18 +1,37 @@
+ import { Transform } from 'class-transformer';
+-import { IsEmail, IsString, Matches, MaxLength, MinLength } from 'class-validator';
++import {
++  IsEmail,
++  IsIn,
++  IsString,
++  Matches,
++  MaxLength,
++  MinLength,
++  ValidateIf,
++} from 'class-validator';
+ import { ApiProperty } from '@nestjs/swagger';
+ import { normalizeAuthenticationLocator } from '../auth-normalization';
+ import { normalizePhoneNumber } from '../../verification/otp/phone-normalization';
++import { ORGANIZATION_TYPES, type OrganizationType } from '../../organization/organization-type';
+ 
+ export class RegisterDto {
+-  @ApiProperty({ example: 'central-pharmacy', maxLength: 100 })
+-  @Transform(({ value }) =>
+-    typeof value === 'string' ? normalizeAuthenticationLocator(value) : value,
+-  )
++  @ApiProperty({ example: 'HOSPITAL', enum: ORGANIZATION_TYPES })
+   @IsString()
+-  @MaxLength(100)
+-  @Matches(/^[a-z0-9]+(?:-[a-z0-9]+)*$/)
+-  tenantSlug!: string;
++  @IsIn(ORGANIZATION_TYPES)
++  organizationType!: OrganizationType;
++
++  /**
++   * Required for every organizationType except 'NONE'. @ValidateIf skips
++   * validation entirely (including presence) when organizationType is
++   * 'NONE', matching the frontend behavior of hiding this field for a
++   * personal account. Bounded length matches the generated code's own
++   * fixed shape (MED-XXXXX-XXXXX, 15 characters) with slack for
++   * whitespace/casing a user might paste.
++   */
++  @ApiProperty({ example: 'MED-X7P42-Q9K3R', required: false, maxLength: 40 })
++  @ValidateIf((dto: RegisterDto) => dto.organizationType !== 'NONE')
++  @IsString()
++  @MaxLength(40)
++  organizationCode?: string;
+ 
+   @ApiProperty({ example: 'user@example.com', maxLength: 254 })
+   @Transform(({ value }) =>
+diff --git a/apps/auth-service/src/auth/dto/select-organization-login.dto.ts b/apps/auth-service/src/auth/dto/select-organization-login.dto.ts
+new file mode 100644
+index 0000000..6025912
+--- /dev/null
++++ b/apps/auth-service/src/auth/dto/select-organization-login.dto.ts
+@@ -0,0 +1,33 @@
++import { Transform } from 'class-transformer';
++import { IsEmail, IsString, IsUUID, MaxLength, MinLength } from 'class-validator';
++import { ApiProperty } from '@nestjs/swagger';
++import { normalizeAuthenticationLocator } from '../auth-normalization';
++
++/**
++ * Task 0010: the second step of the slug-free login flow, used only when
++ * IdentifyLoginDto resolved more than one active membership for the
++ * person. Re-collects the password (rather than trusting a bare
++ * membershipId alone) so a membership can only ever be selected by
++ * someone who has already proven the account's password -- never by
++ * membershipId guessing.
++ */
++export class SelectOrganizationLoginDto {
++  @ApiProperty({ example: 'user@example.com', maxLength: 254 })
++  @Transform(({ value }) =>
++    typeof value === 'string' ? normalizeAuthenticationLocator(value) : value,
++  )
++  @IsEmail()
++  @MaxLength(254)
++  email!: string;
++
++  @ApiProperty({ minLength: 15, maxLength: 128, format: 'password' })
++  @IsString()
++  @MinLength(15)
++  @MaxLength(128)
++  password!: string;
++
++  @ApiProperty({ format: 'uuid' })
++  @IsString()
++  @IsUUID('4')
++  membershipId!: string;
++}
+diff --git a/apps/auth-service/src/auth/registration.service.ts b/apps/auth-service/src/auth/registration.service.ts
+index 43577bd..077f34c 100644
+--- a/apps/auth-service/src/auth/registration.service.ts
++++ b/apps/auth-service/src/auth/registration.service.ts
+@@ -1,29 +1,34 @@
+ import { Injectable } from '@nestjs/common';
+ 
+-import { UsersRepository } from '../users/users.repository';
++import { OrganizationOnboardingService } from '../organization/organization-onboarding.service';
+ import { PasswordService } from './password.service';
++import { AuthConfigService } from './auth-config.service';
+ import { RegisterDto } from './dto/register.dto';
+ import { RegistrationResponseDto } from './dto/registration-response.dto';
+ 
+ @Injectable()
+ export class RegistrationService {
+   constructor(
+-    private readonly usersRepository: UsersRepository,
++    private readonly organizationOnboarding: OrganizationOnboardingService,
+     private readonly passwordService: PasswordService,
++    private readonly authConfig: AuthConfigService,
+   ) {}
+ 
+   async register(registerDto: RegisterDto): Promise<RegistrationResponseDto> {
+     // Hash before policy/existence handling so public responses do not expose
+-    // a materially different fast path for unknown tenants or existing users.
++    // a materially different fast path for unknown organizations or existing
++    // users.
+     const passwordHash = await this.passwordService.hash(registerDto.password);
+ 
+-    await this.usersRepository.createPendingRegistration({
+-      tenantSlug: registerDto.tenantSlug,
++    await this.organizationOnboarding.registerWithPassword({
++      organizationType: registerDto.organizationType,
++      organizationCode: registerDto.organizationCode,
+       email: registerDto.email,
+       phone: registerDto.phone,
+       passwordHash,
+       firstName: registerDto.firstName,
+       lastName: registerDto.lastName,
++      orgJoinCodePepper: this.authConfig.value.orgJoinCodePepper,
+     });
+ 
+     return new RegistrationResponseDto();
+diff --git a/apps/auth-service/src/auth/testing/auth-config-fixture.ts b/apps/auth-service/src/auth/testing/auth-config-fixture.ts
+index c3614db..a226ddd 100644
+--- a/apps/auth-service/src/auth/testing/auth-config-fixture.ts
++++ b/apps/auth-service/src/auth/testing/auth-config-fixture.ts
+@@ -12,6 +12,7 @@ export type AuthConfigFixtureKey =
+   | 'AUTH_REFRESH_ABSOLUTE_TTL_SECONDS'
+   | 'AUTH_REFRESH_TOKEN_PEPPER'
+   | 'AUTH_OTP_PEPPER'
++  | 'ORG_JOIN_CODE_PEPPER'
+   | 'AUTH_ARGON2_MEMORY_KIB'
+   | 'AUTH_ARGON2_TIME_COST'
+   | 'AUTH_ARGON2_PARALLELISM';
+@@ -37,6 +38,7 @@ export function createAuthConfigFixture(
+     AUTH_REFRESH_ABSOLUTE_TTL_SECONDS: '2592000',
+     AUTH_REFRESH_TOKEN_PEPPER: randomBytes(32).toString('base64'),
+     AUTH_OTP_PEPPER: randomBytes(32).toString('base64'),
++    ORG_JOIN_CODE_PEPPER: randomBytes(32).toString('base64'),
+     AUTH_ARGON2_MEMORY_KIB: '19456',
+     AUTH_ARGON2_TIME_COST: '2',
+     AUTH_ARGON2_PARALLELISM: '1',
+diff --git a/apps/auth-service/src/organization/organization-join-code.util.spec.ts b/apps/auth-service/src/organization/organization-join-code.util.spec.ts
+new file mode 100644
+index 0000000..6611b32
+--- /dev/null
++++ b/apps/auth-service/src/organization/organization-join-code.util.spec.ts
+@@ -0,0 +1,121 @@
++import {
++  generateJoinCode,
++  hashJoinCode,
++  isValidJoinCodeFormat,
++  normalizeJoinCode,
++  verifyJoinCode,
++} from './organization-join-code.util';
++
++const pepper = Buffer.from('d'.repeat(64), 'hex');
++
++describe('organization-join-code.util', () => {
++  it('generates a code matching the documented MED-XXXXX-XXXXX shape', () => {
++    for (let i = 0; i < 50; i += 1) {
++      const code = generateJoinCode();
++      expect(code).toMatch(
++        /^MED-[23456789ABCDEFGHJKMNPQRSTUVWXYZ]{5}-[23456789ABCDEFGHJKMNPQRSTUVWXYZ]{5}$/,
++      );
++    }
++  });
++
++  it('never encodes an ambiguous character (0/O/1/I/L)', () => {
++    for (let i = 0; i < 100; i += 1) {
++      const code = generateJoinCode();
++      expect(code).not.toMatch(/[01ILO]/);
++    }
++  });
++
++  it('produces different codes across repeated generation', () => {
++    const codes = new Set(Array.from({ length: 50 }, () => generateJoinCode()));
++    expect(codes.size).toBeGreaterThan(45);
++  });
++
++  it('never embeds a tenant slug/ID/organization name -- the format is fixed and opaque', () => {
++    const code = generateJoinCode();
++    expect(code.length).toBe(15); // MED- (4) + 5 + - (1) + 5
++    expect(isValidJoinCodeFormat(normalizeJoinCode(code))).toBe(true);
++  });
++
++  describe('normalizeJoinCode', () => {
++    it('accepts the code as displayed', () => {
++      expect(normalizeJoinCode('MED-X7P42-Q9K3R')).toBe('MED-X7P42Q9K3R');
++    });
++
++    it('accepts a lowercase submission', () => {
++      expect(normalizeJoinCode('med-x7p42-q9k3r')).toBe('MED-X7P42Q9K3R');
++    });
++
++    it('accepts the code with the internal body hyphen omitted', () => {
++      expect(normalizeJoinCode('MED-X7P42Q9K3R')).toBe('MED-X7P42Q9K3R');
++    });
++
++    it('strips surrounding and embedded whitespace', () => {
++      expect(normalizeJoinCode('  MED-X7P42 -Q9K3R  ')).toBe('MED-X7P42Q9K3R');
++    });
++  });
++
++  describe('isValidJoinCodeFormat', () => {
++    it('accepts a well-formed normalized code', () => {
++      expect(isValidJoinCodeFormat('MED-X7P42Q9K3R')).toBe(true);
++    });
++
++    it('rejects a malformed code (wrong length)', () => {
++      expect(isValidJoinCodeFormat('MED-X7P42')).toBe(false);
++    });
++
++    it('rejects a code containing an ambiguous character', () => {
++      expect(isValidJoinCodeFormat('MED-X7P421O9K3R')).toBe(false);
++    });
++
++    it('rejects a code with the wrong prefix', () => {
++      expect(isValidJoinCodeFormat('ABC-X7P42Q9K3R')).toBe(false);
++    });
++
++    it('rejects an empty string', () => {
++      expect(isValidJoinCodeFormat('')).toBe(false);
++    });
++  });
++
++  describe('hashJoinCode / verifyJoinCode', () => {
++    it('never persists or exposes the plaintext code via the hash itself', () => {
++      const code = normalizeJoinCode(generateJoinCode());
++      const hash = hashJoinCode(pepper, code);
++      expect(hash).not.toContain(code);
++      expect(hash).toMatch(/^[a-f0-9]{64}$/);
++    });
++
++    it('hash is deterministic for the same pepper and code', () => {
++      const code = normalizeJoinCode('MED-X7P42-Q9K3R');
++      expect(hashJoinCode(pepper, code)).toBe(hashJoinCode(pepper, code));
++    });
++
++    it('hash differs for a different pepper (keyed, not a bare digest)', () => {
++      const otherPepper = Buffer.from('e'.repeat(64), 'hex');
++      const code = normalizeJoinCode('MED-X7P42-Q9K3R');
++      expect(hashJoinCode(pepper, code)).not.toBe(hashJoinCode(otherPepper, code));
++    });
++
++    it('verifies a correct code against its own hash, regardless of display formatting', () => {
++      const code = generateJoinCode();
++      const hash = hashJoinCode(pepper, normalizeJoinCode(code));
++      expect(verifyJoinCode(pepper, code, hash)).toBe(true);
++      expect(verifyJoinCode(pepper, code.toLowerCase(), hash)).toBe(true);
++      expect(verifyJoinCode(pepper, code.replace(/-([A-Z0-9]+)$/, '$1'), hash)).toBe(true);
++    });
++
++    it('rejects an incorrect code', () => {
++      const hash = hashJoinCode(pepper, 'MED-AAAAABBBBB');
++      expect(verifyJoinCode(pepper, 'MED-CCCCCDDDDD', hash)).toBe(false);
++    });
++
++    it('rejects a malformed submitted code without throwing', () => {
++      const hash = hashJoinCode(pepper, 'MED-AAAAABBBBB');
++      expect(verifyJoinCode(pepper, 'not-a-code', hash)).toBe(false);
++      expect(verifyJoinCode(pepper, '', hash)).toBe(false);
++    });
++
++    it('rejects a malformed stored hash without throwing', () => {
++      expect(verifyJoinCode(pepper, 'MED-AAAAABBBBB', 'not-a-hash')).toBe(false);
++    });
++  });
++});
+diff --git a/apps/auth-service/src/organization/organization-join-code.util.ts b/apps/auth-service/src/organization/organization-join-code.util.ts
+new file mode 100644
+index 0000000..6a6af9d
+--- /dev/null
++++ b/apps/auth-service/src/organization/organization-join-code.util.ts
+@@ -0,0 +1,85 @@
++import { createHmac, randomInt, timingSafeEqual } from 'node:crypto';
++
++/**
++ * Organization join-code format and crypto (Task 0010). A reusable,
++ * revocable, admin-issued code -- never a per-invitee single-use token
++ * (see the accompanying ADR for the coherent V1 model this chose).
++ *
++ * Shape: a static, non-identifying "MED-" prefix followed by 10
++ * characters drawn from a 32-symbol alphabet that excludes visually
++ * ambiguous characters (0/O, 1/I/L), displayed as two groups of five for
++ * human readability (e.g. "MED-X7P42-Q9K3R"). 32^10 ~= 1.1x10^15
++ * combinations (~50 bits) -- combined with hashing at rest and the
++ * dedicated request/verification rate limits wired in
++ * organization-onboarding.service.ts, this is not brute-forceable at any
++ * practical online rate.
++ *
++ * The prefix and format never encode the tenant slug, tenant ID, or
++ * organization name (see CODE_PATTERN below) -- there is no way to
++ * derive which organization a code belongs to from the code text itself.
++ */
++const CODE_PREFIX = 'MED-';
++const CODE_ALPHABET = '23456789ABCDEFGHJKMNPQRSTUVWXYZ'; // 32 symbols, no 0/O/1/I/L
++const CODE_BODY_LENGTH = 10;
++
++/** Accepts the code with or without the human-readable grouping hyphen; normalization strips both. */
++export const CODE_PATTERN = /^MED-[23456789ABCDEFGHJKMNPQRSTUVWXYZ]{10}$/;
++
++/**
++ * Generates a new plaintext join code using rejection-free uniform
++ * sampling (node:crypto randomInt), never Math.random. Returned only for
++ * immediate one-time display to the issuing operator -- callers must
++ * never persist this value, only its hash (see hashJoinCode).
++ */
++export function generateJoinCode(): string {
++  let body = '';
++  for (let i = 0; i < CODE_BODY_LENGTH; i += 1) {
++    body += CODE_ALPHABET[randomInt(0, CODE_ALPHABET.length)];
++  }
++  return `${CODE_PREFIX}${body.slice(0, 5)}-${body.slice(5)}`;
++}
++
++/**
++ * Normalizes a user-submitted code for lookup/comparison: uppercases,
++ * strips whitespace and the optional display hyphen between the two
++ * body groups, so "med-x7p42-q9k3r", "MED-X7P42Q9K3R", and
++ * "MED-X7P42-Q9K3R" all resolve to the same stored hash. The leading
++ * "MED-" (including its hyphen) must be present as displayed -- this
++ * deliberately does not attempt to also recover a prefix hyphen a
++ * caller stripped entirely, since "MED" can also legitimately appear as
++ * the start of the random body itself (the alphabet includes M, E, and
++ * D), which would make blind prefix-stripping ambiguous and unsafe.
++ */
++export function normalizeJoinCode(raw: string): string {
++  const upper = raw.trim().toUpperCase();
++  const withoutPrefix = upper.startsWith(CODE_PREFIX) ? upper.slice(CODE_PREFIX.length) : upper;
++  const bodyOnly = withoutPrefix.replace(/-/g, '').replace(/\s+/g, '');
++  return `${CODE_PREFIX}${bodyOnly}`;
++}
++
++export function isValidJoinCodeFormat(normalized: string): boolean {
++  return CODE_PATTERN.test(normalized);
++}
++
++/**
++ * Hashes a normalized join code with HMAC-SHA256 keyed by the
++ * server-side ORG_JOIN_CODE_PEPPER -- the same keyed-hash pattern
++ * already accepted for refresh credentials and OTP codes. A stolen
++ * table cannot be brute-forced offline against the ~50-bit code space
++ * without also compromising the pepper, and the plaintext code is never
++ * persisted anywhere.
++ */
++export function hashJoinCode(pepper: Buffer, normalizedCode: string): string {
++  return createHmac('sha256', pepper).update(normalizedCode, 'utf8').digest('hex');
++}
++
++/** Constant-time verification against a stored hash. */
++export function verifyJoinCode(pepper: Buffer, submittedCode: string, storedHash: string): boolean {
++  const normalized = normalizeJoinCode(submittedCode);
++  if (!isValidJoinCodeFormat(normalized) || !/^[a-f0-9]{64}$/.test(storedHash)) {
++    return false;
++  }
++  const actual = Buffer.from(hashJoinCode(pepper, normalized), 'hex');
++  const expected = Buffer.from(storedHash, 'hex');
++  return actual.length === expected.length && timingSafeEqual(actual, expected);
++}
+diff --git a/apps/auth-service/src/organization/organization-onboarding.service.spec.ts b/apps/auth-service/src/organization/organization-onboarding.service.spec.ts
+new file mode 100644
+index 0000000..44bbde4
+--- /dev/null
++++ b/apps/auth-service/src/organization/organization-onboarding.service.spec.ts
+@@ -0,0 +1,547 @@
++import { generateJoinCode, hashJoinCode, normalizeJoinCode } from './organization-join-code.util';
++import { OrganizationOnboardingService } from './organization-onboarding.service';
++
++const PEPPER = Buffer.from('f'.repeat(64), 'hex');
++
++interface TenantRow {
++  id: string;
++  isActive: boolean;
++  deletedAt: Date | null;
++  organizationType: string;
++}
++
++interface JoinCodeRow {
++  id: string;
++  codeHash: string;
++  status: 'ACTIVE' | 'REVOKED';
++  expiresAt: Date | null;
++  deletedAt: Date | null;
++  redemptionCount: number;
++  tenant: TenantRow;
++}
++
++/** Builds a valid join-code fixture together with the plaintext code that hashes to it. */
++function makeValidJoinCode(overrides: Partial<JoinCodeRow> = {}): {
++  code: string;
++  row: JoinCodeRow;
++} {
++  const code = generateJoinCode();
++  const codeHash = hashJoinCode(PEPPER, normalizeJoinCode(code));
++  const row: JoinCodeRow = {
++    id: 'join-code-1',
++    codeHash,
++    status: 'ACTIVE',
++    expiresAt: null,
++    deletedAt: null,
++    redemptionCount: 0,
++    tenant: {
++      id: 'tenant-a',
++      isActive: true,
++      deletedAt: null,
++      organizationType: 'HOSPITAL',
++    },
++    ...overrides,
++  };
++  return { code, row };
++}
++
++function buildHarness(
++  options: {
++    joinCode?: JoinCodeRow | null;
++    existingUser?: { id: string } | null;
++    existingExternalIdentity?: { id: string } | null;
++  } = {},
++) {
++  let joinCodeRow = options.joinCode ?? null;
++  const createdTenants: TenantRow[] = [];
++  const createdUsers: Record<string, unknown>[] = [];
++  const createdMemberships: Record<string, unknown>[] = [];
++  const createdExternalIdentities: Record<string, unknown>[] = [];
++  const auditEvents: Array<{ kind: string; input: unknown }> = [];
++  let personalTenant: TenantRow | null = null;
++
++  const transaction = {
++    user: {
++      findUnique: jest.fn().mockResolvedValue(options.existingUser ?? null),
++      create: jest.fn().mockImplementation(({ data }: { data: Record<string, unknown> }) => {
++        const user = { id: 'new-user-1', ...data };
++        createdUsers.push(user);
++        return Promise.resolve({ id: user.id });
++      }),
++    },
++    externalAuthIdentity: {
++      findFirst: jest.fn().mockResolvedValue(options.existingExternalIdentity ?? null),
++      create: jest.fn().mockImplementation(({ data }: { data: Record<string, unknown> }) => {
++        createdExternalIdentities.push(data);
++        return Promise.resolve({ id: 'external-identity-1' });
++      }),
++    },
++    organizationJoinCode: {
++      findUnique: jest.fn().mockImplementation(({ where }: { where: { codeHash: string } }) => {
++        if (joinCodeRow && joinCodeRow.codeHash === where.codeHash) {
++          return Promise.resolve(joinCodeRow);
++        }
++        return Promise.resolve(null);
++      }),
++      update: jest
++        .fn()
++        .mockImplementation(({ data }: { data: { redemptionCount: { increment: number } } }) => {
++          if (joinCodeRow) {
++            joinCodeRow = {
++              ...joinCodeRow,
++              redemptionCount: joinCodeRow.redemptionCount + data.redemptionCount.increment,
++            };
++          }
++          return Promise.resolve(joinCodeRow);
++        }),
++    },
++    tenantMembership: {
++      create: jest.fn().mockImplementation(({ data }: { data: Record<string, unknown> }) => {
++        const membership = { id: 'membership-1', ...data };
++        createdMemberships.push(membership);
++        return Promise.resolve(membership);
++      }),
++    },
++    tenant: {
++      findFirst: jest.fn().mockImplementation(() => Promise.resolve(personalTenant)),
++      create: jest.fn().mockImplementation(({ data }: { data: Partial<TenantRow> }) => {
++        const tenant: TenantRow = {
++          id: 'personal-tenant-1',
++          isActive: true,
++          deletedAt: null,
++          organizationType: 'NONE',
++          ...data,
++        } as TenantRow;
++        createdTenants.push(tenant);
++        personalTenant = tenant;
++        return Promise.resolve({ id: tenant.id });
++      }),
++    },
++  };
++
++  const prisma = {
++    client: {
++      $transaction: jest.fn((op: (tx: typeof transaction) => unknown) => op(transaction)),
++    },
++  };
++
++  const audit = {
++    appendTenantSystem: jest.fn().mockImplementation((_tx: unknown, input: unknown) => {
++      auditEvents.push({ kind: 'tenant', input });
++      return Promise.resolve();
++    }),
++    appendSystem: jest.fn().mockImplementation((_tx: unknown, input: unknown) => {
++      auditEvents.push({ kind: 'system', input });
++      return Promise.resolve();
++    }),
++  };
++
++  const service = new OrganizationOnboardingService(prisma as never, audit as never);
++
++  return {
++    service,
++    createdTenants,
++    createdUsers,
++    createdMemberships,
++    createdExternalIdentities,
++    auditEvents,
++    getJoinCode: () => joinCodeRow,
++  };
++}
++
++describe('OrganizationOnboardingService.registerWithPassword', () => {
++  const basePasswordInput = {
++    email: 'nurse@example.com',
++    phone: '+919876543210',
++    passwordHash: 'hashed',
++    firstName: 'Asha',
++    lastName: 'Rao',
++    orgJoinCodePepper: PEPPER,
++  };
++
++  it('creates only a PENDING membership for a valid code, with no role/privilege fields', async () => {
++    const { code, row } = makeValidJoinCode();
++    const harness = buildHarness({ joinCode: row });
++
++    await harness.service.registerWithPassword({
++      ...basePasswordInput,
++      organizationType: 'HOSPITAL',
++      organizationCode: code,
++    });
++
++    expect(harness.createdUsers).toHaveLength(1);
++    expect(harness.createdUsers[0]).toMatchObject({ status: 'PENDING_VERIFICATION' });
++    expect(harness.createdMemberships).toHaveLength(1);
++    expect(harness.createdMemberships[0]).toMatchObject({
++      tenantId: 'tenant-a',
++      status: 'PENDING',
++    });
++    expect(harness.createdMemberships[0]).not.toHaveProperty('role');
++    expect(harness.createdMemberships[0]).not.toHaveProperty('roleId');
++    expect(harness.createdMemberships[0]).not.toHaveProperty('permissions');
++  });
++
++  it('increments the reusable code redemption counter without consuming it', async () => {
++    const { code, row } = makeValidJoinCode();
++    const harness = buildHarness({ joinCode: row });
++
++    await harness.service.registerWithPassword({
++      ...basePasswordInput,
++      organizationType: 'HOSPITAL',
++      organizationCode: code,
++    });
++
++    expect(harness.getJoinCode()?.redemptionCount).toBe(1);
++    expect(harness.getJoinCode()?.status).toBe('ACTIVE');
++  });
++
++  it('rejects registration when the selected type does not match the organization type', async () => {
++    const { code, row } = makeValidJoinCode({
++      tenant: { id: 'tenant-a', isActive: true, deletedAt: null, organizationType: 'SUPPLIER' },
++    });
++    const harness = buildHarness({ joinCode: row });
++
++    await harness.service.registerWithPassword({
++      ...basePasswordInput,
++      organizationType: 'HOSPITAL', // client claims Hospital; the code's real org is Supplier
++      organizationCode: code,
++    });
++
++    expect(harness.createdUsers).toHaveLength(0);
++    expect(harness.createdMemberships).toHaveLength(0);
++  });
++
++  it('rejects an expired code', async () => {
++    const { code, row } = makeValidJoinCode({ expiresAt: new Date(Date.now() - 1000) });
++    const harness = buildHarness({ joinCode: row });
++
++    await harness.service.registerWithPassword({
++      ...basePasswordInput,
++      organizationType: 'HOSPITAL',
++      organizationCode: code,
++    });
++
++    expect(harness.createdUsers).toHaveLength(0);
++  });
++
++  it('accepts a code with a future expiry', async () => {
++    const { code, row } = makeValidJoinCode({ expiresAt: new Date(Date.now() + 1000 * 60 * 60) });
++    const harness = buildHarness({ joinCode: row });
++
++    await harness.service.registerWithPassword({
++      ...basePasswordInput,
++      organizationType: 'HOSPITAL',
++      organizationCode: code,
++    });
++
++    expect(harness.createdUsers).toHaveLength(1);
++  });
++
++  it('rejects a revoked code', async () => {
++    const { code, row } = makeValidJoinCode({ status: 'REVOKED' });
++    const harness = buildHarness({ joinCode: row });
++
++    await harness.service.registerWithPassword({
++      ...basePasswordInput,
++      organizationType: 'HOSPITAL',
++      organizationCode: code,
++    });
++
++    expect(harness.createdUsers).toHaveLength(0);
++  });
++
++  it('rejects a code for an inactive organization', async () => {
++    const { code, row } = makeValidJoinCode({
++      tenant: { id: 'tenant-a', isActive: false, deletedAt: null, organizationType: 'HOSPITAL' },
++    });
++    const harness = buildHarness({ joinCode: row });
++
++    await harness.service.registerWithPassword({
++      ...basePasswordInput,
++      organizationType: 'HOSPITAL',
++      organizationCode: code,
++    });
++
++    expect(harness.createdUsers).toHaveLength(0);
++  });
++
++  it('rejects a soft-deleted code even if otherwise well-formed', async () => {
++    const { code, row } = makeValidJoinCode({ deletedAt: new Date() });
++    const harness = buildHarness({ joinCode: row });
++
++    await harness.service.registerWithPassword({
++      ...basePasswordInput,
++      organizationType: 'HOSPITAL',
++      organizationCode: code,
++    });
++
++    expect(harness.createdUsers).toHaveLength(0);
++  });
++
++  it('rejects a nonexistent code and a wrong-type code identically (anti-enumeration)', async () => {
++    const harnessNonexistent = buildHarness({ joinCode: null });
++    await harnessNonexistent.service.registerWithPassword({
++      ...basePasswordInput,
++      organizationType: 'HOSPITAL',
++      organizationCode: 'MED-ZZZZZ-ZZZZZ',
++    });
++    expect(harnessNonexistent.createdUsers).toHaveLength(0);
++
++    const { code, row } = makeValidJoinCode({
++      tenant: { id: 'tenant-a', isActive: true, deletedAt: null, organizationType: 'SUPPLIER' },
++    });
++    const harnessWrongType = buildHarness({ joinCode: row });
++    await harnessWrongType.service.registerWithPassword({
++      ...basePasswordInput,
++      organizationType: 'HOSPITAL',
++      organizationCode: code,
++    });
++    expect(harnessWrongType.createdUsers).toHaveLength(0);
++
++    // Both failure modes produce exactly the same outward effect: no
++    // user, no membership, no thrown error -- a caller cannot
++    // distinguish "no such code" from "wrong organization type" from
++    // the method's return value or any side effect.
++  });
++
++  it('rejects a malformed code without ever querying the database for it', async () => {
++    const harness = buildHarness({ joinCode: null });
++    await harness.service.registerWithPassword({
++      ...basePasswordInput,
++      organizationType: 'HOSPITAL',
++      organizationCode: 'not-a-real-code-at-all!!',
++    });
++    expect(harness.createdUsers).toHaveLength(0);
++  });
++
++  it('rejects registration for a healthcare type with no code supplied at all', async () => {
++    const harness = buildHarness({ joinCode: null });
++    await harness.service.registerWithPassword({
++      ...basePasswordInput,
++      organizationType: 'PHARMACY',
++      organizationCode: undefined,
++    });
++    expect(harness.createdUsers).toHaveLength(0);
++  });
++
++  it('rejects registration when the email already exists, before ever touching the code', async () => {
++    const { code, row } = makeValidJoinCode();
++    const harness = buildHarness({ joinCode: row, existingUser: { id: 'existing-user' } });
++
++    await harness.service.registerWithPassword({
++      ...basePasswordInput,
++      organizationType: 'HOSPITAL',
++      organizationCode: code,
++    });
++
++    expect(harness.createdUsers).toHaveLength(0);
++    expect(harness.createdMemberships).toHaveLength(0);
++  });
++
++  it('never includes the raw code or its hash in any audit event', async () => {
++    const { code, row } = makeValidJoinCode();
++    const harness = buildHarness({ joinCode: row });
++
++    await harness.service.registerWithPassword({
++      ...basePasswordInput,
++      organizationType: 'HOSPITAL',
++      organizationCode: code,
++    });
++
++    const serialized = JSON.stringify(harness.auditEvents);
++    expect(serialized).not.toContain(code);
++    expect(serialized).not.toContain(normalizeJoinCode(code));
++    expect(serialized).not.toContain(row.codeHash);
++  });
++
++  it('never logs the password hash in any audit event', async () => {
++    const { code, row } = makeValidJoinCode();
++    const harness = buildHarness({ joinCode: row });
++
++    await harness.service.registerWithPassword({
++      ...basePasswordInput,
++      organizationType: 'HOSPITAL',
++      organizationCode: code,
++    });
++
++    const serialized = JSON.stringify(harness.auditEvents);
++    expect(serialized).not.toContain(basePasswordInput.passwordHash);
++  });
++
++  it('audits a rejected code with only a bounded, non-identifying reason', async () => {
++    const harness = buildHarness({ joinCode: null });
++    await harness.service.registerWithPassword({
++      ...basePasswordInput,
++      organizationType: 'HOSPITAL',
++      organizationCode: 'MED-ZZZZZ-ZZZZZ',
++    });
++
++    expect(harness.auditEvents).toHaveLength(1);
++    const [event] = harness.auditEvents;
++    expect(event.kind).toBe('system');
++    const metadata = (event.input as { metadata: Record<string, unknown> }).metadata;
++    expect(Object.keys(metadata)).toEqual(['reason']);
++  });
++});
++
++describe('OrganizationOnboardingService -- NONE personal account path', () => {
++  it('creates an ACTIVE, role-less personal membership with no organization code required', async () => {
++    const harness = buildHarness({});
++
++    await harness.service.registerWithPassword({
++      organizationType: 'NONE',
++      email: 'person@example.com',
++      phone: '+919876500000',
++      passwordHash: 'hashed',
++      firstName: 'Ravi',
++      lastName: 'Kumar',
++      orgJoinCodePepper: PEPPER,
++    });
++
++    expect(harness.createdUsers).toHaveLength(1);
++    expect(harness.createdMemberships).toHaveLength(1);
++    expect(harness.createdMemberships[0]).toMatchObject({ status: 'ACTIVE' });
++    expect(harness.createdMemberships[0]).not.toHaveProperty('role');
++    expect(harness.createdTenants).toHaveLength(1);
++    expect(harness.createdTenants[0]).toMatchObject({ organizationType: 'NONE' });
++  });
++
++  it('reuses the same personal-accounts tenant across multiple personal registrations', async () => {
++    const harness = buildHarness({});
++
++    await harness.service.registerWithPassword({
++      organizationType: 'NONE',
++      email: 'first@example.com',
++      phone: '+919876500001',
++      passwordHash: 'hashed',
++      firstName: 'A',
++      lastName: 'B',
++      orgJoinCodePepper: PEPPER,
++    });
++
++    await harness.service.registerWithPassword({
++      organizationType: 'NONE',
++      email: 'second@example.com',
++      phone: '+919876500002',
++      passwordHash: 'hashed',
++      firstName: 'C',
++      lastName: 'D',
++      orgJoinCodePepper: PEPPER,
++    });
++
++    expect(harness.createdTenants).toHaveLength(1);
++    expect(harness.createdMemberships).toHaveLength(2);
++  });
++});
++
++describe('OrganizationOnboardingService.registerWithGoogle', () => {
++  const baseGoogleInput = {
++    subject: 'google-subject-1',
++    email: 'doctor@example.com',
++    phone: '+919876543211',
++    firstName: 'Meera',
++    lastName: 'Nair',
++    orgJoinCodePepper: PEPPER,
++  };
++
++  it('follows the identical code policy and pending-membership behavior as password registration', async () => {
++    const { code, row } = makeValidJoinCode();
++    const harness = buildHarness({ joinCode: row });
++
++    await harness.service.registerWithGoogle({
++      ...baseGoogleInput,
++      organizationType: 'HOSPITAL',
++      organizationCode: code,
++    });
++
++    expect(harness.createdMemberships).toHaveLength(1);
++    expect(harness.createdMemberships[0]).toMatchObject({ status: 'PENDING' });
++    expect(harness.createdExternalIdentities).toHaveLength(1);
++  });
++
++  it('rejects an invalid code identically to password registration (no membership, no user)', async () => {
++    const harness = buildHarness({ joinCode: null });
++
++    await harness.service.registerWithGoogle({
++      ...baseGoogleInput,
++      organizationType: 'HOSPITAL',
++      organizationCode: 'MED-NOTVALID',
++    });
++
++    expect(harness.createdUsers).toHaveLength(0);
++    expect(harness.createdMemberships).toHaveLength(0);
++    expect(harness.createdExternalIdentities).toHaveLength(0);
++  });
++
++  it('never auto-links an existing Google subject to another organization', async () => {
++    const { code, row } = makeValidJoinCode();
++    const harness = buildHarness({
++      joinCode: row,
++      existingExternalIdentity: { id: 'already-linked' },
++    });
++
++    await harness.service.registerWithGoogle({
++      ...baseGoogleInput,
++      organizationType: 'HOSPITAL',
++      organizationCode: code,
++    });
++
++    expect(harness.createdUsers).toHaveLength(0);
++    expect(harness.createdMemberships).toHaveLength(0);
++  });
++
++  it('never auto-links an existing email to another organization via Google', async () => {
++    const { code, row } = makeValidJoinCode();
++    const harness = buildHarness({ joinCode: row, existingUser: { id: 'existing-user' } });
++
++    await harness.service.registerWithGoogle({
++      ...baseGoogleInput,
++      organizationType: 'HOSPITAL',
++      organizationCode: code,
++    });
++
++    expect(harness.createdMemberships).toHaveLength(0);
++  });
++});
++
++describe('OrganizationOnboardingService -- cross-tenant isolation', () => {
++  it('a code for tenant A never creates a membership in tenant B', async () => {
++    const { code, row } = makeValidJoinCode({
++      tenant: { id: 'tenant-a', isActive: true, deletedAt: null, organizationType: 'HOSPITAL' },
++    });
++    const harness = buildHarness({ joinCode: row });
++
++    await harness.service.registerWithPassword({
++      email: 'staff@example.com',
++      phone: '+919876543212',
++      passwordHash: 'hashed',
++      firstName: 'X',
++      lastName: 'Y',
++      orgJoinCodePepper: PEPPER,
++      organizationType: 'HOSPITAL',
++      organizationCode: code,
++    });
++
++    expect(harness.createdMemberships).toHaveLength(1);
++    expect(harness.createdMemberships[0]).toMatchObject({ tenantId: 'tenant-a' });
++    expect(harness.createdMemberships[0]).not.toMatchObject({ tenantId: 'tenant-b' });
++  });
++
++  it('knowing another tenant exists (by guessing an unrelated code) cannot resolve to it', async () => {
++    // The lookup is by codeHash alone -- there is no code path that
++    // accepts a tenant identifier of any kind as an alternative
++    // resolution route.
++    const harness = buildHarness({ joinCode: null });
++    await harness.service.registerWithPassword({
++      email: 'attacker@example.com',
++      phone: '+919876543213',
++      passwordHash: 'hashed',
++      firstName: 'Z',
++      lastName: 'W',
++      orgJoinCodePepper: PEPPER,
++      organizationType: 'HOSPITAL',
++      organizationCode: 'MED-GUESSD-GUESSD',
++    });
++    expect(harness.createdMemberships).toHaveLength(0);
++  });
++});
+diff --git a/apps/auth-service/src/organization/organization-onboarding.service.ts b/apps/auth-service/src/organization/organization-onboarding.service.ts
+new file mode 100644
+index 0000000..8d7727b
+--- /dev/null
++++ b/apps/auth-service/src/organization/organization-onboarding.service.ts
+@@ -0,0 +1,342 @@
++import { Injectable } from '@nestjs/common';
++import { hasPrismaCode, withSerializableRetry, type Prisma } from '@medsphere/database';
++import { AuditWriter } from '../audit/audit-writer.service';
++import { PrismaService } from '../prisma/prisma.service';
++import type { OrganizationType } from './organization-type';
++import {
++  hashJoinCode,
++  isValidJoinCodeFormat,
++  normalizeJoinCode,
++} from './organization-join-code.util';
++
++type OrgTransaction = Prisma.TransactionClient;
++
++/**
++ * The single, well-known personal-account tenant every `organizationType:
++ * 'NONE'` registration becomes a member of. Chosen as the smallest
++ * architecture-compatible model for a personal/patient account: the
++ * existing tenant-isolation architecture requires every User to reach
++ * the system through a TenantMembership, so a personal account is
++ * modeled as an ACTIVE, role-less membership in one dedicated,
++ * non-healthcare tenant -- never a healthcare-organization membership,
++ * never a bypass of TenantMembership/tenant-scoped authorization at all.
++ * See the accompanying ADR for the alternatives considered.
++ */
++const PERSONAL_ACCOUNTS_TENANT_SLUG = 'medsphere-personal-accounts';
++const PERSONAL_ACCOUNTS_TENANT_NAME = 'MedSphere Personal Accounts';
++
++export interface PasswordOrganizationRegistrationInput {
++  readonly organizationType: OrganizationType;
++  readonly organizationCode?: string;
++  readonly email: string;
++  readonly phone: string;
++  readonly passwordHash: string;
++  readonly firstName: string;
++  readonly lastName: string;
++  readonly orgJoinCodePepper: Buffer;
++}
++
++export interface GoogleOrganizationRegistrationInput {
++  readonly organizationType: OrganizationType;
++  readonly organizationCode?: string;
++  readonly subject: string;
++  readonly email: string;
++  readonly phone: string;
++  readonly firstName: string;
++  readonly lastName: string;
++  readonly orgJoinCodePepper: Buffer;
++}
++
++type TenantResolution =
++  | { readonly ok: true; readonly tenantId: string; readonly joinCodeId: string | null }
++  | { readonly ok: false };
++
++@Injectable()
++export class OrganizationOnboardingService {
++  constructor(
++    private readonly prisma: PrismaService,
++    private readonly audit: AuditWriter,
++  ) {}
++
++  /**
++   * Mirrors UsersRepository.createPendingRegistration's accepted shape
++   * and anti-enumeration behavior exactly (identical outward response
++   * whether the organization code is invalid, the organization does not
++   * exist, the type does not match, or the email is already taken) --
++   * only the tenant-resolution step (organization type + code instead of
++   * a user-supplied tenant slug) is new.
++   */
++  async registerWithPassword(input: PasswordOrganizationRegistrationInput): Promise<void> {
++    try {
++      await withSerializableRetry(this.prisma.client, async (transaction) => {
++        const existingUser = await transaction.user.findUnique({
++          where: { email: input.email },
++          select: { id: true },
++        });
++        if (existingUser) {
++          return;
++        }
++
++        const resolution = await this.resolveTenant(
++          transaction,
++          input.organizationType,
++          input.organizationCode,
++          input.orgJoinCodePepper,
++        );
++        if (!resolution.ok) {
++          return;
++        }
++
++        const user = await transaction.user.create({
++          data: {
++            email: input.email,
++            phone: input.phone,
++            passwordHash: input.passwordHash,
++            firstName: input.firstName,
++            lastName: input.lastName,
++            status: 'PENDING_VERIFICATION',
++          },
++          select: { id: true },
++        });
++
++        await this.createMembershipAndAudit(
++          transaction,
++          resolution,
++          user.id,
++          input.organizationType,
++        );
++      });
++    } catch (error) {
++      if (hasPrismaCode(error, 'P2002')) {
++        return;
++      }
++      throw error;
++    }
++  }
++
++  /**
++   * Mirrors UsersRepository.createPendingGoogleRegistration's accepted
++   * shape exactly, including never auto-linking an existing global user
++   * or Google subject to another tenant.
++   */
++  async registerWithGoogle(input: GoogleOrganizationRegistrationInput): Promise<void> {
++    try {
++      await withSerializableRetry(this.prisma.client, async (transaction) => {
++        const existingExternalIdentity = await transaction.externalAuthIdentity.findFirst({
++          where: { provider: 'GOOGLE', subject: input.subject },
++          select: { id: true },
++        });
++        if (existingExternalIdentity) {
++          return;
++        }
++
++        const existingUser = await transaction.user.findUnique({
++          where: { email: input.email },
++          select: { id: true },
++        });
++        if (existingUser) {
++          return;
++        }
++
++        const resolution = await this.resolveTenant(
++          transaction,
++          input.organizationType,
++          input.organizationCode,
++          input.orgJoinCodePepper,
++        );
++        if (!resolution.ok) {
++          return;
++        }
++
++        const user = await transaction.user.create({
++          data: {
++            email: input.email,
++            phone: input.phone,
++            passwordHash: null,
++            firstName: input.firstName,
++            lastName: input.lastName,
++            status: 'PENDING_VERIFICATION',
++          },
++          select: { id: true },
++        });
++
++        await transaction.externalAuthIdentity.create({
++          data: {
++            userId: user.id,
++            provider: 'GOOGLE',
++            subject: input.subject,
++            email: input.email,
++            emailVerified: true,
++          },
++        });
++
++        await this.createMembershipAndAudit(
++          transaction,
++          resolution,
++          user.id,
++          input.organizationType,
++        );
++      });
++    } catch (error) {
++      if (hasPrismaCode(error, 'P2002')) {
++        return;
++      }
++      throw error;
++    }
++  }
++
++  private async createMembershipAndAudit(
++    transaction: OrgTransaction,
++    resolution: Extract<TenantResolution, { ok: true }>,
++    userId: string,
++    organizationType: OrganizationType,
++  ): Promise<void> {
++    // Personal accounts (NONE) are activated immediately: there is no
++    // healthcare permission, provider access, or privileged role to
++    // gate behind phone/identity/age verification for a non-healthcare
++    // context -- see the ADR. Every other organization type creates a
++    // PENDING membership, exactly matching the pre-existing accepted
++    // safety property, and is never auto-activated here.
++    const membership = await transaction.tenantMembership.create({
++      data: {
++        tenantId: resolution.tenantId,
++        userId,
++        status: organizationType === 'NONE' ? 'ACTIVE' : 'PENDING',
++        joinedAt: organizationType === 'NONE' ? new Date() : null,
++      },
++      select: { id: true },
++    });
++
++    if (resolution.joinCodeId) {
++      await transaction.organizationJoinCode.update({
++        where: { id: resolution.joinCodeId },
++        data: { redemptionCount: { increment: 1 } },
++      });
++    }
++
++    await this.audit.appendTenantSystem(transaction, {
++      tenantId: resolution.tenantId,
++      eventType: 'authentication.organization.join.requested',
++      outcome: 'SUCCEEDED',
++      resourceType: 'TenantMembership',
++      resourceId: membership.id,
++      // Never the raw code, the organization name, or any identifying
++      // value -- only the bounded, non-sensitive organization type.
++      metadata: { organizationType },
++    });
++  }
++
++  /**
++   * Resolves the target tenant for a registration request. Returns
++   * `{ ok: false }` for every failure mode (malformed code, invalid
++   * code, expired, revoked, organization inactive, or organization-type
++   * mismatch) -- callers must treat every one of these identically
++   * (silent no-op, same outward response as an unknown email) so an
++   * unauthenticated caller can never distinguish "no such organization"
++   * from "wrong code" from "wrong type" from "expired".
++   */
++  private async resolveTenant(
++    transaction: OrgTransaction,
++    organizationType: OrganizationType,
++    organizationCode: string | undefined,
++    orgJoinCodePepper: Buffer,
++  ): Promise<TenantResolution> {
++    if (organizationType === 'NONE') {
++      const tenantId = await this.ensurePersonalAccountsTenant(transaction);
++      return { ok: true, tenantId, joinCodeId: null };
++    }
++
++    if (!organizationCode) {
++      return { ok: false };
++    }
++    const normalized = normalizeJoinCode(organizationCode);
++    if (!isValidJoinCodeFormat(normalized)) {
++      return { ok: false };
++    }
++
++    const codeHash = hashJoinCode(orgJoinCodePepper, normalized);
++    const joinCode = await transaction.organizationJoinCode.findUnique({
++      where: { codeHash },
++      select: {
++        id: true,
++        status: true,
++        expiresAt: true,
++        deletedAt: true,
++        tenant: {
++          select: {
++            id: true,
++            isActive: true,
++            deletedAt: true,
++            organizationType: true,
++          },
++        },
++      },
++    });
++
++    const now = new Date();
++    const codeValid =
++      joinCode !== null &&
++      joinCode.deletedAt === null &&
++      joinCode.status === 'ACTIVE' &&
++      (joinCode.expiresAt === null || joinCode.expiresAt.getTime() > now.getTime()) &&
++      joinCode.tenant.deletedAt === null &&
++      joinCode.tenant.isActive === true &&
++      // Never trust organization type from the client alone: the
++      // selected type must match the organization's actual,
++      // server-recorded type exactly.
++      joinCode.tenant.organizationType === organizationType;
++
++    if (!codeValid) {
++      // Audited (bounded, non-identifying reason only) even though the
++      // outward registration response stays identical to every other
++      // failure mode -- see resourceType note below.
++      await this.audit.appendSystem(transaction, {
++        eventType: 'authentication.organization.join.code.rejected',
++        outcome: 'DENIED',
++        metadata: { reason: joinCode ? 'invalid_or_expired_or_type_mismatch' : 'code_not_found' },
++      });
++      return { ok: false };
++    }
++
++    return { ok: true, tenantId: joinCode.tenant.id, joinCodeId: joinCode.id };
++  }
++
++  private async ensurePersonalAccountsTenant(transaction: OrgTransaction): Promise<string> {
++    const existing = await transaction.tenant.findFirst({
++      where: { slug: PERSONAL_ACCOUNTS_TENANT_SLUG, deletedAt: null },
++      select: { id: true },
++    });
++    if (existing) {
++      return existing.id;
++    }
++    try {
++      const created = await transaction.tenant.create({
++        data: {
++          name: PERSONAL_ACCOUNTS_TENANT_NAME,
++          slug: PERSONAL_ACCOUNTS_TENANT_SLUG,
++          organizationType: 'NONE',
++          isActive: true,
++          // Never reachable through the accepted tenantSlug-based paths
++          // (login/legacy self-registration) -- only through this
++          // explicit organizationType: 'NONE' code path.
++          selfRegistrationEnabled: false,
++        },
++        select: { id: true },
++      });
++      return created.id;
++    } catch (error) {
++      if (hasPrismaCode(error, 'P2002')) {
++        // Concurrent first-time personal registration raced to create
++        // the same well-known tenant; re-read the now-existing row.
++        const raced = await transaction.tenant.findFirst({
++          where: { slug: PERSONAL_ACCOUNTS_TENANT_SLUG, deletedAt: null },
++          select: { id: true },
++        });
++        if (raced) {
++          return raced.id;
++        }
++      }
++      throw error;
++    }
++  }
++}
+diff --git a/apps/auth-service/src/organization/organization-type.ts b/apps/auth-service/src/organization/organization-type.ts
+new file mode 100644
+index 0000000..68b40b2
+--- /dev/null
++++ b/apps/auth-service/src/organization/organization-type.ts
+@@ -0,0 +1,40 @@
++/**
++ * Bounded V1 organization types a normal user may select during public
++ * registration. Deliberately a plain, hand-maintained constant (mirrors
++ * the Prisma `OrganizationType` enum in schema.prisma exactly) rather
++ * than importing the generated Prisma enum here: this keeps DTO
++ * validation resolvable without the generated Prisma client, and the
++ * frontend (which cannot import from @medsphere/database at all) needs
++ * its own mirrored copy regardless -- see
++ * apps/web/src/lib/organization-types.ts.
++ *
++ * Adding a new organization type is a deliberate code + schema change
++ * (a new Prisma migration for the enum, plus updating this list and its
++ * frontend mirror) -- never a free-form string a client can supply.
++ */
++export const ORGANIZATION_TYPES = [
++  'PHARMACY',
++  'HOSPITAL',
++  'LABORATORY',
++  'CLINIC',
++  'BLOOD_BANK',
++  'SUPPLIER',
++  'NONE',
++] as const;
++
++export type OrganizationType = (typeof ORGANIZATION_TYPES)[number];
++
++/** Organization types that represent a real healthcare/business organization -- i.e. everything except the personal-account marker. */
++export const HEALTHCARE_ORGANIZATION_TYPES = ORGANIZATION_TYPES.filter(
++  (type) => type !== 'NONE',
++) as readonly Exclude<OrganizationType, 'NONE'>[];
++
++export function isOrganizationType(value: string): value is OrganizationType {
++  return (ORGANIZATION_TYPES as readonly string[]).includes(value);
++}
++
++export function isHealthcareOrganizationType(
++  value: OrganizationType,
++): value is Exclude<OrganizationType, 'NONE'> {
++  return value !== 'NONE';
++}
+diff --git a/apps/auth-service/src/organization/organization.module.ts b/apps/auth-service/src/organization/organization.module.ts
+new file mode 100644
+index 0000000..db7f820
+--- /dev/null
++++ b/apps/auth-service/src/organization/organization.module.ts
+@@ -0,0 +1,20 @@
++import { Module } from '@nestjs/common';
++import { AuditPersistenceModule } from '../audit/audit-persistence.module';
++import { PrismaModule } from '../prisma/prisma.module';
++import { OrganizationOnboardingService } from './organization-onboarding.service';
++
++/**
++ * Deliberately does not import AuthModule: OrganizationOnboardingService
++ * receives the join-code pepper as a plain method parameter rather than
++ * an injected AuthConfigService, specifically so this module's only
++ * dependencies are lower-level (Prisma, audit) and AuthModule can safely
++ * import this module (to wire OrganizationOnboardingService into
++ * RegistrationService/the Google registration path) without creating a
++ * circular module dependency.
++ */
++@Module({
++  imports: [PrismaModule, AuditPersistenceModule],
++  providers: [OrganizationOnboardingService],
++  exports: [OrganizationOnboardingService],
++})
++export class OrganizationModule {}
+diff --git a/apps/auth-service/src/security/auth-rate-limit.module.spec.ts b/apps/auth-service/src/security/auth-rate-limit.module.spec.ts
+index c6332e9..0699d70 100644
+--- a/apps/auth-service/src/security/auth-rate-limit.module.spec.ts
++++ b/apps/auth-service/src/security/auth-rate-limit.module.spec.ts
+@@ -40,4 +40,24 @@ describe('authentication rate-limit key generation', () => {
+       }),
+     ).toBe('account:central-pharmacy:user@example.com');
+   });
++
++  it('keys by email alone for a tenantSlug-free request (Task 0010 registration/onboarding)', () => {
++    expect(
++      accountTracker({
++        ip: '127.0.0.1',
++        body: {
++          email: ' USER@Example.COM  ',
++        },
++      }),
++    ).toBe('account:user@example.com');
++  });
++
++  it('falls through to the IP-based tracker when neither tenantSlug+email nor email alone is present', () => {
++    expect(
++      accountTracker({
++        ip: '203.0.113.5',
++        body: {},
++      }),
++    ).toBe('network:203.0.113.5');
++  });
+ });
+diff --git a/apps/auth-service/src/security/auth-rate-limit.module.ts b/apps/auth-service/src/security/auth-rate-limit.module.ts
+index ca912da..16e5eea 100644
+--- a/apps/auth-service/src/security/auth-rate-limit.module.ts
++++ b/apps/auth-service/src/security/auth-rate-limit.module.ts
+@@ -43,6 +43,16 @@ export function accountTracker(request: Record<string, unknown>): string {
+     )}`;
+   }
+ 
++  // Public registration and organization-code onboarding (Task 0010) no
++  // longer collect a tenant slug from the client -- email alone is the
++  // per-account rate-limit key for those requests. Still falls through
++  // to the IP-based tracker below when even email is absent (e.g. a
++  // malformed request body), exactly as the tenantSlug+email path
++  // already did.
++  if (typeof email === 'string') {
++    return `account:${normalizeAuthenticationLocator(email)}`;
++  }
++
+   const refreshCredential = typedRequest.body?.refreshToken;
+   if (typeof refreshCredential === 'string') {
+     const sessionId = refreshCredential.split('.')[1];
+diff --git a/apps/auth-service/src/users/users.repository.ts b/apps/auth-service/src/users/users.repository.ts
+index bf7193f..2f3cee6 100644
+--- a/apps/auth-service/src/users/users.repository.ts
++++ b/apps/auth-service/src/users/users.repository.ts
+@@ -105,6 +105,109 @@ export class UsersRepository {
+     });
+   }
+ 
++  /**
++   * Global (non-tenant-scoped) identity lookup by email, used only by the
++   * slug-free login flow (Task 0010) to verify the person's password
++   * exactly once before resolving which organization(s) they belong to.
++   * Never used to bypass tenant-scoped authorization -- every subsequent
++   * step still resolves membership access explicitly (see
++   * findActiveMembershipsForUser below), and no data beyond what is
++   * needed to verify a password and greet the user is returned.
++   */
++  async findGlobalIdentityByEmail(email: string): Promise<{
++    id: string;
++    email: string;
++    passwordHash: string | null;
++    firstName: string;
++    lastName: string;
++  } | null> {
++    return this.prisma.client.user.findFirst({
++      where: { email, status: 'ACTIVE', deletedAt: null },
++      select: { id: true, email: true, passwordHash: true, firstName: true, lastName: true },
++    });
++  }
++
++  /**
++   * Every ACTIVE membership, in an ACTIVE tenant, belonging to the given
++   * (already password-verified) user. Only organization display
++   * information the authenticated user is already authorized to know
++   * about their own memberships -- never a general tenant search or
++   * listing. A PENDING membership is deliberately excluded: it does not
++   * yet grant login access to that organization context.
++   */
++  async findActiveMembershipsForUser(userId: string): Promise<
++    Array<{
++      membershipId: string;
++      tenantId: string;
++      organizationName: string;
++      organizationType: string;
++    }>
++  > {
++    const memberships = await this.prisma.client.tenantMembership.findMany({
++      where: {
++        userId,
++        status: 'ACTIVE',
++        deletedAt: null,
++        tenant: { isActive: true, deletedAt: null },
++      },
++      select: {
++        id: true,
++        tenantId: true,
++        tenant: { select: { name: true, organizationType: true } },
++      },
++    });
++    return memberships.map((membership) => ({
++      membershipId: membership.id,
++      tenantId: membership.tenantId,
++      organizationName: membership.tenant.name,
++      organizationType: membership.tenant.organizationType,
++    }));
++  }
++
++  /**
++   * Resolves a single specific membership for session issuance, scoped
++   * to the given (already password-verified) userId -- so a membershipId
++   * alone, without the matching userId, can never resolve to a session.
++   * Mirrors findLoginIdentity's ACTIVE/ACTIVE shape exactly.
++   */
++  async findLoginIdentityByMembershipId(
++    userId: string,
++    membershipId: string,
++  ): Promise<LoginIdentity | null> {
++    const membership = await this.prisma.client.tenantMembership.findFirst({
++      where: {
++        id: membershipId,
++        userId,
++        status: 'ACTIVE',
++        deletedAt: null,
++        tenant: { isActive: true, deletedAt: null },
++      },
++      select: {
++        id: true,
++        tenantId: true,
++        user: {
++          select: {
++            id: true,
++            email: true,
++            passwordHash: true,
++            firstName: true,
++            lastName: true,
++          },
++        },
++      },
++    });
++
++    if (!membership || membership.user.id !== userId) {
++      return null;
++    }
++
++    return {
++      user: membership.user,
++      membershipId: membership.id,
++      tenantId: membership.tenantId,
++    };
++  }
++
+   /**
+    * Public onboarding never attaches an existing global identity to another
+    * tenant. That requires a verified invitation flow in a later sprint.
+diff --git a/apps/web/src/app/api/auth/google/register/route.test.ts b/apps/web/src/app/api/auth/google/register/route.test.ts
+index dd9e149..a1885ad 100644
+--- a/apps/web/src/app/api/auth/google/register/route.test.ts
++++ b/apps/web/src/app/api/auth/google/register/route.test.ts
+@@ -7,7 +7,8 @@ import { REGISTRATION_CONFIRMATION_MESSAGE } from '@/lib/auth-contract';
+ import { POST } from './route';
+ 
+ const validRequest = {
+-  tenantSlug: 'central-pharmacy',
++  organizationType: 'HOSPITAL',
++  organizationCode: 'MED-X7P42-Q9K3R',
+   idToken: 'google-id-token',
+   firstName: 'Mira',
+   lastName: 'Patel',
+@@ -52,7 +53,8 @@ describe('Google registration BFF boundary', () => {
+ 
+     const response = await POST(
+       request({
+-        tenantSlug: '  Central-Pharmacy ',
++        organizationType: 'HOSPITAL',
++        organizationCode: ' med-x7p42-q9k3r ',
+         idToken: ' google-id-token ',
+         firstName: ' Mira ',
+         lastName: ' Patel ',
+diff --git a/apps/web/src/app/api/auth/login/identify/route.ts b/apps/web/src/app/api/auth/login/identify/route.ts
+new file mode 100644
+index 0000000..5a35449
+--- /dev/null
++++ b/apps/web/src/app/api/auth/login/identify/route.ts
+@@ -0,0 +1,105 @@
++import { NextRequest, NextResponse } from 'next/server';
++import type { LoginResponse, OrganizationSelectionRequired } from '@/lib/auth-contract';
++import {
++  isIdentifyLoginRequest,
++  isLoginResponse,
++  isOrganizationSelectionRequired,
++  normalizeIdentifyLoginRequest,
++  validateIdentifyLoginRequest,
++} from '@/lib/auth-contract';
++import { authApiUrl, isSameOriginMutation, upstreamHeaders } from '@/lib/auth-api';
++import { setSessionCookies } from '@/lib/session-cookies';
++
++/**
++ * Task 0010: slug-free login, step 1. Never collects, requires, or
++ * forwards a tenant slug -- only individual identity (email + password).
++ */
++export async function POST(request: NextRequest): Promise<NextResponse> {
++  if (!isSameOriginMutation(request)) {
++    return noStore({ message: 'Cross-origin request rejected.' }, 403);
++  }
++
++  let payload: unknown;
++  try {
++    payload = await request.json();
++  } catch {
++    return noStore({ message: 'Invalid sign-in request.' }, 400);
++  }
++
++  if (!isIdentifyLoginRequest(payload)) {
++    return noStore({ message: 'Invalid sign-in request.' }, 400);
++  }
++
++  const normalized = normalizeIdentifyLoginRequest(payload);
++  if (Object.keys(validateIdentifyLoginRequest(normalized)).length > 0) {
++    return noStore({ message: 'Invalid sign-in request.' }, 400);
++  }
++
++  let upstream: Response;
++  try {
++    const headers = upstreamHeaders(request);
++    headers.set('content-type', 'application/json');
++    upstream = await fetch(authApiUrl('/auth/login/identify'), {
++      method: 'POST',
++      headers,
++      body: JSON.stringify(normalized),
++      cache: 'no-store',
++    });
++  } catch {
++    return noStore({ message: 'Authentication service is unavailable.' }, 503);
++  }
++
++  if (!upstream.ok) {
++    return noStore(
++      {
++        message:
++          upstream.status === 401
++            ? 'The email or password is incorrect.'
++            : 'Sign-in failed. Try again.',
++      },
++      upstream.status >= 500 ? 502 : upstream.status,
++    );
++  }
++
++  let body: unknown;
++  try {
++    body = await upstream.json();
++  } catch {
++    return noStore({ message: 'Authentication service returned an invalid response.' }, 502);
++  }
++
++  if (isOrganizationSelectionRequired(body)) {
++    // No session cookie is set yet -- the caller has proven their
++    // identity but not yet selected which of their own organizations to
++    // continue with. Only bounded organization display information the
++    // now-verified caller is already authorized to see is returned.
++    const selection: OrganizationSelectionRequired = body;
++    return noStore(selection, 200);
++  }
++
++  if (!isLoginResponse(body)) {
++    return noStore({ message: 'Authentication service returned an invalid response.' }, 502);
++  }
++
++  const session: LoginResponse = body;
++  const response = noStore(
++    { expiresIn: session.expiresIn, user: session.user, context: session.context },
++    200,
++  );
++  setSessionCookies(response, session, {
++    // The new slug-free flow never collects a tenant slug from the
++    // client, and the current backend response does not yet echo one
++    // back either -- this is a known, narrow follow-up (see the final
++    // report for this task) rather than a security gap: no slug is
++    // ever required from, or exposed to, the user either way.
++    tenantSlug: '',
++    expiresIn: session.expiresIn,
++    user: session.user,
++    context: session.context,
++  });
++  return response;
++}
++
++function noStore(body: unknown, status: number): NextResponse {
++  return NextResponse.json(body, { status, headers: { 'cache-control': 'no-store' } });
++}
+diff --git a/apps/web/src/app/api/auth/login/select-organization/route.ts b/apps/web/src/app/api/auth/login/select-organization/route.ts
+new file mode 100644
+index 0000000..9010bfc
+--- /dev/null
++++ b/apps/web/src/app/api/auth/login/select-organization/route.ts
+@@ -0,0 +1,76 @@
++import { NextRequest, NextResponse } from 'next/server';
++import type { LoginResponse } from '@/lib/auth-contract';
++import { isLoginResponse, isSelectOrganizationLoginRequest } from '@/lib/auth-contract';
++import { authApiUrl, isSameOriginMutation, upstreamHeaders } from '@/lib/auth-api';
++import { setSessionCookies } from '@/lib/session-cookies';
++
++/** Task 0010: slug-free login, step 2 -- completes login for a chosen membership. */
++export async function POST(request: NextRequest): Promise<NextResponse> {
++  if (!isSameOriginMutation(request)) {
++    return noStore({ message: 'Cross-origin request rejected.' }, 403);
++  }
++
++  let payload: unknown;
++  try {
++    payload = await request.json();
++  } catch {
++    return noStore({ message: 'Invalid sign-in request.' }, 400);
++  }
++
++  if (!isSelectOrganizationLoginRequest(payload)) {
++    return noStore({ message: 'Invalid sign-in request.' }, 400);
++  }
++
++  let upstream: Response;
++  try {
++    const headers = upstreamHeaders(request);
++    headers.set('content-type', 'application/json');
++    upstream = await fetch(authApiUrl('/auth/login/select-organization'), {
++      method: 'POST',
++      headers,
++      body: JSON.stringify(payload),
++      cache: 'no-store',
++    });
++  } catch {
++    return noStore({ message: 'Authentication service is unavailable.' }, 503);
++  }
++
++  if (!upstream.ok) {
++    return noStore(
++      {
++        message:
++          upstream.status === 401
++            ? 'The email or password is incorrect.'
++            : 'Sign-in failed. Try again.',
++      },
++      upstream.status >= 500 ? 502 : upstream.status,
++    );
++  }
++
++  let session: LoginResponse;
++  try {
++    const body: unknown = await upstream.json();
++    if (!isLoginResponse(body)) {
++      throw new Error('Invalid authentication response');
++    }
++    session = body;
++  } catch {
++    return noStore({ message: 'Authentication service returned an invalid response.' }, 502);
++  }
++
++  const response = noStore(
++    { expiresIn: session.expiresIn, user: session.user, context: session.context },
++    200,
++  );
++  setSessionCookies(response, session, {
++    tenantSlug: '',
++    expiresIn: session.expiresIn,
++    user: session.user,
++    context: session.context,
++  });
++  return response;
++}
++
++function noStore(body: unknown, status: number): NextResponse {
++  return NextResponse.json(body, { status, headers: { 'cache-control': 'no-store' } });
++}
+diff --git a/apps/web/src/app/api/auth/register/route.test.ts b/apps/web/src/app/api/auth/register/route.test.ts
+index 214da5e..e923622 100644
+--- a/apps/web/src/app/api/auth/register/route.test.ts
++++ b/apps/web/src/app/api/auth/register/route.test.ts
+@@ -6,7 +6,8 @@ import { REGISTRATION_CONFIRMATION_MESSAGE } from '@/lib/auth-contract';
+ import { POST } from './route';
+ 
+ const validRequest = {
+-  tenantSlug: 'central-pharmacy',
++  organizationType: 'HOSPITAL',
++  organizationCode: 'MED-X7P42-Q9K3R',
+   email: 'operator@example.com',
+   password: 'a-secure-password',
+   firstName: 'Mira',
+@@ -50,7 +51,7 @@ describe('public onboarding BFF boundary', () => {
+     const response = await POST(
+       request({
+         ...validRequest,
+-        tenantSlug: '  Central-Pharmacy ',
++        organizationCode: ' med-x7p42-q9k3r ',
+         email: ' OPERATOR@EXAMPLE.COM ',
+         firstName: ' Mira ',
+         lastName: ' Patel ',
+diff --git a/apps/web/src/app/login/login-form.test.tsx b/apps/web/src/app/login/login-form.test.tsx
+index 30332c0..cf8b498 100644
+--- a/apps/web/src/app/login/login-form.test.tsx
++++ b/apps/web/src/app/login/login-form.test.tsx
+@@ -1,7 +1,7 @@
+ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+ import { LanguageProvider } from '@/components/language-provider';
+-import { ApiError, login } from '@/lib/api-client';
++import { ApiError, identifyLogin, selectOrganizationLogin } from '@/lib/api-client';
+ import { LoginForm } from './login-form';
+ 
+ const replace = vi.fn();
+@@ -12,17 +12,19 @@ vi.mock('next/navigation', () => ({
+ 
+ vi.mock('@/lib/api-client', async () => {
+   const actual = await vi.importActual<typeof import('@/lib/api-client')>('@/lib/api-client');
+-  return { ...actual, login: vi.fn() };
++  return { ...actual, identifyLogin: vi.fn(), selectOrganizationLogin: vi.fn() };
+ });
+ 
++const singleMembershipSession = {
++  expiresIn: 3600,
++  user: { id: 'user-1', email: 'operator@example.com', firstName: 'Mira', lastName: 'Patel' },
++  context: { membershipId: '93b31836-6a84-4db9-a935-1c55960c25da', tenantId: 'tenant-1' },
++};
++
+ beforeEach(() => {
+   vi.clearAllMocks();
+   window.localStorage.clear();
+-  vi.mocked(login).mockResolvedValue({
+-    expiresIn: 3600,
+-    user: { id: 'user-1', email: 'operator@example.com', firstName: 'Mira', lastName: 'Patel' },
+-    context: { membershipId: '93b31836-6a84-4db9-a935-1c55960c25da', tenantId: 'tenant-1' },
+-  });
++  vi.mocked(identifyLogin).mockResolvedValue(singleMembershipSession);
+ });
+ 
+ afterEach(() => cleanup());
+@@ -36,19 +38,22 @@ function renderLoginForm() {
+ }
+ 
+ describe('LoginForm interactions', () => {
++  it('never renders an organization slug or tenant field of any kind', () => {
++    renderLoginForm();
++    expect(screen.queryByLabelText(/organization slug/i)).not.toBeInTheDocument();
++    expect(screen.queryByLabelText(/tenant/i)).not.toBeInTheDocument();
++  });
++
+   it('rejects invalid fields without calling the API', () => {
+     renderLoginForm();
+ 
+-    fill('Organization slug', 'Invalid Tenant');
+     fill('Work email', 'invalid');
+     fill('Password', 'too-short');
+     fireEvent.click(screen.getByRole('button', { name: 'Sign in securely' }));
+ 
+-    expect(
+-      screen.getByText('Use the organization slug provided by your administrator.'),
+-    ).toBeVisible();
+     expect(screen.getByText('Enter a valid email address.')).toBeVisible();
+-    expect(login).not.toHaveBeenCalled();
++    expect(screen.getByText('Password must be between 15 and 128 characters.')).toBeVisible();
++    expect(identifyLogin).not.toHaveBeenCalled();
+   });
+ 
+   it('announces field-level validation errors to assistive technology', () => {
+@@ -61,31 +66,68 @@ describe('LoginForm interactions', () => {
+     expect(alerts.some((el) => el.textContent === 'Enter a valid email address.')).toBe(true);
+   });
+ 
+-  it('submits the normalized request and navigates to the dashboard', async () => {
++  it('submits identity alone (no tenant slug) and navigates directly when exactly one membership exists', async () => {
+     renderLoginForm();
+ 
+-    fill('Organization slug', 'central-pharmacy');
+     fill('Work email', ' OPERATOR@EXAMPLE.COM ');
+     fill('Password', 'a-secure-password');
+     fireEvent.click(screen.getByRole('button', { name: 'Sign in securely' }));
+ 
+     await waitFor(() =>
+-      expect(login).toHaveBeenCalledWith({
+-        tenantSlug: 'central-pharmacy',
++      expect(identifyLogin).toHaveBeenCalledWith({
+         email: 'operator@example.com',
+         password: 'a-secure-password',
+       }),
+     );
+     expect(replace).toHaveBeenCalledWith('/dashboard');
+     expect(refresh).toHaveBeenCalled();
++    expect(selectOrganizationLogin).not.toHaveBeenCalled();
++  });
++
++  it('shows only bounded organization display info -- never a search -- when multiple memberships exist, then completes login on selection', async () => {
++    vi.mocked(identifyLogin).mockResolvedValue({
++      requiresOrganizationSelection: true,
++      organizations: [
++        {
++          membershipId: 'membership-1',
++          organizationName: 'Central Hospital',
++          organizationType: 'HOSPITAL',
++        },
++        {
++          membershipId: 'membership-2',
++          organizationName: 'Riverside Pharmacy',
++          organizationType: 'PHARMACY',
++        },
++      ],
++    });
++    vi.mocked(selectOrganizationLogin).mockResolvedValue(singleMembershipSession);
++
++    renderLoginForm();
++
++    fill('Work email', 'operator@example.com');
++    fill('Password', 'a-secure-password');
++    fireEvent.click(screen.getByRole('button', { name: 'Sign in securely' }));
++
++    expect(await screen.findByText('Central Hospital')).toBeVisible();
++    expect(screen.getByText('Riverside Pharmacy')).toBeVisible();
++
++    fireEvent.click(screen.getByText('Central Hospital'));
++
++    await waitFor(() =>
++      expect(selectOrganizationLogin).toHaveBeenCalledWith({
++        email: 'operator@example.com',
++        password: 'a-secure-password',
++        membershipId: 'membership-1',
++      }),
++    );
++    expect(replace).toHaveBeenCalledWith('/dashboard');
+   });
+ 
+   it('prevents duplicate submission while a request is pending, then recovers on error', async () => {
+-    const pendingLogin = deferred<Awaited<ReturnType<typeof login>>>();
+-    vi.mocked(login).mockReturnValueOnce(pendingLogin.promise);
++    const pendingLogin = deferred<Awaited<ReturnType<typeof identifyLogin>>>();
++    vi.mocked(identifyLogin).mockReturnValueOnce(pendingLogin.promise);
+     renderLoginForm();
+ 
+-    fill('Organization slug', 'central-pharmacy');
+     fill('Work email', 'operator@example.com');
+     fill('Password', 'a-secure-password');
+     const submit = screen.getByRole('button', { name: 'Sign in securely' });
+@@ -95,7 +137,7 @@ describe('LoginForm interactions', () => {
+     expect(submit).toBeDisabled();
+ 
+     fireEvent.click(submit);
+-    expect(login).toHaveBeenCalledTimes(1);
++    expect(identifyLogin).toHaveBeenCalledTimes(1);
+ 
+     pendingLogin.reject(new ApiError('Invalid credentials', 401));
+ 
+diff --git a/apps/web/src/app/login/login-form.tsx b/apps/web/src/app/login/login-form.tsx
+index 24f5039..09a410f 100644
+--- a/apps/web/src/app/login/login-form.tsx
++++ b/apps/web/src/app/login/login-form.tsx
+@@ -3,33 +3,43 @@
+ import { FormEvent, useState } from 'react';
+ import { useRouter } from 'next/navigation';
+ import { useLanguage } from '@/components/language-provider';
+-import { login } from '@/lib/api-client';
+-import { normalizeTenantSlug, validateLoginRequest } from '@/lib/auth-contract';
++import { identifyLogin, selectOrganizationLogin } from '@/lib/api-client';
++import {
++  normalizeIdentifyLoginRequest,
++  validateIdentifyLoginRequest,
++  type OrganizationChoice,
++} from '@/lib/auth-contract';
+ import { loginCopy } from './login-copy';
+ 
+-type Fields = 'tenantSlug' | 'email' | 'password';
++type Fields = 'email' | 'password';
+ 
++/**
++ * Task 0010: slug-free sign in. A normal user never enters, sees, or
++ * needs to understand a tenant slug/ID here -- identity (email +
++ * password) is verified first; if that resolves to more than one active
++ * organization membership, a second step lets the person choose using
++ * only the organization display information their own verified identity
++ * is authorized to see (never a general organization search).
++ */
+ export function LoginForm() {
+   const router = useRouter();
+   const { locale } = useLanguage();
+   const copy = loginCopy[locale];
+   const [errors, setErrors] = useState<Partial<Record<Fields | 'form', string>>>({});
+   const [pending, setPending] = useState(false);
++  const [organizations, setOrganizations] = useState<OrganizationChoice[] | null>(null);
++  const [credentials, setCredentials] = useState<{ email: string; password: string } | null>(null);
+ 
+-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
++  async function handleIdentify(event: FormEvent<HTMLFormElement>) {
+     event.preventDefault();
+     const form = new FormData(event.currentTarget);
+-    const request = {
+-      tenantSlug: normalizeTenantSlug(String(form.get('tenantSlug') ?? '')),
+-      email: String(form.get('email') ?? '')
+-        .trim()
+-        .toLowerCase(),
++    const request = normalizeIdentifyLoginRequest({
++      email: String(form.get('email') ?? ''),
+       password: String(form.get('password') ?? ''),
+-    };
+-    const validation = validateLoginRequest(request);
++    });
++    const validation = validateIdentifyLoginRequest(request);
+     if (Object.keys(validation).length > 0) {
+       setErrors({
+-        tenantSlug: validation.tenantSlug ? copy.errorTenant : undefined,
+         email: validation.email ? copy.errorEmail : undefined,
+         password: validation.password ? copy.errorPassword : undefined,
+       });
+@@ -39,7 +49,12 @@ export function LoginForm() {
+     setPending(true);
+     setErrors({});
+     try {
+-      await login(request);
++      const result = await identifyLogin(request);
++      if ('requiresOrganizationSelection' in result) {
++        setOrganizations(result.organizations);
++        setCredentials(request);
++        return;
++      }
+       router.replace('/dashboard');
+       router.refresh();
+     } catch (error) {
+@@ -49,15 +64,64 @@ export function LoginForm() {
+     }
+   }
+ 
++  async function handleSelectOrganization(membershipId: string) {
++    if (!credentials) return;
++    setPending(true);
++    setErrors({});
++    try {
++      await selectOrganizationLogin({ ...credentials, membershipId });
++      router.replace('/dashboard');
++      router.refresh();
++    } catch (error) {
++      setErrors({ form: error instanceof Error ? error.message : copy.errorGeneric });
++    } finally {
++      setPending(false);
++    }
++  }
++
++  if (organizations) {
++    return (
++      <div className="space-y-4">
++        <p className="text-sm font-bold text-[#43524e]">Choose an organization</p>
++        <ul className="space-y-2">
++          {organizations.map((organization) => (
++            <li key={organization.membershipId}>
++              <button
++                type="button"
++                disabled={pending}
++                onClick={() => handleSelectOrganization(organization.membershipId)}
++                className="w-full rounded-xl border border-[#10201c]/[.11] bg-[#fbfaf5] px-4 py-3.5 text-left text-sm text-[#10201c] transition hover:border-emerald-600 disabled:cursor-wait disabled:opacity-60"
++              >
++                {organization.organizationName}
++              </button>
++            </li>
++          ))}
++        </ul>
++        {errors.form ? (
++          <p
++            className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
++            role="alert"
++          >
++            {errors.form}
++          </p>
++        ) : null}
++        <button
++          type="button"
++          onClick={() => {
++            setOrganizations(null);
++            setCredentials(null);
++            setErrors({});
++          }}
++          className="text-xs font-bold text-[#264b40] underline"
++        >
++          Back
++        </button>
++      </div>
++    );
++  }
++
+   return (
+-    <form className="space-y-4" onSubmit={handleSubmit} noValidate>
+-      <Field
+-        name="tenantSlug"
+-        label={copy.organizationSlug}
+-        placeholder="central-pharmacy"
+-        autoComplete="organization"
+-        error={errors.tenantSlug}
+-      />
++    <form className="space-y-4" onSubmit={handleIdentify} noValidate>
+       <Field
+         name="email"
+         label={copy.workEmail}
+diff --git a/apps/web/src/app/register/google-register.tsx b/apps/web/src/app/register/google-register.tsx
+index 156dba2..8f5bbef 100644
+--- a/apps/web/src/app/register/google-register.tsx
++++ b/apps/web/src/app/register/google-register.tsx
+@@ -5,9 +5,11 @@ import { useRef, useState } from 'react';
+ 
+ import { googleRegister } from '@/lib/api-client';
+ import { normalizeGoogleRegisterRequest, validateGoogleRegisterRequest } from '@/lib/auth-contract';
++import type { OrganizationType } from '@/lib/organization-types';
+ 
+ interface GoogleRegisterProps {
+-  tenantSlug: string;
++  organizationType: OrganizationType;
++  organizationCode: string;
+   firstName: string;
+   lastName: string;
+   phone: string;
+@@ -16,7 +18,8 @@ interface GoogleRegisterProps {
+ }
+ 
+ export function GoogleRegister({
+-  tenantSlug,
++  organizationType,
++  organizationCode,
+   firstName,
+   lastName,
+   phone,
+@@ -42,7 +45,8 @@ export function GoogleRegister({
+         }
+ 
+         const request = normalizeGoogleRegisterRequest({
+-          tenantSlug,
++          organizationType,
++          organizationCode: organizationType === 'NONE' ? undefined : organizationCode,
+           idToken: credential,
+           firstName,
+           lastName,
+diff --git a/apps/web/src/app/register/registration-form.test.tsx b/apps/web/src/app/register/registration-form.test.tsx
+index 1023103..3f5f25d 100644
+--- a/apps/web/src/app/register/registration-form.test.tsx
++++ b/apps/web/src/app/register/registration-form.test.tsx
+@@ -19,19 +19,51 @@ beforeEach(() => {
+ afterEach(() => cleanup());
+ 
+ describe('RegistrationForm interactions', () => {
++  it('never renders an organization slug field of any kind', () => {
++    renderForm();
++    expect(screen.queryByLabelText(/organization slug/i)).not.toBeInTheDocument();
++    expect(screen.queryByLabelText(/tenant/i)).not.toBeInTheDocument();
++  });
++
++  it('only offers the fixed, MedSphere-approved organization types', () => {
++    renderForm();
++    const select = screen.getByLabelText('Organization type') as HTMLSelectElement;
++    const options = Array.from(select.querySelectorAll('option'))
++      .map((option) => option.getAttribute('value'))
++      .filter((value): value is string => Boolean(value));
++    expect(options.sort()).toEqual(
++      ['PHARMACY', 'HOSPITAL', 'LABORATORY', 'CLINIC', 'BLOOD_BANK', 'SUPPLIER', 'NONE'].sort(),
++    );
++  });
++
++  it('hides the organization code field until a healthcare type is chosen', () => {
++    renderForm();
++    expect(screen.queryByLabelText('Organization code / Invitation code')).not.toBeInTheDocument();
++
++    selectOrganizationType('HOSPITAL');
++    expect(screen.getByLabelText('Organization code / Invitation code')).toBeInTheDocument();
++  });
++
++  it('keeps the organization code field hidden for "None"', () => {
++    renderForm();
++    selectOrganizationType('NONE');
++    expect(screen.queryByLabelText('Organization code / Invitation code')).not.toBeInTheDocument();
++  });
++
+   it('rejects invalid fields and mismatched passwords without calling the API', () => {
+     renderForm();
+ 
+     fill('First name', 'Mira');
+     fill('Last name', 'Patel');
+-    fill('Organization slug', 'Invalid Tenant');
++    selectOrganizationType('HOSPITAL');
++    fill('Organization code / Invitation code', 'x');
+     fill('Work email', 'invalid');
+     fill('Create password', 'a-secure-password');
+     fill('Confirm password', 'different-password');
+     fireEvent.click(screen.getByRole('button', { name: 'Request organization access' }));
+ 
+     expect(
+-      screen.getByText('Use the organization slug provided by your administrator.'),
++      screen.getByText('Enter the organization code provided by your administrator.'),
+     ).toBeVisible();
+     expect(screen.getByText('Enter a valid email address.')).toBeVisible();
+     expect(screen.getByText('Passwords do not match.')).toBeVisible();
+@@ -48,15 +80,16 @@ describe('RegistrationForm interactions', () => {
+     expect(alerts.some((el) => el.textContent === 'Enter a valid email address.')).toBe(true);
+   });
+ 
+-  it('normalizes and submits the accepted registration request', async () => {
++  it('normalizes and submits the accepted registration request for a healthcare type', async () => {
+     renderForm();
+ 
+-    fillValidForm();
++    fillValidForm('HOSPITAL');
+     fireEvent.click(screen.getByRole('button', { name: 'Request organization access' }));
+ 
+     await waitFor(() =>
+       expect(register).toHaveBeenCalledWith({
+-        tenantSlug: 'central-pharmacy',
++        organizationType: 'HOSPITAL',
++        organizationCode: 'MED-X7P42-Q9K3R',
+         email: 'operator@example.com',
+         password: 'a-secure-password',
+         firstName: 'Mira',
+@@ -68,13 +101,38 @@ describe('RegistrationForm interactions', () => {
+     expect(screen.getByText(REGISTRATION_CONFIRMATION_MESSAGE)).toBeVisible();
+   });
+ 
+-  it('shows a localized bounded service error and preserves the form for correction', async () => {
++  it('submits a personal account request with no organization code, for the "None" type', async () => {
++    renderForm();
++
++    fill('First name', 'Mira');
++    fill('Last name', 'Patel');
++    selectOrganizationType('NONE');
++    fill('Work email', ' OPERATOR@EXAMPLE.COM ');
++    fill('Phone number', ' +91 98765 43210 ');
++    fill('Create password', 'a-secure-password');
++    fill('Confirm password', 'a-secure-password');
++    fireEvent.click(screen.getByRole('button', { name: 'Request organization access' }));
++
++    await waitFor(() =>
++      expect(register).toHaveBeenCalledWith({
++        organizationType: 'NONE',
++        organizationCode: undefined,
++        email: 'operator@example.com',
++        password: 'a-secure-password',
++        firstName: 'Mira',
++        lastName: 'Patel',
++        phone: '+919876543210',
++      }),
++    );
++  });
++
++  it('shows a bounded service error and preserves the form for correction', async () => {
+     vi.mocked(register).mockRejectedValue(
+       new Error('Too many onboarding requests. Try again later.'),
+     );
+     renderForm();
+ 
+-    fillValidForm();
++    fillValidForm('HOSPITAL');
+     fireEvent.click(screen.getByRole('button', { name: 'Request organization access' }));
+ 
+     expect(await screen.findByRole('alert')).toHaveTextContent(
+@@ -105,10 +163,17 @@ function renderForm() {
+   );
+ }
+ 
+-function fillValidForm() {
++function selectOrganizationType(value: string) {
++  fireEvent.change(screen.getByLabelText('Organization type'), { target: { value } });
++}
++
++function fillValidForm(organizationType: string) {
+   fill('First name', ' Mira ');
+   fill('Last name', ' Patel ');
+-  fill('Organization slug', ' Central-Pharmacy ');
++  selectOrganizationType(organizationType);
++  if (organizationType !== 'NONE') {
++    fill('Organization code / Invitation code', ' med-x7p42-q9k3r ');
++  }
+   fill('Work email', ' OPERATOR@EXAMPLE.COM ');
+   fill('Phone number', ' +91 98765 43210 ');
+   fill('Create password', 'a-secure-password');
+diff --git a/apps/web/src/app/register/registration-form.tsx b/apps/web/src/app/register/registration-form.tsx
+index ca6402e..9ef3f19 100644
+--- a/apps/web/src/app/register/registration-form.tsx
++++ b/apps/web/src/app/register/registration-form.tsx
+@@ -9,6 +9,7 @@ import {
+   type RegistrationRequest,
+   validateRegistrationRequest,
+ } from '@/lib/auth-contract';
++import { HEALTHCARE_ORGANIZATION_TYPES, type OrganizationType } from '@/lib/organization-types';
+ import type { TranslationKey } from '@/lib/i18n';
+ import { GoogleRegister } from './google-register';
+ 
+@@ -16,7 +17,9 @@ type RegistrationField = keyof RegistrationRequest;
+ type FormErrors = Partial<Record<RegistrationField | 'confirmPassword' | 'form', string>>;
+ 
+ const validationMessageKeys: Record<string, TranslationKey> = {
+-  'Use the organization slug provided by your administrator.': 'registration.errorTenant',
++  'Choose an organization type.': 'registration.errorOrganizationType',
++  'Enter the organization code provided by your administrator.':
++    'registration.errorOrganizationCode',
+   'Enter a valid email address.': 'registration.errorEmail',
+   'Enter a valid phone number including country code.': 'registration.errorPhone',
+   'Password must be between 15 and 128 characters.': 'registration.errorPassword',
+@@ -24,6 +27,16 @@ const validationMessageKeys: Record<string, TranslationKey> = {
+   'Enter a last name between 1 and 100 characters.': 'registration.errorLastName',
+ };
+ 
++const organizationTypeLabelKeys: Record<OrganizationType, TranslationKey> = {
++  PHARMACY: 'registration.orgType.pharmacy',
++  HOSPITAL: 'registration.orgType.hospital',
++  LABORATORY: 'registration.orgType.laboratory',
++  CLINIC: 'registration.orgType.clinic',
++  BLOOD_BANK: 'registration.orgType.bloodBank',
++  SUPPLIER: 'registration.orgType.supplier',
++  NONE: 'registration.orgType.none',
++};
++
+ export function RegistrationForm() {
+   const { t } = useLanguage();
+   const [errors, setErrors] = useState<FormErrors>({});
+@@ -33,13 +46,19 @@ export function RegistrationForm() {
+   const [firstName, setFirstName] = useState('');
+   const [lastName, setLastName] = useState('');
+   const [phone, setPhone] = useState('');
+-  const [tenantSlug, setTenantSlug] = useState('');
++  const [organizationType, setOrganizationType] = useState<OrganizationType | ''>('');
++  const [organizationCode, setOrganizationCode] = useState('');
++
++  const requiresOrganizationCode = organizationType !== '' && organizationType !== 'NONE';
+ 
+   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+     event.preventDefault();
+     const form = new FormData(event.currentTarget);
++    const selectedType = (String(form.get('organizationType') ?? '') || 'NONE') as OrganizationType;
+     const request = normalizeRegistrationRequest({
+-      tenantSlug: String(form.get('tenantSlug') ?? ''),
++      organizationType: selectedType,
++      organizationCode:
++        selectedType === 'NONE' ? undefined : String(form.get('organizationCode') ?? ''),
+       email: String(form.get('email') ?? ''),
+       password: String(form.get('password') ?? ''),
+       firstName: String(form.get('firstName') ?? ''),
+@@ -93,6 +112,11 @@ export function RegistrationForm() {
+         <div className="mt-6 rounded-2xl border border-emerald-900/[.08] bg-white/70 p-4 text-xs leading-6 text-[#60736d]">
+           {t('registration.privacyConfirmation')}
+         </div>
++        {organizationType !== 'NONE' ? (
++          <div className="mt-4 rounded-2xl border border-emerald-900/[.08] bg-white/70 p-4 text-xs leading-6 text-[#60736d]">
++            {t('registration.pendingMembershipExplanation')}
++          </div>
++        ) : null}
+         <div className="mt-7 flex flex-col gap-3 sm:flex-row">
+           <Link
+             href="/login"
+@@ -138,17 +162,51 @@ export function RegistrationForm() {
+           error={errors.lastName}
+         />
+       </div>
+-      <Field
+-        name="tenantSlug"
+-        label={t('registration.organizationSlug')}
+-        description={t('registration.organizationSlugDescription')}
+-        placeholder="central-pharmacy"
+-        autoComplete="organization"
+-        maxLength={100}
+-        value={tenantSlug}
+-        onChange={(event) => setTenantSlug(event.target.value)}
+-        error={errors.tenantSlug}
+-      />
++      <div className="block">
++        <label
++          htmlFor="registration-organizationType"
++          className="mb-2 block text-xs font-bold text-[#43524e]"
++        >
++          {t('registration.organizationType')}
++        </label>
++        <select
++          id="registration-organizationType"
++          name="organizationType"
++          required
++          value={organizationType}
++          onChange={(event) => setOrganizationType(event.target.value as OrganizationType)}
++          aria-invalid={Boolean(errors.organizationType)}
++          className="w-full rounded-xl border border-[#10201c]/[.11] bg-[#fbfaf5] px-4 py-3.5 text-sm text-[#10201c] shadow-[0_1px_0_rgba(255,255,255,.8)_inset] transition hover:border-[#10201c]/25 focus:border-emerald-600 focus:bg-white"
++        >
++          <option value="" disabled>
++            {t('registration.organizationType')}
++          </option>
++          {HEALTHCARE_ORGANIZATION_TYPES.map((type) => (
++            <option key={type} value={type}>
++              {t(organizationTypeLabelKeys[type])}
++            </option>
++          ))}
++          <option value="NONE">{t(organizationTypeLabelKeys.NONE)}</option>
++        </select>
++        {errors.organizationType ? (
++          <span className="mt-2 block text-xs text-red-700" role="alert">
++            {errors.organizationType}
++          </span>
++        ) : null}
++      </div>
++      {requiresOrganizationCode ? (
++        <Field
++          name="organizationCode"
++          label={t('registration.organizationCode')}
++          description={t('registration.organizationCodeDescription')}
++          placeholder="MED-X7P42-Q9K3R"
++          autoComplete="off"
++          maxLength={40}
++          value={organizationCode}
++          onChange={(event) => setOrganizationCode(event.target.value)}
++          error={errors.organizationCode}
++        />
++      ) : null}
+       <Field
+         name="email"
+         label={t('registration.workEmail')}
+@@ -217,7 +275,8 @@ export function RegistrationForm() {
+ 
+         <div className="flex justify-center">
+           <GoogleRegister
+-            tenantSlug={tenantSlug}
++            organizationType={organizationType || 'NONE'}
++            organizationCode={organizationCode}
+             firstName={firstName}
+             lastName={lastName}
+             phone={phone}
+diff --git a/apps/web/src/lib/api-client.test.ts b/apps/web/src/lib/api-client.test.ts
+index 403f1c1..1c4fa7e 100644
+--- a/apps/web/src/lib/api-client.test.ts
++++ b/apps/web/src/lib/api-client.test.ts
+@@ -313,11 +313,13 @@ describe('authenticated API client', () => {
+ describe('public onboarding API client', () => {
+   it('submits only the accepted registration contract without starting a session', async () => {
+     const request = {
+-      tenantSlug: 'central-pharmacy',
++      organizationType: 'HOSPITAL' as const,
++      organizationCode: 'MED-X7P42-Q9K3R',
+       email: 'operator@example.com',
+       password: 'a-secure-password',
+       firstName: 'Mira',
+       lastName: 'Patel',
++      phone: '+919876543210',
+     };
+     const fetchMock = vi
+       .fn()
+@@ -351,11 +353,13 @@ describe('public onboarding API client', () => {
+ 
+     await expect(
+       register({
+-        tenantSlug: 'central-pharmacy',
++        organizationType: 'HOSPITAL',
++        organizationCode: 'MED-X7P42-Q9K3R',
+         email: 'operator@example.com',
+         password: 'a-secure-password',
+         firstName: 'Mira',
+         lastName: 'Patel',
++        phone: '+919876543210',
+       }),
+     ).rejects.toMatchObject({
+       message: 'Too many onboarding requests. Try again later.',
+diff --git a/apps/web/src/lib/api-client.ts b/apps/web/src/lib/api-client.ts
+index 3a256e0..d723e43 100644
+--- a/apps/web/src/lib/api-client.ts
++++ b/apps/web/src/lib/api-client.ts
+@@ -2,9 +2,12 @@ import type {
+   AuthenticatedSession,
+   GoogleLoginRequest,
+   GoogleRegisterRequest,
++  IdentifyLoginRequest,
+   LoginRequest,
++  OrganizationSelectionRequired,
+   RegistrationRequest,
+   RegistrationResponse,
++  SelectOrganizationLoginRequest,
+ } from './auth-contract';
+ import { toAuditSearchParams, type AuditEventFilters, type AuditEventPage } from './audit-contract';
+ import type {
+@@ -135,6 +138,52 @@ export async function login(request: LoginRequest): Promise<AuthenticatedSession
+   return (await response.json()) as AuthenticatedSession;
+ }
+ 
++/** Task 0010: slug-free login, step 1 -- verifies identity alone. */
++export async function identifyLogin(
++  request: IdentifyLoginRequest,
++): Promise<AuthenticatedSession | OrganizationSelectionRequired> {
++  const response = await fetch('/api/auth/login/identify', {
++    method: 'POST',
++    headers: { 'content-type': 'application/json' },
++    body: JSON.stringify(request),
++    cache: 'no-store',
++  });
++
++  if (!response.ok) {
++    throw new ApiError(
++      response.status === 401
++        ? 'The email or password is incorrect.'
++        : 'Sign-in failed. Try again.',
++      response.status,
++    );
++  }
++
++  return (await response.json()) as AuthenticatedSession | OrganizationSelectionRequired;
++}
++
++/** Task 0010: slug-free login, step 2 -- completes login for a chosen membership. */
++export async function selectOrganizationLogin(
++  request: SelectOrganizationLoginRequest,
++): Promise<AuthenticatedSession> {
++  const response = await fetch('/api/auth/login/select-organization', {
++    method: 'POST',
++    headers: { 'content-type': 'application/json' },
++    body: JSON.stringify(request),
++    cache: 'no-store',
++  });
++
++  if (!response.ok) {
++    throw new ApiError(
++      response.status === 401
++        ? 'The email or password is incorrect.'
++        : 'Sign-in failed. Try again.',
++      response.status,
++    );
++  }
++
++  return (await response.json()) as AuthenticatedSession;
++}
++
+ export async function register(request: RegistrationRequest): Promise<RegistrationResponse> {
+   const response = await fetch('/api/auth/register', {
+     method: 'POST',
+diff --git a/apps/web/src/lib/auth-contract.test.ts b/apps/web/src/lib/auth-contract.test.ts
+index 8fee4b4..713f628 100644
+--- a/apps/web/src/lib/auth-contract.test.ts
++++ b/apps/web/src/lib/auth-contract.test.ts
+@@ -98,7 +98,8 @@ describe('accepted login contract', () => {
+ 
+ describe('accepted registration contract', () => {
+   const request = {
+-    tenantSlug: 'central-pharmacy',
++    organizationType: 'HOSPITAL' as const,
++    organizationCode: 'MED-X7P42-Q9K3R',
+     email: 'operator@example.com',
+     password: 'a-secure-password',
+     firstName: 'Mira',
+@@ -110,7 +111,7 @@ describe('accepted registration contract', () => {
+     expect(
+       normalizeRegistrationRequest({
+         ...request,
+-        tenantSlug: ' Central-Pharmacy ',
++        organizationCode: ' med-x7p42-q9k3r ',
+         email: ' OPERATOR@EXAMPLE.COM ',
+         firstName: ' Mira ',
+         lastName: ' Patel ',
+@@ -134,10 +135,38 @@ describe('accepted registration contract', () => {
+     expect(isRegistrationResponse({ message: 'Account created' })).toBe(false);
+   });
+ 
++  it('rejects an arbitrary organization type', () => {
++    expect(isRegistrationRequest({ ...request, organizationType: 'MADE_UP_TYPE' })).toBe(true); // shape-only check
++    expect(
++      validateRegistrationRequest({ ...request, organizationType: 'MADE_UP_TYPE' as never }),
++    ).toEqual(expect.objectContaining({ organizationType: expect.any(String) }));
++  });
++
++  it('requires an organization code for every type except NONE', () => {
++    expect(
++      validateRegistrationRequest({
++        ...request,
++        organizationType: 'HOSPITAL',
++        organizationCode: undefined,
++      }),
++    ).toEqual(expect.objectContaining({ organizationCode: expect.any(String) }));
++  });
++
++  it('does not require an organization code when the type is NONE', () => {
++    expect(
++      validateRegistrationRequest({
++        ...request,
++        organizationType: 'NONE',
++        organizationCode: undefined,
++      }),
++    ).toEqual({});
++  });
++
+   it('rejects invalid names, locators, and passwords', () => {
+     expect(
+       validateRegistrationRequest({
+-        tenantSlug: 'Invalid Tenant',
++        organizationType: 'HOSPITAL',
++        organizationCode: 'not valid!!',
+         email: 'invalid',
+         password: 'short',
+         firstName: '',
+@@ -145,7 +174,7 @@ describe('accepted registration contract', () => {
+         phone: 'invalid',
+       }),
+     ).toEqual({
+-      tenantSlug: expect.any(String),
++      organizationCode: expect.any(String),
+       email: expect.any(String),
+       password: expect.any(String),
+       firstName: expect.any(String),
+diff --git a/apps/web/src/lib/auth-contract.ts b/apps/web/src/lib/auth-contract.ts
+index 0cae4be..26fc4fd 100644
+--- a/apps/web/src/lib/auth-contract.ts
++++ b/apps/web/src/lib/auth-contract.ts
+@@ -1,10 +1,13 @@
++import { ORGANIZATION_TYPES, type OrganizationType } from './organization-types';
++
+ export interface GoogleLoginRequest {
+   tenantSlug: string;
+   idToken: string;
+ }
+ 
+ export interface GoogleRegisterRequest {
+-  tenantSlug: string;
++  organizationType: OrganizationType;
++  organizationCode?: string;
+   idToken: string;
+   firstName: string;
+   lastName: string;
+@@ -17,8 +20,33 @@ export interface LoginRequest {
+   password: string;
+ }
+ 
++/** Task 0010: slug-free login, step 1 -- verifies identity alone, no organization context. */
++export interface IdentifyLoginRequest {
++  email: string;
++  password: string;
++}
++
++/** Task 0010: slug-free login, step 2 -- only used when identify resolves more than one membership. */
++export interface SelectOrganizationLoginRequest {
++  email: string;
++  password: string;
++  membershipId: string;
++}
++
++export interface OrganizationChoice {
++  membershipId: string;
++  organizationName: string;
++  organizationType: string;
++}
++
++export interface OrganizationSelectionRequired {
++  requiresOrganizationSelection: true;
++  organizations: OrganizationChoice[];
++}
++
+ export interface RegistrationRequest {
+-  tenantSlug: string;
++  organizationType: OrganizationType;
++  organizationCode?: string;
+   email: string;
+   password: string;
+   firstName: string;
+@@ -63,7 +91,11 @@ export function normalizeGoogleRegisterRequest(
+   input: GoogleRegisterRequest,
+ ): GoogleRegisterRequest {
+   return {
+-    tenantSlug: normalizeTenantSlug(input.tenantSlug),
++    organizationType: input.organizationType,
++    organizationCode:
++      input.organizationType === 'NONE'
++        ? undefined
++        : normalizeOrganizationCode(input.organizationCode),
+     idToken: input.idToken.trim(),
+     firstName: input.firstName.trim(),
+     lastName: input.lastName.trim(),
+@@ -72,7 +104,25 @@ export function normalizeGoogleRegisterRequest(
+ }
+ 
+ export function isGoogleRegisterRequest(value: unknown): value is GoogleRegisterRequest {
+-  return hasExactStringKeys(value, ['firstName', 'idToken', 'lastName', 'phone', 'tenantSlug']);
++  if (!value || typeof value !== 'object' || Array.isArray(value)) {
++    return false;
++  }
++  const candidate = value as Record<string, unknown>;
++  const keys = Object.keys(candidate).sort();
++  const requiredKeys = ['firstName', 'idToken', 'lastName', 'organizationType', 'phone'];
++  const allowedKeys = [...requiredKeys, 'organizationCode'];
++  if (!keys.every((key) => allowedKeys.includes(key))) return false;
++  if (!requiredKeys.every((key) => keys.includes(key))) return false;
++  if (typeof candidate.organizationType !== 'string') return false;
++  if (candidate.organizationCode !== undefined && typeof candidate.organizationCode !== 'string') {
++    return false;
++  }
++  return (
++    typeof candidate.idToken === 'string' &&
++    typeof candidate.firstName === 'string' &&
++    typeof candidate.lastName === 'string' &&
++    typeof candidate.phone === 'string'
++  );
+ }
+ 
+ export function validateGoogleRegisterRequest(
+@@ -80,8 +130,12 @@ export function validateGoogleRegisterRequest(
+ ): Partial<Record<keyof GoogleRegisterRequest, string>> {
+   const errors: Partial<Record<keyof GoogleRegisterRequest, string>> = {};
+ 
+-  if (input.tenantSlug.length < 1 || input.tenantSlug.length > 100) {
+-    errors.tenantSlug = 'Use the organization slug provided by your administrator.';
++  if (!isOrganizationType(input.organizationType)) {
++    errors.organizationType = 'Choose an organization type.';
++  } else if (input.organizationType !== 'NONE') {
++    if (!isValidOrganizationCodeFormat(input.organizationCode)) {
++      errors.organizationCode = 'Enter the organization code provided by your administrator.';
++    }
+   }
+ 
+   if (input.idToken.length < 1 || input.idToken.length > 10000) {
+@@ -151,6 +205,46 @@ export function isLoginRequest(value: unknown): value is LoginRequest {
+   return hasExactStringKeys(value, ['email', 'password', 'tenantSlug']);
+ }
+ 
++export function normalizeIdentifyLoginRequest(input: IdentifyLoginRequest): IdentifyLoginRequest {
++  return {
++    email: input.email.trim().toLowerCase(),
++    password: input.password,
++  };
++}
++
++export function isIdentifyLoginRequest(value: unknown): value is IdentifyLoginRequest {
++  return hasExactStringKeys(value, ['email', 'password']);
++}
++
++export function validateIdentifyLoginRequest(
++  input: IdentifyLoginRequest,
++): Partial<Record<keyof IdentifyLoginRequest, string>> {
++  const errors: Partial<Record<keyof IdentifyLoginRequest, string>> = {};
++  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input.email) || input.email.length > 254) {
++    errors.email = 'Enter a valid email address.';
++  }
++  if (input.password.length < 15 || input.password.length > 128) {
++    errors.password = 'Password must be between 15 and 128 characters.';
++  }
++  return errors;
++}
++
++export function isSelectOrganizationLoginRequest(
++  value: unknown,
++): value is SelectOrganizationLoginRequest {
++  return hasExactStringKeys(value, ['email', 'membershipId', 'password']);
++}
++
++export function isOrganizationSelectionRequired(
++  value: unknown,
++): value is OrganizationSelectionRequired {
++  if (!value || typeof value !== 'object' || Array.isArray(value)) {
++    return false;
++  }
++  const candidate = value as Record<string, unknown>;
++  return candidate.requiresOrganizationSelection === true && Array.isArray(candidate.organizations);
++}
++
+ export function isLoginResponse(value: unknown): value is LoginResponse {
+   if (!hasExactKeys(value, ['accessToken', 'context', 'expiresIn', 'refreshToken', 'user'])) {
+     return false;
+@@ -201,9 +295,29 @@ export function normalizeTenantSlug(value: string): string {
+   return value.trim().toLowerCase();
+ }
+ 
++const ORGANIZATION_CODE_PATTERN = /^[A-Za-z0-9-]{6,40}$/;
++
++export function normalizeOrganizationCode(value: string | undefined): string | undefined {
++  if (typeof value !== 'string') return undefined;
++  const trimmed = value.trim().toUpperCase();
++  return trimmed.length > 0 ? trimmed : undefined;
++}
++
++export function isValidOrganizationCodeFormat(value: string | undefined): boolean {
++  return typeof value === 'string' && ORGANIZATION_CODE_PATTERN.test(value);
++}
++
++export function isOrganizationType(value: string): value is OrganizationType {
++  return (ORGANIZATION_TYPES as readonly string[]).includes(value);
++}
++
+ export function normalizeRegistrationRequest(input: RegistrationRequest): RegistrationRequest {
+   return {
+-    tenantSlug: normalizeTenantSlug(input.tenantSlug),
++    organizationType: input.organizationType,
++    organizationCode:
++      input.organizationType === 'NONE'
++        ? undefined
++        : normalizeOrganizationCode(input.organizationCode),
+     email: input.email.trim().toLowerCase(),
+     password: input.password,
+     firstName: input.firstName.trim(),
+@@ -213,14 +327,26 @@ export function normalizeRegistrationRequest(input: RegistrationRequest): Regist
+ }
+ 
+ export function isRegistrationRequest(value: unknown): value is RegistrationRequest {
+-  return hasExactStringKeys(value, [
+-    'email',
+-    'firstName',
+-    'lastName',
+-    'password',
+-    'phone',
+-    'tenantSlug',
+-  ]);
++  if (!value || typeof value !== 'object' || Array.isArray(value)) {
++    return false;
++  }
++  const candidate = value as Record<string, unknown>;
++  const keys = Object.keys(candidate).sort();
++  const requiredKeys = ['email', 'firstName', 'lastName', 'organizationType', 'password', 'phone'];
++  const allowedKeys = [...requiredKeys, 'organizationCode'];
++  if (!keys.every((key) => allowedKeys.includes(key))) return false;
++  if (!requiredKeys.every((key) => keys.includes(key))) return false;
++  if (typeof candidate.organizationType !== 'string') return false;
++  if (candidate.organizationCode !== undefined && typeof candidate.organizationCode !== 'string') {
++    return false;
++  }
++  return (
++    typeof candidate.email === 'string' &&
++    typeof candidate.password === 'string' &&
++    typeof candidate.firstName === 'string' &&
++    typeof candidate.lastName === 'string' &&
++    typeof candidate.phone === 'string'
++  );
+ }
+ 
+ export function isRegistrationResponse(value: unknown): value is RegistrationResponse {
+@@ -237,10 +363,21 @@ export function validateRegistrationRequest(
+   input: RegistrationRequest,
+ ): Partial<Record<keyof RegistrationRequest, string>> {
+   const errors: Partial<Record<keyof RegistrationRequest, string>> = {};
+-  const shared = validateLoginRequest(input);
+-  if (shared.tenantSlug) errors.tenantSlug = shared.tenantSlug;
+-  if (shared.email) errors.email = shared.email;
+-  if (shared.password) errors.password = shared.password;
++
++  if (!isOrganizationType(input.organizationType)) {
++    errors.organizationType = 'Choose an organization type.';
++  } else if (input.organizationType !== 'NONE') {
++    if (!isValidOrganizationCodeFormat(input.organizationCode)) {
++      errors.organizationCode = 'Enter the organization code provided by your administrator.';
++    }
++  }
++
++  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input.email) || input.email.length > 254) {
++    errors.email = 'Enter a valid email address.';
++  }
++  if (input.password.length < 15 || input.password.length > 128) {
++    errors.password = 'Password must be between 15 and 128 characters.';
++  }
+   if (!isValidE164PhoneNumber(input.phone)) {
+     errors.phone = 'Enter a valid phone number including country code.';
+   }
+diff --git a/apps/web/src/lib/i18n.ts b/apps/web/src/lib/i18n.ts
+index abff20c..4219fc9 100644
+--- a/apps/web/src/lib/i18n.ts
++++ b/apps/web/src/lib/i18n.ts
+@@ -80,9 +80,17 @@ const englishMessages = {
+     'This form submits a pending request. It does not guarantee account creation, organization membership, or immediate access.',
+   'registration.firstName': 'First name',
+   'registration.lastName': 'Last name',
+-  'registration.organizationSlug': 'Organization slug',
+-  'registration.organizationSlugDescription':
+-    'Use the exact slug supplied by the organization administrator.',
++  'registration.organizationType': 'Organization type',
++  'registration.orgType.pharmacy': 'Pharmacy',
++  'registration.orgType.hospital': 'Hospital',
++  'registration.orgType.laboratory': 'Laboratory',
++  'registration.orgType.clinic': 'Clinic',
++  'registration.orgType.bloodBank': 'Blood Bank',
++  'registration.orgType.supplier': 'Supplier',
++  'registration.orgType.none': 'None (personal account)',
++  'registration.organizationCode': 'Organization code / Invitation code',
++  'registration.organizationCodeDescription':
++    'Enter the code your organization administrator shared with you, e.g. MED-X7P42.',
+   'registration.workEmail': 'Work email',
+   'registration.phone': 'Phone number',
+   'registration.phoneDescription': 'Include the country code, for example +91 98765 43210.',
+@@ -101,11 +109,15 @@ const englishMessages = {
+     'If registration is available, onboarding instructions will be sent.',
+   'registration.privacyConfirmation':
+     "For privacy, this confirmation does not reveal whether the organization or email already exists. Access becomes available only after the organization's onboarding policy is satisfied.",
++  'registration.pendingMembershipExplanation':
++    'Joining an organization creates a pending request only. A staff role and any organization access are granted separately, after the organization reviews your request.',
+   'registration.returnSignIn': 'Return to sign in',
+   'registration.submitAnother': 'Submit another request',
+   'registration.testDataNotice':
+     'Use test identities only. This stabilization environment is not approved for real patient, employee, or clinical data.',
+-  'registration.errorTenant': 'Use the organization slug provided by your administrator.',
++  'registration.errorOrganizationType': 'Choose an organization type.',
++  'registration.errorOrganizationCode':
++    'Enter the organization code provided by your administrator.',
+   'registration.errorEmail': 'Enter a valid email address.',
+   'registration.errorPhone': 'Enter a valid phone number including country code.',
+   'registration.errorPassword': 'Password must be between 15 and 128 characters.',
+@@ -171,9 +183,17 @@ const tamilMessages: MessageOverrides = {
+     'இந்த படிவம் ஒரு நிலுவை கோரிக்கையை சமர்ப்பிக்கும். இது கணக்கு உருவாக்கம், நிறுவன உறுப்பினர் அணுகல் அல்லது உடனடி அணுகலை உறுதி செய்யாது.',
+   'registration.firstName': 'முதல் பெயர்',
+   'registration.lastName': 'கடைசி பெயர்',
+-  'registration.organizationSlug': 'நிறுவன ஸ்லக்',
+-  'registration.organizationSlugDescription':
+-    'நிறுவன நிர்வாகி வழங்கிய சரியான ஸ்லக் மதிப்பைப் பயன்படுத்தவும்.',
++  'registration.organizationType': 'நிறுவன வகை',
++  'registration.orgType.pharmacy': 'மருந்தகம்',
++  'registration.orgType.hospital': 'மருத்துவமனை',
++  'registration.orgType.laboratory': 'ஆய்வகம்',
++  'registration.orgType.clinic': 'கிளினிக்',
++  'registration.orgType.bloodBank': 'இரத்த வங்கி',
++  'registration.orgType.supplier': 'விநியோகஸ்தர்',
++  'registration.orgType.none': 'எதுவுமில்லை (தனிப்பட்ட கணக்கு)',
++  'registration.organizationCode': 'நிறுவன குறியீடு / அழைப்பு குறியீடு',
++  'registration.organizationCodeDescription':
++    'உங்கள் நிறுவன நிர்வாகி வழங்கிய குறியீட்டை உள்ளிடவும், எ.கா. MED-X7P42.',
+   'registration.workEmail': 'பணி மின்னஞ்சல்',
+   'registration.phone': 'தொலைபேசி எண்',
+   'registration.phoneDescription':
+@@ -192,11 +212,14 @@ const tamilMessages: MessageOverrides = {
+   'registration.confirmationMessage': 'பதிவு கிடைக்குமானால், அடுத்த கட்ட வழிமுறைகள் அனுப்பப்படும்.',
+   'registration.privacyConfirmation':
+     'தனியுரிமைக்காக, நிறுவனம் அல்லது மின்னஞ்சல் ஏற்கனவே உள்ளதா என்பதை இந்த உறுதிப்படுத்தல் வெளிப்படுத்தாது. நிறுவனத்தின் பதிவு கொள்கை பூர்த்தி செய்யப்பட்ட பின்னரே அணுகல் கிடைக்கும்.',
++  'registration.pendingMembershipExplanation':
++    'ஒரு நிறுவனத்தில் சேருவது நிலுவை கோரிக்கையை மட்டுமே உருவாக்கும். பணியாளர் பங்கும் நிறுவன அணுகலும் நிறுவனம் உங்கள் கோரிக்கையை மதிப்பாய்வு செய்த பின்னரே தனித்தனியாக வழங்கப்படும்.',
+   'registration.returnSignIn': 'உள்நுழைவிற்கு திரும்பவும்',
+   'registration.submitAnother': 'மற்றொரு கோரிக்கையை சமர்ப்பிக்கவும்',
+   'registration.testDataNotice':
+     'சோதனை அடையாளங்களை மட்டும் பயன்படுத்தவும். இந்த நிலைப்படுத்தல் சூழல் உண்மையான நோயாளர், பணியாளர் அல்லது மருத்துவத் தரவுகளுக்காக அனுமதிக்கப்படவில்லை.',
+-  'registration.errorTenant': 'உங்கள் நிர்வாகி வழங்கிய நிறுவன ஸ்லக் மதிப்பைப் பயன்படுத்தவும்.',
++  'registration.errorOrganizationType': 'நிறுவன வகையைத் தேர்ந்தெடுக்கவும்.',
++  'registration.errorOrganizationCode': 'உங்கள் நிர்வாகி வழங்கிய நிறுவன குறியீட்டை உள்ளிடவும்.',
+   'registration.errorEmail': 'சரியான மின்னஞ்சல் முகவரியை உள்ளிடவும்.',
+   'registration.errorPhone': 'நாட்டுக் குறியீட்டுடன் சரியான தொலைபேசி எண்ணை உள்ளிடவும்.',
+   'registration.errorPassword': 'கடவுச்சொல் 15 முதல் 128 எழுத்துகளுக்குள் இருக்க வேண்டும்.',
+diff --git a/apps/web/src/lib/organization-types.ts b/apps/web/src/lib/organization-types.ts
+new file mode 100644
+index 0000000..9b89126
+--- /dev/null
++++ b/apps/web/src/lib/organization-types.ts
+@@ -0,0 +1,22 @@
++/**
++ * Bounded V1 organization types a normal user may select during public
++ * registration. Mirrors apps/auth-service/src/organization/organization-type.ts
++ * exactly -- the frontend cannot import from the backend package, so
++ * this is the frontend's own hand-kept-in-sync copy. Adding a new type
++ * is a deliberate code change on both sides, never a free-form string.
++ */
++export const ORGANIZATION_TYPES = [
++  'PHARMACY',
++  'HOSPITAL',
++  'LABORATORY',
++  'CLINIC',
++  'BLOOD_BANK',
++  'SUPPLIER',
++  'NONE',
++] as const;
++
++export type OrganizationType = (typeof ORGANIZATION_TYPES)[number];
++
++export const HEALTHCARE_ORGANIZATION_TYPES = ORGANIZATION_TYPES.filter(
++  (type) => type !== 'NONE',
++) as readonly Exclude<OrganizationType, 'NONE'>[];
+diff --git a/packages/database/prisma/migrations/20260828090000_organization_type_and_join_codes/migration.sql b/packages/database/prisma/migrations/20260828090000_organization_type_and_join_codes/migration.sql
+new file mode 100644
+index 0000000..0e0a0cc
+--- /dev/null
++++ b/packages/database/prisma/migrations/20260828090000_organization_type_and_join_codes/migration.sql
+@@ -0,0 +1,94 @@
++-- Task 0010: secure organization-type + reusable, revocable organization
++-- join-code onboarding. Adds Tenant.organizationType (bounded enum, never
++-- a free-form string) and a new OrganizationJoinCode table storing only a
++-- keyed HMAC-SHA256 hash of each code -- never the plaintext.
++
++CREATE TYPE "OrganizationType" AS ENUM (
++  'PHARMACY',
++  'HOSPITAL',
++  'LABORATORY',
++  'CLINIC',
++  'BLOOD_BANK',
++  'SUPPLIER',
++  'NONE'
++);
++
++CREATE TYPE "JoinCodeStatus" AS ENUM (
++  'ACTIVE',
++  'REVOKED'
++);
++
++ALTER TABLE "Tenant"
++  ADD COLUMN "organizationType" "OrganizationType" NOT NULL DEFAULT 'NONE';
++
++CREATE TABLE "OrganizationJoinCode" (
++  "id" UUID NOT NULL,
++  "tenantId" UUID NOT NULL,
++  "codeHash" VARCHAR(64) NOT NULL,
++  "status" "JoinCodeStatus" NOT NULL DEFAULT 'ACTIVE',
++  "expiresAt" TIMESTAMP(3),
++  "revokedAt" TIMESTAMP(3),
++  "redemptionCount" INTEGER NOT NULL DEFAULT 0,
++  "createdByUserId" UUID,
++  "version" INTEGER NOT NULL DEFAULT 1,
++  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
++  "updatedAt" TIMESTAMP(3) NOT NULL,
++  "deletedAt" TIMESTAMP(3),
++  CONSTRAINT "OrganizationJoinCode_pkey" PRIMARY KEY ("id")
++);
++
++CREATE UNIQUE INDEX "OrganizationJoinCode_codeHash_key"
++  ON "OrganizationJoinCode"("codeHash");
++
++CREATE INDEX "OrganizationJoinCode_tenantId_idx"
++  ON "OrganizationJoinCode"("tenantId");
++
++ALTER TABLE "OrganizationJoinCode"
++  ADD CONSTRAINT "OrganizationJoinCode_tenantId_fkey"
++  FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id") ON DELETE CASCADE ON UPDATE CASCADE;
++
++ALTER TABLE "OrganizationJoinCode"
++  ADD CONSTRAINT "OrganizationJoinCode_createdByUserId_fkey"
++  FOREIGN KEY ("createdByUserId") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
++
++-- Extend the database audit-event allowlist for organization onboarding
++-- events.
++ALTER TABLE "AuditEvent"
++  DROP CONSTRAINT "AuditEvent_event_type_check";
++
++ALTER TABLE "AuditEvent"
++  ADD CONSTRAINT "AuditEvent_event_type_check"
++  CHECK ("eventType" IN (
++    'authorization.role.created',
++    'authorization.role.updated',
++    'authorization.role.deleted',
++    'authorization.assignment.added',
++    'authorization.assignment.removed',
++    'authorization.provider-access.added',
++    'authorization.provider-access.removed',
++    'authorization.permission.denied',
++    'authentication.session.created',
++    'authentication.session.refresh.succeeded',
++    'authentication.session.refresh.failed',
++    'authentication.session.refresh.replayed',
++    'authentication.session.logout.succeeded',
++    'authentication.sessions.logout.succeeded',
++    'authentication.verification.completed',
++    'authentication.account.activated',
++    'authentication.otp.requested',
++    'authentication.organization.join.requested',
++    'authentication.organization.join.code.rejected',
++    'inventory.listing.configured',
++    'inventory.batch.received',
++    'inventory.stock.adjusted',
++    'inventory.stock.transferred',
++    'inventory.stock.damaged',
++    'inventory.batch.expired',
++    'inventory.batch.quarantined',
++    'inventory.reservation.created',
++    'inventory.reservation.confirmed',
++    'inventory.reservation.ready',
++    'inventory.reservation.completed',
++    'inventory.reservation.cancelled',
++    'inventory.reservation.expired'
++  ));
+diff --git a/packages/database/prisma/schema.prisma b/packages/database/prisma/schema.prisma
+index 8946f31..10bea20 100644
+--- a/packages/database/prisma/schema.prisma
++++ b/packages/database/prisma/schema.prisma
+@@ -195,6 +195,21 @@ enum NotificationAttemptOutcome {
+   DEAD_LETTER
+ }
+ 
++enum OrganizationType {
++  PHARMACY
++  HOSPITAL
++  LABORATORY
++  CLINIC
++  BLOOD_BANK
++  SUPPLIER
++  NONE
++}
++
++enum JoinCodeStatus {
++  ACTIVE
++  REVOKED
++}
++
+ model Tenant {
+   id String @id @default(uuid()) @db.Uuid
+ 
+@@ -202,6 +217,13 @@ model Tenant {
+   slug  String  @unique
+   email String? @unique
+ 
++  /// The organization's own accepted category, verified server-side at
++  /// join-code redemption time against the type the registering user
++  /// selected -- never trusted from the client alone (see ADR for this
++  /// task). NONE identifies the single, dedicated personal-account
++  /// tenant, not a healthcare organization.
++  organizationType OrganizationType @default(NONE)
++
+   isActive                Boolean @default(true)
+   selfRegistrationEnabled Boolean @default(false)
+ 
+@@ -234,10 +256,60 @@ model Tenant {
+   notificationDeliveries         NotificationDelivery[]
+   notificationDeliveryAttempts   NotificationDeliveryAttempt[]
+   phoneOtpChallenges             PhoneOtpChallenge[]
++  organizationJoinCodes          OrganizationJoinCode[]
+ 
+   @@index([slug])
+ }
+ 
++/**
++ * Reusable, revocable organization join code (see the accompanying ADR
++ * for this task's coherent V1 model choice: reusable admin-issued codes,
++ * not per-invitee single-use tokens). Possessing a valid code only lets
++ * a public registration request be associated with this tenant -- it
++ * never grants a role or activates a membership by itself; that remains
++ * governed entirely by the existing account-activation policy and the
++ * separate RBAC role-assignment framework.
++ *
++ * The code itself is never persisted: only an HMAC-SHA256 hash (keyed by
++ * ORG_JOIN_CODE_PEPPER, mirroring the same keyed-hash pattern already
++ * accepted for refresh credentials and OTP codes) is stored, so a
++ * database compromise alone cannot recover a working code.
++ */
++model OrganizationJoinCode {
++  id String @id @default(uuid()) @db.Uuid
++
++  tenantId String @db.Uuid
++  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
++
++  /// HMAC-SHA256 hex digest of the normalized code. Never the plaintext
++  /// code. Globally unique and looked up directly at redemption time,
++  /// since the client submits only the raw code, not a tenant hint.
++  codeHash String @unique @db.VarChar(64)
++
++  status JoinCodeStatus @default(ACTIVE)
++
++  /// Null means no expiry is enforced; revocation/status remain the
++  /// only lifecycle control in that case.
++  expiresAt DateTime?
++  revokedAt DateTime?
++
++  /// Reusable by design (see model doc) -- tracks how many onboarding
++  /// requests have redeemed this code for operator visibility only. Not
++  /// a single-use consumption counter.
++  redemptionCount Int @default(0)
++
++  createdByUserId String? @db.Uuid
++  createdByUser   User?   @relation("OrganizationJoinCodeCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
++
++  version Int @default(1)
++
++  createdAt DateTime  @default(now())
++  updatedAt DateTime  @updatedAt
++  deletedAt DateTime?
++
++  @@index([tenantId])
++}
++
+ model User {
+   id String @id @default(uuid()) @db.Uuid
+ 
+@@ -272,6 +344,7 @@ model User {
+   verificationAttempts   AccountVerificationAttempt[]
+   externalAuthIdentities ExternalAuthIdentity[]
+   phoneOtpChallenges     PhoneOtpChallenge[]
++  createdOrganizationJoinCodes OrganizationJoinCode[] @relation("OrganizationJoinCodeCreatedBy")
+ }
+ 
+ model ExternalAuthIdentity {
+diff --git a/packages/database/src/audit.ts b/packages/database/src/audit.ts
+index 7747165..3001980 100644
+--- a/packages/database/src/audit.ts
++++ b/packages/database/src/audit.ts
+@@ -19,6 +19,8 @@ export const AUDIT_EVENT_TYPES = [
+   'authentication.verification.completed',
+   'authentication.account.activated',
+   'authentication.otp.requested',
++  'authentication.organization.join.requested',
++  'authentication.organization.join.code.rejected',
+   'inventory.listing.configured',
+   'inventory.batch.received',
+   'inventory.stock.adjusted',
+@@ -58,6 +60,8 @@ export const AUDIT_METADATA_KEYS = {
+   'authentication.verification.completed': ['method', 'provider', 'status', 'age18Plus'],
+   'authentication.account.activated': ['verificationPolicy'],
+   'authentication.otp.requested': [],
++  'authentication.organization.join.requested': ['organizationType'],
++  'authentication.organization.join.code.rejected': ['reason'],
+   'inventory.listing.configured': ['productId', 'version'],
+   'inventory.batch.received': ['productId', 'quantity'],
+   'inventory.stock.adjusted': ['productId', 'delta', 'onHandBefore', 'onHandAfter'],
+-- 
+2.43.0
+
