@@ -30,12 +30,13 @@
 //    dependent checks without losing already-recorded results.
 
 import { execFileSync, spawnSync } from 'node:child_process';
-import { randomUUID } from 'node:crypto';
+import { createHmac, randomUUID } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 
 const BACKEND = process.env.SMOKE_BACKEND_URL ?? 'http://localhost:3000';
 const FRONTEND = process.env.SMOKE_FRONTEND_URL ?? 'http://localhost:3001';
 const DATABASE_URL = process.env.DATABASE_URL;
+const ORG_JOIN_CODE_PEPPER = process.env.ORG_JOIN_CODE_PEPPER;
 const BACKEND_PID_FILE = process.env.SMOKE_BACKEND_PID_FILE ?? '/tmp/backend.pid';
 const FRONTEND_PID_FILE = process.env.SMOKE_FRONTEND_PID_FILE ?? '/tmp/frontend.pid';
 const BACKEND_LOG_FILE = process.env.SMOKE_BACKEND_LOG_FILE ?? '/tmp/backend.log';
@@ -43,6 +44,17 @@ const FRONTEND_LOG_FILE = process.env.SMOKE_FRONTEND_LOG_FILE ?? '/tmp/frontend.
 
 if (!DATABASE_URL) {
   console.error('DATABASE_URL is required to seed synthetic smoke-test data.');
+  process.exit(1);
+}
+
+if (!ORG_JOIN_CODE_PEPPER) {
+  console.error('ORG_JOIN_CODE_PEPPER is required to seed synthetic organization join codes.');
+  process.exit(1);
+}
+
+const orgJoinCodePepper = Buffer.from(ORG_JOIN_CODE_PEPPER, 'base64');
+if (orgJoinCodePepper.length < 32) {
+  console.error('ORG_JOIN_CODE_PEPPER must decode to at least 32 bytes.');
   process.exit(1);
 }
 
@@ -213,13 +225,23 @@ function membershipIdByEmail(email, tenantId) {
 function bootstrapUncreatableFoundationState({
   tenantId,
   tenantSlug,
+  joinCode,
+  joinCodeIssuerUserId,
+  joinCodeIssuerMembershipId,
   providerAId,
   providerBId,
   roleId,
   productId,
 }) {
-  sql(`INSERT INTO "Tenant" (id, name, slug, "isActive", "selfRegistrationEnabled", "createdAt", "updatedAt")
-       VALUES ('${tenantId}', 'Task5 Smoke Tenant', '${tenantSlug}', true, true, now(), now());`);
+  sql(`INSERT INTO "Tenant" (id, name, slug, "organizationType", "isActive", "selfRegistrationEnabled", "createdAt", "updatedAt")
+       VALUES ('${tenantId}', 'Task5 Smoke Tenant', '${tenantSlug}', 'HOSPITAL', true, true, now(), now());`);
+
+  seedOrganizationJoinCode({
+    tenantId,
+    joinCode,
+    issuerUserId: joinCodeIssuerUserId,
+    issuerMembershipId: joinCodeIssuerMembershipId,
+  });
 
   sql(`INSERT INTO "Role" (id, "tenantId", name, description, type, version, "createdAt", "updatedAt")
        VALUES ('${roleId}', '${tenantId}', 'TENANT_ADMINISTRATOR', 'Built-in tenant authorization administrator', 'SYSTEM', 1, now(), now());`);
@@ -292,14 +314,26 @@ function bootstrapMembershipActivation({ tenantId, adminEmail, staffEmail, roleI
 // the cross-tenant negative case is trusted to mean anything.
 // ---------------------------------------------------------------------
 function bootstrapCrossTenantActor({ tenantId, tenantSlug, roleId, providerId }) {
-  sql(`INSERT INTO "Tenant" (id, name, slug, "isActive", "selfRegistrationEnabled", "createdAt", "updatedAt")
-       VALUES ('${tenantId}', 'Task5 Smoke Tenant B', '${tenantSlug}', true, true, now(), now());`);
+  sql(`INSERT INTO "Tenant" (id, name, slug, "organizationType", "isActive", "selfRegistrationEnabled", "createdAt", "updatedAt")
+       VALUES ('${tenantId}', 'Task5 Smoke Tenant B', '${tenantSlug}', 'HOSPITAL', true, true, now(), now());`);
   sql(`INSERT INTO "Role" (id, "tenantId", name, description, type, version, "createdAt", "updatedAt")
        VALUES ('${roleId}', '${tenantId}', 'TENANT_ADMINISTRATOR', 'Built-in tenant authorization administrator', 'SYSTEM', 1, now(), now());`);
   sql(`INSERT INTO "RolePermission" (id, "tenantId", "roleId", "permissionId", "createdAt")
        SELECT gen_random_uuid(), '${tenantId}', '${roleId}', id, now() FROM "Permission";`);
   sql(`INSERT INTO "Provider" (id, "tenantId", "providerType", "businessName", "ownerName", email, phone, address, city, state, country, "postalCode", latitude, longitude, "isVerified", "isActive", "createdAt", "updatedAt")
        VALUES ('${providerId}', '${tenantId}', 'PHARMACY', 'Task5 Smoke Pharmacy C', 'Smoke Owner', '${providerId}@smoke.test', '0000000000', 'Smoke Address', 'Chennai', 'Tamil Nadu', 'India', '600001', 13.0827, 80.2707, true, true, now(), now());`);
+}
+
+function seedOrganizationJoinCode({ tenantId, joinCode, issuerUserId, issuerMembershipId }) {
+  const codeHash = createHmac('sha256', orgJoinCodePepper)
+    .update(joinCode.replace(/-(?=[^-]*$)/, ''), 'utf8')
+    .digest('hex');
+  sql(`INSERT INTO "User" (id, email, "firstName", "lastName", status, "createdAt", "updatedAt")
+       VALUES ('${issuerUserId}', '${issuerUserId}@smoke.test', 'Smoke', 'Code Issuer', 'ACTIVE', now(), now());`);
+  sql(`INSERT INTO "TenantMembership" (id, "tenantId", "userId", status, "isDefault", "joinedAt", "createdAt", "updatedAt")
+       VALUES ('${issuerMembershipId}', '${tenantId}', '${issuerUserId}', 'ACTIVE', true, now(), now(), now());`);
+  sql(`INSERT INTO "OrganizationJoinCode" (id, "tenantId", "codeHash", status, "createdByMembershipId", "createdAt", "updatedAt")
+       VALUES (gen_random_uuid(), '${tenantId}', '${codeHash}', 'ACTIVE', '${issuerMembershipId}', now(), now());`);
 }
 
 // Activates exactly one membership in tenant B and grants it the
@@ -336,6 +370,9 @@ async function main() {
 
   const tenantId = randomUUID();
   const tenantSlug = `task5-smoke-${Date.now()}`;
+  const organizationCode = 'MED-X7P42-Q9K3R';
+  const joinCodeIssuerUserId = randomUUID();
+  const joinCodeIssuerMembershipId = randomUUID();
   const providerAId = randomUUID();
   const providerBId = randomUUID();
   const roleId = randomUUID();
@@ -347,6 +384,9 @@ async function main() {
   bootstrapUncreatableFoundationState({
     tenantId,
     tenantSlug,
+    joinCode: organizationCode,
+    joinCodeIssuerUserId,
+    joinCodeIssuerMembershipId,
     providerAId,
     providerBId,
     roleId,
@@ -354,7 +394,7 @@ async function main() {
   });
   record('foundation seed (tenant, providers, product, admin role/permissions)', 'WORKING');
 
-  async function register(email, slug = tenantSlug) {
+  async function register(email, code = organizationCode) {
     const phoneDigits = randomUUID().replace(/\D/g, '').padEnd(10, '0').slice(0, 10);
     const phone = `+91${phoneDigits[0] === '0' ? '9' : phoneDigits[0]}${phoneDigits.slice(1)}`;
 
@@ -362,7 +402,8 @@ async function main() {
       method: 'POST',
       headers: { 'content-type': 'application/json', origin: FRONTEND },
       body: JSON.stringify({
-        tenantSlug: slug,
+        organizationType: 'HOSPITAL',
+        organizationCode: code,
         email,
         password,
         firstName: 'Task5',
@@ -489,6 +530,9 @@ async function main() {
   // anyway".
   const tenantBId = randomUUID();
   const tenantBSlug = `task5-smoke-b-${Date.now()}`;
+  const tenantBOrganizationCode = 'MED-R8V6C-W4N2H';
+  const tenantBJoinCodeIssuerUserId = randomUUID();
+  const tenantBJoinCodeIssuerMembershipId = randomUUID();
   const roleBId = randomUUID();
   const providerCId = randomUUID();
   const adminBEmail = `task5-admin-b-${Date.now()}@smoke.test`;
@@ -503,7 +547,13 @@ async function main() {
     roleId: roleBId,
     providerId: providerCId,
   });
-  const adminBRegister = await register(adminBEmail, tenantBSlug);
+  seedOrganizationJoinCode({
+    tenantId: tenantBId,
+    joinCode: tenantBOrganizationCode,
+    issuerUserId: tenantBJoinCodeIssuerUserId,
+    issuerMembershipId: tenantBJoinCodeIssuerMembershipId,
+  });
+  const adminBRegister = await register(adminBEmail, tenantBOrganizationCode);
   if (adminBRegister.status !== 202) {
     record(
       crossTenantCheckName,
