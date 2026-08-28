@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { INestApplication } from '@nestjs/common';
-import { normalizeRequestId } from '@medsphere/common';
+import { appMetrics, normalizeRequestId, statusClass } from '@medsphere/common';
 import type { ServiceLogger } from '@medsphere/logger';
 
 interface ObservableHttpRequest {
@@ -86,6 +86,21 @@ export function createRequestObservabilityMiddleware(
     response.once('finish', () => {
       const elapsedNanoseconds = clock() - startedAt;
       const durationMs = Math.round((Number(elapsedNanoseconds) / 1_000_000) * 100) / 100;
+      const route = safeRouteTemplate(request) ?? 'unmatched';
+      const method = safeMethod(request.method);
+      const statusClassLabel = statusClass(response.statusCode);
+
+      appMetrics.httpRequestsTotal.increment({
+        service: 'auth-service',
+        method,
+        route,
+        status_class: statusClassLabel,
+      });
+      appMetrics.httpRequestDurationMs.observe(durationMs, {
+        service: 'auth-service',
+        method,
+        route,
+      });
 
       logger.info('HTTP request completed', {
         event: 'http_request_completed',

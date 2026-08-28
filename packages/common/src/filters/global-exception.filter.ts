@@ -9,6 +9,7 @@ import {
 import type { Request, Response } from 'express';
 import { DomainException } from '../exceptions/domain.exception';
 import { normalizeRequestId } from '../http/request-id';
+import { appMetrics, statusClass } from '../metrics/metrics-registry';
 
 export interface ErrorEnvelope {
   error: {
@@ -74,9 +75,11 @@ function isServerErrorStatus(status: number): boolean {
 @Catch()
 export class GlobalExceptionFilter implements ExceptionFilter {
   private readonly logger: ExceptionTelemetryLogger;
+  private readonly serviceName: string;
 
-  constructor(logger?: ExceptionTelemetryLogger) {
+  constructor(logger?: ExceptionTelemetryLogger, serviceName = 'unknown-service') {
     this.logger = logger ?? new SafeNestExceptionLogger();
+    this.serviceName = serviceName;
   }
 
   catch(exception: unknown, host: ArgumentsHost): void {
@@ -121,6 +124,10 @@ export class GlobalExceptionFilter implements ExceptionFilter {
         requestId,
         status,
         errorType,
+      });
+      appMetrics.httpServerErrorsTotal.increment({
+        service: this.serviceName,
+        status_class: statusClass(status),
       });
     }
 

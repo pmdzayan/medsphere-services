@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { appMetrics } from '@medsphere/common';
 import type {
   NotificationDeliveryObserver,
   NotificationObservation,
@@ -12,6 +13,13 @@ import type {
  * provider response -- none of those are present on
  * NotificationObservation in the first place, so there is nothing to
  * accidentally leak here.
+ *
+ * Also records a bounded metric counter (channel + outcome only --
+ * tenantId, deliveryId, and errorCode are deliberately excluded from the
+ * metric labels: the first two are high-cardinality identifiers, and
+ * errorCode's cardinality is not bounded by this contract, so none of
+ * the three belong on a low-cardinality metric label even though they
+ * are safe to log).
  */
 @Injectable()
 export class LoggingNotificationDeliveryObserver implements NotificationDeliveryObserver {
@@ -26,6 +34,10 @@ export class LoggingNotificationDeliveryObserver implements NotificationDelivery
       attemptCount: observation.attemptCount,
       outcome: observation.outcome,
       errorCode: observation.errorCode,
+    });
+    appMetrics.notificationDeliveryTotal.increment({
+      channel: observation.channel,
+      outcome: observation.outcome,
     });
   }
 }

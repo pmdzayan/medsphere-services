@@ -8,3 +8,7 @@ export * from './health/health.controller';
 export * from './health/health.module';
 export * from './http/request-id';
 export * from './http/security-headers';
+export * from './metrics/metrics-registry';
+export * from './metrics/otlp-exporter';
+export * from './metrics/metrics.controller';
+export * from './metrics/metrics.module';

@@ -18,7 +18,7 @@ export function configureAuthApplication(app: INestApplication, logger?: Service
   configureHttpSecurityHeaders(app, {
     interactiveDocumentation: process.env.ENABLE_SWAGGER === 'true',
   });
-  app.useGlobalFilters(new GlobalExceptionFilter(logger));
+  app.useGlobalFilters(new GlobalExceptionFilter(logger, 'auth-service'));
   app.useGlobalPipes(createValidationPipe());
 
   if (process.env.ENABLE_SWAGGER === 'true') {
