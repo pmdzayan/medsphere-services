@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard } from '@nestjs/throttler';
-import { HEALTH_READINESS_CHECK, HealthModule } from '@medsphere/common';
+import { HEALTH_READINESS_CHECK, HealthModule, MetricsModule } from '@medsphere/common';
 import { PrismaModule } from './prisma/prisma.module';
 import { UsersModule } from './users/users.module';
 import { LocalizationModule } from './localization/localization.module';
@@ -34,6 +34,7 @@ import { AuthReadinessService } from './health/auth-readiness.service';
     InventoryModule,
     NotificationModule,
     VerificationModule,
+    MetricsModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },

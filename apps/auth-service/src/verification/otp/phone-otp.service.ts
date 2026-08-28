@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
+import { appMetrics } from '@medsphere/common';
 import { withSerializableRetry, type Prisma } from '@medsphere/database';
 import { AuditWriter } from '../../audit/audit-writer.service';
 import { AuthConfigService } from '../../auth/auth-config.service';
@@ -150,7 +151,9 @@ export class PhoneOtpService {
         body: `Your MedSphere verification code is ${dispatch.code}. It expires in 10 minutes.`,
         otpCode: dispatch.code,
       });
+      appMetrics.otpDispatchTotal.increment({ outcome: 'success' });
     } catch (error) {
+      appMetrics.otpDispatchTotal.increment({ outcome: 'failure' });
       await this.invalidateChallenge(dispatch.tenantId, dispatch.userId);
       if (error instanceof SmsProviderContractFailure) {
         throw new BadRequestException('Verification code delivery is temporarily unavailable');

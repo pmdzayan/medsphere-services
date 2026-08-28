@@ -22,6 +22,7 @@ import {
   ApiConflictResponse,
   ApiTags,
 } from '@nestjs/swagger';
+import { appMetrics } from '@medsphere/common';
 import { AuthenticatedIdentity } from '../auth/auth.types';
 import { extractRequestMetadata, MetadataHttpRequest } from '../auth/request-metadata';
 import { CurrentIdentity } from '../common/decorators/current-identity.decorator';
@@ -98,15 +99,17 @@ export class InventoryController {
     @Body() dto: CreateProviderReservationDto,
     @Req() request: MetadataHttpRequest,
   ) {
-    return this.reservationCreation.create({
-      actor: identity,
-      providerId,
-      subjectUserId: dto.subjectUserId,
-      expiresAt: new Date(dto.expiresAt),
-      items: dto.items,
-      idempotencyKey: dto.idempotencyKey,
-      request: extractRequestMetadata(request),
-    });
+    return observeOutcome(
+      this.reservationCreation.create({
+        actor: identity,
+        providerId,
+        subjectUserId: dto.subjectUserId,
+        expiresAt: new Date(dto.expiresAt),
+        items: dto.items,
+        idempotencyKey: dto.idempotencyKey,
+        request: extractRequestMetadata(request),
+      }),
+    );
   }
 
   @Post('providers/:providerId/batches/:batchId/quarantine')
@@ -341,4 +344,18 @@ export class InventoryController {
       request: extractRequestMetadata(request),
     });
   }
+}
+
+/**
+ * Transparent pass-through: records a bounded reservation-outcome metric
+ * (success/failure only, no tenant/product/subject identifiers) without
+ * altering the wrapped promise's resolution, rejection, or timing in any
+ * way visible to the caller.
+ */
+function observeOutcome<T>(result: Promise<T>): Promise<T> {
+  result.then(
+    () => appMetrics.reservationOutcomeTotal.increment({ outcome: 'success' }),
+    () => appMetrics.reservationOutcomeTotal.increment({ outcome: 'failure' }),
+  );
+  return result;
 }

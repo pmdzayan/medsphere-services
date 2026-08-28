@@ -1,0 +1,148 @@
+# MedSphere V1 alert rules -- provider-neutral, standard Prometheus
+# rule-file syntax. Importable into any Prometheus-compatible alerting
+# system (Prometheus + Alertmanager, or any OTLP/Prometheus-compatible
+# hosted backend) without modification.
+#
+# Every rule declares a bounded evaluation window ("for:") so a single
+# noisy data point never pages anyone; an alert only fires once its
+# condition has held true continuously for that window, and resolves
+# automatically once the condition is no longer true.
+#
+# See docs/operations/v1-observability-runbook.md for the SLO context
+# these thresholds are drawn from, and an explicit statement that these
+# are initial engineering thresholds, not a contractual SLA.
+
+groups:
+  - name: medsphere-v1-availability
+    rules:
+      - alert: MedSphereServiceUnavailable
+        expr: up{job="medsphere-auth-service"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: 'MedSphere auth-service is unreachable'
+          description: 'The scrape target has been down for 2 minutes.'
+
+      - alert: MedSphereRepeatedReadinessFailure
+        expr: |
+          sum(rate(medsphere_dependency_check_total{outcome="failure"}[5m]))
+          / sum(rate(medsphere_dependency_check_total[5m])) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: 'Repeated dependency readiness failures'
+          description: 'More than 10% of readiness checks have failed over 5 minutes.'
+
+      - alert: MedSpherePostgresUnavailable
+        expr: |
+          sum(rate(medsphere_dependency_check_total{dependency="postgresql",outcome="failure"}[5m]))
+          / sum(rate(medsphere_dependency_check_total{dependency="postgresql"}[5m])) > 0.5
+        for: 3m
+        labels:
+          severity: critical
+        annotations:
+          summary: 'PostgreSQL appears unavailable'
+          description: 'Over 50% of PostgreSQL readiness checks have failed for 3 minutes.'
+
+      - alert: MedSphereRedisUnavailable
+        expr: |
+          sum(rate(medsphere_dependency_check_total{dependency="redis",outcome="failure"}[5m]))
+          / sum(rate(medsphere_dependency_check_total{dependency="redis"}[5m])) > 0.5
+        for: 3m
+        labels:
+          severity: critical
+        annotations:
+          summary: 'Redis appears unavailable'
+          description: 'Over 50% of Redis readiness checks have failed for 3 minutes.'
+
+  - name: medsphere-v1-http
+    rules:
+      - alert: MedSphereElevated5xxRateWarning
+        expr: |
+          sum(rate(medsphere_http_server_errors_total[5m]))
+          / sum(rate(medsphere_http_requests_total[5m])) > 0.01
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: 'Elevated server-error rate (warning)'
+          description: '5xx rate has exceeded 1% for 5 minutes.'
+
+      - alert: MedSphereElevated5xxRateCritical
+        expr: |
+          sum(rate(medsphere_http_server_errors_total[5m]))
+          / sum(rate(medsphere_http_requests_total[5m])) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: 'Elevated server-error rate (critical)'
+          description: '5xx rate has exceeded 5% for 5 minutes.'
+
+      - alert: MedSphereAbnormalLatencyP95Warning
+        expr: |
+          histogram_quantile(0.95, sum(rate(medsphere_http_request_duration_ms_bucket[5m])) by (le)) > 1500
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: 'p95 latency above 1500ms'
+          description: 'p95 HTTP request latency has exceeded 1500ms for 5 minutes.'
+
+      - alert: MedSphereAbnormalLatencyP99Critical
+        expr: |
+          histogram_quantile(0.99, sum(rate(medsphere_http_request_duration_ms_bucket[5m])) by (le)) > 3000
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: 'p99 latency above 3000ms'
+          description: 'p99 HTTP request latency has exceeded 3000ms for 5 minutes.'
+
+  - name: medsphere-v1-workflows
+    rules:
+      - alert: MedSphereNotificationWorkerRepeatedlyFailing
+        expr: |
+          sum(rate(medsphere_notification_delivery_total{outcome="FAILED"}[15m]))
+          / sum(rate(medsphere_notification_delivery_total[15m])) > 0.05
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: 'Notification worker delivery failure rate elevated'
+          description: 'Over 5% of notification deliveries have failed over 15 minutes.'
+
+      - alert: MedSphereReservationWorkflowFailureRateElevated
+        expr: |
+          sum(rate(medsphere_reservation_outcome_total{outcome="failure"}[15m]))
+          / sum(rate(medsphere_reservation_outcome_total[15m])) > 0.02
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: 'Reservation workflow failure rate elevated'
+          description: 'Over 2% of reservation creation attempts have failed over 15 minutes.'
+
+      - alert: MedSphereOtpDispatchFailureRateElevated
+        expr: |
+          sum(rate(medsphere_otp_dispatch_total{outcome="failure"}[15m]))
+          / sum(rate(medsphere_otp_dispatch_total[15m])) > 0.05
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: 'OTP dispatch failure rate elevated'
+          description: 'Over 5% of OTP provider dispatch attempts have failed over 15 minutes.'
+
+  - name: medsphere-v1-telemetry
+    rules:
+      - alert: MedSphereExporterCollectorUnhealthy
+        expr: increase(medsphere_metrics_exporter_failures_total[15m]) > 5
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: 'Metrics exporter/collector appears unhealthy'
+          description: 'More than 5 consecutive telemetry export failures in 15 minutes. This reflects telemetry pipeline health only, not necessarily a business-impacting outage.'
