@@ -1,6 +1,6 @@
 # MedSphere Product Roadmap
 
-**Version:** 1.1
+**Version:** 1.2
 
 **Planning model:** Milestone → Sprint → Task → Checklist → Completion criteria
 
@@ -140,6 +140,43 @@ Unit, integration, API, E2E, security, performance, and load testing; Docker; CI
 AI Pharmacist, Doctor Assistant, Laboratory Assistant, Hospital Assistant, Inventory Assistant, and AI Analytics.
 
 AI work requires accepted data governance, model-risk controls, prompt standards, evaluation, auditability, human approval rules, privacy controls, and rollback/disable mechanisms. AI may not independently diagnose, prescribe, or approve high-impact clinical actions.
+
+## Milestone 13 — Global Governance & Regional Administration
+
+**Status:** Planned — post-India expansion; not a V1 India launch blocker.
+
+**Purpose:** Allow MedSphere to expand globally with a flexible management hierarchy that can add, remove, split, merge, and reassign territories and leadership without changing application code.
+
+**Governance hierarchy:** Global Owner → Regional Executive → Country Head/Admin → Healthcare Organization → Organization Staff.
+
+Ordered scope:
+
+1. GG13.1 Global-owner authority and protected owner controls.
+2. GG13.2 Dynamic territory model for regions, countries, and future sub-regions.
+3. GG13.3 Regional Executive lifecycle: create, assign, suspend, reactivate, and remove.
+4. GG13.4 Country Head/Admin lifecycle beneath assigned Regional Executives.
+5. GG13.5 Territory assignment, reassignment, split, merge, and transfer workflows.
+6. GG13.6 Hierarchical authorization with deny-by-default regional and country isolation.
+7. GG13.7 Delegated administration with no privilege escalation beyond the delegating leader.
+8. GG13.8 Separation of business-management authority from clinical/patient-data authority.
+9. GG13.9 Global Owner dashboard with cross-region and cross-country visibility.
+10. GG13.10 Regional Executive dashboard limited to assigned territories only.
+11. GG13.11 Country dashboard and organization-level operational rollups.
+12. GG13.12 Revenue attribution by country, region, and responsible executive while retaining original transaction currency.
+13. GG13.13 Performance scorecards for revenue, growth, subscriptions, active organizations, retention/churn, support performance, incidents, and compliance indicators.
+14. GG13.14 Financial and operational approval thresholds for sensitive actions such as major refunds, pricing changes, discounts, and other configured high-impact decisions.
+15. GG13.15 Immutable audit evidence for leadership changes, territory changes, delegated permissions, financial approvals, and sensitive administrative actions.
+16. GG13.16 Immediate executive/admin suspension and session revocation.
+17. GG13.17 Temporary delegation with explicit scope, start/end time, and automatic expiry.
+18. GG13.18 Multi-currency reporting and normalized global reporting views without rewriting source transaction values.
+19. GG13.19 Country-aware policy, privacy, retention, and data-residency boundaries.
+20. GG13.20 Cross-region/cross-country isolation, authorization, concurrency, audit, and regression certification.
+
+**Security boundary:** A leadership role does not automatically grant access to patient medical records, prescriptions, lab results, or other clinical data. Business, financial, security, administrative, and clinical permissions must remain separately modeled and independently authorized.
+
+**Scalability rule:** The implementation must never hard-code four CEOs, fixed compass directions, or a fixed number of regions. Leadership and territory assignments must be data-driven so MedSphere can grow from a small initial regional structure to any future number of executives and territories.
+
+**Completion gate:** Global-owner controls accepted; territory reassignment safe and auditable; regional/country isolation proven; no privilege escalation; business/clinical permission separation proven; session revocation tested; financial attribution reconciled; multi-currency reporting validated; country-policy/data-residency boundaries documented; required migrations, tests, lint, build, threat model, ADRs, and CTO acceptance complete.
 
 ## Future integrations
 
