@@ -265,20 +265,11 @@ model Tenant {
   @@index([slug])
 }
 
-/**
- * Reusable, revocable organization join code (see the accompanying ADR
- * for this task's coherent V1 model choice: reusable admin-issued codes,
- * not per-invitee single-use tokens). Possessing a valid code only lets
- * a public registration request be associated with this tenant -- it
- * never grants a role or activates a membership by itself; that remains
- * governed entirely by the existing account-activation policy and the
- * separate RBAC role-assignment framework.
- *
- * The code itself is never persisted: only an HMAC-SHA256 hash (keyed by
- * ORG_JOIN_CODE_PEPPER, mirroring the same keyed-hash pattern already
- * accepted for refresh credentials and OTP codes) is stored, so a
- * database compromise alone cannot recover a working code.
- */
+/// Reusable, revocable organization join code (see ADR-025). Possessing a
+/// valid code only associates a public registration request with this tenant;
+/// it never grants a role or activates a membership. The plaintext code is
+/// never persisted: only an HMAC-SHA256 digest keyed by
+/// ORG_JOIN_CODE_PEPPER is stored.
 model OrganizationJoinCode {
   id String @id @default(uuid()) @db.Uuid
 
@@ -302,13 +293,8 @@ model OrganizationJoinCode {
   /// a single-use consumption counter.
   redemptionCount Int @default(0)
 
-  createdByMembershipId String @db.Uuid
-  createdByMembership   TenantMembership @relation(
-    "OrganizationJoinCodeCreatedBy",
-    fields: [createdByMembershipId, tenantId],
-    references: [id, tenantId],
-    onDelete: Restrict
-  )
+  createdByMembershipId String           @db.Uuid
+  createdByMembership   TenantMembership @relation("OrganizationJoinCodeCreatedBy", fields: [createdByMembershipId, tenantId], references: [id, tenantId], onDelete: Restrict)
 
   version Int @default(1)
 
