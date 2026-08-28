@@ -167,7 +167,10 @@ export function RegistrationForm() {
           </div>
         ) : (
           <form className="mt-5 space-y-3" onSubmit={handleVerification} noValidate>
-            <label htmlFor="registration-verification-code" className="block text-xs font-bold text-[#43524e]">
+            <label
+              htmlFor="registration-verification-code"
+              className="block text-xs font-bold text-[#43524e]"
+            >
               {t('registration.verificationCode')}
             </label>
             <input
@@ -181,7 +184,9 @@ export function RegistrationForm() {
               aria-invalid={Boolean(verificationError)}
             />
             {verificationError ? (
-              <p className="text-xs text-red-700" role="alert">{verificationError}</p>
+              <p className="text-xs text-red-700" role="alert">
+                {verificationError}
+              </p>
             ) : (
               <p className="text-xs text-[#60736d]">{t('registration.verificationSent')}</p>
             )}

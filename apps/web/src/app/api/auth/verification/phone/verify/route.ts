@@ -22,9 +22,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       return noStore(
         {
           message:
-            upstream.status === 429
-              ? 'Try again later.'
-              : 'Invalid or expired verification code.',
+            upstream.status === 429 ? 'Try again later.' : 'Invalid or expired verification code.',
         },
         upstream.status >= 500 ? 502 : upstream.status,
       );
@@ -43,9 +41,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 }
 
-async function readPayload(
-  request: NextRequest,
-): Promise<{ email: string; code: string } | null> {
+async function readPayload(request: NextRequest): Promise<{ email: string; code: string } | null> {
   try {
     const value: unknown = await request.json();
     if (!value || typeof value !== 'object' || Array.isArray(value)) return null;

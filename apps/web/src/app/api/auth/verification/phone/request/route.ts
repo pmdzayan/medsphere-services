@@ -21,9 +21,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       return noStore(
         {
           message:
-            upstream.status === 429
-              ? 'Try again later.'
-              : 'Unable to send verification code.',
+            upstream.status === 429 ? 'Try again later.' : 'Unable to send verification code.',
         },
         upstream.status >= 500 ? 502 : upstream.status,
       );

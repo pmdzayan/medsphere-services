@@ -105,7 +105,8 @@ const englishMessages = {
   'registration.verificationSent': 'Enter the six-digit code sent to your registered phone.',
   'registration.verifyCode': 'Verify phone',
   'registration.resendCode': 'Send code again',
-  'registration.verificationComplete': 'Phone verified. You can now sign in when your membership is active.',
+  'registration.verificationComplete':
+    'Phone verified. You can now sign in when your membership is active.',
   'registration.verificationSendError': 'The code could not be sent. Try again.',
   'registration.verificationCodeError': 'Enter a valid, unexpired six-digit code.',
   'registration.alreadyMember': 'Already have an active membership?',
@@ -211,10 +212,12 @@ const tamilMessages: MessageOverrides = {
   'registration.confirmPassword': 'கடவுச்சொல்லை உறுதிப்படுத்தவும்',
   'registration.showPassword': 'கடவுச்சொல்லைக் காட்டு',
   'registration.verificationCode': 'தொலைபேசி சரிபார்ப்புக் குறியீடு',
-  'registration.verificationSent': 'உங்கள் பதிவு செய்யப்பட்ட தொலைபேசிக்கு அனுப்பப்பட்ட ஆறு இலக்கக் குறியீட்டை உள்ளிடவும்.',
+  'registration.verificationSent':
+    'உங்கள் பதிவு செய்யப்பட்ட தொலைபேசிக்கு அனுப்பப்பட்ட ஆறு இலக்கக் குறியீட்டை உள்ளிடவும்.',
   'registration.verifyCode': 'தொலைபேசியைச் சரிபார்க்கவும்',
   'registration.resendCode': 'குறியீட்டை மீண்டும் அனுப்பவும்',
-  'registration.verificationComplete': 'தொலைபேசி சரிபார்க்கப்பட்டது. உறுப்பினர் அணுகல் செயலில் இருக்கும்போது உள்நுழையலாம்.',
+  'registration.verificationComplete':
+    'தொலைபேசி சரிபார்க்கப்பட்டது. உறுப்பினர் அணுகல் செயலில் இருக்கும்போது உள்நுழையலாம்.',
   'registration.verificationSendError': 'குறியீட்டை அனுப்ப முடியவில்லை. மீண்டும் முயலவும்.',
   'registration.verificationCodeError': 'செல்லுபடியாகும் ஆறு இலக்கக் குறியீட்டை உள்ளிடவும்.',
   'registration.submitting': 'பாதுகாப்பாக சமர்ப்பிக்கப்படுகிறது…',

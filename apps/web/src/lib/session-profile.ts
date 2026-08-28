@@ -58,17 +58,17 @@ function isSessionProfile(value: unknown): value is SessionProfile {
     Number(candidate.expiresIn) > 0 &&
     Boolean(
       candidate.user &&
-      isBoundedString(candidate.user.id, 100) &&
-      isBoundedString(candidate.user.email, 254) &&
-      isBoundedString(candidate.user.firstName, 100) &&
-      isBoundedString(candidate.user.lastName, 100),
+        isBoundedString(candidate.user.id, 100) &&
+        isBoundedString(candidate.user.email, 254) &&
+        isBoundedString(candidate.user.firstName, 100) &&
+        isBoundedString(candidate.user.lastName, 100),
     ) &&
     Boolean(
       candidate.context &&
-      isBoundedString(candidate.context.membershipId, 100) &&
-      isBoundedString(candidate.context.tenantId, 100) &&
-      isBoundedString(candidate.context.tenantName, 200) &&
-      isBoundedString(candidate.context.organizationType, 50),
+        isBoundedString(candidate.context.membershipId, 100) &&
+        isBoundedString(candidate.context.tenantId, 100) &&
+        isBoundedString(candidate.context.tenantName, 200) &&
+        isBoundedString(candidate.context.organizationType, 50),
     )
   );
 }

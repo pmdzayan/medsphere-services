@@ -29,7 +29,9 @@ function buildService(
   const transaction = {
     tenantMembership: {
       findFirst: jest.fn().mockResolvedValue(membership ?? null),
-      findMany: jest.fn().mockResolvedValue(overrides.memberships ?? (membership ? [membership] : [])),
+      findMany: jest
+        .fn()
+        .mockResolvedValue(overrides.memberships ?? (membership ? [membership] : [])),
     },
     phoneOtpChallenge: {
       findUnique: jest.fn().mockImplementation(() => Promise.resolve(challengeRow)),
