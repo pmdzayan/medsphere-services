@@ -1,6 +1,6 @@
 # MedSphere Product Roadmap
 
-**Version:** 1.2
+**Version:** 1.3
 
 **Planning model:** Milestone → Sprint → Task → Checklist → Completion criteria
 
@@ -177,6 +177,38 @@ Ordered scope:
 **Scalability rule:** The implementation must never hard-code four CEOs, fixed compass directions, or a fixed number of regions. Leadership and territory assignments must be data-driven so MedSphere can grow from a small initial regional structure to any future number of executives and territories.
 
 **Completion gate:** Global-owner controls accepted; territory reassignment safe and auditable; regional/country isolation proven; no privilege escalation; business/clinical permission separation proven; session revocation tested; financial attribution reconciled; multi-currency reporting validated; country-policy/data-residency boundaries documented; required migrations, tests, lint, build, threat model, ADRs, and CTO acceptance complete.
+
+## Milestone 14 — Application Versioning & Update Management
+
+**Status:** Planned. Backend/web release controls support production operations; native-store update tasks apply when MedSphere is distributed through mobile app stores.
+
+**Purpose:** Make MedSphere updates safe and simple for users across V1, future major versions, routine feature releases, and urgent security patches while preserving accounts, organization data, and compatible healthcare workflows.
+
+Ordered scope:
+
+1. UM14.1 Canonical application-version model and release policy covering major, minor, patch, build, API, and database-schema compatibility.
+2. UM14.2 Signed/versioned update-manifest service exposing current version, minimum supported version, update severity, release notes reference, and supported client platforms without exposing secrets.
+3. UM14.3 Web/PWA update detection with safe refresh/reload behavior and a user-facing `Update now` flow when a new frontend build is available.
+4. UM14.4 Optional-versus-required update UX so normal releases may be deferred while critical security or incompatible releases can require an upgrade before continued use.
+5. UM14.5 Minimum-supported-client enforcement that fails safely and never silently allows a client version known to be incompatible or unsafe.
+6. UM14.6 Android/iOS store-release boundary for directing users to the official Google Play or Apple App Store update path when native applications are published.
+7. UM14.7 Backend/API compatibility policy allowing controlled overlap between old and new clients during rollout instead of breaking every existing session immediately.
+8. UM14.8 Backward-compatible database migration and data-preservation rules so V1 → V2 → later upgrades retain valid user accounts, organizations, inventory, reservations, subscriptions, audit evidence, and other required records.
+9. UM14.9 Release channels and feature flags for internal, test/beta, staged, and stable activation without maintaining separate unsafe product forks.
+10. UM14.10 Progressive/canary rollout controls supporting bounded percentages or selected regions before full release.
+11. UM14.11 Automated rollback and operational kill-switch controls for defective frontend/backend releases and independently disableable risky features where safe rollback requires it.
+12. UM14.12 Emergency security-update process with expedited validation, mandatory-upgrade policy when required, session/token invalidation where relevant, and clear incident audit evidence.
+13. UM14.13 Release ledger and immutable audit trail recording version, commit/build identity, migration set, approver, rollout start/stop, rollback, and security-release decisions.
+14. UM14.14 Release health and adoption monitoring covering error rate, readiness, rollback triggers, version adoption, unsupported-client counts, and privacy-safe operational telemetry.
+15. UM14.15 End-to-end update certification covering upgrade, rollback, data preservation, old/new-client compatibility, forced-update behavior, migration safety, security checks, and exact-release-artifact validation.
+
+**User-experience rule:** Routine server-side releases should require no user action when compatible. Web/PWA users should receive the latest safe build automatically or through a bounded refresh prompt. Native users should update through official app-store mechanisms. Required security updates must clearly explain that an update is necessary without exposing sensitive vulnerability details.
+
+**Data-preservation rule:** A new MedSphere version must not require users or healthcare organizations to recreate accounts or lose valid business/healthcare records merely because the application version changed. Any intentionally incompatible data transition requires an explicit migration, backup/restore plan, validation evidence, and rollback strategy.
+
+**Release-safety rule:** No update goes directly from a developer change to all production users. Production releases require applicable tests, security checks, migration/drift safety, staged rollout or equivalent bounded exposure, monitoring, rollback readiness, and release approval.
+
+**Completion gate:** Version policy accepted; update manifest and client handling proven; backward compatibility and data preservation certified; forced-security-update behavior tested; staged rollout and rollback proven; release audit evidence complete; monitoring and adoption telemetry validated; native-store flows certified when applicable; required tests, lint, build, migrations, security review, ADRs, runbooks, and CTO acceptance complete.
 
 ## Future integrations
 
