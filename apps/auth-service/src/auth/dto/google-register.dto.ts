@@ -1,19 +1,21 @@
 import { Transform } from 'class-transformer';
-import { IsString, Matches, MaxLength, MinLength } from 'class-validator';
+import { IsIn, IsString, Matches, MaxLength, MinLength, ValidateIf } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
-import { normalizeAuthenticationLocator } from '../auth-normalization';
 import { normalizePhoneNumber } from '../../verification/otp/phone-normalization';
+import { ORGANIZATION_TYPES, type OrganizationType } from '../../organization/organization-type';
 
 export class GoogleRegisterDto {
-  @ApiProperty({ example: 'central-pharmacy', maxLength: 100 })
-  @Transform(({ value }) =>
-    typeof value === 'string' ? normalizeAuthenticationLocator(value) : value,
-  )
+  @ApiProperty({ example: 'HOSPITAL', enum: ORGANIZATION_TYPES })
   @IsString()
-  @MaxLength(100)
-  @Matches(/^[a-z0-9]+(?:-[a-z0-9]+)*$/)
-  tenantSlug!: string;
+  @IsIn(ORGANIZATION_TYPES)
+  organizationType!: OrganizationType;
+
+  @ApiProperty({ example: 'MED-X7P42-Q9K3R', required: false, maxLength: 40 })
+  @ValidateIf((dto: GoogleRegisterDto) => dto.organizationType !== 'NONE')
+  @IsString()
+  @MaxLength(40)
+  organizationCode?: string;
 
   @ApiProperty({ example: '+919876543210', maxLength: 20 })
   @Transform(({ value }) => (typeof value === 'string' ? normalizePhoneNumber(value) : value))

@@ -7,7 +7,8 @@ import { REGISTRATION_CONFIRMATION_MESSAGE } from '@/lib/auth-contract';
 import { POST } from './route';
 
 const validRequest = {
-  tenantSlug: 'central-pharmacy',
+  organizationType: 'HOSPITAL',
+  organizationCode: 'MED-X7P42-Q9K3R',
   idToken: 'google-id-token',
   firstName: 'Mira',
   lastName: 'Patel',
@@ -52,7 +53,8 @@ describe('Google registration BFF boundary', () => {
 
     const response = await POST(
       request({
-        tenantSlug: '  Central-Pharmacy ',
+        organizationType: 'HOSPITAL',
+        organizationCode: ' med-x7p42-q9k3r ',
         idToken: ' google-id-token ',
         firstName: ' Mira ',
         lastName: ' Patel ',

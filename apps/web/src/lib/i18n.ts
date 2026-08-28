@@ -80,9 +80,17 @@ const englishMessages = {
     'This form submits a pending request. It does not guarantee account creation, organization membership, or immediate access.',
   'registration.firstName': 'First name',
   'registration.lastName': 'Last name',
-  'registration.organizationSlug': 'Organization slug',
-  'registration.organizationSlugDescription':
-    'Use the exact slug supplied by the organization administrator.',
+  'registration.organizationType': 'Organization type',
+  'registration.orgType.pharmacy': 'Pharmacy',
+  'registration.orgType.hospital': 'Hospital',
+  'registration.orgType.laboratory': 'Laboratory',
+  'registration.orgType.clinic': 'Clinic',
+  'registration.orgType.bloodBank': 'Blood Bank',
+  'registration.orgType.supplier': 'Supplier',
+  'registration.orgType.none': 'None (personal account)',
+  'registration.organizationCode': 'Organization code / Invitation code',
+  'registration.organizationCodeDescription':
+    'Enter the code your organization administrator shared with you, e.g. MED-X7P42.',
   'registration.workEmail': 'Work email',
   'registration.phone': 'Phone number',
   'registration.phoneDescription': 'Include the country code, for example +91 98765 43210.',
@@ -93,6 +101,14 @@ const englishMessages = {
   'registration.showPassword': 'Show password',
   'registration.submitting': 'Submitting securely…',
   'registration.requestAccess': 'Request organization access',
+  'registration.verificationCode': 'Phone verification code',
+  'registration.verificationSent': 'Enter the six-digit code sent to your registered phone.',
+  'registration.verifyCode': 'Verify phone',
+  'registration.resendCode': 'Send code again',
+  'registration.verificationComplete':
+    'Phone verified. You can now sign in when your membership is active.',
+  'registration.verificationSendError': 'The code could not be sent. Try again.',
+  'registration.verificationCodeError': 'Enter a valid, unexpired six-digit code.',
   'registration.alreadyMember': 'Already have an active membership?',
   'registration.signIn': 'Sign in',
   'registration.requestReceived': 'Request received',
@@ -101,11 +117,15 @@ const englishMessages = {
     'If registration is available, onboarding instructions will be sent.',
   'registration.privacyConfirmation':
     "For privacy, this confirmation does not reveal whether the organization or email already exists. Access becomes available only after the organization's onboarding policy is satisfied.",
+  'registration.pendingMembershipExplanation':
+    'Joining an organization creates a pending request only. A staff role and any organization access are granted separately, after the organization reviews your request.',
   'registration.returnSignIn': 'Return to sign in',
   'registration.submitAnother': 'Submit another request',
   'registration.testDataNotice':
     'Use test identities only. This stabilization environment is not approved for real patient, employee, or clinical data.',
-  'registration.errorTenant': 'Use the organization slug provided by your administrator.',
+  'registration.errorOrganizationType': 'Choose an organization type.',
+  'registration.errorOrganizationCode':
+    'Enter the organization code provided by your administrator.',
   'registration.errorEmail': 'Enter a valid email address.',
   'registration.errorPhone': 'Enter a valid phone number including country code.',
   'registration.errorPassword': 'Password must be between 15 and 128 characters.',
@@ -171,9 +191,17 @@ const tamilMessages: MessageOverrides = {
     'இந்த படிவம் ஒரு நிலுவை கோரிக்கையை சமர்ப்பிக்கும். இது கணக்கு உருவாக்கம், நிறுவன உறுப்பினர் அணுகல் அல்லது உடனடி அணுகலை உறுதி செய்யாது.',
   'registration.firstName': 'முதல் பெயர்',
   'registration.lastName': 'கடைசி பெயர்',
-  'registration.organizationSlug': 'நிறுவன ஸ்லக்',
-  'registration.organizationSlugDescription':
-    'நிறுவன நிர்வாகி வழங்கிய சரியான ஸ்லக் மதிப்பைப் பயன்படுத்தவும்.',
+  'registration.organizationType': 'நிறுவன வகை',
+  'registration.orgType.pharmacy': 'மருந்தகம்',
+  'registration.orgType.hospital': 'மருத்துவமனை',
+  'registration.orgType.laboratory': 'ஆய்வகம்',
+  'registration.orgType.clinic': 'கிளினிக்',
+  'registration.orgType.bloodBank': 'இரத்த வங்கி',
+  'registration.orgType.supplier': 'விநியோகஸ்தர்',
+  'registration.orgType.none': 'எதுவுமில்லை (தனிப்பட்ட கணக்கு)',
+  'registration.organizationCode': 'நிறுவன குறியீடு / அழைப்பு குறியீடு',
+  'registration.organizationCodeDescription':
+    'உங்கள் நிறுவன நிர்வாகி வழங்கிய குறியீட்டை உள்ளிடவும், எ.கா. MED-X7P42.',
   'registration.workEmail': 'பணி மின்னஞ்சல்',
   'registration.phone': 'தொலைபேசி எண்',
   'registration.phoneDescription':
@@ -183,6 +211,15 @@ const tamilMessages: MessageOverrides = {
     '15–128 எழுத்துகளைப் பயன்படுத்தவும். வேறு சேவையில் பயன்படுத்திய கடவுச்சொல்லை மீண்டும் பயன்படுத்த வேண்டாம்.',
   'registration.confirmPassword': 'கடவுச்சொல்லை உறுதிப்படுத்தவும்',
   'registration.showPassword': 'கடவுச்சொல்லைக் காட்டு',
+  'registration.verificationCode': 'தொலைபேசி சரிபார்ப்புக் குறியீடு',
+  'registration.verificationSent':
+    'உங்கள் பதிவு செய்யப்பட்ட தொலைபேசிக்கு அனுப்பப்பட்ட ஆறு இலக்கக் குறியீட்டை உள்ளிடவும்.',
+  'registration.verifyCode': 'தொலைபேசியைச் சரிபார்க்கவும்',
+  'registration.resendCode': 'குறியீட்டை மீண்டும் அனுப்பவும்',
+  'registration.verificationComplete':
+    'தொலைபேசி சரிபார்க்கப்பட்டது. உறுப்பினர் அணுகல் செயலில் இருக்கும்போது உள்நுழையலாம்.',
+  'registration.verificationSendError': 'குறியீட்டை அனுப்ப முடியவில்லை. மீண்டும் முயலவும்.',
+  'registration.verificationCodeError': 'செல்லுபடியாகும் ஆறு இலக்கக் குறியீட்டை உள்ளிடவும்.',
   'registration.submitting': 'பாதுகாப்பாக சமர்ப்பிக்கப்படுகிறது…',
   'registration.requestAccess': 'நிறுவன அணுகலை கோருங்கள்',
   'registration.alreadyMember': 'ஏற்கனவே செயலில் உள்ள உறுப்பினர் அணுகல் உள்ளதா?',
@@ -192,11 +229,14 @@ const tamilMessages: MessageOverrides = {
   'registration.confirmationMessage': 'பதிவு கிடைக்குமானால், அடுத்த கட்ட வழிமுறைகள் அனுப்பப்படும்.',
   'registration.privacyConfirmation':
     'தனியுரிமைக்காக, நிறுவனம் அல்லது மின்னஞ்சல் ஏற்கனவே உள்ளதா என்பதை இந்த உறுதிப்படுத்தல் வெளிப்படுத்தாது. நிறுவனத்தின் பதிவு கொள்கை பூர்த்தி செய்யப்பட்ட பின்னரே அணுகல் கிடைக்கும்.',
+  'registration.pendingMembershipExplanation':
+    'ஒரு நிறுவனத்தில் சேருவது நிலுவை கோரிக்கையை மட்டுமே உருவாக்கும். பணியாளர் பங்கும் நிறுவன அணுகலும் நிறுவனம் உங்கள் கோரிக்கையை மதிப்பாய்வு செய்த பின்னரே தனித்தனியாக வழங்கப்படும்.',
   'registration.returnSignIn': 'உள்நுழைவிற்கு திரும்பவும்',
   'registration.submitAnother': 'மற்றொரு கோரிக்கையை சமர்ப்பிக்கவும்',
   'registration.testDataNotice':
     'சோதனை அடையாளங்களை மட்டும் பயன்படுத்தவும். இந்த நிலைப்படுத்தல் சூழல் உண்மையான நோயாளர், பணியாளர் அல்லது மருத்துவத் தரவுகளுக்காக அனுமதிக்கப்படவில்லை.',
-  'registration.errorTenant': 'உங்கள் நிர்வாகி வழங்கிய நிறுவன ஸ்லக் மதிப்பைப் பயன்படுத்தவும்.',
+  'registration.errorOrganizationType': 'நிறுவன வகையைத் தேர்ந்தெடுக்கவும்.',
+  'registration.errorOrganizationCode': 'உங்கள் நிர்வாகி வழங்கிய நிறுவன குறியீட்டை உள்ளிடவும்.',
   'registration.errorEmail': 'சரியான மின்னஞ்சல் முகவரியை உள்ளிடவும்.',
   'registration.errorPhone': 'நாட்டுக் குறியீட்டுடன் சரியான தொலைபேசி எண்ணை உள்ளிடவும்.',
   'registration.errorPassword': 'கடவுச்சொல் 15 முதல் 128 எழுத்துகளுக்குள் இருக்க வேண்டும்.',

@@ -34,7 +34,7 @@
 //   node scripts/v1-performance-certification.mjs
 
 import { execFileSync } from 'node:child_process';
-import { randomUUID } from 'node:crypto';
+import { createHmac, randomUUID } from 'node:crypto';
 
 // ---------------------------------------------------------------------
 // Configuration -- exported so the negative-test suite can exercise
@@ -69,6 +69,7 @@ export const THRESHOLDS = Object.freeze({
 const FRONTEND = process.env.FRONTEND_URL ?? 'http://localhost:3001';
 const BACKEND = process.env.BACKEND_URL ?? 'http://localhost:3000';
 const DATABASE_URL = process.env.DATABASE_URL;
+const ORG_JOIN_CODE_PEPPER = process.env.ORG_JOIN_CODE_PEPPER;
 const HTTP_REQUEST_TIMEOUT_MS = 10_000;
 
 // ---------------------------------------------------------------------
@@ -289,6 +290,15 @@ async function main() {
     fail('DATABASE_URL is required (synthetic database only).');
     return;
   }
+  if (!ORG_JOIN_CODE_PEPPER) {
+    fail('ORG_JOIN_CODE_PEPPER is required to seed a synthetic organization join code.');
+    return;
+  }
+  const orgJoinCodePepper = Buffer.from(ORG_JOIN_CODE_PEPPER, 'base64');
+  if (orgJoinCodePepper.length < 32) {
+    fail('ORG_JOIN_CODE_PEPPER must decode to at least 32 bytes.');
+    return;
+  }
 
   const dbParts = connectionParts(DATABASE_URL);
   const sql = makeSqlRunner(dbParts);
@@ -324,10 +334,16 @@ async function main() {
     product: randomUUID(),
     inventory: randomUUID(),
     batch: randomUUID(),
+    joinCodeIssuerUser: randomUUID(),
+    joinCodeIssuerMembership: randomUUID(),
   };
   const tenantSlug = `perf-cert-${runId.slice(0, 8)}`;
   const adminEmail = `perf-cert-admin-${runId}@example.test`;
   const password = 'Perf-Cert-Synthetic-Password-1!';
+  const organizationCode = 'MED-K7R4W-P9C2N';
+  const organizationCodeHash = createHmac('sha256', orgJoinCodePepper)
+    .update('MED-K7R4WP9C2N', 'utf8')
+    .digest('hex');
 
   // Large synthetic stock: mutationOperations reservations of 1 unit each
   // must never fail on availability, or a threshold violation would be
@@ -335,8 +351,20 @@ async function main() {
   const seededStock = PROFILE.mutationOperations * 10;
 
   sql(
-    `INSERT INTO "Tenant" (id, name, slug, "isActive", "selfRegistrationEnabled", "createdAt", "updatedAt")
-     VALUES ('${ids.tenant}', 'Perf Cert Tenant', '${tenantSlug}', true, true, now(), now());`,
+    `INSERT INTO "Tenant" (id, name, slug, "organizationType", "isActive", "selfRegistrationEnabled", "createdAt", "updatedAt")
+     VALUES ('${ids.tenant}', 'Perf Cert Tenant', '${tenantSlug}', 'HOSPITAL', true, true, now(), now());`,
+  );
+  sql(
+    `INSERT INTO "User" (id, email, "firstName", "lastName", status, "createdAt", "updatedAt")
+     VALUES ('${ids.joinCodeIssuerUser}', '${ids.joinCodeIssuerUser}@example.test', 'Perf', 'Code Issuer', 'ACTIVE', now(), now());`,
+  );
+  sql(
+    `INSERT INTO "TenantMembership" (id, "tenantId", "userId", status, "isDefault", "joinedAt", "createdAt", "updatedAt")
+     VALUES ('${ids.joinCodeIssuerMembership}', '${ids.tenant}', '${ids.joinCodeIssuerUser}', 'ACTIVE', true, now(), now(), now());`,
+  );
+  sql(
+    `INSERT INTO "OrganizationJoinCode" (id, "tenantId", "codeHash", status, "createdByMembershipId", "createdAt", "updatedAt")
+     VALUES (gen_random_uuid(), '${ids.tenant}', '${organizationCodeHash}', 'ACTIVE', '${ids.joinCodeIssuerMembership}', now(), now());`,
   );
   sql(
     `INSERT INTO "Role" (id, "tenantId", name, description, type, version, "createdAt", "updatedAt")
@@ -378,7 +406,8 @@ async function main() {
     method: 'POST',
     headers: { 'content-type': 'application/json', origin: FRONTEND },
     body: JSON.stringify({
-      tenantSlug,
+      organizationType: 'HOSPITAL',
+      organizationCode,
       email: adminEmail,
       password,
       firstName: 'Perf',
@@ -655,7 +684,11 @@ async function main() {
 
     sql(`UPDATE "User"
          SET status = 'INACTIVE', "passwordHash" = NULL, phone = NULL, "updatedAt" = now()
-         WHERE email = '${adminEmail}';`);
+         WHERE email = '${adminEmail}' OR id = '${ids.joinCodeIssuerUser}';`);
+
+    sql(`UPDATE "OrganizationJoinCode"
+         SET status = 'REVOKED', "revokedAt" = now(), "updatedAt" = now()
+         WHERE "tenantId" = '${ids.tenant}';`);
 
     sql(`UPDATE "Tenant"
          SET "isActive" = false, "selfRegistrationEnabled" = false, "updatedAt" = now()

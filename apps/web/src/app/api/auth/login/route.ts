@@ -75,7 +75,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     200,
   );
   setSessionCookies(response, session, {
-    tenantSlug: normalized.tenantSlug,
     expiresIn: session.expiresIn,
     user: session.user,
     context: session.context,

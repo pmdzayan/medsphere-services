@@ -195,12 +195,38 @@ enum NotificationAttemptOutcome {
   DEAD_LETTER
 }
 
+enum OrganizationType {
+  /// Fail-closed value for tenants created before organization-type
+  /// classification was introduced. Never accepted by public onboarding.
+  UNSPECIFIED
+  PHARMACY
+  HOSPITAL
+  LABORATORY
+  CLINIC
+  BLOOD_BANK
+  SUPPLIER
+  NONE
+}
+
+enum JoinCodeStatus {
+  ACTIVE
+  REVOKED
+}
+
 model Tenant {
   id String @id @default(uuid()) @db.Uuid
 
   name  String
   slug  String  @unique
   email String? @unique
+
+  /// The organization's own accepted category, verified server-side at
+  /// join-code redemption time against the type the registering user
+  /// selected -- never trusted from the client alone (see ADR for this
+  /// task). UNSPECIFIED preserves legacy tenants until an operator
+  /// classifies them; NONE identifies only the dedicated personal-account
+  /// tenant and is never assigned to legacy organizations by migration.
+  organizationType OrganizationType @default(UNSPECIFIED)
 
   isActive                Boolean @default(true)
   selfRegistrationEnabled Boolean @default(false)
@@ -234,8 +260,49 @@ model Tenant {
   notificationDeliveries         NotificationDelivery[]
   notificationDeliveryAttempts   NotificationDeliveryAttempt[]
   phoneOtpChallenges             PhoneOtpChallenge[]
+  organizationJoinCodes          OrganizationJoinCode[]
 
   @@index([slug])
+}
+
+/// Reusable, revocable organization join code (see ADR-025). Possessing a
+/// valid code only associates a public registration request with this tenant;
+/// it never grants a role or activates a membership. The plaintext code is
+/// never persisted: only an HMAC-SHA256 digest keyed by
+/// ORG_JOIN_CODE_PEPPER is stored.
+model OrganizationJoinCode {
+  id String @id @default(uuid()) @db.Uuid
+
+  tenantId String @db.Uuid
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  /// HMAC-SHA256 hex digest of the normalized code. Never the plaintext
+  /// code. Globally unique and looked up directly at redemption time,
+  /// since the client submits only the raw code, not a tenant hint.
+  codeHash String @unique @db.VarChar(64)
+
+  status JoinCodeStatus @default(ACTIVE)
+
+  /// Null means no expiry is enforced; revocation/status remain the
+  /// only lifecycle control in that case.
+  expiresAt DateTime?
+  revokedAt DateTime?
+
+  /// Reusable by design (see model doc) -- tracks how many onboarding
+  /// requests have redeemed this code for operator visibility only. Not
+  /// a single-use consumption counter.
+  redemptionCount Int @default(0)
+
+  createdByMembershipId String           @db.Uuid
+  createdByMembership   TenantMembership @relation("OrganizationJoinCodeCreatedBy", fields: [createdByMembershipId, tenantId], references: [id, tenantId], onDelete: Restrict)
+
+  version Int @default(1)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([tenantId])
 }
 
 model User {
@@ -377,6 +444,7 @@ model TenantMembership {
   providerAccess         MembershipProviderAccess[]
   batchQuarantineRecords BatchQuarantineRecord[]
   outboxEvents           OutboxEvent[]
+  createdOrganizationJoinCodes OrganizationJoinCode[] @relation("OrganizationJoinCodeCreatedBy")
 
   @@unique([tenantId, userId])
   @@unique([id, tenantId])

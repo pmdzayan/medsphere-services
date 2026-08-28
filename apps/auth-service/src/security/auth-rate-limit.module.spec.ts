@@ -40,4 +40,24 @@ describe('authentication rate-limit key generation', () => {
       }),
     ).toBe('account:central-pharmacy:user@example.com');
   });
+
+  it('keys by email alone for a tenantSlug-free request (Task 0010 registration/onboarding)', () => {
+    expect(
+      accountTracker({
+        ip: '127.0.0.1',
+        body: {
+          email: ' USER@Example.COM  ',
+        },
+      }),
+    ).toBe('account:user@example.com');
+  });
+
+  it('falls through to the IP-based tracker when neither tenantSlug+email nor email alone is present', () => {
+    expect(
+      accountTracker({
+        ip: '203.0.113.5',
+        body: {},
+      }),
+    ).toBe('network:203.0.113.5');
+  });
 });

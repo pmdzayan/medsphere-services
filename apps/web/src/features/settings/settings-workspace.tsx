@@ -19,7 +19,7 @@ import type {
 interface SettingsIdentity {
   readonly name: string;
   readonly email: string;
-  readonly tenantSlug: string;
+  readonly tenantName: string;
   readonly tenantId: string;
   readonly membershipId: string;
 }
@@ -372,7 +372,7 @@ function IdentityPanel({ identity }: { identity: SettingsIdentity }) {
         <p className="mt-1 text-xs text-white/45">{identity.email}</p>
       </div>
       <dl className="divide-y divide-[#edf1ef] px-5">
-        <IdentityItem label="Organization" value={formatTenant(identity.tenantSlug)} />
+        <IdentityItem label="Organization" value={identity.tenantName} />
         <IdentityItem label="Tenant" value={abbreviate(identity.tenantId)} mono />
         <IdentityItem label="Membership" value={abbreviate(identity.membershipId)} mono />
       </dl>
@@ -511,13 +511,6 @@ function changedPreferences(
     if (saved[option.key] !== draft[option.key]) changes[option.key] = draft[option.key];
     return changes;
   }, {});
-}
-
-function formatTenant(slug: string): string {
-  return slug
-    .split('-')
-    .map((part) => `${part[0]?.toUpperCase() ?? ''}${part.slice(1)}`)
-    .join(' ');
 }
 
 function abbreviate(value: string): string {

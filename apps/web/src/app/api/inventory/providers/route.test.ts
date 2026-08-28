@@ -9,10 +9,14 @@ import { GET } from './route';
 const refreshToken = 'refresh-secret';
 const profile = sealSessionProfile(
   {
-    tenantSlug: 'central-pharmacy',
     expiresIn: 900,
     user: { id: 'user-id', email: 'user@example.com', firstName: 'Test', lastName: 'User' },
-    context: { membershipId: validProviders[0].membershipId, tenantId: 'tenant-id' },
+    context: {
+      membershipId: validProviders[0].membershipId,
+      tenantId: 'tenant-id',
+      tenantName: 'Central Pharmacy',
+      organizationType: 'PHARMACY',
+    },
   },
   refreshToken,
 );

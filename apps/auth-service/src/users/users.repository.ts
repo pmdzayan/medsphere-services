@@ -34,6 +34,7 @@ export class UsersRepository {
       select: {
         id: true,
         tenantId: true,
+        tenant: { select: { name: true, organizationType: true } },
         user: {
           select: {
             id: true,
@@ -54,6 +55,7 @@ export class UsersRepository {
       user: membership.user,
       membershipId: membership.id,
       tenantId: membership.tenantId,
+      tenant: membership.tenant,
     };
   }
 
@@ -76,6 +78,7 @@ export class UsersRepository {
       select: {
         id: true,
         tenantId: true,
+        tenant: { select: { name: true, organizationType: true } },
         user: {
           select: {
             id: true,
@@ -96,6 +99,7 @@ export class UsersRepository {
       user: membership.user,
       membershipId: membership.id,
       tenantId: membership.tenantId,
+      tenant: membership.tenant,
     };
   }
 
@@ -103,6 +107,112 @@ export class UsersRepository {
     return this.prisma.client.user.findFirst({
       where: { id, deletedAt: null },
     });
+  }
+
+  /**
+   * Global (non-tenant-scoped) identity lookup by email, used only by the
+   * slug-free login flow (Task 0010) to verify the person's password
+   * exactly once before resolving which organization(s) they belong to.
+   * Never used to bypass tenant-scoped authorization -- every subsequent
+   * step still resolves membership access explicitly (see
+   * findActiveMembershipsForUser below), and no data beyond what is
+   * needed to verify a password and greet the user is returned.
+   */
+  async findGlobalIdentityByEmail(email: string): Promise<{
+    id: string;
+    email: string;
+    passwordHash: string | null;
+    firstName: string;
+    lastName: string;
+  } | null> {
+    return this.prisma.client.user.findFirst({
+      where: { email, status: 'ACTIVE', deletedAt: null },
+      select: { id: true, email: true, passwordHash: true, firstName: true, lastName: true },
+    });
+  }
+
+  /**
+   * Every ACTIVE membership, in an ACTIVE tenant, belonging to the given
+   * (already password-verified) user. Only organization display
+   * information the authenticated user is already authorized to know
+   * about their own memberships -- never a general tenant search or
+   * listing. A PENDING membership is deliberately excluded: it does not
+   * yet grant login access to that organization context.
+   */
+  async findActiveMembershipsForUser(userId: string): Promise<
+    Array<{
+      membershipId: string;
+      tenantId: string;
+      organizationName: string;
+      organizationType: string;
+    }>
+  > {
+    const memberships = await this.prisma.client.tenantMembership.findMany({
+      where: {
+        userId,
+        status: 'ACTIVE',
+        deletedAt: null,
+        tenant: { isActive: true, deletedAt: null },
+      },
+      select: {
+        id: true,
+        tenantId: true,
+        tenant: { select: { name: true, organizationType: true } },
+      },
+    });
+    return memberships.map((membership) => ({
+      membershipId: membership.id,
+      tenantId: membership.tenantId,
+      tenant: membership.tenant,
+      organizationName: membership.tenant.name,
+      organizationType: membership.tenant.organizationType,
+    }));
+  }
+
+  /**
+   * Resolves a single specific membership for session issuance, scoped
+   * to the given (already password-verified) userId -- so a membershipId
+   * alone, without the matching userId, can never resolve to a session.
+   * Mirrors findLoginIdentity's ACTIVE/ACTIVE shape exactly.
+   */
+  async findLoginIdentityByMembershipId(
+    userId: string,
+    membershipId: string,
+  ): Promise<LoginIdentity | null> {
+    const membership = await this.prisma.client.tenantMembership.findFirst({
+      where: {
+        id: membershipId,
+        userId,
+        status: 'ACTIVE',
+        deletedAt: null,
+        tenant: { isActive: true, deletedAt: null },
+      },
+      select: {
+        id: true,
+        tenantId: true,
+        tenant: { select: { name: true, organizationType: true } },
+        user: {
+          select: {
+            id: true,
+            email: true,
+            passwordHash: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
+      },
+    });
+
+    if (!membership || membership.user.id !== userId) {
+      return null;
+    }
+
+    return {
+      user: membership.user,
+      membershipId: membership.id,
+      tenantId: membership.tenantId,
+      tenant: membership.tenant,
+    };
   }
 
   /**

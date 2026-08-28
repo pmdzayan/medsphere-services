@@ -58,7 +58,12 @@ describe('accepted login contract', () => {
         firstName: 'Test',
         lastName: 'User',
       },
-      context: { membershipId: 'membership-id', tenantId: 'tenant-id' },
+      context: {
+        membershipId: 'membership-id',
+        tenantId: 'tenant-id',
+        tenantName: 'Central Pharmacy',
+        organizationType: 'PHARMACY',
+      },
     };
 
     expect(isLoginRequest(request)).toBe(true);
@@ -98,7 +103,8 @@ describe('accepted login contract', () => {
 
 describe('accepted registration contract', () => {
   const request = {
-    tenantSlug: 'central-pharmacy',
+    organizationType: 'HOSPITAL' as const,
+    organizationCode: 'MED-X7P42-Q9K3R',
     email: 'operator@example.com',
     password: 'a-secure-password',
     firstName: 'Mira',
@@ -110,7 +116,7 @@ describe('accepted registration contract', () => {
     expect(
       normalizeRegistrationRequest({
         ...request,
-        tenantSlug: ' Central-Pharmacy ',
+        organizationCode: ' med-x7p42-q9k3r ',
         email: ' OPERATOR@EXAMPLE.COM ',
         firstName: ' Mira ',
         lastName: ' Patel ',
@@ -134,10 +140,38 @@ describe('accepted registration contract', () => {
     expect(isRegistrationResponse({ message: 'Account created' })).toBe(false);
   });
 
+  it('rejects an arbitrary organization type', () => {
+    expect(isRegistrationRequest({ ...request, organizationType: 'MADE_UP_TYPE' })).toBe(true); // shape-only check
+    expect(
+      validateRegistrationRequest({ ...request, organizationType: 'MADE_UP_TYPE' as never }),
+    ).toEqual(expect.objectContaining({ organizationType: expect.any(String) }));
+  });
+
+  it('requires an organization code for every type except NONE', () => {
+    expect(
+      validateRegistrationRequest({
+        ...request,
+        organizationType: 'HOSPITAL',
+        organizationCode: undefined,
+      }),
+    ).toEqual(expect.objectContaining({ organizationCode: expect.any(String) }));
+  });
+
+  it('does not require an organization code when the type is NONE', () => {
+    expect(
+      validateRegistrationRequest({
+        ...request,
+        organizationType: 'NONE',
+        organizationCode: undefined,
+      }),
+    ).toEqual({});
+  });
+
   it('rejects invalid names, locators, and passwords', () => {
     expect(
       validateRegistrationRequest({
-        tenantSlug: 'Invalid Tenant',
+        organizationType: 'HOSPITAL',
+        organizationCode: 'not valid!!',
         email: 'invalid',
         password: 'short',
         firstName: '',
@@ -145,7 +179,7 @@ describe('accepted registration contract', () => {
         phone: 'invalid',
       }),
     ).toEqual({
-      tenantSlug: expect.any(String),
+      organizationCode: expect.any(String),
       email: expect.any(String),
       password: expect.any(String),
       firstName: expect.any(String),

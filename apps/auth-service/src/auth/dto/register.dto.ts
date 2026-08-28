@@ -1,18 +1,37 @@
 import { Transform } from 'class-transformer';
-import { IsEmail, IsString, Matches, MaxLength, MinLength } from 'class-validator';
+import {
+  IsEmail,
+  IsIn,
+  IsString,
+  Matches,
+  MaxLength,
+  MinLength,
+  ValidateIf,
+} from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { normalizeAuthenticationLocator } from '../auth-normalization';
 import { normalizePhoneNumber } from '../../verification/otp/phone-normalization';
+import { ORGANIZATION_TYPES, type OrganizationType } from '../../organization/organization-type';
 
 export class RegisterDto {
-  @ApiProperty({ example: 'central-pharmacy', maxLength: 100 })
-  @Transform(({ value }) =>
-    typeof value === 'string' ? normalizeAuthenticationLocator(value) : value,
-  )
+  @ApiProperty({ example: 'HOSPITAL', enum: ORGANIZATION_TYPES })
   @IsString()
-  @MaxLength(100)
-  @Matches(/^[a-z0-9]+(?:-[a-z0-9]+)*$/)
-  tenantSlug!: string;
+  @IsIn(ORGANIZATION_TYPES)
+  organizationType!: OrganizationType;
+
+  /**
+   * Required for every organizationType except 'NONE'. @ValidateIf skips
+   * validation entirely (including presence) when organizationType is
+   * 'NONE', matching the frontend behavior of hiding this field for a
+   * personal account. Bounded length matches the generated code's own
+   * fixed shape (MED-XXXXX-XXXXX, 15 characters) with slack for
+   * whitespace/casing a user might paste.
+   */
+  @ApiProperty({ example: 'MED-X7P42-Q9K3R', required: false, maxLength: 40 })
+  @ValidateIf((dto: RegisterDto) => dto.organizationType !== 'NONE')
+  @IsString()
+  @MaxLength(40)
+  organizationCode?: string;
 
   @ApiProperty({ example: 'user@example.com', maxLength: 254 })
   @Transform(({ value }) =>

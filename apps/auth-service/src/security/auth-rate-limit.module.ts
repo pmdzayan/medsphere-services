@@ -43,6 +43,16 @@ export function accountTracker(request: Record<string, unknown>): string {
     )}`;
   }
 
+  // Public registration and organization-code onboarding (Task 0010) no
+  // longer collect a tenant slug from the client -- email alone is the
+  // per-account rate-limit key for those requests. Still falls through
+  // to the IP-based tracker below when even email is absent (e.g. a
+  // malformed request body), exactly as the tenantSlug+email path
+  // already did.
+  if (typeof email === 'string') {
+    return `account:${normalizeAuthenticationLocator(email)}`;
+  }
+
   const refreshCredential = typedRequest.body?.refreshToken;
   if (typeof refreshCredential === 'string') {
     const sessionId = refreshCredential.split('.')[1];

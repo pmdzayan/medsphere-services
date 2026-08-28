@@ -6,9 +6,7 @@ export const ACCESS_COOKIE = 'medsphere_access';
 export const REFRESH_COOKIE = 'medsphere_refresh';
 export const PROFILE_COOKIE = 'medsphere_profile';
 
-export interface SessionProfile extends AuthenticatedSession {
-  tenantSlug: string;
-}
+export type SessionProfile = AuthenticatedSession;
 
 export function sealSessionProfile(profile: SessionProfile, integrityKey: string): string {
   const payload = Buffer.from(JSON.stringify(profile), 'utf8').toString('base64url');
@@ -56,7 +54,6 @@ function isSessionProfile(value: unknown): value is SessionProfile {
 
   const candidate = value as Partial<SessionProfile>;
   return (
-    isBoundedString(candidate.tenantSlug, 100) &&
     Number.isSafeInteger(candidate.expiresIn) &&
     Number(candidate.expiresIn) > 0 &&
     Boolean(
@@ -69,7 +66,9 @@ function isSessionProfile(value: unknown): value is SessionProfile {
     Boolean(
       candidate.context &&
       isBoundedString(candidate.context.membershipId, 100) &&
-      isBoundedString(candidate.context.tenantId, 100),
+      isBoundedString(candidate.context.tenantId, 100) &&
+      isBoundedString(candidate.context.tenantName, 200) &&
+      isBoundedString(candidate.context.organizationType, 50),
     )
   );
 }

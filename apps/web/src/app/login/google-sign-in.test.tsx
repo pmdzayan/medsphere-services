@@ -101,6 +101,8 @@ describe('GoogleSignIn', () => {
       context: {
         membershipId: 'membership-1',
         tenantId: 'tenant-1',
+        tenantName: 'Central Pharmacy',
+        organizationType: 'PHARMACY',
       },
     });
 

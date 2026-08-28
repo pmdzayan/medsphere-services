@@ -184,7 +184,7 @@ export function AppShell({
                         {session.user.email}
                       </p>
                       <p className="mt-1 truncate text-[10px] text-[#75857f]">
-                        {formatTenantName(session.tenantSlug)}
+                        {session.context.tenantName}
                       </p>
                     </div>
                     <button
@@ -250,11 +250,11 @@ function TenantContext({ session }: { session: SessionProfile }) {
   return (
     <div className="mt-7 flex w-full items-center gap-3 rounded-2xl border border-white/[.08] bg-white/[.045] p-3 text-left">
       <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-[#d9b568] text-xs font-black text-[#1f281e]">
-        {tenantInitials(session.tenantSlug)}
+        {tenantInitials(session.context.tenantName)}
       </span>
       <span className="min-w-0 flex-1">
         <span className="block truncate text-xs font-bold text-white">
-          {formatTenantName(session.tenantSlug)}
+          {session.context.tenantName}
         </span>
         <span className="mt-1 block text-[10px] text-white/38">
           {t('shell.tenant')} · {abbreviateId(session.context.tenantId)}
@@ -391,13 +391,6 @@ function tenantInitials(slug: string): string {
     .map((part) => part[0] ?? '')
     .join('')
     .toUpperCase();
-}
-
-function formatTenantName(slug: string): string {
-  return slug
-    .split('-')
-    .map((part) => `${part[0]?.toUpperCase() ?? ''}${part.slice(1)}`)
-    .join(' ');
 }
 
 function abbreviateId(value: string): string {

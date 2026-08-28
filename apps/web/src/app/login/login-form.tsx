@@ -3,33 +3,43 @@
 import { FormEvent, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useLanguage } from '@/components/language-provider';
-import { login } from '@/lib/api-client';
-import { normalizeTenantSlug, validateLoginRequest } from '@/lib/auth-contract';
+import { identifyLogin, selectOrganizationLogin } from '@/lib/api-client';
+import {
+  normalizeIdentifyLoginRequest,
+  validateIdentifyLoginRequest,
+  type OrganizationChoice,
+} from '@/lib/auth-contract';
 import { loginCopy } from './login-copy';
 
-type Fields = 'tenantSlug' | 'email' | 'password';
+type Fields = 'email' | 'password';
 
+/**
+ * Task 0010: slug-free sign in. A normal user never enters, sees, or
+ * needs to understand a tenant slug/ID here -- identity (email +
+ * password) is verified first; if that resolves to more than one active
+ * organization membership, a second step lets the person choose using
+ * only the organization display information their own verified identity
+ * is authorized to see (never a general organization search).
+ */
 export function LoginForm() {
   const router = useRouter();
   const { locale } = useLanguage();
   const copy = loginCopy[locale];
   const [errors, setErrors] = useState<Partial<Record<Fields | 'form', string>>>({});
   const [pending, setPending] = useState(false);
+  const [organizations, setOrganizations] = useState<OrganizationChoice[] | null>(null);
+  const [credentials, setCredentials] = useState<{ email: string; password: string } | null>(null);
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleIdentify(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
-    const request = {
-      tenantSlug: normalizeTenantSlug(String(form.get('tenantSlug') ?? '')),
-      email: String(form.get('email') ?? '')
-        .trim()
-        .toLowerCase(),
+    const request = normalizeIdentifyLoginRequest({
+      email: String(form.get('email') ?? ''),
       password: String(form.get('password') ?? ''),
-    };
-    const validation = validateLoginRequest(request);
+    });
+    const validation = validateIdentifyLoginRequest(request);
     if (Object.keys(validation).length > 0) {
       setErrors({
-        tenantSlug: validation.tenantSlug ? copy.errorTenant : undefined,
         email: validation.email ? copy.errorEmail : undefined,
         password: validation.password ? copy.errorPassword : undefined,
       });
@@ -39,7 +49,12 @@ export function LoginForm() {
     setPending(true);
     setErrors({});
     try {
-      await login(request);
+      const result = await identifyLogin(request);
+      if ('requiresOrganizationSelection' in result) {
+        setOrganizations(result.organizations);
+        setCredentials(request);
+        return;
+      }
       router.replace('/dashboard');
       router.refresh();
     } catch (error) {
@@ -49,15 +64,64 @@ export function LoginForm() {
     }
   }
 
+  async function handleSelectOrganization(membershipId: string) {
+    if (!credentials) return;
+    setPending(true);
+    setErrors({});
+    try {
+      await selectOrganizationLogin({ ...credentials, membershipId });
+      router.replace('/dashboard');
+      router.refresh();
+    } catch (error) {
+      setErrors({ form: error instanceof Error ? error.message : copy.errorGeneric });
+    } finally {
+      setPending(false);
+    }
+  }
+
+  if (organizations) {
+    return (
+      <div className="space-y-4">
+        <p className="text-sm font-bold text-[#43524e]">Choose an organization</p>
+        <ul className="space-y-2">
+          {organizations.map((organization) => (
+            <li key={organization.membershipId}>
+              <button
+                type="button"
+                disabled={pending}
+                onClick={() => handleSelectOrganization(organization.membershipId)}
+                className="w-full rounded-xl border border-[#10201c]/[.11] bg-[#fbfaf5] px-4 py-3.5 text-left text-sm text-[#10201c] transition hover:border-emerald-600 disabled:cursor-wait disabled:opacity-60"
+              >
+                {organization.organizationName}
+              </button>
+            </li>
+          ))}
+        </ul>
+        {errors.form ? (
+          <p
+            className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
+            role="alert"
+          >
+            {errors.form}
+          </p>
+        ) : null}
+        <button
+          type="button"
+          onClick={() => {
+            setOrganizations(null);
+            setCredentials(null);
+            setErrors({});
+          }}
+          className="text-xs font-bold text-[#264b40] underline"
+        >
+          Back
+        </button>
+      </div>
+    );
+  }
+
   return (
-    <form className="space-y-4" onSubmit={handleSubmit} noValidate>
-      <Field
-        name="tenantSlug"
-        label={copy.organizationSlug}
-        placeholder="central-pharmacy"
-        autoComplete="organization"
-        error={errors.tenantSlug}
-      />
+    <form className="space-y-4" onSubmit={handleIdentify} noValidate>
       <Field
         name="email"
         label={copy.workEmail}

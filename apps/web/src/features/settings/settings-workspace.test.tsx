@@ -35,7 +35,7 @@ const languages = [
 const identity = {
   name: 'Mira Patel',
   email: 'mira@example.test',
-  tenantSlug: 'central-pharmacy',
+  tenantName: 'Central Pharmacy',
   tenantId: '2f96df49-54a0-4fac-a3fd-e796cb1f1d3d',
   membershipId: '93b31836-6a84-4db9-a935-1c55960c25da',
 };

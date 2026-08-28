@@ -18,6 +18,7 @@ interface ChallengeRow {
 function buildService(
   overrides: {
     membership?: unknown;
+    memberships?: unknown[];
     challenge?: ChallengeRow | null;
     deliver?: jest.Mock;
   } = {},
@@ -28,6 +29,9 @@ function buildService(
   const transaction = {
     tenantMembership: {
       findFirst: jest.fn().mockResolvedValue(membership ?? null),
+      findMany: jest
+        .fn()
+        .mockResolvedValue(overrides.memberships ?? (membership ? [membership] : [])),
     },
     phoneOtpChallenge: {
       findUnique: jest.fn().mockImplementation(() => Promise.resolve(challengeRow)),
@@ -98,6 +102,28 @@ const MEMBERSHIP = {
 };
 
 describe('PhoneOtpService.requestOtp', () => {
+  it('resolves a unique onboarding membership without requiring an internal tenant slug', async () => {
+    const { service, transaction, deliver } = buildService({ membership: MEMBERSHIP });
+
+    await service.requestOtp({ email: 'person@example.com' });
+
+    expect(transaction.tenantMembership.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ take: 2 }),
+    );
+    expect(deliver).toHaveBeenCalledTimes(1);
+  });
+
+  it('fails closed when slug-free onboarding membership resolution is ambiguous', async () => {
+    const { service, deliver } = buildService({
+      memberships: [MEMBERSHIP, { ...MEMBERSHIP, id: 'membership-2', tenantId: 'tenant-2' }],
+    });
+
+    const result = await service.requestOtp({ email: 'person@example.com' });
+
+    expect(result.message).toBe('If eligible, a verification code has been sent.');
+    expect(deliver).not.toHaveBeenCalled();
+  });
+
   it('returns the same generic message when no eligible membership exists (non-enumerating)', async () => {
     const { service, deliver } = buildService({ membership: null });
     const result = await service.requestOtp({

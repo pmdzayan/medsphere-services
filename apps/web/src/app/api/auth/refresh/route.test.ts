@@ -6,7 +6,6 @@ import { sealSessionProfile, type SessionProfile } from '@/lib/session-profile';
 import { POST } from './route';
 
 const profile: SessionProfile = {
-  tenantSlug: 'central-pharmacy',
   expiresIn: 900,
   user: {
     id: 'user-id',
@@ -14,7 +13,12 @@ const profile: SessionProfile = {
     firstName: 'Aisha',
     lastName: 'Zahra',
   },
-  context: { membershipId: 'membership-id', tenantId: 'tenant-id' },
+  context: {
+    membershipId: 'membership-id',
+    tenantId: 'tenant-id',
+    tenantName: 'Central Pharmacy',
+    organizationType: 'PHARMACY',
+  },
 };
 
 afterEach(() => {

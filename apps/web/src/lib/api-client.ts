@@ -2,9 +2,15 @@ import type {
   AuthenticatedSession,
   GoogleLoginRequest,
   GoogleRegisterRequest,
+  IdentifyLoginRequest,
   LoginRequest,
+  OrganizationSelectionRequired,
   RegistrationRequest,
   RegistrationResponse,
+  RequestPhoneOtpRequest,
+  SelectOrganizationLoginRequest,
+  VerifyPhoneOtpRequest,
+  VerifyPhoneOtpResponse,
 } from './auth-contract';
 import { toAuditSearchParams, type AuditEventFilters, type AuditEventPage } from './audit-contract';
 import type {
@@ -135,6 +141,52 @@ export async function login(request: LoginRequest): Promise<AuthenticatedSession
   return (await response.json()) as AuthenticatedSession;
 }
 
+/** Task 0010: slug-free login, step 1 -- verifies identity alone. */
+export async function identifyLogin(
+  request: IdentifyLoginRequest,
+): Promise<AuthenticatedSession | OrganizationSelectionRequired> {
+  const response = await fetch('/api/auth/login/identify', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(request),
+    cache: 'no-store',
+  });
+
+  if (!response.ok) {
+    throw new ApiError(
+      response.status === 401
+        ? 'The email or password is incorrect.'
+        : 'Sign-in failed. Try again.',
+      response.status,
+    );
+  }
+
+  return (await response.json()) as AuthenticatedSession | OrganizationSelectionRequired;
+}
+
+/** Task 0010: slug-free login, step 2 -- completes login for a chosen membership. */
+export async function selectOrganizationLogin(
+  request: SelectOrganizationLoginRequest,
+): Promise<AuthenticatedSession> {
+  const response = await fetch('/api/auth/login/select-organization', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(request),
+    cache: 'no-store',
+  });
+
+  if (!response.ok) {
+    throw new ApiError(
+      response.status === 401
+        ? 'The email or password is incorrect.'
+        : 'Sign-in failed. Try again.',
+      response.status,
+    );
+  }
+
+  return (await response.json()) as AuthenticatedSession;
+}
+
 export async function register(request: RegistrationRequest): Promise<RegistrationResponse> {
   const response = await fetch('/api/auth/register', {
     method: 'POST',
@@ -163,6 +215,24 @@ export async function register(request: RegistrationRequest): Promise<Registrati
   }
 
   return (await response.json()) as RegistrationResponse;
+}
+
+export async function requestPhoneOtp(request: RequestPhoneOtpRequest): Promise<void> {
+  await requestJson('/api/auth/verification/phone/request', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(request),
+  });
+}
+
+export async function verifyPhoneOtp(
+  request: VerifyPhoneOtpRequest,
+): Promise<VerifyPhoneOtpResponse> {
+  return requestJson<VerifyPhoneOtpResponse>('/api/auth/verification/phone/verify', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(request),
+  });
 }
 
 export async function getAuthorizationCatalogue(): Promise<AuthorizationCatalogue> {
