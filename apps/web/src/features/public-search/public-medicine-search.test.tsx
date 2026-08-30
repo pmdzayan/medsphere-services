@@ -214,6 +214,9 @@ describe('PublicMedicineSearch', () => {
     });
 
     fireEvent.click(screen.getByRole('button', { name: 'Find near me' }));
+    expect(screen.getByRole('dialog', { name: 'Use your location?' })).toBeVisible();
+    expect(navigator.geolocation.getCurrentPosition).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Use my location' }));
 
     expect(await screen.findByText('1.4 km away')).toBeVisible();
 
@@ -239,6 +242,7 @@ describe('PublicMedicineSearch', () => {
     });
 
     fireEvent.click(screen.getByRole('button', { name: 'Find near me' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Use my location' }));
 
     expect(
       await screen.findByText(
@@ -268,6 +272,7 @@ describe('PublicMedicineSearch', () => {
     });
 
     fireEvent.click(screen.getByRole('button', { name: 'Find near me' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Use my location' }));
 
     await screen.findByText(/No matches/i);
 
@@ -277,6 +282,50 @@ describe('PublicMedicineSearch', () => {
     expect(storageSpy.mock.calls.some(([key]) => /latitude|longitude|location/i.test(key))).toBe(
       false,
     );
+  });
+
+  it('never requests location at startup or before the explicit explained action', () => {
+    mockGeolocationSuccess();
+    renderSearch();
+
+    expect(navigator.geolocation.getCurrentPosition).not.toHaveBeenCalled();
+    fireEvent.change(screen.getByLabelText('Medicine name'), {
+      target: { value: 'paracetamol' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Find near me' }));
+
+    expect(screen.getByText('Use your location?')).toBeVisible();
+    expect(navigator.geolocation.getCurrentPosition).not.toHaveBeenCalled();
+  });
+
+  it('keeps manual search usable when location is declined and restores keyboard focus', async () => {
+    mockGeolocationSuccess();
+    renderSearch();
+
+    const input = screen.getByLabelText('Medicine name');
+    fireEvent.change(input, { target: { value: 'paracetamol' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Find near me' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Search without location' }));
+
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+    expect(navigator.geolocation.getCurrentPosition).not.toHaveBeenCalled();
+    expect(input).toHaveFocus();
+    expect(screen.getByRole('button', { name: 'Search' })).toBeEnabled();
+  });
+
+  it('localizes the responsive permission explanation with screen-reader dialog semantics', () => {
+    mockGeolocationSuccess();
+    renderSearch();
+    fireEvent.change(screen.getByLabelText('Medicine name'), { target: { value: 'paracetamol' } });
+    fireEvent.change(screen.getByLabelText('Language'), { target: { value: 'ta' } });
+    fireEvent.click(screen.getByRole('button', { name: 'எனக்கு அருகில் தேடு' }));
+
+    const dialog = screen.getByRole('dialog', {
+      name: 'உங்கள் இருப்பிடத்தைப் பயன்படுத்தலாமா?',
+    });
+    expect(dialog).toHaveAttribute('aria-modal', 'true');
+    expect(screen.getByText('உங்கள் இருப்பிடத்தைப் பயன்படுத்தலாமா?')).toBeVisible();
+    expect(dialog).toHaveClass('w-full', 'max-w-lg');
   });
 });
 

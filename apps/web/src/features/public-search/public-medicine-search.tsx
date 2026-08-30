@@ -3,8 +3,10 @@
 import { FormEvent, useState } from 'react';
 import { LanguageSelector } from '@/components/language-selector';
 import { useLanguage } from '@/components/language-provider';
+import { PermissionExplanationDialog } from '@/components/permission-explanation-dialog';
 import { Badge, Button, Card, EmptyState, Input, Skeleton } from '@/components/platform/primitives';
 import { ApiError, searchNearbyMedicine, searchPublicMedicine } from '@/lib/api-client';
+import { requestCurrentLocation, type BrowserCapabilityState } from '@/lib/browser-permissions';
 import type {
   PublicMedicineSearchResult,
   PublicNearbyMedicineSearchResult,
@@ -27,6 +29,7 @@ export function PublicMedicineSearch({ providerId }: { providerId: string }) {
   const [results, setResults] = useState<SearchResult[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [locating, setLocating] = useState(false);
+  const [locationExplanationOpen, setLocationExplanationOpen] = useState(false);
   const [error, setError] = useState<PublicError | null>(null);
   const [searchedFor, setSearchedFor] = useState<string | null>(null);
 
@@ -56,24 +59,22 @@ export function PublicMedicineSearch({ providerId }: { providerId: string }) {
 
     if (!query || loading || locating) return;
 
-    if (!navigator.geolocation) {
-      setResults(null);
-      setError({
-        message: t('publicSearch.locationUnavailable'),
-      });
-      return;
-    }
-
     setLocating(true);
+    setLocationExplanationOpen(false);
     setError(null);
 
     try {
-      const position = await getCurrentPosition();
+      const location = await requestCurrentLocation();
+      if (location.state !== 'granted' || !location.position) {
+        setResults(null);
+        setError({ message: locationFailureMessage(location.state, t) });
+        return;
+      }
 
       const response = await searchNearbyMedicine({
         q: query,
-        latitude: position.coords.latitude,
-        longitude: position.coords.longitude,
+        latitude: location.position.coords.latitude,
+        longitude: location.position.coords.longitude,
         radiusKm: 10,
         limit: 20,
         offset: 0,
@@ -84,14 +85,7 @@ export function PublicMedicineSearch({ providerId }: { providerId: string }) {
     } catch (thrown) {
       setResults(null);
 
-      if (isGeolocationError(thrown)) {
-        setError({
-          message:
-            thrown.code === 1 ? t('publicSearch.locationDenied') : t('publicSearch.locationFailed'),
-        });
-      } else {
-        setError(toPublicError(thrown, t('publicSearch.nearbyUnavailable')));
-      }
+      setError(toPublicError(thrown, t('publicSearch.nearbyUnavailable')));
     } finally {
       setLocating(false);
     }
@@ -129,7 +123,7 @@ export function PublicMedicineSearch({ providerId }: { providerId: string }) {
 
           <Button
             type="button"
-            onClick={handleNearbySearch}
+            onClick={() => setLocationExplanationOpen(true)}
             loading={locating}
             loadingLabel={t('publicSearch.findingNearby')}
             disabled={!term.trim() || loading}
@@ -206,27 +200,30 @@ export function PublicMedicineSearch({ providerId }: { providerId: string }) {
           </ul>
         ) : null}
       </div>
+
+      <PermissionExplanationDialog
+        kind="location"
+        open={locationExplanationOpen}
+        busy={locating}
+        onContinue={() => void handleNearbySearch()}
+        onAlternative={() => {
+          setLocationExplanationOpen(false);
+          window.requestAnimationFrame(() => {
+            document.querySelector<HTMLInputElement>('input[name="q"]')?.focus();
+          });
+        }}
+      />
     </div>
   );
 }
 
-function getCurrentPosition(): Promise<GeolocationPosition> {
-  return new Promise((resolve, reject) => {
-    navigator.geolocation.getCurrentPosition(resolve, reject, {
-      enableHighAccuracy: false,
-      timeout: 10_000,
-      maximumAge: 60_000,
-    });
-  });
-}
-
-function isGeolocationError(error: unknown): error is GeolocationPositionError {
-  return (
-    typeof error === 'object' &&
-    error !== null &&
-    'code' in error &&
-    typeof (error as { code?: unknown }).code === 'number'
-  );
+function locationFailureMessage(
+  state: BrowserCapabilityState,
+  t: ReturnType<typeof useLanguage>['t'],
+): string {
+  if (state === 'denied') return t('publicSearch.locationDenied');
+  if (state === 'unsupported') return t('publicSearch.locationUnavailable');
+  return t('publicSearch.locationFailed');
 }
 
 function formatDistance(distanceKm: number, locale: string): string {
