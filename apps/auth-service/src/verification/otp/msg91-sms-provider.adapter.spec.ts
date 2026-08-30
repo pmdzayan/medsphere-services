@@ -9,7 +9,7 @@ const CONFIG = {
 };
 const INPUT = {
   to: '+919876543210',
-  body: 'Your MedSphere verification code is 123456. It expires in 10 minutes.',
+  body: 'Your AIM verification code is 123456. It expires in 10 minutes.',
   otpCode: '123456',
 };
 

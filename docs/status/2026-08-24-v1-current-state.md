@@ -1,4 +1,4 @@
-# MedSphere V1 Current State — 2026-08-24
+# AIM — All In Medico V1 Current State — 2026-08-24
 
 This file is a current-state overlay for stale summary documents and must be read together with accepted ADRs, merged PRs, sprint acceptance records, and exact-head CI evidence. It does not replace those authorities.
 

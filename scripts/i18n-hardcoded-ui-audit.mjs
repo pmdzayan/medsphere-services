@@ -36,7 +36,6 @@ const visiblePropertyNames = new Set([
   'title',
 ]);
 const justifiedLiteralExclusions = new Map([
-  ['MedSphere', 'product brand'],
   ['UUID', 'standard technical identifier'],
   ['PHARMACY_MANAGER', 'role-code example, not prose'],
   ['you@organization.com', 'locale-independent email-format example'],

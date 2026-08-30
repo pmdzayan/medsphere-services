@@ -6,7 +6,7 @@ import { Injectable, NotImplementedException } from '@nestjs/common';
  * This intentionally contains no Aadhaar network implementation. A future
  * adapter must use an approved UIDAI AUA/KUA/Sub-AUA or permitted offline
  * verification arrangement and must never persist raw Aadhaar numbers,
- * authentication OTPs, biometrics, or identity-document images in MedSphere.
+ * authentication OTPs, biometrics, or identity-document images in the application.
  */
 @Injectable()
 export class ExternalIdentityProvider {

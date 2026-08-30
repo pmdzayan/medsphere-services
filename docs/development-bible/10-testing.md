@@ -6,7 +6,7 @@
 
 ## Purpose
 
-MedSphere uses evidence-based acceptance. A test is evidence only when its
+AIM uses evidence-based acceptance. A test is evidence only when its
 required dependencies are available, it executes rather than skips, and its
 result is recorded truthfully. Unit or mocked HTTP tests cannot replace
 database constraints, transaction concurrency, Redis behavior, migration

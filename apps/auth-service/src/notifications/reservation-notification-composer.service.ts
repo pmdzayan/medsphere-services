@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { BRAND } from '@medsphere/brand';
 import { NotificationDeliveryFailure } from './notification.errors';
 
 export const RESERVATION_READY_TEMPLATE_KEY = 'reservation-ready';
@@ -51,8 +52,8 @@ export class ReservationNotificationComposerService {
       templateKey: RESERVATION_READY_TEMPLATE_KEY,
       templateVersion: RESERVATION_READY_TEMPLATE_VERSION,
       locale,
-      subject: 'Your reservation is ready',
-      body: 'Your reserved item is ready for collection.',
+      subject: `${BRAND.shortName}: Your reservation is ready`,
+      body: `Your ${BRAND.fullName} reservation is ready for collection.`,
       metadata: {
         workflowKey: 'reservation-ready-membership-v1',
         contentClass: 'OPERATIONAL',

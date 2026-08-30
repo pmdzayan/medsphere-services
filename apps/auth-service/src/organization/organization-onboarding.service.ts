@@ -4,6 +4,7 @@ import {
   NotFoundException,
   PreconditionFailedException,
 } from '@nestjs/common';
+import { BRAND } from '@medsphere/brand';
 import { hasPrismaCode, withSerializableRetry, type Prisma } from '@medsphere/database';
 import { AuditWriter } from '../audit/audit-writer.service';
 import type { AuthenticatedIdentity, RequestMetadata } from '../auth/auth.types';
@@ -30,7 +31,7 @@ type OrgTransaction = Prisma.TransactionClient;
  * See the accompanying ADR for the alternatives considered.
  */
 const PERSONAL_ACCOUNTS_TENANT_SLUG = 'medsphere-personal-accounts';
-const PERSONAL_ACCOUNTS_TENANT_NAME = 'MedSphere Personal Accounts';
+const PERSONAL_ACCOUNTS_TENANT_NAME = `${BRAND.fullName} Personal Accounts`;
 
 export interface PasswordOrganizationRegistrationInput {
   readonly organizationType: OrganizationType;

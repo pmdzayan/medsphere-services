@@ -66,7 +66,7 @@ export class SmtpNotificationProviderAdapter implements ActivatedNotificationPro
         text: input.composedContent.body,
         // The provider's own generated Message-ID doubles as a delivery
         // reference for observability -- it is not the same value as
-        // MedSphere's own idempotency key, and callers must still only
+        // The application's own idempotency key, and callers must still only
         // ever hash it before persisting (see NotificationWorkerService).
         headers: { 'X-MedSphere-Delivery-Id': input.deliveryId },
       });

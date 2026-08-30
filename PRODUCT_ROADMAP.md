@@ -1,10 +1,10 @@
-# MedSphere Product Roadmap
+# AIM — All In Medico Product Roadmap
 
 **Version:** 1.3
 
 **Planning model:** Milestone → Sprint → Task → Checklist → Completion criteria
 
-This roadmap preserves the MedSphere product vision while inserting the engineering stabilization dependency required by the 2026-07-20 CTO audit.
+This roadmap preserves the AIM — All In Medico product vision while inserting the engineering stabilization dependency required by the 2026-07-20 CTO audit.
 
 ## Milestone 0 — Architecture and Safety Stabilization
 
@@ -145,7 +145,7 @@ AI work requires accepted data governance, model-risk controls, prompt standards
 
 **Status:** Planned — post-India expansion; not a V1 India launch blocker.
 
-**Purpose:** Allow MedSphere to expand globally with a flexible management hierarchy that can add, remove, split, merge, and reassign territories and leadership without changing application code.
+**Purpose:** Allow AIM to expand globally with a flexible management hierarchy that can add, remove, split, merge, and reassign territories and leadership without changing application code.
 
 **Governance hierarchy:** Global Owner → Regional Executive → Country Head/Admin → Healthcare Organization → Organization Staff.
 
@@ -174,15 +174,15 @@ Ordered scope:
 
 **Security boundary:** A leadership role does not automatically grant access to patient medical records, prescriptions, lab results, or other clinical data. Business, financial, security, administrative, and clinical permissions must remain separately modeled and independently authorized.
 
-**Scalability rule:** The implementation must never hard-code four CEOs, fixed compass directions, or a fixed number of regions. Leadership and territory assignments must be data-driven so MedSphere can grow from a small initial regional structure to any future number of executives and territories.
+**Scalability rule:** The implementation must never hard-code four CEOs, fixed compass directions, or a fixed number of regions. Leadership and territory assignments must be data-driven so AIM can grow from a small initial regional structure to any future number of executives and territories.
 
 **Completion gate:** Global-owner controls accepted; territory reassignment safe and auditable; regional/country isolation proven; no privilege escalation; business/clinical permission separation proven; session revocation tested; financial attribution reconciled; multi-currency reporting validated; country-policy/data-residency boundaries documented; required migrations, tests, lint, build, threat model, ADRs, and CTO acceptance complete.
 
 ## Milestone 14 — Application Versioning & Update Management
 
-**Status:** Planned. Backend/web release controls support production operations; native-store update tasks apply when MedSphere is distributed through mobile app stores.
+**Status:** Planned. Backend/web release controls support production operations; native-store update tasks apply when AIM is distributed through mobile app stores.
 
-**Purpose:** Make MedSphere updates safe and simple for users across V1, future major versions, routine feature releases, and urgent security patches while preserving accounts, organization data, and compatible healthcare workflows.
+**Purpose:** Make AIM updates safe and simple for users across V1, future major versions, routine feature releases, and urgent security patches while preserving accounts, organization data, and compatible healthcare workflows.
 
 Ordered scope:
 
@@ -204,7 +204,7 @@ Ordered scope:
 
 **User-experience rule:** Routine server-side releases should require no user action when compatible. Web/PWA users should receive the latest safe build automatically or through a bounded refresh prompt. Native users should update through official app-store mechanisms. Required security updates must clearly explain that an update is necessary without exposing sensitive vulnerability details.
 
-**Data-preservation rule:** A new MedSphere version must not require users or healthcare organizations to recreate accounts or lose valid business/healthcare records merely because the application version changed. Any intentionally incompatible data transition requires an explicit migration, backup/restore plan, validation evidence, and rollback strategy.
+**Data-preservation rule:** A new AIM version must not require users or healthcare organizations to recreate accounts or lose valid business/healthcare records merely because the application version changed. Any intentionally incompatible data transition requires an explicit migration, backup/restore plan, validation evidence, and rollback strategy.
 
 **Release-safety rule:** No update goes directly from a developer change to all production users. Production releases require applicable tests, security checks, migration/drift safety, staged rollout or equivalent bounded exposure, monitoring, rollback readiness, and release approval.
 

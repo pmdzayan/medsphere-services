@@ -1,7 +1,7 @@
 # V1 Performance & Reliability Certification
 
 This document describes the automated certification that proves the
-accepted MedSphere V1 runtime chain (Frontend BFF -> auth-service ->
+accepted AIM V1 runtime chain (Frontend BFF -> auth-service ->
 PostgreSQL -> Redis) stays stable under controlled, genuinely concurrent
 synthetic traffic. It is launch-hardening evidence, not a feature, and not
 a promise about production capacity -- see "What this does NOT prove"

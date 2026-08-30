@@ -1,6 +1,8 @@
 'use client';
 
+import { BRAND } from '@medsphere/brand';
 import Link from 'next/link';
+import { AimSpine } from '@/components/brand/aim-spine';
 import { LanguageSelector } from '@/components/language-selector';
 import { useLanguage } from '@/components/language-provider';
 import { RegistrationForm } from './registration-form';
@@ -23,11 +25,11 @@ export function RegisterPageContent() {
           <Link
             href="/"
             className="relative inline-flex items-center gap-3 font-[var(--font-display)] font-bold"
+            aria-label={BRAND.accessibleName}
           >
-            <span className="grid size-10 place-items-center rounded-[.9rem] border border-emerald-300/25 bg-emerald-300/10 text-sm text-emerald-300 shadow-inner">
-              M
+            <span className="grid min-h-12 min-w-20 place-items-center rounded-[.9rem] border border-emerald-300/25 bg-emerald-300/10 px-3 py-2 text-emerald-300 shadow-inner">
+              <AimSpine expanded tone="dark" size="sm" decorative />
             </span>
-            <span>MedSphere</span>
           </Link>
 
           <div className="relative max-w-xl">
@@ -74,11 +76,11 @@ export function RegisterPageContent() {
           <Link
             href="/"
             className="absolute left-6 top-6 inline-flex items-center gap-3 font-[var(--font-display)] font-bold lg:hidden"
+            aria-label={BRAND.accessibleName}
           >
-            <span className="grid size-10 place-items-center rounded-[.9rem] bg-[#0b2f28] text-sm text-emerald-300 shadow-inner">
-              M
+            <span className="grid min-h-12 min-w-20 place-items-center rounded-[.9rem] bg-[#0b2f28] px-3 py-2 text-emerald-300 shadow-inner">
+              <AimSpine expanded tone="dark" size="sm" decorative />
             </span>
-            <span>MedSphere</span>
           </Link>
 
           <div className="w-full max-w-[36rem] pt-20 lg:pt-0">

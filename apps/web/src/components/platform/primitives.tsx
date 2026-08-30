@@ -4,14 +4,14 @@ import type { InputHTMLAttributes, ReactNode } from 'react';
 import { useLanguage } from '@/components/language-provider';
 
 /**
- * Shared MedSphere visual primitives (Task 1 — design-system foundation).
+ * Shared application visual primitives (Task 1 — design-system foundation).
  *
  * These consolidate patterns that were previously duplicated per-screen
  * (the login form's local `Field`, the registration form's own input
  * styling, one-off card/badge markup across dashboard and settings
  * screens) into a single, small set of building blocks. This is
  * deliberately not a general-purpose UI framework: every primitive here
- * exists because at least two current MedSphere screens needed it.
+ * exists because at least two current application screens needed it.
  */
 
 // ---------------------------------------------------------------------------

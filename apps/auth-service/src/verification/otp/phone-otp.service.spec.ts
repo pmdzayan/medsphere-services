@@ -161,6 +161,7 @@ describe('PhoneOtpService.requestOtp', () => {
     expect(deliver).toHaveBeenCalledTimes(1);
     const [[deliverArgs]] = deliver.mock.calls;
     expect(deliverArgs.to).toBe('+15551234567');
+    expect(deliverArgs.body).toMatch(/^Your AIM verification code is \d{6}\./);
     expect(deliverArgs.body).not.toMatch(/undefined/);
     expect(getChallenge()!.codeHash).toMatch(/^[a-f0-9]{64}$/);
     expect(

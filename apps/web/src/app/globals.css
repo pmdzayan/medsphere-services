@@ -96,6 +96,37 @@ input {
   animation: soft-float 7s ease-in-out infinite;
 }
 
+.brand-startup {
+  pointer-events: none;
+  animation: aim-startup-reveal 720ms ease-out forwards;
+}
+
+.brand-startup .aim-spine {
+  animation: aim-spine-expand 520ms ease-out both;
+}
+
+@keyframes aim-startup-reveal {
+  0%,
+  48% {
+    opacity: 1;
+  }
+  100% {
+    visibility: hidden;
+    opacity: 0;
+  }
+}
+
+@keyframes aim-spine-expand {
+  from {
+    transform: scale(0.94);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
 @keyframes soft-float {
   0%,
   100% {
@@ -113,6 +144,12 @@ input {
 
   .soft-float {
     animation: none;
+  }
+
+  .brand-startup,
+  .brand-startup .aim-spine {
+    animation-duration: 1ms;
+    animation-iteration-count: 1;
   }
 }
 

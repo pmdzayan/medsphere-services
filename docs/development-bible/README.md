@@ -1,4 +1,4 @@
-# MedSphere Development Bible
+# AIM — All In Medico Development Bible
 
 **Version:** 1.0
 
@@ -28,7 +28,7 @@ The Development Bible is the long-term engineering source of truth. It describes
 
 ## Volume 01 — Vision and Business
 
-MedSphere's vision is one trustworthy healthcare ecosystem that improves access, medicine visibility, operational coordination, and patient control without weakening privacy or clinical responsibility.
+AIM's vision is one trustworthy healthcare ecosystem that improves access, medicine visibility, operational coordination, and patient control without weakening privacy or clinical responsibility.
 
 Primary Version 1 users are patients, pharmacy teams, suppliers, hospitals, doctors, laboratories, organization administrators, and platform administrators. Commercial and revenue models remain product decisions and must not be embedded in technical architecture before validation.
 

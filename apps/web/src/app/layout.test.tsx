@@ -2,7 +2,8 @@
 
 import { describe, expect, it, vi } from 'vitest';
 import { cookies } from 'next/headers';
-import RootLayout from './layout';
+import RootLayout, { generateMetadata } from './layout';
+import { BRAND } from '@medsphere/brand';
 import { LOCALE_COOKIE } from '@/lib/i18n';
 import {
   PROFILE_COOKIE,
@@ -31,6 +32,21 @@ const profile: SessionProfile = {
 };
 
 describe('RootLayout server locale', () => {
+  it('publishes the approved application and Open Graph identity', async () => {
+    vi.mocked(cookies).mockResolvedValue({ get: () => undefined } as never);
+    const metadata = await generateMetadata();
+    expect(metadata.applicationName).toBe(BRAND.fullName);
+    expect(metadata.title).toEqual({
+      default: BRAND.applicationTitle,
+      template: `%s | ${BRAND.shortName}`,
+    });
+    expect(metadata.manifest).toBe('/manifest.webmanifest');
+    expect(metadata.openGraph).toEqual(
+      expect.objectContaining({ siteName: BRAND.fullName, title: BRAND.applicationTitle }),
+    );
+    expect(metadata.appleWebApp).toEqual(expect.objectContaining({ title: BRAND.shortName }));
+  });
+
   it('server-renders the signed-out reopening locale from the bounded locale cookie', async () => {
     vi.mocked(cookies).mockResolvedValue({
       get(name: string) {

@@ -1,6 +1,8 @@
 'use client';
 
+import { BRAND } from '@medsphere/brand';
 import Link from 'next/link';
+import { AimSpine } from '@/components/brand/aim-spine';
 import { LanguageSelector } from '@/components/language-selector';
 import { useLanguage } from '@/components/language-provider';
 import { LoginForm } from './login-form';
@@ -23,11 +25,11 @@ export function LoginPageContent() {
           <Link
             href="/"
             className="absolute left-6 top-6 inline-flex items-center gap-3 font-[var(--font-display)] font-bold sm:left-10 sm:top-9"
+            aria-label={BRAND.accessibleName}
           >
-            <span className="grid size-10 place-items-center rounded-[.9rem] bg-[#0b2f28] text-sm text-emerald-300 shadow-inner">
-              M
+            <span className="grid min-h-12 min-w-20 place-items-center rounded-[.9rem] bg-[#0b2f28] px-3 py-2 text-emerald-300 shadow-inner">
+              <AimSpine expanded tone="dark" size="sm" decorative />
             </span>
-            <span>MedSphere</span>
           </Link>
           <div className="absolute right-6 top-6 sm:right-10 sm:top-9">
             <LanguageSelector />

@@ -91,6 +91,9 @@ importers:
 
   apps/auth-service:
     dependencies:
+      '@medsphere/brand':
+        specifier: workspace:*
+        version: link:../../packages/brand
       '@medsphere/common':
         specifier: workspace:*
         version: link:../../packages/common
@@ -346,6 +349,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@medsphere/brand':
+        specifier: workspace:*
+        version: link:../../packages/brand
       next:
         specifier: 15.5.21
         version: 15.5.21(@playwright/test@1.62.1)(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
@@ -395,6 +401,12 @@ importers:
       vitest:
         specifier: 3.2.4
         version: 3.2.4(@types/node@20.19.43)(jiti@2.6.1)(jsdom@26.1.0)(terser@5.49.0)(yaml@2.9.0)
+
+  packages/brand:
+    devDependencies:
+      typescript:
+        specifier: ^5.3.3
+        version: 5.9.3
 
   packages/common:
     dependencies:

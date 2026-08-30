@@ -28,7 +28,7 @@ function normalizeGeneratedRequestId(value: string): string {
   const normalized = normalizeRequestId(value);
 
   if (!normalized) {
-    throw new Error('Generated request ID must satisfy the MedSphere request ID contract');
+    throw new Error('Generated request ID must satisfy the application request ID contract');
   }
 
   return normalized;

@@ -8,6 +8,9 @@
 
     "baseUrl": ".",
     "paths": {
+      "@medsphere/brand": ["packages/brand/src"],
+      "@medsphere/brand/*": ["packages/brand/src/*"],
+
       "@medsphere/common": ["packages/common/src"],
       "@medsphere/common/*": ["packages/common/src/*"],
 

@@ -18,8 +18,8 @@ describe('G3.26 ReservationNotificationComposerService', () => {
       templateKey: 'reservation-ready',
       templateVersion: 1,
       locale: 'en',
-      subject: 'Your reservation is ready',
-      body: 'Your reserved item is ready for collection.',
+      subject: 'AIM: Your reservation is ready',
+      body: 'Your All In Medico reservation is ready for collection.',
       metadata: {
         workflowKey: 'reservation-ready-membership-v1',
         contentClass: 'OPERATIONAL',
@@ -30,13 +30,13 @@ describe('G3.26 ReservationNotificationComposerService', () => {
   it('keeps the composition snapshot deterministic', () => {
     expect(service.compose(input)).toMatchInlineSnapshot(`
       {
-        "body": "Your reserved item is ready for collection.",
+        "body": "Your All In Medico reservation is ready for collection.",
         "locale": "en",
         "metadata": {
           "contentClass": "OPERATIONAL",
           "workflowKey": "reservation-ready-membership-v1",
         },
-        "subject": "Your reservation is ready",
+        "subject": "AIM: Your reservation is ready",
         "templateKey": "reservation-ready",
         "templateVersion": 1,
       }

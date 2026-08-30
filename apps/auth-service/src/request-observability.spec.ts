@@ -26,7 +26,7 @@ describe('request observability', () => {
 
   it('rejects an invalid generated request ID', () => {
     expect(() => resolveRequestId(undefined, () => 'invalid generated id')).toThrow(
-      'Generated request ID must satisfy the MedSphere request ID contract',
+      'Generated request ID must satisfy the application request ID contract',
     );
   });
 
