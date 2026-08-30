@@ -2,6 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { LanguageProvider } from '@/components/language-provider';
 import { ApiError, identifyLogin, selectOrganizationLogin } from '@/lib/api-client';
+import type { AuthenticatedSession } from '@/lib/auth-contract';
 import { LoginForm } from './login-form';
 
 const replace = vi.fn();
@@ -15,9 +16,15 @@ vi.mock('@/lib/api-client', async () => {
   return { ...actual, identifyLogin: vi.fn(), selectOrganizationLogin: vi.fn() };
 });
 
-const singleMembershipSession = {
+const singleMembershipSession: AuthenticatedSession = {
   expiresIn: 3600,
-  user: { id: 'user-1', email: 'operator@example.com', firstName: 'Mira', lastName: 'Patel' },
+  user: {
+    id: 'user-1',
+    email: 'operator@example.com',
+    firstName: 'Mira',
+    lastName: 'Patel',
+    preferredLanguage: 'en',
+  },
   context: {
     membershipId: '93b31836-6a84-4db9-a935-1c55960c25da',
     tenantId: 'tenant-1',
@@ -144,11 +151,52 @@ describe('LoginForm interactions', () => {
     fireEvent.click(submit);
     expect(identifyLogin).toHaveBeenCalledTimes(1);
 
-    pendingLogin.reject(new ApiError('Invalid credentials', 401));
+    pendingLogin.reject(new ApiError('unbounded backend English must not be reflected', 401));
 
-    expect(await screen.findByText('Invalid credentials')).toBeVisible();
+    expect(await screen.findByText('Sign-in failed.')).toBeVisible();
+    expect(
+      screen.queryByText('unbounded backend English must not be reflected'),
+    ).not.toBeInTheDocument();
     expect(submit).not.toBeDisabled();
     expect(screen.getByText('Sign in securely')).toBeVisible();
+  });
+
+  it('preserves an RTL locale through organization selection', async () => {
+    vi.mocked(identifyLogin).mockResolvedValue({
+      requiresOrganizationSelection: true,
+      organizations: [
+        {
+          membershipId: 'membership-1',
+          organizationName: 'Central Hospital',
+          organizationType: 'HOSPITAL',
+        },
+      ],
+    });
+    vi.mocked(selectOrganizationLogin).mockResolvedValue({
+      ...singleMembershipSession,
+      user: { ...singleMembershipSession.user, preferredLanguage: 'ur' },
+    });
+
+    const { container } = render(
+      <LanguageProvider initialLocale="ur">
+        <LoginForm />
+      </LanguageProvider>,
+    );
+    fireEvent.change(container.querySelector('input[name="email"]')!, {
+      target: { value: 'operator@example.com' },
+    });
+    fireEvent.change(container.querySelector('input[name="password"]')!, {
+      target: { value: 'a-secure-password' },
+    });
+    fireEvent.submit(container.querySelector('form')!);
+
+    expect(await screen.findByText('Central Hospital')).toBeVisible();
+    expect(document.documentElement.lang).toBe('ur');
+    expect(document.documentElement.dir).toBe('rtl');
+    fireEvent.click(screen.getByText('Central Hospital'));
+    await waitFor(() => expect(replace).toHaveBeenCalledWith('/dashboard'));
+    expect(document.documentElement.lang).toBe('ur');
+    expect(document.documentElement.dir).toBe('rtl');
   });
 });
 

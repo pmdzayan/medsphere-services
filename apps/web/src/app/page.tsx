@@ -1,18 +1,29 @@
+'use client';
+
 import Link from 'next/link';
+import { LanguageSelector } from '@/components/language-selector';
+import { useLanguage } from '@/components/language-provider';
+import type { TranslationKey } from '@/lib/i18n';
 
-const foundations = [
-  ['01', 'Identity', 'Verified membership and tenant-aware sessions.'],
-  ['02', 'Operations', 'A calm command layer for healthcare teams.'],
-  ['03', 'Intelligence', 'Clear signals without clinical noise.'],
-] as const;
-
-const metrics = [
-  ['Tenant context', 'Verified'],
-  ['Access posture', 'Deny by default'],
-  ['Audit boundary', 'Attributable'],
-] as const;
+type Translator = (key: TranslationKey) => string;
 
 export default function HomePage() {
+  const { t } = useLanguage();
+  const foundations = [
+    ['01', t('landing.foundationIdentityTitle'), t('landing.foundationIdentityDescription')],
+    ['02', t('landing.foundationOperationsTitle'), t('landing.foundationOperationsDescription')],
+    [
+      '03',
+      t('landing.foundationIntelligenceTitle'),
+      t('landing.foundationIntelligenceDescription'),
+    ],
+  ] as const;
+  const metrics = [
+    [t('landing.metricTenantContext'), t('landing.metricVerified')],
+    [t('landing.metricAccessPosture'), t('landing.metricDenyByDefault')],
+    [t('landing.metricAuditBoundary'), t('landing.metricAttributable')],
+  ] as const;
+
   return (
     <main className="min-h-screen overflow-hidden bg-[#f7f6f0]">
       <div className="mx-auto max-w-[1500px] px-4 py-4 sm:px-6 sm:py-6">
@@ -22,25 +33,26 @@ export default function HomePage() {
 
           <nav
             className="relative z-10 mx-auto flex max-w-7xl items-center justify-between px-5 py-5 sm:px-9 sm:py-7"
-            aria-label="Primary"
+            aria-label={t('landing.primaryNavigation')}
           >
             <BrandMark />
             <div className="flex items-center gap-3">
-              <span className="hidden items-center gap-2 text-xs font-medium text-white/55 sm:flex">
+              <LanguageSelector />
+              <span className="hidden items-center gap-2 text-xs font-medium text-white/55 lg:flex">
                 <span className="size-1.5 rounded-full bg-emerald-400 shadow-[0_0_12px_#34d399]" />
-                Foundation online
+                {t('landing.foundationOnline')}
               </span>
               <Link
                 href="/register"
                 className="hidden rounded-full px-3 py-2 text-xs font-semibold text-white/60 transition hover:text-emerald-200 sm:inline-flex"
               >
-                Request access
+                {t('landing.requestAccess')}
               </Link>
               <Link
                 href="/login"
                 className="rounded-full border border-white/15 bg-white/[.07] px-5 py-2.5 text-sm font-semibold text-white backdrop-blur-xl transition hover:border-emerald-300/50 hover:bg-white/[.12]"
               >
-                Sign in <span aria-hidden="true">↗</span>
+                {t('landing.signIn')} <span aria-hidden="true">↗</span>
               </Link>
             </div>
           </nav>
@@ -48,22 +60,21 @@ export default function HomePage() {
           <div className="relative z-10 mx-auto grid max-w-7xl items-center gap-14 px-5 pb-16 pt-14 sm:px-9 sm:pb-24 sm:pt-20 lg:grid-cols-[1.02fr_.98fr] lg:gap-20 lg:pb-28">
             <div>
               <div className="mb-7 inline-flex items-center gap-3 rounded-full border border-[#d7b56d]/25 bg-[#d7b56d]/[.07] px-4 py-2 text-[11px] font-bold uppercase tracking-[.22em] text-[#e8cc91]">
-                <span className="h-px w-5 bg-[#d7b56d]" /> Healthcare operating system
+                <span className="h-px w-5 bg-[#d7b56d]" /> {t('landing.systemLabel')}
               </div>
               <h1 className="max-w-4xl font-[var(--font-display)] text-[3.45rem] font-semibold leading-[.96] tracking-[-.065em] sm:text-7xl lg:text-[5.4rem]">
-                Healthcare,
-                <span className="block text-emerald-300">beautifully connected.</span>
+                {t('landing.heroPrefix')}
+                <span className="block text-emerald-300">{t('landing.heroAccent')}</span>
               </h1>
               <p className="mt-7 max-w-xl text-base leading-8 text-white/58 sm:text-lg">
-                One secure operating layer that brings identity, coordination, inventory, and care
-                into a clear, trusted workspace.
+                {t('landing.heroDescription')}
               </p>
               <div className="mt-10 flex flex-col gap-3 sm:flex-row sm:items-center">
                 <Link
                   href="/login"
                   className="group inline-flex items-center justify-center gap-3 rounded-full bg-[#f5f2e8] px-6 py-3.5 text-sm font-bold text-[#10201c] transition hover:bg-emerald-300"
                 >
-                  Enter MedSphere
+                  {t('landing.enter')}
                   <span
                     className="transition-transform group-hover:translate-x-1"
                     aria-hidden="true"
@@ -75,16 +86,16 @@ export default function HomePage() {
                   href="/register"
                   className="inline-flex items-center justify-center rounded-full border border-white/15 bg-white/[.05] px-6 py-3.5 text-sm font-bold text-white/75 transition hover:border-emerald-300/40 hover:text-emerald-200"
                 >
-                  Request access
+                  {t('landing.requestAccess')}
                 </Link>
                 <span className="px-3 text-center text-xs leading-5 text-white/38 sm:text-left">
-                  Stabilization environment
-                  <br /> No real patient data
+                  {t('landing.stabilizationEnvironment')}
+                  <br /> {t('landing.noRealPatientData')}
                 </span>
               </div>
             </div>
 
-            <ProductPreview />
+            <ProductPreview t={t} />
           </div>
 
           <div className="relative z-10 border-t border-white/[.08]">
@@ -106,10 +117,10 @@ export default function HomePage() {
           <div className="grid gap-10 lg:grid-cols-[.8fr_1.2fr] lg:gap-20">
             <div>
               <p className="text-xs font-bold uppercase tracking-[.22em] text-emerald-700">
-                Trust architecture
+                {t('landing.trustArchitecture')}
               </p>
               <h2 className="mt-5 max-w-md font-[var(--font-display)] text-4xl font-semibold tracking-[-.045em] text-[#10201c] sm:text-5xl">
-                Premium should feel calm, not crowded.
+                {t('landing.calmTitle')}
               </h2>
             </div>
             <div className="grid gap-px overflow-hidden rounded-[1.75rem] border border-[#10201c]/10 bg-[#10201c]/10 sm:grid-cols-3">
@@ -149,7 +160,7 @@ function BrandMark({ dark = true }: { dark?: boolean }) {
   );
 }
 
-function ProductPreview() {
+function ProductPreview({ t }: { t: Translator }) {
   return (
     <div className="soft-float relative mx-auto w-full max-w-xl">
       <div className="absolute -inset-5 rounded-[2.5rem] bg-emerald-300/[.08] blur-2xl" />
@@ -159,11 +170,11 @@ function ProductPreview() {
             <div className="flex items-center gap-2">
               <span className="size-2 rounded-full bg-emerald-500" />
               <span className="text-[10px] font-bold uppercase tracking-[.16em] text-[#60706b]">
-                Operations overview
+                {t('landing.previewOverview')}
               </span>
             </div>
             <span className="rounded-full bg-white px-3 py-1 text-[9px] font-semibold text-[#60706b] shadow-sm">
-              Live context
+              {t('landing.previewLiveContext')}
             </span>
           </div>
           <div className="grid grid-cols-[4.4rem_1fr] sm:grid-cols-[6.5rem_1fr]">
@@ -180,21 +191,33 @@ function ProductPreview() {
             <div className="p-4 sm:p-6">
               <div className="flex items-start justify-between">
                 <div>
-                  <p className="text-[10px] font-semibold text-[#60706b]">Good morning</p>
+                  <p className="text-[10px] font-semibold text-[#60706b]">
+                    {t('landing.previewGreeting')}
+                  </p>
                   <p className="mt-1 font-[var(--font-display)] text-lg font-bold sm:text-2xl">
-                    Command centre
+                    {t('landing.previewCommandCentre')}
                   </p>
                 </div>
                 <div className="size-8 rounded-full border-4 border-white bg-[#d7b56d] shadow" />
               </div>
               <div className="mt-6 grid grid-cols-2 gap-3">
-                <PreviewCard label="Identity" value="Protected" accent="emerald" />
-                <PreviewCard label="Tenant" value="Verified" accent="cyan" />
+                <PreviewCard
+                  label={t('landing.foundationIdentityTitle')}
+                  value={t('landing.previewProtected')}
+                  accent="emerald"
+                />
+                <PreviewCard
+                  label={t('landing.previewTenant')}
+                  value={t('landing.metricVerified')}
+                  accent="cyan"
+                />
               </div>
               <div className="mt-3 rounded-xl border border-[#10201c]/[.07] bg-white p-4 shadow-[0_12px_30px_-22px_rgba(7,17,15,.5)]">
                 <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-bold">System activity</span>
-                  <span className="text-[9px] text-[#60706b]">Today</span>
+                  <span className="text-[10px] font-bold">
+                    {t('landing.previewSystemActivity')}
+                  </span>
+                  <span className="text-[9px] text-[#60706b]">{t('landing.previewToday')}</span>
                 </div>
                 <div className="mt-5 flex h-16 items-end gap-1.5">
                   {[34, 52, 41, 72, 58, 88, 70, 96, 76, 92].map((height, index) => (

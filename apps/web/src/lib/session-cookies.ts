@@ -27,11 +27,29 @@ export function setSessionCookies(
     sameSite: 'strict',
     path: '/',
   });
-  response.cookies.set(PROFILE_COOKIE, sealSessionProfile(profile, credentials.refreshToken), {
+  setSessionProfileCookie(response, profile, credentials.refreshToken);
+}
+
+export function setSessionProfileCookie(
+  response: NextResponse,
+  profile: SessionProfile,
+  integrityKey: string,
+): void {
+  response.cookies.set(PROFILE_COOKIE, sealSessionProfile(profile, integrityKey), {
     httpOnly: true,
-    secure,
+    secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
     path: '/',
+  });
+}
+
+export function clearSessionProfileCookie(response: NextResponse): void {
+  response.cookies.set(PROFILE_COOKIE, '', {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    path: '/',
+    maxAge: 0,
   });
 }
 

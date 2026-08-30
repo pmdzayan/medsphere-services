@@ -20,7 +20,7 @@ function hasDistance(result: SearchResult): result is PublicNearbyMedicineSearch
 }
 
 export function PublicMedicineSearch({ providerId }: { providerId: string }) {
-  const { locale } = useLanguage();
+  const { locale, t } = useLanguage();
   const copy = publicSearchCopy[locale];
 
   const [term, setTerm] = useState('');
@@ -59,7 +59,7 @@ export function PublicMedicineSearch({ providerId }: { providerId: string }) {
     if (!navigator.geolocation) {
       setResults(null);
       setError({
-        message: 'Location services are not available in this browser.',
+        message: t('publicSearch.locationUnavailable'),
       });
       return;
     }
@@ -87,12 +87,10 @@ export function PublicMedicineSearch({ providerId }: { providerId: string }) {
       if (isGeolocationError(thrown)) {
         setError({
           message:
-            thrown.code === 1
-              ? 'Location permission was denied. Allow location access to search nearby pharmacies.'
-              : 'Your location could not be determined. Try again.',
+            thrown.code === 1 ? t('publicSearch.locationDenied') : t('publicSearch.locationFailed'),
         });
       } else {
-        setError(toPublicError(thrown, 'Nearby medicine search is unavailable right now.'));
+        setError(toPublicError(thrown, t('publicSearch.nearbyUnavailable')));
       }
     } finally {
       setLocating(false);
@@ -133,10 +131,10 @@ export function PublicMedicineSearch({ providerId }: { providerId: string }) {
             type="button"
             onClick={handleNearbySearch}
             loading={locating}
-            loadingLabel="Finding nearby pharmacies..."
+            loadingLabel={t('publicSearch.findingNearby')}
             disabled={!term.trim() || loading}
           >
-            Find near me
+            {t('publicSearch.findNearMe')}
           </Button>
         </div>
       </form>
@@ -181,7 +179,9 @@ export function PublicMedicineSearch({ providerId }: { providerId: string }) {
 
                       {hasDistance(result) ? (
                         <p className="mt-1 text-xs font-semibold text-[#536a62]">
-                          {formatDistance(result.distanceKm)} away
+                          {t('publicSearch.distanceAway', {
+                            distance: formatDistance(result.distanceKm, locale),
+                          })}
                         </p>
                       ) : null}
                     </div>
@@ -229,12 +229,22 @@ function isGeolocationError(error: unknown): error is GeolocationPositionError {
   );
 }
 
-function formatDistance(distanceKm: number): string {
+function formatDistance(distanceKm: number, locale: string): string {
   if (distanceKm < 1) {
-    return `${Math.round(distanceKm * 1000)} m`;
+    return new Intl.NumberFormat(locale, {
+      style: 'unit',
+      unit: 'meter',
+      unitDisplay: 'short',
+      maximumFractionDigits: 0,
+    }).format(distanceKm * 1000);
   }
 
-  return `${distanceKm.toFixed(1)} km`;
+  return new Intl.NumberFormat(locale, {
+    style: 'unit',
+    unit: 'kilometer',
+    unitDisplay: 'short',
+    maximumFractionDigits: 1,
+  }).format(distanceKm);
 }
 
 function titleCase(value: string): string {
@@ -244,7 +254,7 @@ function titleCase(value: string): string {
 function toPublicError(error: unknown, fallback: string): PublicError {
   if (error instanceof ApiError) {
     return {
-      message: error.message,
+      message: fallback,
       status: error.status,
     };
   }

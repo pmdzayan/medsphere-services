@@ -3,6 +3,7 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { MetricCard, SectionCard, StatusBadge } from '@/components/platform/dashboard-primitives';
 import { Icon } from '@/components/platform/icon';
+import { useLanguage } from '@/components/language-provider';
 import {
   ApiError,
   createProviderReservation,
@@ -25,6 +26,7 @@ import {
   type ReservationTransition,
   type ReservationTransitionResponse,
 } from '@/lib/reservation-contract';
+import type { TranslationKey, TranslationValues } from '@/lib/i18n';
 
 const PAGE_SIZE = 25;
 const statusTone: Record<ReservationStatus, 'emerald' | 'amber' | 'rose' | 'cyan' | 'slate'> = {
@@ -51,6 +53,7 @@ interface CreationDraft {
 }
 
 export function ReservationWorkspace() {
+  const { locale, t } = useLanguage();
   const [providers, setProviders] = useState<ProviderAccess[]>([]);
   const [providerId, setProviderId] = useState('');
   const [status, setStatus] = useState<'' | ReservationStatus>('');
@@ -102,11 +105,11 @@ export function ReservationWorkspace() {
     } catch (loadError) {
       setProviders([]);
       setProviderId('');
-      setError(publicError(loadError, 'Unable to load assigned providers.'));
+      setError(publicError(loadError, t('inventory.error.providers')));
     } finally {
       setProvidersLoading(false);
     }
-  }, []);
+  }, [t]);
 
   const loadReservations = useCallback(
     async (selectedProvider: string, selectedStatus: '' | ReservationStatus, start: number) => {
@@ -125,12 +128,12 @@ export function ReservationWorkspace() {
         );
       } catch (loadError) {
         setPage(null);
-        setError(publicError(loadError, 'Unable to load provider reservations.'));
+        setError(publicError(loadError, t('reservations.error.load')));
       } finally {
         setLoading(false);
       }
     },
-    [],
+    [t],
   );
 
   useEffect(() => void loadProviders(), [loadProviders]);
@@ -168,7 +171,7 @@ export function ReservationWorkspace() {
         idempotencyKey: `reservation-create-${crypto.randomUUID()}`,
       });
     } catch (loadError) {
-      setCreationError(publicError(loadError, 'Unable to load eligible stock.').message);
+      setCreationError(publicError(loadError, t('reservations.error.stock')).message);
     } finally {
       setCreationLoading(false);
     }
@@ -183,7 +186,7 @@ export function ReservationWorkspace() {
     const quantity = Number(creationDraft.quantity);
     const expiry = new Date(creationDraft.expiresAt);
     if (!isCanonicalUuid(creationDraft.subjectUserId.trim())) {
-      setCreationError('Enter a valid active tenant user identifier.');
+      setCreationError(t('reservations.error.userId'));
       return;
     }
     if (
@@ -192,11 +195,11 @@ export function ReservationWorkspace() {
       quantity < 1 ||
       quantity > selectedStock.totalAvailableQuantity
     ) {
-      setCreationError('Quantity must fit the currently visible available stock.');
+      setCreationError(t('reservations.error.quantity'));
       return;
     }
     if (Number.isNaN(expiry.getTime()) || expiry.getTime() <= Date.now()) {
-      setCreationError('Choose a reservation expiry in the future.');
+      setCreationError(t('reservations.error.expiry'));
       return;
     }
     setCreationSubmitting(true);
@@ -212,7 +215,7 @@ export function ReservationWorkspace() {
       setCreationDraft(null);
       await loadReservations(providerId, status, offset);
     } catch (mutationError) {
-      setCreationError(publicError(mutationError, 'Unable to create reservation.').message);
+      setCreationError(publicError(mutationError, t('reservations.error.create')).message);
     } finally {
       setCreationSubmitting(false);
     }
@@ -237,7 +240,7 @@ export function ReservationWorkspace() {
       setTransitionTarget(null);
       await loadReservations(providerId, status, offset);
     } catch (mutationError) {
-      setTransitionError(publicError(mutationError, 'Unable to transition reservation.').message);
+      setTransitionError(publicError(mutationError, t('reservations.error.transition')).message);
     } finally {
       setTransitionSubmitting(false);
     }
@@ -246,9 +249,9 @@ export function ReservationWorkspace() {
   if (!providersLoading && error?.status === 403 && providers.length === 0) {
     return (
       <WorkspaceState
-        title="Reservation access is not assigned"
-        detail="Your membership needs provider-access and inventory.reservations.read permissions."
-        action="Retry access check"
+        title={t('reservations.accessTitle')}
+        detail={t('reservations.accessDetail')}
+        action={t('inventory.expiry.retryAccess')}
         onAction={() => void loadProviders()}
       />
     );
@@ -259,14 +262,13 @@ export function ReservationWorkspace() {
       <header className="flex flex-col justify-between gap-5 lg:flex-row lg:items-end">
         <div>
           <p className="text-xs font-extrabold uppercase tracking-[.18em] text-emerald-700">
-            Live assigned-provider reservations
+            {t('reservations.eyebrow')}
           </p>
           <h1 className="mt-3 font-[var(--font-display)] text-3xl font-bold tracking-[-.045em] text-[#10271f] sm:text-[2.45rem]">
-            Reservation workspace
+            {t('reservations.title')}
           </h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-[#71817c]">
-            Operational records and bounded staff actions. This view contains no patient,
-            prescription, payment, or delivery identity.
+            {t('reservations.description')}
           </p>
         </div>
         <div className="flex flex-wrap gap-3">
@@ -276,7 +278,7 @@ export function ReservationWorkspace() {
             disabled={!providerId || creationLoading}
             className="inline-flex w-fit items-center gap-2 rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50"
           >
-            {creationLoading ? 'Loading stock…' : 'New reservation'}
+            {creationLoading ? t('reservations.loadingStock') : t('reservations.new')}
           </button>
           <button
             type="button"
@@ -284,39 +286,39 @@ export function ReservationWorkspace() {
             disabled={!providerId || loading}
             className="inline-flex w-fit items-center gap-2 rounded-xl border border-[#d8e2de] bg-white px-4 py-2.5 text-sm font-bold text-[#436158] disabled:opacity-50"
           >
-            <Icon name="refresh" className={`size-4 ${loading ? 'animate-spin' : ''}`} /> Refresh
-            reservations
+            <Icon name="refresh" className={`size-4 ${loading ? 'animate-spin' : ''}`} />{' '}
+            {t('reservations.refresh')}
           </button>
         </div>
       </header>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard
-          label="Reservations on page"
+          label={t('reservations.metric.total')}
           value={String(metrics.total)}
           icon="reservations"
-          detail="Current loaded page only"
+          detail={t('inventory.metric.detail')}
         />
         <MetricCard
-          label="Pending or confirmed"
+          label={t('reservations.metric.open')}
           value={String(metrics.open)}
           icon="clock"
           accent="cyan"
-          detail="Current loaded page only"
+          detail={t('inventory.metric.detail')}
         />
         <MetricCard
-          label="Ready"
+          label={t('reservations.metric.ready')}
           value={String(metrics.ready)}
           icon="reservations"
           accent="amber"
-          detail="Current loaded page only"
+          detail={t('inventory.metric.detail')}
         />
         <MetricCard
-          label="Medicine units"
+          label={t('reservations.metric.units')}
           value={String(metrics.quantity)}
           icon="inventory"
           accent="rose"
-          detail="Current loaded page only"
+          detail={t('inventory.metric.detail')}
         />
       </div>
 
@@ -324,10 +326,10 @@ export function ReservationWorkspace() {
         <div className="grid gap-3 border-b border-[#edf1ef] bg-[#fbfcfb] p-4 sm:grid-cols-2 sm:p-5 lg:px-6">
           <label>
             <span className="mb-1.5 block text-[10px] font-extrabold uppercase tracking-[.14em] text-[#70827b]">
-              Assigned provider
+              {t('inventory.common.assignedProvider')}
             </span>
             <select
-              aria-label="Assigned provider"
+              aria-label={t('inventory.common.assignedProvider')}
               value={providerId}
               disabled={providersLoading || providers.length === 0}
               onChange={(event) => {
@@ -337,23 +339,26 @@ export function ReservationWorkspace() {
                 setCreationStock([]);
                 setCreationError(null);
               }}
-              className="h-11 w-full rounded-xl border border-[#dce5e1] bg-white px-3 text-sm font-semibold text-[#38544b] disabled:opacity-60"
             >
-              {providers.length === 0 ? <option value="">No assigned provider</option> : null}
+              {providers.length === 0 ? (
+                <option value="">{t('inventory.common.noProvider')}</option>
+              ) : null}
               {providers.map((provider) => (
                 <option key={provider.providerId} value={provider.providerId}>
                   {provider.businessName} ·{' '}
-                  {provider.providerType === 'PHARMACY' ? 'Pharmacy' : 'Hospital'}
+                  {provider.providerType === 'PHARMACY'
+                    ? t('inventory.common.pharmacy')
+                    : t('inventory.common.hospital')}
                 </option>
               ))}
             </select>
           </label>
           <label>
             <span className="mb-1.5 block text-[10px] font-extrabold uppercase tracking-[.14em] text-[#70827b]">
-              Reservation status
+              {t('reservations.statusFilter')}
             </span>
             <select
-              aria-label="Reservation status"
+              aria-label={t('reservations.statusFilter')}
               value={status}
               disabled={!providerId}
               onChange={(event) => {
@@ -362,53 +367,53 @@ export function ReservationWorkspace() {
               }}
               className="h-11 w-full rounded-xl border border-[#dce5e1] bg-white px-3 text-sm font-semibold text-[#38544b] disabled:opacity-60"
             >
-              <option value="">All statuses</option>
+              <option value="">{t('reservations.allStatuses')}</option>
               {RESERVATION_STATUSES.map((value) => (
                 <option key={value} value={value}>
-                  {titleCase(value)}
+                  {reservationStatusLabel(value, t)}
                 </option>
               ))}
             </select>
           </label>
         </div>
 
-        {providersLoading ? <LoadingState label="Checking assigned providers…" /> : null}
+        {providersLoading ? <LoadingState label={t('reservations.checkingProviders')} /> : null}
         {!providersLoading && !error && providers.length === 0 ? (
           <WorkspaceState
-            title="No active provider assignment"
-            detail="Ask a tenant administrator to assign this membership to an active pharmacy or hospital."
-            action="Check again"
+            title={t('reservations.noActiveProvider')}
+            detail={t('reservations.noActiveProviderDetail')}
+            action={t('reservations.checkAgain')}
             onAction={() => void loadProviders()}
           />
         ) : null}
         {!providersLoading && error ? (
           <WorkspaceState
             title={
-              error.status === 404
-                ? 'Reservations are no longer available'
-                : 'Reservations could not be loaded'
+              error.status === 404 ? t('reservations.unavailable') : t('reservations.loadFailure')
             }
             detail={error.message}
-            action="Try again"
+            action={t('inventory.common.tryAgain')}
             onAction={() =>
               providerId ? void loadReservations(providerId, status, offset) : void loadProviders()
             }
           />
         ) : null}
         {!providersLoading && !error && loading && !page ? (
-          <LoadingState label="Loading live reservations…" />
+          <LoadingState label={t('reservations.loading')} />
         ) : null}
         {!providersLoading && !error && !loading && page?.data.length === 0 ? (
           <WorkspaceState
-            title="No reservations matched"
-            detail="No accepted reservation records matched this provider and status."
-            action="Refresh"
+            title={t('reservations.empty')}
+            detail={t('reservations.emptyDetail')}
+            action={t('inventory.common.refresh')}
             onAction={() => providerId && void loadReservations(providerId, status, offset)}
           />
         ) : null}
         {!error && page?.data.length ? (
           <ReservationTable
             reservations={page.data}
+            locale={locale}
+            t={t}
             selectedId={selectedId}
             onSelect={(reservation) =>
               setSelectedId((current) => (current === reservation.id ? null : reservation.id))
@@ -416,13 +421,14 @@ export function ReservationWorkspace() {
           />
         ) : null}
         {!error && page && page.total > 0 ? (
-          <Pagination page={page} loading={loading} onOffset={setOffset} />
+          <Pagination page={page} loading={loading} t={t} onOffset={setOffset} />
         ) : null}
       </SectionCard>
 
       {selected ? (
         <ReservationDetails
           reservation={selected}
+          t={t}
           onClose={() => setSelectedId(null)}
           onTransition={openTransition}
         />
@@ -432,9 +438,11 @@ export function ReservationWorkspace() {
           role="status"
           className="rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm text-emerald-900"
         >
-          Reservation is now {titleCase(transitionReceipt.status)} at version{' '}
-          {transitionReceipt.version}. {transitionReceipt.totalQuantity} unit(s) were processed by
-          the accepted lifecycle command.
+          {t('reservations.transitionReceipt', {
+            status: reservationStatusLabel(transitionReceipt.status, t),
+            version: transitionReceipt.version,
+            quantity: transitionReceipt.totalQuantity,
+          })}
         </div>
       ) : null}
       {creationReceipt ? (
@@ -442,9 +450,10 @@ export function ReservationWorkspace() {
           role="status"
           className="rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm text-emerald-900"
         >
-          Reservation {shortId(creationReceipt.reservationId)} is Pending with{' '}
-          {creationReceipt.totalQuantity} held unit(s). The provider list was refreshed from the
-          authoritative service.
+          {t('reservations.creationReceipt', {
+            reservation: shortId(creationReceipt.reservationId),
+            quantity: creationReceipt.totalQuantity,
+          })}
         </div>
       ) : null}
       {creationError && !creationDraft ? (
@@ -465,25 +474,24 @@ export function ReservationWorkspace() {
             className="w-full max-w-xl rounded-3xl bg-white p-6 shadow-2xl"
           >
             <p className="text-xs font-extrabold uppercase tracking-[.16em] text-emerald-700">
-              Atomic FEFO hold
+              {t('reservations.creation.eyebrow')}
             </p>
             <h2
               id="creation-title"
               className="mt-2 font-[var(--font-display)] text-2xl font-bold text-[#17352a]"
             >
-              Create staff reservation
+              {t('reservations.creation.title')}
             </h2>
             <p className="mt-2 text-sm leading-6 text-[#647870]">
-              Enter only the active tenant user UUID. No name, contact, prescription, clinical,
-              payment, or delivery data is collected here.
+              {t('reservations.creation.description')}
             </p>
             <div className="mt-5 grid gap-4 sm:grid-cols-2">
               <label className="sm:col-span-2">
                 <span className="mb-1.5 block text-xs font-bold text-[#536a62]">
-                  Tenant user ID
+                  {t('reservations.creation.userId')}
                 </span>
                 <input
-                  aria-label="Tenant user ID"
+                  aria-label={t('reservations.creation.userId')}
                   value={creationDraft.subjectUserId}
                   onChange={(event) =>
                     setCreationDraft(
@@ -494,9 +502,11 @@ export function ReservationWorkspace() {
                 />
               </label>
               <label>
-                <span className="mb-1.5 block text-xs font-bold text-[#536a62]">Medicine</span>
+                <span className="mb-1.5 block text-xs font-bold text-[#536a62]">
+                  {t('reservations.creation.medicine')}
+                </span>
                 <select
-                  aria-label="Reservation medicine"
+                  aria-label={t('reservations.creation.medicineAria')}
                   value={creationDraft.productId}
                   onChange={(event) =>
                     setCreationDraft(
@@ -506,18 +516,25 @@ export function ReservationWorkspace() {
                   }
                   className="h-11 w-full rounded-xl border border-[#dce5e1] bg-white px-3 text-sm"
                 >
-                  {creationStock.length === 0 ? <option value="">No eligible stock</option> : null}
+                  {creationStock.length === 0 ? (
+                    <option value="">{t('reservations.creation.noStock')}</option>
+                  ) : null}
                   {creationStock.map((item) => (
                     <option key={item.productId} value={item.productId}>
-                      {item.name} · {item.totalAvailableQuantity} available
+                      {t('reservations.creation.stockOption', {
+                        name: item.name,
+                        quantity: item.totalAvailableQuantity,
+                      })}
                     </option>
                   ))}
                 </select>
               </label>
               <label>
-                <span className="mb-1.5 block text-xs font-bold text-[#536a62]">Quantity</span>
+                <span className="mb-1.5 block text-xs font-bold text-[#536a62]">
+                  {t('reservations.creation.quantity')}
+                </span>
                 <input
-                  aria-label="Reservation quantity"
+                  aria-label={t('reservations.creation.quantityAria')}
                   inputMode="numeric"
                   value={creationDraft.quantity}
                   onChange={(event) =>
@@ -529,9 +546,11 @@ export function ReservationWorkspace() {
                 />
               </label>
               <label className="sm:col-span-2">
-                <span className="mb-1.5 block text-xs font-bold text-[#536a62]">Expires at</span>
+                <span className="mb-1.5 block text-xs font-bold text-[#536a62]">
+                  {t('reservations.creation.expires')}
+                </span>
                 <input
-                  aria-label="Reservation expiry"
+                  aria-label={t('reservations.creation.expiryAria')}
                   type="datetime-local"
                   value={creationDraft.expiresAt}
                   onChange={(event) =>
@@ -552,8 +571,7 @@ export function ReservationWorkspace() {
               </p>
             ) : null}
             <p className="mt-4 text-xs leading-5 text-[#758780]">
-              The backend rechecks assignment, permission, tenant membership, expiry, stock, FEFO
-              order, concurrency, and idempotency before committing any hold.
+              {t('reservations.creation.boundary')}
             </p>
             <div className="mt-6 flex justify-end gap-3">
               <button
@@ -562,14 +580,16 @@ export function ReservationWorkspace() {
                 onClick={() => setCreationDraft(null)}
                 className="rounded-xl border border-[#dce5e1] px-4 py-2.5 text-sm font-bold text-[#536a62] disabled:opacity-50"
               >
-                Cancel
+                {t('reservations.cancel')}
               </button>
               <button
                 type="submit"
                 disabled={creationSubmitting || creationStock.length === 0}
                 className="rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-bold text-white disabled:cursor-wait disabled:opacity-50"
               >
-                {creationSubmitting ? 'Creating…' : 'Confirm reservation'}
+                {creationSubmitting
+                  ? t('reservations.creating')
+                  : t('reservations.confirmCreation')}
               </button>
             </div>
           </form>
@@ -587,18 +607,19 @@ export function ReservationWorkspace() {
             className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl"
           >
             <p className="text-xs font-extrabold uppercase tracking-[.16em] text-emerald-700">
-              Version-safe lifecycle command
+              {t('reservations.transition.eyebrow')}
             </p>
             <h2
               id="transition-title"
               className="mt-2 font-[var(--font-display)] text-2xl font-bold text-[#17352a]"
             >
-              {transitionLabel(transitionTarget.transition)} reservation
+              {t('reservations.transition.title', {
+                action: transitionLabel(transitionTarget.transition, t),
+              })}
             </h2>
             <p className="mt-2 text-sm leading-6 text-[#647870]">
-              {transitionWarning(transitionTarget.transition)} The backend will recheck provider
-              assignment, permission, state, expiry, version, stock, and idempotency before any
-              change is committed.
+              {transitionWarning(transitionTarget.transition, t)}{' '}
+              {t('reservations.transition.boundary')}
             </p>
             {transitionError ? (
               <p
@@ -615,7 +636,7 @@ export function ReservationWorkspace() {
                 onClick={() => setTransitionTarget(null)}
                 className="rounded-xl border border-[#dce5e1] px-4 py-2.5 text-sm font-bold text-[#536a62] disabled:opacity-50"
               >
-                Cancel
+                {t('reservations.cancel')}
               </button>
               <button
                 type="submit"
@@ -623,26 +644,30 @@ export function ReservationWorkspace() {
                 className="rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-bold text-white disabled:cursor-wait disabled:opacity-50"
               >
                 {transitionSubmitting
-                  ? 'Applying…'
-                  : `Confirm ${transitionLabel(transitionTarget.transition).toLowerCase()}`}
+                  ? t('reservations.transition.applying')
+                  : t('reservations.transition.confirm', {
+                      action: transitionLabel(transitionTarget.transition, t),
+                    })}
               </button>
             </div>
           </form>
         </div>
       ) : null}
-      <p className="pb-2 text-center text-[11px] text-[#93a09c]">
-        Live data · Provider assignment and lifecycle permission are rechecked for every command
-      </p>
+      <p className="pb-2 text-center text-[11px] text-[#93a09c]">{t('reservations.footer')}</p>
     </div>
   );
 }
 
 function ReservationTable({
   reservations,
+  locale,
+  t,
   selectedId,
   onSelect,
 }: {
   reservations: ProviderReservation[];
+  locale: string;
+  t: Translator;
   selectedId: string | null;
   onSelect: (reservation: ProviderReservation) => void;
 }) {
@@ -654,13 +679,13 @@ function ReservationTable({
         <table className="w-full min-w-[850px] border-collapse text-left">
           <thead>
             <tr className="border-b border-[#edf1ef] bg-[#fbfcfb] text-[10px] font-extrabold uppercase tracking-[.13em] text-[#8a9994]">
-              <th className="px-6 py-3.5">Reservation</th>
-              <th className="px-4 py-3.5">Status</th>
-              <th className="px-4 py-3.5">Created</th>
-              <th className="px-4 py-3.5">Expires</th>
-              <th className="px-4 py-3.5">Quantity</th>
+              <th className="px-6 py-3.5">{t('reservations.table.reservation')}</th>
+              <th className="px-4 py-3.5">{t('reservations.table.status')}</th>
+              <th className="px-4 py-3.5">{t('reservations.table.created')}</th>
+              <th className="px-4 py-3.5">{t('reservations.table.expires')}</th>
+              <th className="px-4 py-3.5">{t('reservations.table.quantity')}</th>
               <th className="px-6 py-3.5">
-                <span className="sr-only">Details</span>
+                <span className="sr-only">{t('reservations.table.details')}</span>
               </th>
             </tr>
           </thead>
@@ -677,20 +702,22 @@ function ReservationTable({
                     {shortId(reservation.id)}
                   </p>
                   <p className="mt-1 text-[11px] text-[#899792]">
-                    Version {reservation.version} · {reservation.items.length} product
-                    {reservation.items.length === 1 ? '' : 's'}
+                    {t('reservations.table.versionProducts', {
+                      version: reservation.version,
+                      count: reservation.items.length,
+                    })}
                   </p>
                 </td>
                 <td className="px-4 py-4">
                   <StatusBadge tone={statusTone[reservation.status]}>
-                    {titleCase(reservation.status)}
+                    {reservationStatusLabel(reservation.status, t)}
                   </StatusBadge>
                 </td>
                 <td className="px-4 py-4 text-xs text-[#536a62]">
-                  {formatDate(reservation.createdAt)}
+                  {formatDate(reservation.createdAt, locale)}
                 </td>
                 <td className="px-4 py-4 text-xs text-[#536a62]">
-                  {formatDate(reservation.expiresAt)}
+                  {formatDate(reservation.expiresAt, locale)}
                 </td>
                 <td className="px-4 py-4 text-sm font-bold text-[#28453b]">
                   {reservation.totalQuantity}
@@ -699,11 +726,13 @@ function ReservationTable({
                   <button
                     type="button"
                     aria-expanded={selectedId === reservation.id}
-                    aria-label={`View reservation ${shortId(reservation.id)} details`}
+                    aria-label={t('reservations.table.viewAria', {
+                      reservation: shortId(reservation.id),
+                    })}
                     onClick={() => onSelect(reservation)}
                     className="rounded-lg border border-[#dce5e1] px-3 py-2 text-xs font-bold text-emerald-700"
                   >
-                    Details
+                    {t('reservations.table.details')}
                   </button>
                 </td>
               </tr>
@@ -724,26 +753,32 @@ function ReservationTable({
                   {shortId(reservation.id)}
                 </p>
                 <p className="mt-1 text-[11px] text-[#899792]">
-                  {reservation.items.length} product{reservation.items.length === 1 ? '' : 's'} ·{' '}
-                  {reservation.totalQuantity} units
+                  {t('reservations.table.productsUnits', {
+                    count: reservation.items.length,
+                    quantity: reservation.totalQuantity,
+                  })}
                 </p>
               </div>
               <StatusBadge tone={statusTone[reservation.status]}>
-                {titleCase(reservation.status)}
+                {reservationStatusLabel(reservation.status, t)}
               </StatusBadge>
             </div>
             <p className="mt-3 text-xs text-[#536a62]">
-              Created {formatDate(reservation.createdAt)} · Expires{' '}
-              {formatDate(reservation.expiresAt)}
+              {t('reservations.table.timeline', {
+                created: formatDate(reservation.createdAt, locale),
+                expires: formatDate(reservation.expiresAt, locale),
+              })}
             </p>
             <button
               type="button"
               aria-expanded={selectedId === reservation.id}
-              aria-label={`View reservation ${shortId(reservation.id)} details`}
+              aria-label={t('reservations.table.viewAria', {
+                reservation: shortId(reservation.id),
+              })}
               onClick={() => onSelect(reservation)}
               className="mt-3 w-full rounded-lg border border-[#dce5e1] px-3 py-2.5 text-xs font-bold text-emerald-700"
             >
-              View details
+              {t('reservations.table.view')}
             </button>
           </li>
         ))}
@@ -754,10 +789,12 @@ function ReservationTable({
 
 function ReservationDetails({
   reservation,
+  t,
   onClose,
   onTransition,
 }: {
   reservation: ProviderReservation;
+  t: Translator;
   onClose: () => void;
   onTransition: (reservation: ProviderReservation, transition: ReservationTransition) => void;
 }) {
@@ -767,14 +804,14 @@ function ReservationDetails({
       <div className="flex items-start justify-between border-b border-[#edf1ef] px-5 py-5 sm:px-6">
         <div>
           <p className="text-[10px] font-extrabold uppercase tracking-[.18em] text-emerald-700">
-            Read-only reservation details
+            {t('reservations.details.eyebrow')}
           </p>
           <h2 className="mt-1 font-mono text-sm font-bold text-[#173128]">{reservation.id}</h2>
         </div>
         <button
           type="button"
           onClick={onClose}
-          aria-label="Close reservation details"
+          aria-label={t('reservations.details.close')}
           className="rounded-lg p-2 text-[#71817c]"
         >
           <Icon name="close" className="size-4" />
@@ -787,11 +824,11 @@ function ReservationDetails({
               <div>
                 <h3 className="text-sm font-bold text-[#1b372d]">{item.name}</h3>
                 <p className="mt-1 text-xs text-[#758780]">
-                  {item.genericName ?? 'Generic name unavailable'} · {item.brand}
+                  {item.genericName ?? t('reservations.details.genericUnavailable')} · {item.brand}
                 </p>
               </div>
               <p className="text-sm font-bold text-[#28453b]">
-                {item.quantity} unit{item.quantity === 1 ? '' : 's'}
+                {t('reservations.details.units', { quantity: item.quantity })}
               </p>
             </div>
             <div className="mt-3 flex flex-wrap gap-2">
@@ -800,7 +837,8 @@ function ReservationDetails({
                   key={allocation.batchId}
                   className="rounded-lg bg-[#f0f5f3] px-3 py-2 font-mono text-[11px] text-[#536a62]"
                 >
-                  {allocation.batchNumber} · {allocation.quantity} · {titleCase(allocation.status)}
+                  {allocation.batchNumber} · {allocation.quantity} ·{' '}
+                  {allocationStatusLabel(allocation.status, t)}
                 </span>
               ))}
             </div>
@@ -816,7 +854,7 @@ function ReservationDetails({
               onClick={() => onTransition(reservation, transition)}
               className="rounded-xl border border-emerald-200 px-4 py-2.5 text-sm font-bold text-emerald-700"
             >
-              {transitionLabel(transition)}
+              {transitionLabel(transition, t)}
             </button>
           ))}
         </div>
@@ -828,17 +866,22 @@ function ReservationDetails({
 function Pagination({
   page,
   loading,
+  t,
   onOffset,
 }: {
   page: ProviderReservationPage;
   loading: boolean;
+  t: Translator;
   onOffset: (offset: number) => void;
 }) {
   return (
     <div className="flex items-center justify-between gap-3 border-t border-[#edf1ef] px-5 py-4 text-xs text-[#70827b] sm:px-6">
       <p>
-        {page.offset + 1}–{Math.min(page.offset + page.data.length, page.total)} of {page.total}{' '}
-        reservations
+        {t('reservations.range', {
+          start: page.offset + 1,
+          end: Math.min(page.offset + page.data.length, page.total),
+          total: page.total,
+        })}
       </p>
       <div className="flex gap-2">
         <button
@@ -847,7 +890,7 @@ function Pagination({
           onClick={() => onOffset(Math.max(0, page.offset - PAGE_SIZE))}
           className="rounded-lg border border-[#dce5e1] px-3 py-2 font-bold disabled:opacity-40"
         >
-          Previous
+          {t('inventory.common.previous')}
         </button>
         <button
           type="button"
@@ -855,7 +898,7 @@ function Pagination({
           onClick={() => onOffset(page.offset + PAGE_SIZE)}
           className="rounded-lg border border-[#dce5e1] px-3 py-2 font-bold disabled:opacity-40"
         >
-          Next
+          {t('inventory.common.next')}
         </button>
       </div>
     </div>
@@ -920,18 +963,15 @@ function reservationMetrics(items: ProviderReservation[]) {
 }
 function publicError(error: unknown, fallback: string) {
   return {
-    message: error instanceof Error ? error.message : fallback,
+    message: fallback,
     status: error instanceof ApiError ? error.status : undefined,
   };
 }
 function shortId(value: string) {
   return `${value.slice(0, 8)}…${value.slice(-4)}`;
 }
-function titleCase(value: string) {
-  return value.charAt(0) + value.slice(1).toLowerCase();
-}
-function formatDate(value: string) {
-  return new Intl.DateTimeFormat('en-IN', {
+function formatDate(value: string, locale: string) {
+  return new Intl.DateTimeFormat(locale, {
     dateStyle: 'medium',
     timeStyle: 'short',
     timeZone: 'UTC',
@@ -952,16 +992,33 @@ function transitionsFor(status: ReservationStatus): ReservationTransition[] {
   return [];
 }
 
-function transitionLabel(transition: ReservationTransition): string {
-  return transition === 'READY' ? 'Mark ready' : titleCase(transition);
+type Translator = (key: TranslationKey, values?: TranslationValues) => string;
+
+function reservationStatusLabel(status: ReservationStatus, t: Translator): string {
+  return t(`reservations.status.${status.toLowerCase()}` as TranslationKey);
 }
 
-function transitionWarning(transition: ReservationTransition): string {
-  if (transition === 'COMPLETE') {
-    return 'Completion permanently consumes the held stock and cannot be reversed in V1.';
-  }
-  if (transition === 'CANCEL') {
-    return 'Cancellation releases every held allocation and cannot be reversed in V1.';
-  }
-  return `This moves the reservation to ${transition === 'CONFIRM' ? 'Confirmed' : 'Ready'}.`;
+function allocationStatusLabel(status: string, t: Translator): string {
+  const key = `reservations.status.${status.toLowerCase()}` as TranslationKey;
+  return status === 'HELD' || status === 'CONSUMED' || status === 'RELEASED' ? t(key) : status;
+}
+
+function transitionLabel(transition: ReservationTransition, t: Translator): string {
+  const keyByTransition: Record<ReservationTransition, TranslationKey> = {
+    CONFIRM: 'reservations.transition.confirmAction',
+    CANCEL: 'reservations.transition.cancelAction',
+    READY: 'reservations.transition.readyAction',
+    COMPLETE: 'reservations.transition.completeAction',
+  };
+  return t(keyByTransition[transition]);
+}
+
+function transitionWarning(transition: ReservationTransition, t: Translator): string {
+  const keyByTransition: Record<ReservationTransition, TranslationKey> = {
+    COMPLETE: 'reservations.transition.completeWarning',
+    CANCEL: 'reservations.transition.cancelWarning',
+    CONFIRM: 'reservations.transition.confirmWarning',
+    READY: 'reservations.transition.readyWarning',
+  };
+  return t(keyByTransition[transition]);
 }

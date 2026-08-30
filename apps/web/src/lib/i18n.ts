@@ -1,3 +1,41 @@
+import {
+  landingEnglishMessages,
+  landingTamilMessages,
+  landingUrduMessages,
+} from './i18n-catalogs/landing';
+import {
+  commonAuthEnglishMessages,
+  commonAuthTamilMessages,
+  commonAuthUrduMessages,
+} from './i18n-catalogs/common-auth';
+import {
+  publicSearchEnglishMessages,
+  publicSearchTamilMessages,
+  publicSearchUrduMessages,
+} from './i18n-catalogs/public-search';
+import {
+  dashboardEnglishMessages,
+  dashboardTamilMessages,
+  dashboardUrduMessages,
+} from './i18n-catalogs/dashboard';
+import {
+  settingsEnglishMessages,
+  settingsTamilMessages,
+  settingsUrduMessages,
+} from './i18n-catalogs/settings';
+import {
+  inventoryEnglishMessages,
+  inventoryTamilMessages,
+  inventoryUrduMessages,
+} from './i18n-catalogs/inventory';
+import {
+  reservationsEnglishMessages,
+  reservationsTamilMessages,
+  reservationsUrduMessages,
+} from './i18n-catalogs/reservations';
+import { auditEnglishMessages, auditTamilMessages, auditUrduMessages } from './i18n-catalogs/audit';
+import { teamEnglishMessages, teamTamilMessages, teamUrduMessages } from './i18n-catalogs/team';
+
 export const localeOptions = [
   { code: 'en', label: 'English', dir: 'ltr' },
   { code: 'as', label: 'অসমীয়া', dir: 'ltr' },
@@ -27,9 +65,36 @@ export const localeOptions = [
 export const supportedLocales = localeOptions.map((option) => option.code);
 export type Locale = (typeof localeOptions)[number]['code'];
 export type LocaleDirection = (typeof localeOptions)[number]['dir'];
+export const LOCALE_COOKIE = 'medsphere_locale';
 
 const englishMessages = {
+  ...commonAuthEnglishMessages,
+  ...dashboardEnglishMessages,
+  ...landingEnglishMessages,
+  ...publicSearchEnglishMessages,
+  ...settingsEnglishMessages,
+  ...inventoryEnglishMessages,
+  ...reservationsEnglishMessages,
+  ...auditEnglishMessages,
+  ...teamEnglishMessages,
   'language.label': 'Language',
+  'meta.description': 'One connected healthcare operating system.',
+  'meta.login.title': 'Sign in',
+  'meta.register.title': 'Request access',
+  'meta.search.title': 'Medicine availability search',
+  'meta.dashboard.title': 'Operations overview',
+  'meta.inventory.title': 'Inventory',
+  'meta.inventory.description': 'Medicine inventory operations workspace.',
+  'meta.expiry.title': 'Expiry worklist',
+  'meta.expiry.description': 'Assigned-provider physical batch expiry worklist.',
+  'meta.reservations.title': 'Reservations',
+  'meta.reservations.description':
+    'Assigned-provider medicine reservation reads and bounded staff actions.',
+  'meta.audit.title': 'Audit trail',
+  'meta.audit.description': 'Tenant-scoped security and operations evidence.',
+  'meta.team.title': 'Team & access',
+  'meta.settings.title': 'Settings',
+  'meta.settings.description': 'Personal privacy and language settings.',
   'shell.skipToContent': 'Skip to content',
   'shell.closeNavigation': 'Close navigation',
   'shell.openNavigation': 'Open navigation',
@@ -136,11 +201,38 @@ const englishMessages = {
 } as const;
 
 export type TranslationKey = keyof typeof englishMessages;
+export type TranslationValues = Readonly<Record<string, string | number>>;
 
 type MessageOverrides = Partial<Record<TranslationKey, string>>;
 
 const tamilMessages: MessageOverrides = {
+  ...commonAuthTamilMessages,
+  ...dashboardTamilMessages,
+  ...landingTamilMessages,
+  ...publicSearchTamilMessages,
+  ...settingsTamilMessages,
+  ...inventoryTamilMessages,
+  ...reservationsTamilMessages,
+  ...auditTamilMessages,
+  ...teamTamilMessages,
   'language.label': 'மொழி',
+  'meta.description': 'இணைக்கப்பட்ட ஒரே சுகாதார இயக்க முறைமை.',
+  'meta.login.title': 'உள்நுழைக',
+  'meta.register.title': 'அணுகலைக் கோருங்கள்',
+  'meta.search.title': 'மருந்து கிடைப்புத் தேடல்',
+  'meta.dashboard.title': 'செயல்பாட்டு மேலோட்டம்',
+  'meta.inventory.title': 'சரக்கு',
+  'meta.inventory.description': 'மருந்துச் சரக்கு செயல்பாட்டுப் பணியிடம்.',
+  'meta.expiry.title': 'காலாவதி பணிப்பட்டியல்',
+  'meta.expiry.description': 'ஒதுக்கப்பட்ட வழங்குநரின் பொருள் தொகுதி காலாவதி பணிப்பட்டியல்.',
+  'meta.reservations.title': 'முன்பதிவுகள்',
+  'meta.reservations.description':
+    'ஒதுக்கப்பட்ட வழங்குநரின் மருந்து முன்பதிவு வாசிப்புகளும் வரம்பிட்ட பணியாளர் செயல்களும்.',
+  'meta.audit.title': 'தணிக்கைப் பதிவு',
+  'meta.audit.description': 'நிறுவன வரம்புக்குட்பட்ட பாதுகாப்பு மற்றும் செயல்பாட்டு ஆதாரம்.',
+  'meta.team.title': 'குழு மற்றும் அணுகல்',
+  'meta.settings.title': 'அமைப்புகள்',
+  'meta.settings.description': 'தனிப்பட்ட தனியுரிமை மற்றும் மொழி அமைப்புகள்.',
   'shell.skipToContent': 'உள்ளடக்கத்திற்குச் செல்லவும்',
   'shell.closeNavigation': 'வழிசெலுத்தலை மூடு',
   'shell.openNavigation': 'வழிசெலுத்தலைத் திற',
@@ -283,6 +375,135 @@ function shell(values: readonly string[]): MessageOverrides {
     shellKeys.map((key, index) => [key, values[index] ?? englishMessages[key]]),
   );
 }
+
+const urduMessages: MessageOverrides = {
+  ...commonAuthUrduMessages,
+  ...dashboardUrduMessages,
+  ...landingUrduMessages,
+  ...publicSearchUrduMessages,
+  ...settingsUrduMessages,
+  ...inventoryUrduMessages,
+  ...reservationsUrduMessages,
+  ...auditUrduMessages,
+  ...teamUrduMessages,
+  'language.label': 'زبان',
+  'meta.description': 'ایک مربوط صحت نگہداشت عملی نظام۔',
+  'meta.login.title': 'سائن ان',
+  'meta.register.title': 'رسائی کی درخواست',
+  'meta.search.title': 'دوا کی دستیابی کی تلاش',
+  'meta.dashboard.title': 'عملی جائزہ',
+  'meta.inventory.title': 'انوینٹری',
+  'meta.inventory.description': 'دوا کی انوینٹری کا عملی ورک اسپیس۔',
+  'meta.expiry.title': 'میعاد ختم ہونے کی فہرست',
+  'meta.expiry.description': 'تفویض شدہ فراہم کنندہ کی جسمانی بیچ میعاد فہرست۔',
+  'meta.reservations.title': 'ریزرویشنز',
+  'meta.reservations.description':
+    'تفویض شدہ فراہم کنندہ کے دوا ریزرویشن مطالعے اور محدود عملی اقدامات۔',
+  'meta.audit.title': 'آڈٹ ٹریل',
+  'meta.audit.description': 'ٹیننٹ تک محدود سیکیورٹی اور عملی ثبوت۔',
+  'meta.team.title': 'ٹیم اور رسائی',
+  'meta.settings.title': 'ترتیبات',
+  'meta.settings.description': 'ذاتی رازداری اور زبان کی ترتیبات۔',
+  'shell.skipToContent': 'مواد پر جائیں',
+  'shell.closeNavigation': 'نیویگیشن بند کریں',
+  'shell.openNavigation': 'نیویگیشن کھولیں',
+  'shell.openAccountMenu': 'اکاؤنٹ مینو کھولیں',
+  'shell.protectedWorkspace': 'محفوظ ورک اسپیس',
+  'shell.tenantScopedAccess': 'ادارے تک محدود رسائی',
+  'shell.secureSession': 'محفوظ سیشن',
+  'shell.authenticatedMember': 'تصدیق شدہ رکن',
+  'shell.signingOut': 'سائن آؤٹ ہو رہا ہے…',
+  'shell.signOutSecurely': 'محفوظ طریقے سے سائن آؤٹ',
+  'shell.mobileNavigation': 'موبائل نیویگیشن',
+  'shell.moreNavigation': 'مزید نیویگیشن، ٹیم اور سیٹنگز',
+  'shell.more': 'مزید',
+  'shell.workspace': 'ورک اسپیس',
+  'shell.organization': 'ادارہ',
+  'shell.overview': 'جائزہ',
+  'shell.inventory': 'انوینٹری',
+  'shell.reservations': 'ریزرویشن',
+  'shell.billing': 'بلنگ',
+  'shell.documents': 'دستاویزات',
+  'shell.teamAccess': 'ٹیم اور رسائی',
+  'shell.auditTrail': 'آڈٹ ٹریل',
+  'shell.settings': 'سیٹنگز',
+  'shell.soon': 'جلد',
+  'shell.availableWhenConnected': 'منظور شدہ بیک اینڈ API جڑنے پر دستیاب',
+  'shell.needHelp': 'مدد چاہیے؟',
+  'shell.helpText': 'آپریشن گائیڈ پڑھیں یا سپورٹ سے رابطہ کریں۔',
+  'shell.tenant': 'ادارہ',
+  'registration.trustedOnboarding': 'قابلِ اعتماد اندراج',
+  'registration.heroPrefix': 'رسائی کا آغاز',
+  'registration.heroAccent': 'تصدیق شدہ سیاق و سباق سے ہوتا ہے۔',
+  'registration.heroDescription':
+    'اس ادارے کے لیے زیرِالتوا رکنیت کی درخواست دیں جس نے عوامی اندراج کو واضح طور پر فعال کیا ہو۔ منظوری اور فعالیت ادارے کی پالیسی کے تحت رہتی ہے۔',
+  'registration.safeguardPolicyTitle': 'پالیسی کے تحت کنٹرول شدہ',
+  'registration.safeguardPolicyDescription': 'ادارے کو خود اندراج کی واضح اجازت دینی ہوگی۔',
+  'registration.safeguardPendingTitle': 'بطورِ ڈیفالٹ زیرِالتوا',
+  'registration.safeguardPendingDescription': 'درخواست فعال ادارہ رکنیت پیدا نہیں کرتی۔',
+  'registration.safeguardPrivacyTitle': 'رازداری کا تحفظ',
+  'registration.safeguardPrivacyDescription':
+    'جواب کبھی بھی موجودہ اکاؤنٹس یا اداروں کو ظاہر نہیں کرتا۔',
+  'registration.identityMembershipTenant': 'شناخت · رکنیت · ادارہ',
+  'registration.signInInstead': 'اس کے بجائے سائن ان کریں ↗',
+  'registration.sectionLabel': 'ادارے تک رسائی',
+  'registration.title': 'اندراج کی درخواست دیں۔',
+  'registration.description':
+    'یہ فارم ایک زیرِالتوا درخواست جمع کرتا ہے۔ یہ اکاؤنٹ کی تخلیق، ادارہ رکنیت، یا فوری رسائی کی ضمانت نہیں دیتا۔',
+  'registration.firstName': 'پہلا نام',
+  'registration.lastName': 'آخری نام',
+  'registration.organizationType': 'ادارے کی قسم',
+  'registration.orgType.pharmacy': 'فارمیسی',
+  'registration.orgType.hospital': 'ہسپتال',
+  'registration.orgType.laboratory': 'لیبارٹری',
+  'registration.orgType.clinic': 'کلینک',
+  'registration.orgType.bloodBank': 'بلڈ بینک',
+  'registration.orgType.supplier': 'سپلائر',
+  'registration.orgType.none': 'کوئی نہیں (ذاتی اکاؤنٹ)',
+  'registration.organizationCode': 'ادارے کا کوڈ / دعوتی کوڈ',
+  'registration.organizationCodeDescription':
+    'اپنے ادارے کے منتظم کا دیا ہوا کوڈ درج کریں، مثال کے طور پر MED-X7P42۔',
+  'registration.workEmail': 'دفتری ای میل',
+  'registration.phone': 'فون نمبر',
+  'registration.phoneDescription': 'ملکی کوڈ شامل کریں، مثال کے طور پر +91 98765 43210۔',
+  'registration.createPassword': 'پاس ورڈ بنائیں',
+  'registration.passwordDescription':
+    '15–128 حروف استعمال کریں۔ کسی دوسری سروس کا پاس ورڈ دوبارہ استعمال نہ کریں۔',
+  'registration.confirmPassword': 'پاس ورڈ کی تصدیق کریں',
+  'registration.showPassword': 'پاس ورڈ دکھائیں',
+  'registration.verificationCode': 'فون کی تصدیق کا کوڈ',
+  'registration.verificationSent': 'اپنے رجسٹرڈ فون پر بھیجا گیا چھ ہندسوں کا کوڈ درج کریں۔',
+  'registration.verifyCode': 'فون کی تصدیق کریں',
+  'registration.resendCode': 'کوڈ دوبارہ بھیجیں',
+  'registration.verificationComplete':
+    'فون کی تصدیق ہو گئی۔ رکنیت فعال ہونے پر آپ سائن ان کر سکتے ہیں۔',
+  'registration.verificationSendError': 'کوڈ نہیں بھیجا جا سکا۔ دوبارہ کوشش کریں۔',
+  'registration.verificationCodeError': 'درست اور غیر میعاد شدہ چھ ہندسوں کا کوڈ درج کریں۔',
+  'registration.submitting': 'محفوظ طریقے سے جمع کیا جا رہا ہے…',
+  'registration.requestAccess': 'ادارے تک رسائی کی درخواست دیں',
+  'registration.alreadyMember': 'کیا آپ کے پاس پہلے سے فعال رکنیت ہے؟',
+  'registration.signIn': 'سائن ان کریں',
+  'registration.requestReceived': 'درخواست موصول ہو گئی',
+  'registration.queuedTitle': 'آپ کی درخواست محفوظ طریقے سے قطار میں لگا دی گئی ہے۔',
+  'registration.confirmationMessage': 'اگر اندراج دستیاب ہے، تو اندراج کی ہدایات بھیج دی جائیں گی۔',
+  'registration.privacyConfirmation':
+    'رازداری کے لیے، یہ تصدیق ظاہر نہیں کرتی کہ ادارہ یا ای میل پہلے سے موجود ہے یا نہیں۔ رسائی صرف اس وقت دستیاب ہوگی جب ادارے کی اندراج پالیسی پوری ہو جائے۔',
+  'registration.pendingMembershipExplanation':
+    'کسی ادارے میں شامل ہونے سے صرف زیرِالتوا درخواست بنتی ہے۔ عملے کا کردار اور ادارے تک رسائی، ادارے کے جائزے کے بعد الگ سے دی جاتی ہے۔',
+  'registration.returnSignIn': 'سائن ان پر واپس جائیں',
+  'registration.submitAnother': 'ایک اور درخواست جمع کریں',
+  'registration.testDataNotice':
+    'صرف ٹیسٹ شناختیں استعمال کریں۔ یہ استحکام کا ماحول حقیقی مریض، ملازم، یا طبی ڈیٹا کے لیے منظور شدہ نہیں ہے۔',
+  'registration.errorOrganizationType': 'ادارے کی قسم منتخب کریں۔',
+  'registration.errorOrganizationCode': 'اپنے منتظم کا دیا ہوا ادارے کا کوڈ درج کریں۔',
+  'registration.errorEmail': 'ایک درست ای میل پتہ درج کریں۔',
+  'registration.errorPhone': 'ملکی کوڈ سمیت ایک درست فون نمبر درج کریں۔',
+  'registration.errorPassword': 'پاس ورڈ 15 سے 128 حروف کے درمیان ہونا چاہیے۔',
+  'registration.errorFirstName': '1 سے 100 حروف کے درمیان پہلا نام درج کریں۔',
+  'registration.errorLastName': '1 سے 100 حروف کے درمیان آخری نام درج کریں۔',
+  'registration.errorConfirmPassword': 'پاس ورڈز مماثل نہیں ہیں۔',
+  'registration.errorGeneric': 'اندراج کی درخواست پر کارروائی کرنے سے قاصر۔',
+};
 
 const localeMessages: Partial<Record<Locale, MessageOverrides>> = {
   as: shell([
@@ -875,6 +1096,7 @@ const localeMessages: Partial<Record<Locale, MessageOverrides>> = {
     'ادارو',
   ]),
   ta: tamilMessages,
+  ur: urduMessages,
   te: shell([
     'భాష',
     'విషయానికి వెళ్లండి',
@@ -906,37 +1128,6 @@ const localeMessages: Partial<Record<Locale, MessageOverrides>> = {
     'ఆపరేషన్స్ గైడ్ చదవండి లేదా సపోర్ట్‌ను సంప్రదించండి.',
     'సంస్థ',
   ]),
-  ur: shell([
-    'زبان',
-    'مواد پر جائیں',
-    'نیویگیشن بند کریں',
-    'نیویگیشن کھولیں',
-    'اکاؤنٹ مینو کھولیں',
-    'محفوظ ورک اسپیس',
-    'ادارے تک محدود رسائی',
-    'محفوظ سیشن',
-    'تصدیق شدہ رکن',
-    'سائن آؤٹ ہو رہا ہے…',
-    'محفوظ طریقے سے سائن آؤٹ',
-    'موبائل نیویگیشن',
-    'مزید نیویگیشن، ٹیم اور سیٹنگز',
-    'مزید',
-    'ورک اسپیس',
-    'ادارہ',
-    'جائزہ',
-    'انوینٹری',
-    'ریزرویشن',
-    'بلنگ',
-    'دستاویزات',
-    'ٹیم اور رسائی',
-    'آڈٹ ٹریل',
-    'سیٹنگز',
-    'جلد',
-    'منظور شدہ بیک اینڈ API جڑنے پر دستیاب',
-    'مدد چاہیے؟',
-    'آپریشن گائیڈ پڑھیں یا سپورٹ سے رابطہ کریں۔',
-    'ادارہ',
-  ]),
 };
 
 export function isLocale(value: string | null): value is Locale {
@@ -947,6 +1138,45 @@ export function getLocaleDirection(locale: Locale): LocaleDirection {
   return localeOptions.find((option) => option.code === locale)?.dir ?? 'ltr';
 }
 
-export function translate(locale: Locale, key: TranslationKey): string {
-  return localeMessages[locale]?.[key] ?? englishMessages[key];
+export function translate(
+  locale: Locale,
+  key: TranslationKey,
+  values: TranslationValues = {},
+): string {
+  const template = localeMessages[locale]?.[key] ?? englishMessages[key];
+  return template.replace(/\{([A-Za-z][A-Za-z0-9]*)\}/g, (placeholder, name: string) =>
+    Object.prototype.hasOwnProperty.call(values, name) ? String(values[name]) : placeholder,
+  );
 }
+
+/**
+ * The full set of keys every locale must translate to be considered
+ * "complete" -- every key MedSphere currently renders through this
+ * system, not just the navigation shell.
+ */
+export const translationKeys = Object.keys(englishMessages) as TranslationKey[];
+
+/**
+ * A locale is complete only if every currently-defined translation key
+ * has a real, non-English override (English itself is always complete
+ * by definition, since it is the source of truth every other locale is
+ * measured against). This is computed from the actual catalog, not a
+ * manually maintained flag, so it can never drift out of sync with the
+ * real translation content -- see i18n.test.ts's completeness-gating
+ * tests, which assert this directly against the live catalog rather
+ * than a hardcoded list of "known complete" locales.
+ */
+export function isLocaleComplete(locale: Locale): boolean {
+  if (locale === 'en') return true;
+  const overrides = localeMessages[locale];
+  if (!overrides) return false;
+  return translationKeys.every((key) => typeof overrides[key] === 'string');
+}
+
+/**
+ * Locales safe to offer in any production language selector. A locale
+ * whose translation is not yet complete for the current critical key set
+ * is deliberately excluded here rather than shown with silent English
+ * fallback text mixed in -- see docs/i18n/v1-app-wide-language-system.md.
+ */
+export const enabledLocaleOptions = localeOptions.filter((option) => isLocaleComplete(option.code));

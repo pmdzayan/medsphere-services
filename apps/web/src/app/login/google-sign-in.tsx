@@ -4,6 +4,7 @@ import Script from 'next/script';
 import { useRouter } from 'next/navigation';
 import { useRef, useState } from 'react';
 
+import { useLanguage } from '@/components/language-provider';
 import { googleLogin } from '@/lib/api-client';
 import { normalizeTenantSlug } from '@/lib/auth-contract';
 
@@ -40,6 +41,7 @@ interface GoogleSignInProps {
 
 export function GoogleSignIn({ tenantSlug, onError }: GoogleSignInProps) {
   const router = useRouter();
+  const { t } = useLanguage();
   const buttonRef = useRef<HTMLDivElement>(null);
   const [ready, setReady] = useState(false);
   const [pending, setPending] = useState(false);
@@ -57,12 +59,12 @@ export function GoogleSignIn({ tenantSlug, onError }: GoogleSignInProps) {
         const normalizedTenantSlug = normalizeTenantSlug(tenantSlug);
 
         if (!normalizedTenantSlug) {
-          onError('Enter your organization slug before continuing with Google.');
+          onError(t('auth.googleMissingOrganization'));
           return;
         }
 
         if (!credential) {
-          onError('Google sign-in did not return a valid credential.');
+          onError(t('auth.googleCredentialInvalid'));
           return;
         }
 
@@ -77,8 +79,11 @@ export function GoogleSignIn({ tenantSlug, onError }: GoogleSignInProps) {
 
           router.replace('/dashboard');
           router.refresh();
-        } catch (error) {
-          onError(error instanceof Error ? error.message : 'Google sign-in failed. Try again.');
+        } catch {
+          // The identity provider/API boundary may supply English, sensitive,
+          // or otherwise unbounded exception text. Keep the user-facing copy
+          // stable and localizable instead of reflecting it into the page.
+          onError(t('auth.googleFailed'));
         } finally {
           setPending(false);
         }
@@ -114,7 +119,7 @@ export function GoogleSignIn({ tenantSlug, onError }: GoogleSignInProps) {
       <div className="space-y-3">
         <div className="flex items-center gap-3" aria-hidden="true">
           <span className="h-px flex-1 bg-[#10201c]/10" />
-          <span className="text-xs font-semibold text-[#71807b]">or</span>
+          <span className="text-xs font-semibold text-[#71807b]">{t('common.or')}</span>
           <span className="h-px flex-1 bg-[#10201c]/10" />
         </div>
 
@@ -125,7 +130,7 @@ export function GoogleSignIn({ tenantSlug, onError }: GoogleSignInProps) {
         />
 
         {!ready ? (
-          <p className="text-center text-xs text-[#71807b]">Loading Google sign-in…</p>
+          <p className="text-center text-xs text-[#71807b]">{t('auth.googleLoading')}</p>
         ) : null}
       </div>
     </>

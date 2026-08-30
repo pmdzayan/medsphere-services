@@ -4,14 +4,17 @@ import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { MetricCard, SectionCard, StatusBadge } from '@/components/platform/dashboard-primitives';
 import { Icon } from '@/components/platform/icon';
+import { useLanguage } from '@/components/language-provider';
 import { ApiError, getAssignedProviders, getProviderExpiryWorklist } from '@/lib/api-client';
+import type { TranslationKey, TranslationValues } from '@/lib/i18n';
 import type { InventoryExpiryWorklistPage, ProviderAccess } from '@/lib/inventory-contract';
-import { daysUntilExpiry, expiryUrgencyLabel } from './inventory-data';
+import { daysUntilExpiry } from './inventory-data';
 
 const PAGE_SIZE = 25;
 const HORIZONS = [7, 30, 60, 90] as const;
 
 export function ExpiryWorklistWorkspace() {
+  const { locale, t } = useLanguage();
   const [providers, setProviders] = useState<ProviderAccess[]>([]);
   const [providerId, setProviderId] = useState('');
   const [horizonDays, setHorizonDays] = useState(30);
@@ -36,11 +39,11 @@ export function ExpiryWorklistWorkspace() {
     } catch (loadError) {
       setProviders([]);
       setProviderId('');
-      setError(publicError(loadError, 'Unable to load assigned providers.'));
+      setError(publicError(loadError, t('inventory.error.providers')));
     } finally {
       setProvidersLoading(false);
     }
-  }, []);
+  }, [t]);
 
   const loadWorklist = useCallback(
     async (selectedProvider: string, days: number, start: number) => {
@@ -58,12 +61,12 @@ export function ExpiryWorklistWorkspace() {
         );
       } catch (loadError) {
         setPage(null);
-        setError(publicError(loadError, 'Unable to load expiry worklist.'));
+        setError(publicError(loadError, t('inventory.expiry.error.load')));
       } finally {
         setLoading(false);
       }
     },
-    [],
+    [t],
   );
 
   useEffect(() => void loadProviders(), [loadProviders]);
@@ -84,9 +87,9 @@ export function ExpiryWorklistWorkspace() {
   if (!providersLoading && error?.status === 403 && providers.length === 0) {
     return (
       <StatePanel
-        title="Expiry worklist access is not assigned"
-        detail="Your membership needs provider access and inventory.stock.read permission."
-        action="Retry access check"
+        title={t('inventory.expiry.accessTitle')}
+        detail={t('inventory.expiry.accessDetail')}
+        action={t('inventory.expiry.retryAccess')}
         onAction={() => void loadProviders()}
       />
     );
@@ -97,14 +100,13 @@ export function ExpiryWorklistWorkspace() {
       <header className="flex flex-col justify-between gap-5 lg:flex-row lg:items-end">
         <div>
           <p className="text-xs font-extrabold uppercase tracking-[.18em] text-amber-700">
-            Live physical batch evidence
+            {t('inventory.expiry.eyebrow')}
           </p>
           <h1 className="mt-3 font-[var(--font-display)] text-3xl font-bold tracking-[-.045em] text-[#10271f] sm:text-[2.45rem]">
-            Expiry worklist
+            {t('inventory.expiry.title')}
           </h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-[#71817c]">
-            Active on-hand batches approaching expiry. This read does not reconcile, quarantine,
-            release, dispose, or notify.
+            {t('inventory.expiry.description')}
           </p>
         </div>
         <div className="flex flex-wrap gap-3">
@@ -112,7 +114,7 @@ export function ExpiryWorklistWorkspace() {
             href="/inventory"
             className="inline-flex items-center gap-2 rounded-xl border border-[#d8e2de] bg-white px-4 py-2.5 text-sm font-bold text-[#436158]"
           >
-            Back to inventory
+            {t('inventory.expiry.back')}
           </Link>
           <button
             type="button"
@@ -120,36 +122,37 @@ export function ExpiryWorklistWorkspace() {
             onClick={() => providerId && void loadWorklist(providerId, horizonDays, offset)}
             className="inline-flex items-center gap-2 rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50"
           >
-            <Icon name="refresh" className={`size-4 ${loading ? 'animate-spin' : ''}`} /> Refresh
+            <Icon name="refresh" className={`size-4 ${loading ? 'animate-spin' : ''}`} />{' '}
+            {t('inventory.common.refresh')}
           </button>
         </div>
       </header>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard
-          label="Batches on page"
+          label={t('inventory.expiry.metric.batches')}
           value={String(metrics.batches)}
-          detail="Current page only"
+          detail={t('inventory.common.currentPage')}
           icon="inventory"
         />
         <MetricCard
-          label="Physical units"
+          label={t('inventory.expiry.metric.physical')}
           value={String(metrics.onHand)}
-          detail="Current page only"
+          detail={t('inventory.common.currentPage')}
           icon="inventory"
           accent="cyan"
         />
         <MetricCard
-          label="Held units"
+          label={t('inventory.expiry.metric.held')}
           value={String(metrics.held)}
-          detail="Current page only"
+          detail={t('inventory.common.currentPage')}
           icon="clock"
           accent="amber"
         />
         <MetricCard
-          label="Available units"
+          label={t('inventory.expiry.metric.available')}
           value={String(metrics.available)}
-          detail="Current page only"
+          detail={t('inventory.common.currentPage')}
           icon="inventory"
           accent="rose"
         />
@@ -159,10 +162,10 @@ export function ExpiryWorklistWorkspace() {
         <div className="grid gap-3 border-b border-[#edf1ef] bg-[#fbfcfb] p-4 sm:grid-cols-2 sm:p-5 lg:px-6">
           <label>
             <span className="mb-1.5 block text-[10px] font-extrabold uppercase tracking-[.14em] text-[#70827b]">
-              Assigned provider
+              {t('inventory.common.assignedProvider')}
             </span>
             <select
-              aria-label="Assigned provider"
+              aria-label={t('inventory.common.assignedProvider')}
               value={providerId}
               disabled={providersLoading || providers.length === 0}
               onChange={(event) => {
@@ -171,21 +174,25 @@ export function ExpiryWorklistWorkspace() {
               }}
               className="h-11 w-full rounded-xl border border-[#dce5e1] bg-white px-3 text-sm font-semibold text-[#38544b] disabled:opacity-60"
             >
-              {providers.length === 0 ? <option value="">No assigned provider</option> : null}
+              {providers.length === 0 ? (
+                <option value="">{t('inventory.common.noProvider')}</option>
+              ) : null}
               {providers.map((provider) => (
                 <option key={provider.providerId} value={provider.providerId}>
                   {provider.businessName} ·{' '}
-                  {provider.providerType === 'PHARMACY' ? 'Pharmacy' : 'Hospital'}
+                  {provider.providerType === 'PHARMACY'
+                    ? t('inventory.common.pharmacy')
+                    : t('inventory.common.hospital')}
                 </option>
               ))}
             </select>
           </label>
           <label>
             <span className="mb-1.5 block text-[10px] font-extrabold uppercase tracking-[.14em] text-[#70827b]">
-              Expiry horizon
+              {t('inventory.expiry.horizon')}
             </span>
             <select
-              aria-label="Expiry horizon"
+              aria-label={t('inventory.expiry.horizon')}
               value={horizonDays}
               disabled={!providerId}
               onChange={(event) => {
@@ -196,43 +203,39 @@ export function ExpiryWorklistWorkspace() {
             >
               {HORIZONS.map((days) => (
                 <option key={days} value={days}>
-                  Next {days} days
+                  {t('inventory.expiry.nextDays', { days })}
                 </option>
               ))}
             </select>
           </label>
         </div>
 
-        {providersLoading ? <Loading label="Checking assigned providers…" /> : null}
+        {providersLoading ? <Loading label={t('inventory.expiry.checkingProviders')} /> : null}
         {!providersLoading && !error && providers.length === 0 ? (
           <StatePanel
-            title="No active provider assignment"
-            detail="Ask a tenant administrator to assign this membership to an active provider."
-            action="Check again"
+            title={t('inventory.expiry.noActiveProvider')}
+            detail={t('inventory.expiry.noActiveProviderDetail')}
+            action={t('inventory.expiry.checkAgain')}
             onAction={() => void loadProviders()}
           />
         ) : null}
         {!providersLoading && error ? (
           <StatePanel
-            title="Expiry worklist could not be loaded"
+            title={t('inventory.expiry.loadFailure')}
             detail={error.message}
-            action="Try again"
+            action={t('inventory.common.tryAgain')}
             onAction={() =>
               providerId ? void loadWorklist(providerId, horizonDays, offset) : void loadProviders()
             }
           />
         ) : null}
         {!providersLoading && !error && loading && !page ? (
-          <Loading label="Loading expiry worklist…" />
+          <Loading label={t('inventory.expiry.loading')} />
         ) : null}
         {!providersLoading && !error && page?.data.length === 0 ? (
           <div className="px-6 py-14 text-center">
-            <p className="font-bold text-[#27483e]">
-              No active on-hand batches expire in this horizon
-            </p>
-            <p className="mt-2 text-sm text-[#75857f]">
-              Change the bounded horizon or refresh the authoritative read.
-            </p>
+            <p className="font-bold text-[#27483e]">{t('inventory.expiry.empty')}</p>
+            <p className="mt-2 text-sm text-[#75857f]">{t('inventory.expiry.emptyDetail')}</p>
           </div>
         ) : null}
         {!providersLoading && !error && page && page.data.length > 0 ? (
@@ -241,13 +244,13 @@ export function ExpiryWorklistWorkspace() {
               <table className="min-w-full text-left text-sm">
                 <thead className="bg-[#f8faf9] text-[10px] font-extrabold uppercase tracking-[.13em] text-[#74847e]">
                   <tr>
-                    <th className="px-5 py-3">Medicine</th>
-                    <th className="px-5 py-3">Batch</th>
-                    <th className="px-5 py-3">Expiry</th>
-                    <th className="px-5 py-3">Physical</th>
-                    <th className="px-5 py-3">Held</th>
-                    <th className="px-5 py-3">Available</th>
-                    <th className="px-5 py-3">Listing</th>
+                    <th className="px-5 py-3">{t('inventory.expiry.medicine')}</th>
+                    <th className="px-5 py-3">{t('inventory.expiry.batch')}</th>
+                    <th className="px-5 py-3">{t('inventory.expiry.expiry')}</th>
+                    <th className="px-5 py-3">{t('inventory.expiry.physical')}</th>
+                    <th className="px-5 py-3">{t('inventory.common.held')}</th>
+                    <th className="px-5 py-3">{t('inventory.common.available')}</th>
+                    <th className="px-5 py-3">{t('inventory.expiry.listing')}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#edf1ef]">
@@ -262,13 +265,13 @@ export function ExpiryWorklistWorkspace() {
                       </td>
                       <td className="px-5 py-4 font-semibold text-[#456158]">{item.batchNumber}</td>
                       <td className="px-5 py-4 text-[#456158]">
-                        <p>{formatDate(item.expiryDate)}</p>
+                        <p>{formatDate(item.expiryDate, locale)}</p>
                         <p
                           className={`mt-0.5 text-[11px] font-bold ${expiryLabelTone(
                             daysUntilExpiry(item.expiryDate),
                           )}`}
                         >
-                          {expiryUrgencyLabel(daysUntilExpiry(item.expiryDate))}
+                          {localizedExpiryUrgency(daysUntilExpiry(item.expiryDate), t)}
                         </p>
                       </td>
                       <td className="px-5 py-4 font-bold text-[#24483d]">{item.onHandQuantity}</td>
@@ -278,7 +281,9 @@ export function ExpiryWorklistWorkspace() {
                       </td>
                       <td className="px-5 py-4">
                         <StatusBadge tone={item.isVisible ? 'emerald' : 'slate'}>
-                          {item.isVisible ? 'Visible' : 'Hidden'}
+                          {item.isVisible
+                            ? t('inventory.expiry.visible')
+                            : t('inventory.expiry.hidden')}
                         </StatusBadge>
                       </td>
                     </tr>
@@ -299,24 +304,27 @@ export function ExpiryWorklistWorkspace() {
                       </p>
                     </div>
                     <StatusBadge tone={item.isVisible ? 'emerald' : 'slate'}>
-                      {item.isVisible ? 'Visible' : 'Hidden'}
+                      {item.isVisible
+                        ? t('inventory.expiry.visible')
+                        : t('inventory.expiry.hidden')}
                     </StatusBadge>
                   </div>
                   <p className="mt-2 text-xs text-[#456158]">
-                    Batch <span className="font-semibold">{item.batchNumber}</span> · Expires{' '}
-                    {formatDate(item.expiryDate)}
+                    {t('inventory.expiry.batch')}{' '}
+                    <span className="font-semibold">{item.batchNumber}</span> ·{' '}
+                    {t('inventory.expiry.expires')} {formatDate(item.expiryDate, locale)}
                   </p>
                   <p
                     className={`mt-1 text-[11px] font-bold ${expiryLabelTone(
                       daysUntilExpiry(item.expiryDate),
                     )}`}
                   >
-                    {expiryUrgencyLabel(daysUntilExpiry(item.expiryDate))}
+                    {localizedExpiryUrgency(daysUntilExpiry(item.expiryDate), t)}
                   </p>
                   <dl className="mt-3 grid grid-cols-3 gap-2 rounded-xl bg-[#f8faf9] p-3 text-center">
                     <div>
                       <dt className="text-[10px] font-bold uppercase tracking-wide text-[#8a9994]">
-                        Physical
+                        {t('inventory.expiry.physical')}
                       </dt>
                       <dd className="mt-0.5 text-sm font-bold text-[#24483d]">
                         {item.onHandQuantity}
@@ -324,7 +332,7 @@ export function ExpiryWorklistWorkspace() {
                     </div>
                     <div>
                       <dt className="text-[10px] font-bold uppercase tracking-wide text-[#8a9994]">
-                        Held
+                        {t('inventory.common.held')}
                       </dt>
                       <dd className="mt-0.5 text-sm font-bold text-[#735f30]">
                         {item.heldQuantity}
@@ -332,7 +340,7 @@ export function ExpiryWorklistWorkspace() {
                     </div>
                     <div>
                       <dt className="text-[10px] font-bold uppercase tracking-wide text-[#8a9994]">
-                        Available
+                        {t('inventory.common.available')}
                       </dt>
                       <dd className="mt-0.5 text-sm font-bold text-emerald-700">
                         {item.availableQuantity}
@@ -344,8 +352,11 @@ export function ExpiryWorklistWorkspace() {
             </ul>
             <div className="flex flex-col gap-3 border-t border-[#edf1ef] px-5 py-4 text-xs text-[#74847e] sm:flex-row sm:items-center sm:justify-between">
               <span>
-                Observed {formatDateTime(page.asOf)} · through {formatDateTime(page.horizonEndsAt)}{' '}
-                · {page.total} total
+                {t('inventory.expiry.observed', {
+                  start: formatDateTime(page.asOf, locale),
+                  end: formatDateTime(page.horizonEndsAt, locale),
+                  total: page.total,
+                })}
               </span>
               <div className="flex gap-2">
                 <button
@@ -354,7 +365,7 @@ export function ExpiryWorklistWorkspace() {
                   onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}
                   className="rounded-lg border border-[#dce5e1] px-3 py-2 font-bold disabled:opacity-40"
                 >
-                  Previous
+                  {t('inventory.common.previous')}
                 </button>
                 <button
                   type="button"
@@ -362,7 +373,7 @@ export function ExpiryWorklistWorkspace() {
                   onClick={() => setOffset(offset + PAGE_SIZE)}
                   className="rounded-lg border border-[#dce5e1] px-3 py-2 font-bold disabled:opacity-40"
                 >
-                  Next
+                  {t('inventory.common.next')}
                 </button>
               </div>
             </div>
@@ -407,11 +418,11 @@ function StatePanel({
 }
 function publicError(error: unknown, fallback: string) {
   return error instanceof ApiError
-    ? { message: error.message, status: error.status }
+    ? { message: fallback, status: error.status }
     : { message: fallback };
 }
-function formatDate(value: string) {
-  return new Intl.DateTimeFormat('en-IN', { dateStyle: 'medium', timeZone: 'UTC' }).format(
+function formatDate(value: string, locale: string) {
+  return new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeZone: 'UTC' }).format(
     new Date(value),
   );
 }
@@ -422,10 +433,20 @@ function expiryLabelTone(daysUntil: number | null): string {
   if (daysUntil <= 7) return 'text-amber-700';
   return 'text-[#8a9994]';
 }
-function formatDateTime(value: string) {
-  return new Intl.DateTimeFormat('en-IN', {
+function formatDateTime(value: string, locale: string) {
+  return new Intl.DateTimeFormat(locale, {
     dateStyle: 'medium',
     timeStyle: 'short',
     timeZone: 'UTC',
   }).format(new Date(value));
+}
+
+type Translator = (key: TranslationKey, values?: TranslationValues) => string;
+
+function localizedExpiryUrgency(daysUntil: number | null, t: Translator): string {
+  if (daysUntil === null) return t('inventory.expiry.urgency.unknown');
+  if (daysUntil < 0) return t('inventory.expiry.urgency.overdue', { days: Math.abs(daysUntil) });
+  if (daysUntil === 0) return t('inventory.expiry.urgency.today');
+  if (daysUntil === 1) return t('inventory.expiry.urgency.tomorrow');
+  return t('inventory.expiry.urgency.days', { days: daysUntil });
 }

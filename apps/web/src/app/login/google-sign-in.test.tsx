@@ -3,6 +3,7 @@ import '@testing-library/jest-dom/vitest';
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { LanguageProvider } from '@/components/language-provider';
 import { googleLogin } from '@/lib/api-client';
 import { GoogleSignIn } from './google-sign-in';
 
@@ -29,6 +30,14 @@ vi.mock('@/lib/api-client', async () => {
     googleLogin: vi.fn(),
   };
 });
+
+function renderGoogleSignIn(tenantSlug: string, onError = vi.fn()) {
+  return render(
+    <LanguageProvider initialLocale="en">
+      <GoogleSignIn tenantSlug={tenantSlug} onError={onError} />
+    </LanguageProvider>,
+  );
+}
 
 describe('GoogleSignIn', () => {
   let credentialCallback: ((response: { credential?: string }) => void) | undefined;
@@ -66,13 +75,13 @@ describe('GoogleSignIn', () => {
   it('does not expose Google sign-in when the client ID is absent', () => {
     delete process.env.NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_ID;
 
-    const { container } = render(<GoogleSignIn tenantSlug="central-pharmacy" onError={vi.fn()} />);
+    const { container } = renderGoogleSignIn('central-pharmacy');
 
     expect(container).toBeEmptyDOMElement();
   });
 
   it('initializes Google with the configured client ID', () => {
-    render(<GoogleSignIn tenantSlug="central-pharmacy" onError={vi.fn()} />);
+    renderGoogleSignIn('central-pharmacy');
 
     fireEvent.click(
       screen.getByRole('button', {
@@ -97,6 +106,7 @@ describe('GoogleSignIn', () => {
         email: 'user@example.com',
         firstName: 'Test',
         lastName: 'User',
+        preferredLanguage: 'en',
       },
       context: {
         membershipId: 'membership-1',
@@ -108,7 +118,7 @@ describe('GoogleSignIn', () => {
 
     const onError = vi.fn();
 
-    render(<GoogleSignIn tenantSlug=" CENTRAL-PHARMACY " onError={onError} />);
+    renderGoogleSignIn(' CENTRAL-PHARMACY ', onError);
 
     fireEvent.click(
       screen.getByRole('button', {
@@ -139,7 +149,7 @@ describe('GoogleSignIn', () => {
   it('requires the tenant slug before exchanging a Google credential', async () => {
     const onError = vi.fn();
 
-    render(<GoogleSignIn tenantSlug="" onError={onError} />);
+    renderGoogleSignIn('', onError);
 
     fireEvent.click(
       screen.getByRole('button', {
@@ -154,17 +164,17 @@ describe('GoogleSignIn', () => {
     });
 
     expect(googleLogin).not.toHaveBeenCalled();
-    expect(onError).toHaveBeenCalledWith(
-      'Enter your organization slug before continuing with Google.',
-    );
+    expect(onError).toHaveBeenCalledWith('Choose an organization before continuing with Google.');
   });
 
   it('surfaces a bounded Google authentication failure', async () => {
-    vi.mocked(googleLogin).mockRejectedValue(new Error('Google sign-in could not be authorized.'));
+    vi.mocked(googleLogin).mockRejectedValue(
+      new Error('unbounded identity-provider English must not be reflected'),
+    );
 
     const onError = vi.fn();
 
-    render(<GoogleSignIn tenantSlug="central-pharmacy" onError={onError} />);
+    renderGoogleSignIn('central-pharmacy', onError);
 
     fireEvent.click(
       screen.getByRole('button', {
@@ -179,8 +189,12 @@ describe('GoogleSignIn', () => {
     });
 
     await waitFor(() => {
-      expect(onError).toHaveBeenCalledWith('Google sign-in could not be authorized.');
+      expect(onError).toHaveBeenCalledWith('Google sign-in failed. Try again.');
     });
+
+    expect(onError).not.toHaveBeenCalledWith(
+      'unbounded identity-provider English must not be reflected',
+    );
 
     expect(replace).not.toHaveBeenCalled();
   });

@@ -1,12 +1,19 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 
 import type { AuthenticatedSession } from './auth-contract';
+import { isKnownLanguageCode } from './settings-contract';
 
 export const ACCESS_COOKIE = 'medsphere_access';
 export const REFRESH_COOKIE = 'medsphere_refresh';
 export const PROFILE_COOKIE = 'medsphere_profile';
 
 export type SessionProfile = AuthenticatedSession;
+
+type SessionProfilePayload = Omit<SessionProfile, 'user'> & {
+  user: Omit<SessionProfile['user'], 'preferredLanguage'> & {
+    preferredLanguage?: SessionProfile['user']['preferredLanguage'];
+  };
+};
 
 export function sealSessionProfile(profile: SessionProfile, integrityKey: string): string {
   const payload = Buffer.from(JSON.stringify(profile), 'utf8').toString('base64url');
@@ -37,7 +44,11 @@ export function readSessionProfile(
 
   try {
     const parsed: unknown = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
-    return isSessionProfile(parsed) ? parsed : null;
+    if (!isSessionProfilePayload(parsed)) return null;
+    return {
+      ...parsed,
+      user: { ...parsed.user, preferredLanguage: parsed.user.preferredLanguage ?? 'en' },
+    };
   } catch {
     return null;
   }
@@ -47,12 +58,12 @@ function sign(payload: string, integrityKey: string): string {
   return createHmac('sha256', integrityKey).update(payload).digest('base64url');
 }
 
-function isSessionProfile(value: unknown): value is SessionProfile {
+function isSessionProfilePayload(value: unknown): value is SessionProfilePayload {
   if (!value || typeof value !== 'object') {
     return false;
   }
 
-  const candidate = value as Partial<SessionProfile>;
+  const candidate = value as Partial<SessionProfilePayload>;
   return (
     Number.isSafeInteger(candidate.expiresIn) &&
     Number(candidate.expiresIn) > 0 &&
@@ -61,7 +72,9 @@ function isSessionProfile(value: unknown): value is SessionProfile {
       isBoundedString(candidate.user.id, 100) &&
       isBoundedString(candidate.user.email, 254) &&
       isBoundedString(candidate.user.firstName, 100) &&
-      isBoundedString(candidate.user.lastName, 100),
+      isBoundedString(candidate.user.lastName, 100) &&
+      (candidate.user.preferredLanguage === undefined ||
+        isKnownLanguageCode(candidate.user.preferredLanguage)),
     ) &&
     Boolean(
       candidate.context &&

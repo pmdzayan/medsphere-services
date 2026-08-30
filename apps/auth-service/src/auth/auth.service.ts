@@ -285,6 +285,7 @@ export class AuthService {
         email: loginIdentity.user.email,
         firstName: loginIdentity.user.firstName,
         lastName: loginIdentity.user.lastName,
+        preferredLanguage: loginIdentity.user.preferredLanguage,
       },
       context: {
         membershipId: loginIdentity.membershipId,

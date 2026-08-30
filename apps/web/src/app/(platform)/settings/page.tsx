@@ -2,12 +2,17 @@ import type { Metadata } from 'next';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { SettingsWorkspace } from '@/features/settings/settings-workspace';
+import { translate } from '@/lib/i18n';
+import { getServerLocale } from '@/lib/server-locale';
 import { PROFILE_COOKIE, REFRESH_COOKIE, readSessionProfile } from '@/lib/session-profile';
 
-export const metadata: Metadata = {
-  title: 'Settings | MedSphere',
-  description: 'Personal privacy and language settings.',
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await getServerLocale();
+  return {
+    title: translate(locale, 'meta.settings.title'),
+    description: translate(locale, 'meta.settings.description'),
+  };
+}
 
 export default async function SettingsPage() {
   const cookieStore = await cookies();

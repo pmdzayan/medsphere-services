@@ -1,5 +1,6 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { LanguageProvider } from '@/components/language-provider';
 import { ApiError, getAssignedProviders, getProviderExpiryWorklist } from '@/lib/api-client';
 import type { InventoryExpiryWorklistPage, ProviderAccess } from '@/lib/inventory-contract';
 import { validExpiryWorklistPage, validProviders } from '@/test/inventory-fixtures';
@@ -28,9 +29,17 @@ async function findTable() {
   return screen.findByRole('table');
 }
 
+function renderWorkspace() {
+  return render(
+    <LanguageProvider initialLocale="en">
+      <ExpiryWorklistWorkspace />
+    </LanguageProvider>,
+  );
+}
+
 describe('ExpiryWorklistWorkspace live integration', () => {
   it('renders exact physical evidence and current-page metrics without mutation claims', async () => {
-    render(<ExpiryWorklistWorkspace />);
+    renderWorkspace();
     const scope = within(await findTable());
     expect(await scope.findByText('Metformin 500 mg')).toBeVisible();
     expect(scope.getByText('BATCH-1')).toBeVisible();
@@ -43,7 +52,7 @@ describe('ExpiryWorklistWorkspace live integration', () => {
   });
 
   it('loads the selected assigned provider and bounded horizon', async () => {
-    render(<ExpiryWorklistWorkspace />);
+    renderWorkspace();
     await within(await findTable()).findByText('Metformin 500 mg');
     fireEvent.change(screen.getByLabelText('Expiry horizon'), { target: { value: '90' } });
     await waitFor(() =>
@@ -57,7 +66,7 @@ describe('ExpiryWorklistWorkspace live integration', () => {
   });
 
   it('paginates with accepted offsets', async () => {
-    render(<ExpiryWorklistWorkspace />);
+    renderWorkspace();
     fireEvent.click(await screen.findByRole('button', { name: 'Next' }));
     await waitFor(() =>
       expect(getProviderExpiryWorklist).toHaveBeenLastCalledWith({
@@ -70,7 +79,7 @@ describe('ExpiryWorklistWorkspace live integration', () => {
   });
 
   it('renders both the desktop table and a mobile card list from the same data', async () => {
-    render(<ExpiryWorklistWorkspace />);
+    renderWorkspace();
     const table = await screen.findByRole('table');
     await within(table).findByText('BATCH-1');
     const batchMatches = screen.getAllByText('BATCH-1');
@@ -85,21 +94,21 @@ describe('ExpiryWorklistWorkspace live integration', () => {
       ...page,
       data: [{ ...page.data[0], expiryDate: '2026-08-20T00:00:00.000Z' }],
     });
-    render(<ExpiryWorklistWorkspace />);
+    renderWorkspace();
     const scope = within(await screen.findByRole('table'));
     await scope.findByText('BATCH-1');
-    expect(scope.getByText('6d remaining')).toBeVisible();
+    expect(scope.getByText('Expires in 6d')).toBeVisible();
     vi.useRealTimers();
   });
 
   it('renders bounded access and empty states', async () => {
     vi.mocked(getAssignedProviders).mockRejectedValueOnce(new ApiError('Permission denied', 403));
-    const { unmount } = render(<ExpiryWorklistWorkspace />);
+    const { unmount } = renderWorkspace();
     expect(await screen.findByText('Expiry worklist access is not assigned')).toBeVisible();
     unmount();
     vi.mocked(getAssignedProviders).mockResolvedValueOnce(providers);
     vi.mocked(getProviderExpiryWorklist).mockResolvedValueOnce({ ...page, data: [], total: 0 });
-    render(<ExpiryWorklistWorkspace />);
+    renderWorkspace();
     expect(
       await screen.findByText('No active on-hand batches expire in this horizon'),
     ).toBeVisible();

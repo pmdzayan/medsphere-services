@@ -1,5 +1,6 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { LanguageProvider } from '@/components/language-provider';
 import {
   getAuthorizationCatalogue,
   getMembershipCatalogue,
@@ -59,13 +60,21 @@ beforeEach(() => {
 
 afterEach(() => cleanup());
 
+function renderWorkspace() {
+  return render(
+    <LanguageProvider initialLocale="en">
+      <TeamAccessWorkspace />
+    </LanguageProvider>,
+  );
+}
+
 describe('TeamAccessWorkspace permission-aware interactions', () => {
   it('omits mutation and membership controls for a role-registry reader', async () => {
     vi.mocked(getAuthorizationCatalogue).mockResolvedValue(
       catalogueWith([AUTHORIZATION_PERMISSIONS.rolesRead]),
     );
 
-    render(<TeamAccessWorkspace />);
+    renderWorkspace();
 
     expect((await screen.findAllByText(/Pharmacy manager/i))[0]).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Create custom role' })).not.toBeInTheDocument();
@@ -84,7 +93,7 @@ describe('TeamAccessWorkspace permission-aware interactions', () => {
       ]),
     );
 
-    render(<TeamAccessWorkspace />);
+    renderWorkspace();
 
     fireEvent.click(await screen.findByRole('button', { name: 'Create custom role' }));
     expect(screen.getByRole('heading', { name: 'Create custom role' })).toBeInTheDocument();
@@ -107,7 +116,7 @@ describe('TeamAccessWorkspace permission-aware interactions', () => {
       ]),
     );
 
-    render(<TeamAccessWorkspace />);
+    renderWorkspace();
 
     fireEvent.click(await screen.findByRole('button', { name: /Aisha Zahra/ }));
     const assignment = screen.getByRole('checkbox', { name: /PHARMACY_MANAGER/ });
@@ -130,7 +139,7 @@ describe('TeamAccessWorkspace permission-aware interactions', () => {
       ]),
     );
 
-    render(<TeamAccessWorkspace />);
+    renderWorkspace();
 
     fireEvent.click(await screen.findByRole('button', { name: /Aisha Zahra/ }));
     expect(screen.getByText('Your current role has read-only assignment access.')).toBeVisible();
@@ -149,7 +158,7 @@ describe('TeamAccessWorkspace permission-aware interactions', () => {
       )
       .mockResolvedValueOnce(catalogueWith([AUTHORIZATION_PERMISSIONS.rolesRead]));
 
-    render(<TeamAccessWorkspace />);
+    renderWorkspace();
 
     fireEvent.click(await screen.findByRole('button', { name: 'Create custom role' }));
     expect(screen.getByRole('heading', { name: 'Create custom role' })).toBeVisible();

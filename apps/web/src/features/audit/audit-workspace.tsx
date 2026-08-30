@@ -3,11 +3,12 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { Icon } from '@/components/platform/icon';
 import { MetricCard, SectionCard, StatusBadge } from '@/components/platform/dashboard-primitives';
+import { useLanguage } from '@/components/language-provider';
 import { ApiError, getAuditEvents } from '@/lib/api-client';
+import type { TranslationKey, TranslationValues } from '@/lib/i18n';
 import {
   AUDIT_EVENT_TYPES,
   AUDIT_OUTCOMES,
-  auditEventLabel,
   type AuditEvent,
   type AuditEventFilters,
   type AuditEventType,
@@ -37,6 +38,7 @@ const emptyDraft: FilterDraft = {
 };
 
 export function AuditWorkspace() {
+  const { locale, t } = useLanguage();
   const [events, setEvents] = useState<AuditEvent[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<AuditEvent | null>(null);
@@ -47,38 +49,41 @@ export function AuditWorkspace() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<{ message: string; status?: number } | null>(null);
 
-  const load = useCallback(async (filters: AuditEventFilters, append = false) => {
-    append ? setLoadingMore(true) : setLoading(true);
-    setError(null);
-    try {
-      const page = await getAuditEvents(filters);
-      setEvents((current) => (append ? mergeEvents(current, page.data) : page.data));
-      setNextCursor(page.nextCursor);
-      if (!append) setSelectedEvent(null);
-    } catch (loadError) {
-      setError({
-        message: loadError instanceof Error ? loadError.message : 'Unable to load audit events.',
-        status: loadError instanceof ApiError ? loadError.status : undefined,
-      });
-      if (!append) {
-        setEvents([]);
-        setNextCursor(null);
-        setSelectedEvent(null);
+  const load = useCallback(
+    async (filters: AuditEventFilters, append = false) => {
+      append ? setLoadingMore(true) : setLoading(true);
+      setError(null);
+      try {
+        const page = await getAuditEvents(filters);
+        setEvents((current) => (append ? mergeEvents(current, page.data) : page.data));
+        setNextCursor(page.nextCursor);
+        if (!append) setSelectedEvent(null);
+      } catch (loadError) {
+        setError({
+          message: t('audit.error.load'),
+          status: loadError instanceof ApiError ? loadError.status : undefined,
+        });
+        if (!append) {
+          setEvents([]);
+          setNextCursor(null);
+          setSelectedEvent(null);
+        }
+      } finally {
+        append ? setLoadingMore(false) : setLoading(false);
       }
-    } finally {
-      append ? setLoadingMore(false) : setLoading(false);
-    }
-  }, []);
+    },
+    [t],
+  );
 
   useEffect(() => {
     void load({ limit: PAGE_SIZE });
   }, [load]);
 
-  const metrics = useMemo(() => loadedMetrics(events), [events]);
+  const metrics = useMemo(() => loadedMetrics(events, locale, t), [events, locale, t]);
 
   function applyFilters(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const validation = validateFilterDraft(draft);
+    const validation = validateFilterDraft(draft, t);
     if (validation) {
       setFilterError(validation);
       return;
@@ -98,7 +103,7 @@ export function AuditWorkspace() {
   }
 
   if (error?.status === 403 && events.length === 0) {
-    return <AuditAccessDenied onRetry={() => void load(appliedFilters)} />;
+    return <AuditAccessDenied t={t} onRetry={() => void load(appliedFilters)} />;
   }
 
   return (
@@ -111,18 +116,17 @@ export function AuditWorkspace() {
             <div className="flex flex-wrap items-center gap-2.5">
               <span className="inline-flex items-center gap-2 text-[10px] font-extrabold uppercase tracking-[.2em] text-emerald-300">
                 <Icon name="audit" className="size-4" />
-                Tenant evidence ledger
+                {t('audit.eyebrow')}
               </span>
               <span className="rounded-full border border-cyan-200/15 bg-cyan-300/10 px-2.5 py-1 text-[9px] font-bold text-cyan-100">
-                Append-only records
+                {t('audit.appendOnly')}
               </span>
             </div>
             <h1 className="mt-4 font-[var(--font-display)] text-3xl font-bold tracking-[-.045em] sm:text-[2.55rem]">
-              Audit trail
+              {t('audit.title')}
             </h1>
             <p className="mt-3 max-w-2xl text-sm leading-7 text-white/50">
-              Review bounded security and operational evidence for the authenticated tenant. Records
-              are read-only and ordered from newest to oldest.
+              {t('audit.description')}
             </p>
           </div>
           <button
@@ -132,34 +136,34 @@ export function AuditWorkspace() {
             className="inline-flex w-fit items-center gap-2 rounded-xl border border-white/10 bg-white/[.06] px-4 py-2.5 text-xs font-bold text-white/75 transition hover:bg-white/10 disabled:cursor-wait disabled:opacity-50"
           >
             <Icon name="refresh" className={`size-4 ${loading ? 'animate-spin' : ''}`} />
-            Refresh evidence
+            {t('audit.refresh')}
           </button>
         </div>
       </header>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard
-          label="Loaded evidence"
+          label={t('audit.metric.loaded')}
           value={String(metrics.total)}
-          detail="Current filtered pages"
+          detail={t('audit.metric.pages')}
           icon="audit"
         />
         <MetricCard
-          label="Denied events"
+          label={t('audit.metric.denied')}
           value={String(metrics.denied)}
-          detail="Within loaded evidence"
+          detail={t('audit.metric.withinLoaded')}
           icon="shield"
           accent="rose"
         />
         <MetricCard
-          label="Identified actors"
+          label={t('audit.metric.actors')}
           value={String(metrics.actors)}
-          detail="Unique loaded memberships"
+          detail={t('audit.metric.memberships')}
           icon="team"
           accent="cyan"
         />
         <MetricCard
-          label="Newest loaded event"
+          label={t('audit.metric.newest')}
           value={metrics.newestTime}
           detail={metrics.newestDate}
           icon="clock"
@@ -168,6 +172,7 @@ export function AuditWorkspace() {
       </div>
 
       <AuditFilters
+        t={t}
         draft={draft}
         error={filterError}
         loading={loading}
@@ -182,7 +187,7 @@ export function AuditWorkspace() {
           className="flex items-start gap-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs text-rose-800"
         >
           <Icon name="warning" className="mt-0.5 size-4 shrink-0" />
-          <span>{error.message} Existing loaded evidence remains visible.</span>
+          <span>{t('audit.loadedWarning', { error: error.message })}</span>
         </div>
       ) : null}
 
@@ -191,25 +196,27 @@ export function AuditWorkspace() {
           <div className="flex flex-col gap-2 border-b border-[#edf1ef] px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
             <div>
               <p className="text-[10px] font-extrabold uppercase tracking-[.18em] text-emerald-700">
-                Evidence stream
+                {t('audit.stream.eyebrow')}
               </p>
               <h2 className="mt-1 font-[var(--font-display)] text-xl font-bold tracking-[-.03em] text-[#173128]">
-                Tenant events
+                {t('audit.stream.title')}
               </h2>
             </div>
             <p className="text-[11px] font-medium text-[#7a8a84]">
-              {events.length} loaded · newest first
+              {t('audit.stream.count', { count: events.length })}
             </p>
           </div>
 
-          {loading && events.length === 0 ? <LoadingState /> : null}
+          {loading && events.length === 0 ? <LoadingState t={t} /> : null}
           {error && events.length === 0 ? (
-            <ErrorState error={error.message} onRetry={() => void load(appliedFilters)} />
+            <ErrorState t={t} error={error.message} onRetry={() => void load(appliedFilters)} />
           ) : null}
-          {!loading && !error && events.length === 0 ? <EmptyState /> : null}
+          {!loading && !error && events.length === 0 ? <EmptyState t={t} /> : null}
           {events.length > 0 ? (
             <AuditEventTable
               events={events}
+              locale={locale}
+              t={t}
               selectedId={selectedEvent?.id ?? null}
               onSelect={setSelectedEvent}
             />
@@ -226,14 +233,19 @@ export function AuditWorkspace() {
                 className="inline-flex items-center gap-2 rounded-xl border border-[#d7e2dd] bg-white px-4 py-2.5 text-xs font-bold text-emerald-800 transition hover:border-emerald-300 hover:bg-emerald-50 disabled:cursor-wait disabled:opacity-50"
               >
                 <Icon name="plus" className="size-4" />
-                {loadingMore ? 'Loading evidence…' : 'Load older evidence'}
+                {loadingMore ? t('audit.loadingMore') : t('audit.loadOlder')}
               </button>
             </div>
           ) : null}
         </SectionCard>
 
         {selectedEvent ? (
-          <AuditEventDetails event={selectedEvent} onClose={() => setSelectedEvent(null)} />
+          <AuditEventDetails
+            event={selectedEvent}
+            locale={locale}
+            t={t}
+            onClose={() => setSelectedEvent(null)}
+          />
         ) : null}
       </div>
     </div>
@@ -241,6 +253,7 @@ export function AuditWorkspace() {
 }
 
 function AuditFilters({
+  t,
   draft,
   error,
   loading,
@@ -248,6 +261,7 @@ function AuditFilters({
   onApply,
   onClear,
 }: {
+  t: Translator;
   draft: FilterDraft;
   error: string | null;
   loading: boolean;
@@ -261,90 +275,92 @@ function AuditFilters({
         <div className="flex items-center justify-between gap-4 border-b border-[#edf1ef] px-5 py-4 sm:px-6">
           <div>
             <p className="text-[10px] font-extrabold uppercase tracking-[.18em] text-emerald-700">
-              Server-side filters
+              {t('audit.filters.eyebrow')}
             </p>
             <h2 className="mt-1 font-[var(--font-display)] text-lg font-bold tracking-[-.025em] text-[#173128]">
-              Narrow the evidence stream
+              {t('audit.filters.title')}
             </h2>
           </div>
           <Icon name="filter" className="size-5 text-emerald-700" />
         </div>
         <div className="grid gap-4 px-5 py-5 sm:grid-cols-2 sm:px-6 lg:grid-cols-4">
-          <FilterField label="Event type">
+          <FilterField label={t('audit.filters.eventType')}>
             <select
-              aria-label="Event type"
+              aria-label={t('audit.filters.eventType')}
               value={draft.eventType}
               onChange={(event) =>
                 onChange({ ...draft, eventType: event.target.value as FilterDraft['eventType'] })
               }
               className={inputClassName}
             >
-              <option value="">All event types</option>
+              <option value="">{t('audit.filters.allEvents')}</option>
               {AUDIT_EVENT_TYPES.map((eventType) => (
                 <option key={eventType} value={eventType}>
-                  {auditEventLabel(eventType)}
+                  {t('audit.event.generic')} · {eventType}
                 </option>
               ))}
             </select>
           </FilterField>
-          <FilterField label="Outcome">
+          <FilterField label={t('audit.filters.outcome')}>
             <select
-              aria-label="Outcome"
+              aria-label={t('audit.filters.outcome')}
               value={draft.outcome}
               onChange={(event) =>
                 onChange({ ...draft, outcome: event.target.value as FilterDraft['outcome'] })
               }
               className={inputClassName}
             >
-              <option value="">All outcomes</option>
+              <option value="">{t('audit.filters.allOutcomes')}</option>
               {AUDIT_OUTCOMES.map((outcome) => (
-                <option key={outcome}>{outcome}</option>
+                <option key={outcome} value={outcome}>
+                  {outcomeLabel(outcome, t)}
+                </option>
               ))}
             </select>
           </FilterField>
-          <FilterField label="From">
+          <FilterField label={t('audit.filters.from')}>
             <input
-              aria-label="From"
+              aria-label={t('audit.filters.from')}
               type="datetime-local"
               value={draft.startDate}
               onChange={(event) => onChange({ ...draft, startDate: event.target.value })}
               className={inputClassName}
             />
           </FilterField>
-          <FilterField label="Until">
+          <FilterField label={t('audit.filters.until')}>
             <input
-              aria-label="Until"
+              aria-label={t('audit.filters.until')}
               type="datetime-local"
               value={draft.endDate}
               onChange={(event) => onChange({ ...draft, endDate: event.target.value })}
               className={inputClassName}
             />
           </FilterField>
-          <FilterField label="Actor membership ID">
+          <FilterField label={t('audit.filters.actorId')}>
             <input
-              aria-label="Actor membership ID"
+              aria-label={t('audit.filters.actorId')}
               value={draft.actorMembershipId}
               onChange={(event) => onChange({ ...draft, actorMembershipId: event.target.value })}
               placeholder="UUID"
               className={inputClassName}
             />
           </FilterField>
-          <FilterField label="Resource type">
+          <FilterField label={t('audit.filters.resourceType')}>
             <input
-              aria-label="Resource type"
+              aria-label={t('audit.filters.resourceType')}
               value={draft.resourceType}
               onChange={(event) => onChange({ ...draft, resourceType: event.target.value })}
-              placeholder="Role, Session, Reservation…"
+              placeholder={t('audit.filters.resourceTypePlaceholder')}
               maxLength={80}
               className={inputClassName}
             />
           </FilterField>
-          <FilterField label="Resource ID">
+          <FilterField label={t('audit.filters.resourceId')}>
             <input
-              aria-label="Resource ID"
+              aria-label={t('audit.filters.resourceId')}
               value={draft.resourceId}
               onChange={(event) => onChange({ ...draft, resourceId: event.target.value })}
-              placeholder="Exact identifier"
+              placeholder={t('audit.filters.resourceIdPlaceholder')}
               maxLength={120}
               className={inputClassName}
             />
@@ -355,7 +371,7 @@ function AuditFilters({
               disabled={loading}
               className="h-10 flex-1 rounded-xl bg-[#0a342a] px-4 text-xs font-black text-white transition hover:bg-emerald-800 disabled:cursor-wait disabled:opacity-50"
             >
-              Apply filters
+              {t('audit.filters.apply')}
             </button>
             <button
               type="button"
@@ -363,7 +379,7 @@ function AuditFilters({
               disabled={loading}
               className="h-10 rounded-xl border border-[#d9e3df] px-3 text-xs font-bold text-[#587168] transition hover:bg-[#f4f8f6] disabled:opacity-50"
             >
-              Clear
+              {t('audit.filters.clear')}
             </button>
           </div>
         </div>
@@ -393,10 +409,14 @@ function FilterField({ label, children }: { label: string; children: React.React
 
 function AuditEventTable({
   events,
+  locale,
+  t,
   selectedId,
   onSelect,
 }: {
   events: readonly AuditEvent[];
+  locale: string;
+  t: Translator;
   selectedId: string | null;
   onSelect: (event: AuditEvent) => void;
 }) {
@@ -411,19 +431,19 @@ function AuditEventTable({
           <thead>
             <tr className="border-b border-[#edf1ef] bg-[#fbfcfb] text-[10px] font-extrabold uppercase tracking-[.13em] text-[#8a9994]">
               <th className="px-6 py-3.5" scope="col">
-                Event
+                {t('audit.table.event')}
               </th>
               <th className="px-4 py-3.5" scope="col">
-                Outcome
+                {t('audit.table.outcome')}
               </th>
               <th className="px-4 py-3.5" scope="col">
-                Resource
+                {t('audit.table.resource')}
               </th>
               <th className="px-4 py-3.5" scope="col">
-                Actor
+                {t('audit.table.actor')}
               </th>
               <th className="px-6 py-3.5" scope="col">
-                Occurred
+                {t('audit.table.occurred')}
               </th>
             </tr>
           </thead>
@@ -437,19 +457,19 @@ function AuditEventTable({
                   <button
                     type="button"
                     onClick={() => onSelect(event)}
-                    aria-label={`View ${auditEventLabel(event.eventType)} details`}
+                    aria-label={t('audit.event.view', { event: event.eventType })}
                     className="group text-left"
                   >
                     <span className="block text-xs font-bold text-[#17372d] group-hover:text-emerald-700">
-                      {auditEventLabel(event.eventType)}
+                      {t('audit.event.generic')}
                     </span>
                     <span className="mt-1 block font-mono text-[9px] text-[#889791]">
-                      {abbreviate(event.id, 18)}
+                      {event.eventType} · {abbreviate(event.id, 18)}
                     </span>
                   </button>
                 </td>
                 <td className="px-4 py-4">
-                  <OutcomeBadge outcome={event.outcome} />
+                  <OutcomeBadge outcome={event.outcome} t={t} />
                 </td>
                 <td className="px-4 py-4 text-[11px] text-[#60756d]">
                   {event.resourceType && event.resourceId ? (
@@ -460,16 +480,18 @@ function AuditEventTable({
                       </span>
                     </>
                   ) : (
-                    <span className="text-[#9aa7a2]">Not attached</span>
+                    <span className="text-[#9aa7a2]">{t('audit.notAttached')}</span>
                   )}
                 </td>
                 <td className="px-4 py-4 font-mono text-[9px] text-[#71837c]">
-                  {event.actorMembershipId ? abbreviate(event.actorMembershipId, 18) : 'System'}
+                  {event.actorMembershipId
+                    ? abbreviate(event.actorMembershipId, 18)
+                    : t('audit.system')}
                 </td>
                 <td className="px-6 py-4 text-[11px] text-[#536c63]">
-                  <span className="block font-bold">{formatDate(event.occurredAt)}</span>
+                  <span className="block font-bold">{formatDate(event.occurredAt, locale)}</span>
                   <span className="mt-1 block text-[9px] text-[#8b9994]">
-                    {formatTime(event.occurredAt)}
+                    {formatTime(event.occurredAt, locale)}
                   </span>
                 </td>
               </tr>
@@ -484,19 +506,19 @@ function AuditEventTable({
             <button
               type="button"
               onClick={() => onSelect(event)}
-              aria-label={`View ${auditEventLabel(event.eventType)} details`}
+              aria-label={t('audit.event.view', { event: event.eventType })}
               className="block w-full p-4 text-left sm:p-5"
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <span className="block text-xs font-bold text-[#17372d]">
-                    {auditEventLabel(event.eventType)}
+                    {t('audit.event.generic')}
                   </span>
                   <span className="mt-1 block font-mono text-[9px] text-[#889791]">
-                    {abbreviate(event.id, 18)}
+                    {event.eventType} · {abbreviate(event.id, 18)}
                   </span>
                 </div>
-                <OutcomeBadge outcome={event.outcome} />
+                <OutcomeBadge outcome={event.outcome} t={t} />
               </div>
               <p className="mt-2 text-[11px] text-[#60756d]">
                 {event.resourceType && event.resourceId ? (
@@ -505,12 +527,17 @@ function AuditEventTable({
                     <span className="font-mono text-[9px]">{abbreviate(event.resourceId, 18)}</span>
                   </>
                 ) : (
-                  <span className="text-[#9aa7a2]">No resource attached</span>
+                  <span className="text-[#9aa7a2]">{t('audit.noResource')}</span>
                 )}
               </p>
               <p className="mt-2 text-[11px] text-[#536c63]">
-                {formatDate(event.occurredAt)} · {formatTime(event.occurredAt)} · Actor{' '}
-                {event.actorMembershipId ? abbreviate(event.actorMembershipId, 18) : 'System'}
+                {t('audit.mobile.timeline', {
+                  date: formatDate(event.occurredAt, locale),
+                  time: formatTime(event.occurredAt, locale),
+                  actor: event.actorMembershipId
+                    ? abbreviate(event.actorMembershipId, 18)
+                    : t('audit.system'),
+                })}
               </p>
             </button>
           </li>
@@ -520,58 +547,70 @@ function AuditEventTable({
   );
 }
 
-function AuditEventDetails({ event, onClose }: { event: AuditEvent; onClose: () => void }) {
+function AuditEventDetails({
+  event,
+  locale,
+  t,
+  onClose,
+}: {
+  event: AuditEvent;
+  locale: string;
+  t: Translator;
+  onClose: () => void;
+}) {
   const metadata = Object.entries(event.metadata);
   return (
     <aside
       className="h-fit overflow-hidden rounded-[1.4rem] border border-[#dfe7e3] bg-white shadow-[0_18px_60px_rgba(24,57,47,.08)] xl:sticky xl:top-24"
-      aria-label="Audit event details"
+      aria-label={t('audit.details.aria')}
     >
       <div className="flex items-start justify-between gap-4 bg-[#0a2a22] px-5 py-5 text-white">
         <div>
           <p className="text-[9px] font-extrabold uppercase tracking-[.18em] text-emerald-300">
-            Evidence detail
+            {t('audit.details.eyebrow')}
           </p>
-          <h2 className="mt-2 text-sm font-bold leading-5">{auditEventLabel(event.eventType)}</h2>
+          <h2 className="mt-2 text-sm font-bold leading-5">
+            {t('audit.event.generic')} · <code>{event.eventType}</code>
+          </h2>
         </div>
         <button
           type="button"
           onClick={onClose}
-          aria-label="Close audit event details"
+          aria-label={t('audit.details.close')}
           className="grid size-8 shrink-0 place-items-center rounded-lg bg-white/[.07] text-white/60 hover:bg-white/10 hover:text-white"
         >
           <Icon name="close" className="size-4" />
         </button>
       </div>
       <div className="space-y-5 px-5 py-5">
-        <OutcomeBadge outcome={event.outcome} />
+        <OutcomeBadge outcome={event.outcome} t={t} />
         <DetailItem
-          label="Occurred"
-          value={`${formatDate(event.occurredAt)} · ${formatTime(event.occurredAt)}`}
+          label={t('audit.details.occurred')}
+          value={`${formatDate(event.occurredAt, locale)} · ${formatTime(event.occurredAt, locale)}`}
         />
-        <DetailItem label="Event ID" value={event.id} mono />
+        <DetailItem label={t('audit.details.eventId')} value={event.id} mono />
         <DetailItem
-          label="Actor membership"
-          value={event.actorMembershipId ?? 'System actor'}
+          label={t('audit.details.actorMembership')}
+          value={event.actorMembershipId ?? t('audit.details.systemActor')}
           mono={Boolean(event.actorMembershipId)}
         />
         <DetailItem
-          label="Request ID"
-          value={event.requestId ?? 'Not recorded'}
+          label={t('audit.details.requestId')}
+          value={event.requestId ?? t('audit.details.notRecorded')}
           mono={Boolean(event.requestId)}
         />
         <DetailItem
-          label="Resource"
+          label={t('audit.details.resource')}
           value={
             event.resourceType && event.resourceId
               ? `${event.resourceType} · ${event.resourceId}`
-              : 'Not attached'
+              : t('audit.notAttached')
           }
           mono={Boolean(event.resourceId)}
         />
         <div>
           <p className="text-[9px] font-extrabold uppercase tracking-[.14em] text-[#899791]">
-            Reviewed metadata
+            {t('audit.details.metadata')}
           </p>
           {metadata.length > 0 ? (
             <dl className="mt-2 divide-y divide-[#edf1ef] rounded-xl border border-[#e2e9e6] bg-[#fbfcfb] px-3">
@@ -588,13 +627,11 @@ function AuditEventDetails({ event, onClose }: { event: AuditEvent; onClose: () 
               ))}
             </dl>
           ) : (
-            <p className="mt-2 text-[11px] text-[#82918c]">
-              No metadata recorded for this event type.
-            </p>
+            <p className="mt-2 text-[11px] text-[#82918c]">{t('audit.details.noMetadata')}</p>
           )}
         </div>
         <p className="rounded-xl bg-emerald-50 px-3 py-3 text-[10px] leading-5 text-emerald-800">
-          This interface cannot modify or delete audit evidence.
+          {t('audit.details.immutable')}
         </p>
       </div>
     </aside>
@@ -622,42 +659,42 @@ function DetailItem({
   );
 }
 
-function OutcomeBadge({ outcome }: { outcome: AuditOutcome }) {
+function OutcomeBadge({ outcome, t }: { outcome: AuditOutcome; t: Translator }) {
   const tone = outcome === 'SUCCEEDED' ? 'emerald' : outcome === 'DENIED' ? 'rose' : 'amber';
-  return <StatusBadge tone={tone}>{outcome}</StatusBadge>;
+  return <StatusBadge tone={tone}>{outcomeLabel(outcome, t)}</StatusBadge>;
 }
 
-function AuditAccessDenied({ onRetry }: { onRetry: () => void }) {
+function AuditAccessDenied({ t, onRetry }: { t: Translator; onRetry: () => void }) {
   return (
     <div className="mx-auto max-w-3xl rounded-[1.75rem] border border-[#dfe7e3] bg-white px-6 py-16 text-center shadow-[0_24px_70px_rgba(20,52,42,.08)] sm:px-10">
       <span className="mx-auto grid size-14 place-items-center rounded-2xl bg-amber-50 text-amber-700">
         <Icon name="shield" className="size-6" />
       </span>
       <p className="mt-5 text-[10px] font-extrabold uppercase tracking-[.18em] text-amber-700">
-        Restricted evidence
+        {t('audit.access.eyebrow')}
       </p>
       <h1 className="mt-2 font-[var(--font-display)] text-2xl font-bold tracking-[-.035em] text-[#173128]">
-        Audit access is not assigned
+        {t('audit.access.title')}
       </h1>
       <p className="mx-auto mt-3 max-w-xl text-sm leading-7 text-[#71827c]">
-        Your active tenant membership requires the{' '}
+        {t('audit.access.detailPrefix')}{' '}
         <code className="rounded bg-[#f2f5f4] px-1.5 py-1 text-[11px]">audit.events.read</code>{' '}
-        permission. No tenant evidence was returned.
+        {t('audit.access.detailSuffix')}
       </p>
       <button
         type="button"
         onClick={onRetry}
         className="mt-6 rounded-xl bg-[#0a342a] px-4 py-2.5 text-xs font-bold text-white"
       >
-        Check access again
+        {t('audit.access.retry')}
       </button>
     </div>
   );
 }
 
-function LoadingState() {
+function LoadingState({ t }: { t: Translator }) {
   return (
-    <div className="space-y-3 px-6 py-7" aria-label="Loading audit events">
+    <div className="space-y-3 px-6 py-7" aria-label={t('audit.loading')}>
       {[0, 1, 2, 3].map((item) => (
         <div key={item} className="h-14 animate-pulse rounded-xl bg-[#f0f4f2]" />
       ))}
@@ -665,55 +702,53 @@ function LoadingState() {
   );
 }
 
-function ErrorState({ error, onRetry }: { error: string; onRetry: () => void }) {
+function ErrorState({ t, error, onRetry }: { t: Translator; error: string; onRetry: () => void }) {
   return (
     <div role="alert" className="px-6 py-16 text-center">
       <span className="mx-auto grid size-12 place-items-center rounded-2xl bg-rose-50 text-rose-700">
         <Icon name="warning" className="size-5" />
       </span>
-      <p className="mt-4 text-sm font-bold text-[#28463c]">Audit evidence could not be loaded</p>
+      <p className="mt-4 text-sm font-bold text-[#28463c]">{t('audit.error.title')}</p>
       <p className="mx-auto mt-2 max-w-lg text-xs leading-6 text-[#7c8c86]">{error}</p>
       <button
         type="button"
         onClick={onRetry}
         className="mt-5 rounded-xl border border-[#d7e2dd] px-4 py-2.5 text-xs font-bold text-emerald-800"
       >
-        Try again
+        {t('audit.tryAgain')}
       </button>
     </div>
   );
 }
 
-function EmptyState() {
+function EmptyState({ t }: { t: Translator }) {
   return (
     <div className="px-6 py-16 text-center">
       <span className="mx-auto grid size-12 place-items-center rounded-2xl bg-emerald-50 text-emerald-700">
         <Icon name="audit" className="size-5" />
       </span>
-      <p className="mt-4 text-sm font-bold text-[#28463c]">No matching evidence</p>
-      <p className="mt-2 text-xs text-[#7c8c86]">
-        Adjust the filters or clear them to review recent tenant events.
-      </p>
+      <p className="mt-4 text-sm font-bold text-[#28463c]">{t('audit.empty.title')}</p>
+      <p className="mt-2 text-xs text-[#7c8c86]">{t('audit.empty.detail')}</p>
     </div>
   );
 }
 
-function validateFilterDraft(draft: FilterDraft): string | null {
+function validateFilterDraft(draft: FilterDraft, t: Translator): string | null {
   if (Boolean(draft.resourceType.trim()) !== Boolean(draft.resourceId.trim()))
-    return 'Resource type and resource ID must be supplied together.';
+    return t('audit.validation.resourcePair');
   if (
     draft.actorMembershipId.trim() &&
     !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
       draft.actorMembershipId.trim(),
     )
   )
-    return 'Actor membership ID must be a version 4 UUID.';
+    return t('audit.validation.actorId');
   if (
     draft.startDate &&
     draft.endDate &&
     new Date(draft.startDate).getTime() > new Date(draft.endDate).getTime()
   )
-    return 'The start time must be earlier than the end time.';
+    return t('audit.validation.dateOrder');
   return null;
 }
 
@@ -733,7 +768,7 @@ function toFilters(draft: FilterDraft): AuditEventFilters {
   };
 }
 
-function loadedMetrics(events: readonly AuditEvent[]) {
+function loadedMetrics(events: readonly AuditEvent[], locale: string, t: Translator) {
   const newest = events[0];
   return {
     total: events.length,
@@ -741,8 +776,8 @@ function loadedMetrics(events: readonly AuditEvent[]) {
     actors: new Set(
       events.flatMap((event) => (event.actorMembershipId ? [event.actorMembershipId] : [])),
     ).size,
-    newestTime: newest ? formatTime(newest.occurredAt) : '—',
-    newestDate: newest ? formatDate(newest.occurredAt) : 'No evidence loaded',
+    newestTime: newest ? formatTime(newest.occurredAt, locale) : '—',
+    newestDate: newest ? formatDate(newest.occurredAt, locale) : t('audit.metric.none'),
   };
 }
 
@@ -754,16 +789,16 @@ function mergeEvents(
   return [...current, ...incoming.filter((event) => !known.has(event.id))];
 }
 
-function formatDate(value: string): string {
-  return new Intl.DateTimeFormat('en-IN', {
+function formatDate(value: string, locale: string): string {
+  return new Intl.DateTimeFormat(locale, {
     day: '2-digit',
     month: 'short',
     year: 'numeric',
   }).format(new Date(value));
 }
 
-function formatTime(value: string): string {
-  return new Intl.DateTimeFormat('en-IN', { hour: '2-digit', minute: '2-digit' }).format(
+function formatTime(value: string, locale: string): string {
+  return new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit' }).format(
     new Date(value),
   );
 }
@@ -774,3 +809,14 @@ function abbreviate(value: string, maximum: number): string {
 
 const inputClassName =
   'h-10 w-full rounded-xl border border-[#dbe4e0] bg-[#fbfcfb] px-3 text-xs text-[#18352c] placeholder:text-[#93a09c] focus:border-emerald-500';
+
+type Translator = (key: TranslationKey, values?: TranslationValues) => string;
+
+function outcomeLabel(outcome: AuditOutcome, t: Translator): string {
+  const keyByOutcome: Record<AuditOutcome, TranslationKey> = {
+    SUCCEEDED: 'audit.outcome.succeeded',
+    DENIED: 'audit.outcome.denied',
+    FAILED: 'audit.outcome.failed',
+  };
+  return t(keyByOutcome[outcome]);
+}

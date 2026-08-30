@@ -61,6 +61,7 @@ describe('login session boundary', () => {
             email: validRequest.email,
             firstName: 'Test',
             lastName: 'User',
+            preferredLanguage: 'en',
           },
           context: {
             membershipId: 'membership-id',
@@ -119,6 +120,7 @@ describe('login session boundary', () => {
             email: validRequest.email,
             firstName: 'Test',
             lastName: 'User',
+            preferredLanguage: 'en',
             permissions: ['unsafe-upstream-field'],
           },
           context: {

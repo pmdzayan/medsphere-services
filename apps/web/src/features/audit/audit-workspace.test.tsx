@@ -1,5 +1,6 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { LanguageProvider } from '@/components/language-provider';
 import { ApiError, getAuditEvents } from '@/lib/api-client';
 import { type AuditEvent } from '@/lib/audit-contract';
 import { AuditWorkspace } from './audit-workspace';
@@ -40,13 +41,21 @@ beforeEach(() => {
 
 afterEach(() => cleanup());
 
+function renderWorkspace() {
+  return render(
+    <LanguageProvider initialLocale="en">
+      <AuditWorkspace />
+    </LanguageProvider>,
+  );
+}
+
 describe('AuditWorkspace interactions', () => {
   it('renders live evidence and opens reviewed details', async () => {
-    render(<AuditWorkspace />);
+    renderWorkspace();
 
     fireEvent.click(
       within(await screen.findByRole('table')).getByRole('button', {
-        name: /View Authorization · Permission · Denied details/i,
+        name: /View audit event authorization\.permission\.denied details/i,
       }),
     );
 
@@ -58,7 +67,7 @@ describe('AuditWorkspace interactions', () => {
   });
 
   it('applies server-side outcome filters', async () => {
-    render(<AuditWorkspace />);
+    renderWorkspace();
     await screen.findByText('Tenant events');
 
     fireEvent.change(screen.getByLabelText('Outcome'), { target: { value: 'DENIED' } });
@@ -74,19 +83,19 @@ describe('AuditWorkspace interactions', () => {
       .mockResolvedValueOnce({ data: [deniedEvent], nextCursor: roleEvent.id })
       .mockResolvedValueOnce({ data: [deniedEvent, roleEvent], nextCursor: null });
 
-    render(<AuditWorkspace />);
+    renderWorkspace();
 
     fireEvent.click(await screen.findByRole('button', { name: 'Load older evidence' }));
 
     const table = await screen.findByRole('table');
     expect(
       await within(table).findByRole('button', {
-        name: /View Authorization · Role · Created details/i,
+        name: /View audit event authorization\.role\.created details/i,
       }),
     ).toBeVisible();
     expect(
       within(table).getAllByRole('button', {
-        name: /View Authorization · Permission · Denied details/i,
+        name: /View audit event authorization\.permission\.denied details/i,
       }),
     ).toHaveLength(1);
     expect(getAuditEvents).toHaveBeenLastCalledWith({ limit: 25, cursor: roleEvent.id });
@@ -95,7 +104,7 @@ describe('AuditWorkspace interactions', () => {
   it('fails closed with a permission-specific access state', async () => {
     vi.mocked(getAuditEvents).mockRejectedValue(new ApiError('Permission denied', 403));
 
-    render(<AuditWorkspace />);
+    renderWorkspace();
 
     expect(
       await screen.findByRole('heading', { name: 'Audit access is not assigned' }),
@@ -105,7 +114,7 @@ describe('AuditWorkspace interactions', () => {
   });
 
   it('rejects incomplete resource filters before making another request', async () => {
-    render(<AuditWorkspace />);
+    renderWorkspace();
     await screen.findByText('Tenant events');
 
     fireEvent.change(screen.getByLabelText('Resource type'), { target: { value: 'Role' } });

@@ -47,6 +47,7 @@ describe('Google login session boundary', () => {
             email: 'user@example.com',
             firstName: 'Test',
             lastName: 'User',
+            preferredLanguage: 'en',
           },
           context: {
             membershipId: 'membership-id',
@@ -96,6 +97,7 @@ describe('Google login session boundary', () => {
             email: 'user@example.com',
             firstName: 'Test',
             lastName: 'User',
+            preferredLanguage: 'en',
             permissions: ['unsafe-upstream-field'],
           },
           context: {

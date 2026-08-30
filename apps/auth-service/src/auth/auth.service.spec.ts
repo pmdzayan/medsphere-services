@@ -31,6 +31,7 @@ describe('AuthService', () => {
       passwordHash: 'password-hash',
       firstName: 'Test',
       lastName: 'User',
+      preferredLanguage: 'ta',
     },
     membershipId,
     tenantId,
@@ -150,6 +151,7 @@ describe('AuthService', () => {
       tenantName: 'Central Pharmacy',
       organizationType: 'PHARMACY',
     });
+    expect(result.user.preferredLanguage).toBe('ta');
     expect(result).not.toHaveProperty('passwordHash');
   });
 
@@ -284,6 +286,7 @@ describe('AuthService', () => {
       tenantName: 'Central Pharmacy',
       organizationType: 'PHARMACY',
     });
+    expect(result.user.preferredLanguage).toBe('ta');
   });
 
   it('rejects an unknown Google identity without creating a session', async () => {

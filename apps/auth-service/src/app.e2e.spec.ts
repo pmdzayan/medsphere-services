@@ -236,15 +236,11 @@ describe('S0.4 authentication and authorization HTTP security boundary', () => {
 
     const languages = await sendRequest('/localization/languages');
     expect(languages.status).toBe(200);
-    expect(languages.body).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ code: 'en' }),
-        expect.objectContaining({ code: 'hi' }),
-        expect.objectContaining({ code: 'ta' }),
-        expect.objectContaining({ code: 'te' }),
-        expect.objectContaining({ code: 'kn' }),
-      ]),
-    );
+    expect(languages.body).toEqual([
+      expect.objectContaining({ code: 'en' }),
+      expect.objectContaining({ code: 'ta' }),
+      expect.objectContaining({ code: 'ur' }),
+    ]);
 
     const publicLoginBoundary = await sendRequest('/auth/login', {
       method: 'POST',

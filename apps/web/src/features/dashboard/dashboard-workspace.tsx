@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { MetricCard, SectionCard, StatusBadge } from '@/components/platform/dashboard-primitives';
 import { Icon } from '@/components/platform/icon';
+import { useLanguage } from '@/components/language-provider';
 import {
   Badge,
   Button,
@@ -27,6 +28,7 @@ import type {
   InventoryStockPage,
   ProviderAccess,
 } from '@/lib/inventory-contract';
+import type { TranslationKey, TranslationValues } from '@/lib/i18n';
 import {
   RESERVATION_STATUSES,
   type ProviderReservation,
@@ -44,6 +46,7 @@ const EXPIRY_HORIZON_DAYS = 30;
 const RECENT_ACTIVITY_LIMIT = 5;
 
 type PublicError = { message: string; status?: number };
+type Translator = (key: TranslationKey, values?: TranslationValues) => string;
 
 const statusTone: Record<ReservationStatus, 'emerald' | 'amber' | 'rose' | 'cyan' | 'slate'> = {
   PENDING: 'amber',
@@ -55,6 +58,7 @@ const statusTone: Record<ReservationStatus, 'emerald' | 'amber' | 'rose' | 'cyan
 };
 
 export function DashboardWorkspace() {
+  const { t } = useLanguage();
   const [providers, setProviders] = useState<ProviderAccess[]>([]);
   const [providerId, setProviderId] = useState('');
   const [providersLoading, setProvidersLoading] = useState(true);
@@ -94,75 +98,84 @@ export function DashboardWorkspace() {
       if (request !== providerRequest.current) return;
       setProviders([]);
       setProviderId('');
-      setProviderError(toPublicError(error, 'Unable to load assigned providers.'));
+      setProviderError(toPublicError(error, t('dashboard.providersLoadFailed')));
     } finally {
       if (request === providerRequest.current) setProvidersLoading(false);
     }
-  }, []);
+  }, [t]);
 
-  const loadStock = useCallback(async (selectedProvider: string) => {
-    const request = ++stockRequest.current;
-    setStockLoading(true);
-    setStockError(null);
-    setStock(null);
-    try {
-      const page = await getProviderStock({
-        providerId: selectedProvider,
-        limit: PAGE_SIZE,
-        offset: 0,
-      });
-      if (request === stockRequest.current) setStock(page);
-    } catch (error) {
-      if (request === stockRequest.current) {
-        setStockError(toPublicError(error, 'Unable to load provider stock.'));
+  const loadStock = useCallback(
+    async (selectedProvider: string) => {
+      const request = ++stockRequest.current;
+      setStockLoading(true);
+      setStockError(null);
+      setStock(null);
+      try {
+        const page = await getProviderStock({
+          providerId: selectedProvider,
+          limit: PAGE_SIZE,
+          offset: 0,
+        });
+        if (request === stockRequest.current) setStock(page);
+      } catch (error) {
+        if (request === stockRequest.current) {
+          setStockError(toPublicError(error, t('dashboard.stockLoadFailed')));
+        }
+      } finally {
+        if (request === stockRequest.current) setStockLoading(false);
       }
-    } finally {
-      if (request === stockRequest.current) setStockLoading(false);
-    }
-  }, []);
+    },
+    [t],
+  );
 
-  const loadReservations = useCallback(async (selectedProvider: string) => {
-    const request = ++reservationRequest.current;
-    setReservationsLoading(true);
-    setReservationsError(null);
-    setReservations(null);
-    try {
-      const page = await getProviderReservations({
-        providerId: selectedProvider,
-        limit: PAGE_SIZE,
-        offset: 0,
-      });
-      if (request === reservationRequest.current) setReservations(page);
-    } catch (error) {
-      if (request === reservationRequest.current) {
-        setReservationsError(toPublicError(error, 'Unable to load provider reservations.'));
+  const loadReservations = useCallback(
+    async (selectedProvider: string) => {
+      const request = ++reservationRequest.current;
+      setReservationsLoading(true);
+      setReservationsError(null);
+      setReservations(null);
+      try {
+        const page = await getProviderReservations({
+          providerId: selectedProvider,
+          limit: PAGE_SIZE,
+          offset: 0,
+        });
+        if (request === reservationRequest.current) setReservations(page);
+      } catch (error) {
+        if (request === reservationRequest.current) {
+          setReservationsError(toPublicError(error, t('dashboard.reservationsLoadFailed')));
+        }
+      } finally {
+        if (request === reservationRequest.current) setReservationsLoading(false);
       }
-    } finally {
-      if (request === reservationRequest.current) setReservationsLoading(false);
-    }
-  }, []);
+    },
+    [t],
+  );
 
-  const loadExpiryWorklist = useCallback(async (selectedProvider: string) => {
-    const request = ++expiryRequest.current;
-    setExpiryLoading(true);
-    setExpiryError(null);
-    setExpiryWorklist(null);
-    try {
-      const page = await getProviderExpiryWorklist({
-        providerId: selectedProvider,
-        horizonDays: EXPIRY_HORIZON_DAYS,
-        limit: 5,
-        offset: 0,
-      });
-      if (request === expiryRequest.current) setExpiryWorklist(page);
-    } catch (error) {
-      if (request === expiryRequest.current) {
-        setExpiryError(toPublicError(error, 'Unable to load the expiry worklist.'));
+  const loadExpiryWorklist = useCallback(
+    async (selectedProvider: string) => {
+      const request = ++expiryRequest.current;
+      setExpiryLoading(true);
+      setExpiryError(null);
+      setExpiryWorklist(null);
+      try {
+        const page = await getProviderExpiryWorklist({
+          providerId: selectedProvider,
+          horizonDays: EXPIRY_HORIZON_DAYS,
+          limit: 5,
+          offset: 0,
+        });
+        if (request === expiryRequest.current) setExpiryWorklist(page);
+      } catch (error) {
+        if (request === expiryRequest.current) {
+          setExpiryError(toPublicError(error, t('dashboard.expiryLoadFailed')));
+        }
+      } finally {
+        if (request === expiryRequest.current) setExpiryLoading(false);
       }
-    } finally {
-      if (request === expiryRequest.current) setExpiryLoading(false);
-    }
-  }, []);
+    },
+    [t],
+  );
 
   const loadRecentActivity = useCallback(async () => {
     const request = ++recentActivityRequest.current;
@@ -176,13 +189,13 @@ export function DashboardWorkspace() {
         setRecentActivity(null);
         // A 403 here means this membership lacks audit-read permission -- that
         // is an honest, expected outcome, not an error worth alarming over.
-        const publicError = toPublicError(error, 'Unable to load recent activity.');
+        const publicError = toPublicError(error, t('dashboard.activityLoadFailed'));
         setRecentActivityError(publicError);
       }
     } finally {
       if (request === recentActivityRequest.current) setRecentActivityLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     void loadProviders();
@@ -243,22 +256,21 @@ export function DashboardWorkspace() {
       <header className="flex flex-col justify-between gap-5 lg:flex-row lg:items-end">
         <div>
           <p className="text-xs font-extrabold uppercase tracking-[.18em] text-emerald-700">
-            Assigned-provider operations
+            {t('dashboard.eyebrow')}
           </p>
           <h1 className="mt-3 font-[var(--font-display)] text-3xl font-bold tracking-[-.045em] text-[#10271f] sm:text-[2.45rem]">
-            Operations overview
+            {t('dashboard.title')}
           </h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-[#71817c]">
-            A read-only current-page view of accepted stock and reservation records. No patient,
-            prescription, payment, or delivery identity is displayed.
+            {t('dashboard.description')}
           </p>
         </div>
-        <nav aria-label="Operations workspaces" className="flex flex-wrap gap-2.5">
+        <nav aria-label={t('dashboard.workspaceNavigation')} className="flex flex-wrap gap-2.5">
           <WorkspaceLink href="/inventory" icon="inventory">
-            Open Inventory
+            {t('dashboard.openInventory')}
           </WorkspaceLink>
           <WorkspaceLink href="/reservations" icon="reservations">
-            Open Reservations
+            {t('dashboard.openReservations')}
           </WorkspaceLink>
         </nav>
       </header>
@@ -267,53 +279,55 @@ export function DashboardWorkspace() {
         <div className="border-b border-[#edf1ef] bg-[#fbfcfb] p-4 sm:p-5 lg:px-6">
           <label className="block max-w-xl">
             <span className="mb-1.5 block text-[10px] font-extrabold uppercase tracking-[.14em] text-[#70827b]">
-              Assigned provider
+              {t('dashboard.assignedProvider')}
             </span>
             <select
-              aria-label="Assigned provider"
+              aria-label={t('dashboard.assignedProvider')}
               value={providerId}
               disabled={providersLoading || providers.length === 0}
               onChange={(event) => selectProvider(event.target.value)}
               className="h-11 w-full rounded-xl border border-[#dce5e1] bg-white px-3 text-sm font-semibold text-[#38544b] disabled:opacity-60"
             >
               {providers.length === 0 ? (
-                <option value="">No active provider assignment</option>
+                <option value="">{t('dashboard.noProvider')}</option>
               ) : null}
               {providers.map((provider) => (
                 <option key={provider.providerId} value={provider.providerId}>
                   {provider.businessName} ·{' '}
-                  {provider.providerType === 'PHARMACY' ? 'Pharmacy' : 'Hospital'}
+                  {provider.providerType === 'PHARMACY'
+                    ? t('dashboard.pharmacy')
+                    : t('dashboard.hospital')}
                 </option>
               ))}
             </select>
           </label>
           {selectedProvider ? (
             <p className="mt-2 text-xs text-[#7a8b85]">
-              Showing bounded reads for {selectedProvider.businessName}.
+              {t('dashboard.showingProvider', { provider: selectedProvider.businessName })}
             </p>
           ) : null}
         </div>
-        {providersLoading ? <LoadingState label="Checking assigned providers…" /> : null}
+        {providersLoading ? <LoadingState label={t('dashboard.checkingProviders')} /> : null}
         {!providersLoading && providerError ? (
           <StatePanel
-            title={errorTitle(providerError, 'Assigned providers are unavailable')}
+            title={errorTitle(providerError, t('dashboard.providersUnavailable'), t)}
             detail={providerError.message}
-            action="Retry provider access"
+            action={t('dashboard.retryProvider')}
             onAction={() => void loadProviders()}
           />
         ) : null}
         {!providersLoading && !providerError && providers.length === 0 ? (
           <StatePanel
-            title="No active provider assignment"
-            detail="Ask a tenant administrator to assign this membership to an active pharmacy or hospital."
-            action="Check assignments again"
+            title={t('dashboard.noProvider')}
+            detail={t('dashboard.noProviderDetail')}
+            action={t('dashboard.checkAssignments')}
             onAction={() => void loadProviders()}
           />
         ) : null}
       </SectionCard>
 
       <section aria-labelledby="attention-title" className="space-y-3">
-        <SectionTitle id="attention-title">Needs attention</SectionTitle>
+        <SectionTitle id="attention-title">{t('dashboard.needsAttention')}</SectionTitle>
         <div className="grid gap-3 lg:grid-cols-[1.4fr_1fr]">
           <AttentionCard
             providerSelected={Boolean(providerId)}
@@ -334,83 +348,82 @@ export function DashboardWorkspace() {
       {providerId ? (
         <>
           <section aria-labelledby="stock-metrics-title" className="space-y-3">
-            <SectionTitle id="stock-metrics-title">Stock · Current page</SectionTitle>
+            <SectionTitle id="stock-metrics-title">{t('dashboard.stockCurrentPage')}</SectionTitle>
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
               <MetricCard
-                label="Products"
+                label={t('dashboard.products')}
                 value={metricValue(stock, stockMetrics.products)}
                 icon="inventory"
-                detail="Current page"
+                detail={t('dashboard.currentPage')}
               />
               <MetricCard
-                label="Batches"
+                label={t('dashboard.batches')}
                 value={metricValue(stock, stockMetrics.batches)}
                 icon="calendar"
                 accent="cyan"
-                detail="Current page"
+                detail={t('dashboard.currentPage')}
               />
               <MetricCard
-                label="On-hand units"
+                label={t('dashboard.onHandUnits')}
                 value={metricValue(stock, stockMetrics.onHand)}
                 icon="inventory"
                 accent="amber"
-                detail="Current page"
+                detail={t('dashboard.currentPage')}
               />
               <MetricCard
-                label="Held units"
+                label={t('dashboard.heldUnits')}
                 value={metricValue(stock, stockMetrics.held)}
                 icon="clock"
                 accent="rose"
-                detail="Current page"
+                detail={t('dashboard.currentPage')}
               />
               <MetricCard
-                label="Available units"
+                label={t('dashboard.availableUnits')}
                 value={metricValue(stock, stockMetrics.available)}
                 icon="inventory"
-                detail="Current page"
+                detail={t('dashboard.currentPage')}
               />
             </div>
           </section>
 
           <section aria-labelledby="reservation-metrics-title" className="space-y-3">
-            <SectionTitle id="reservation-metrics-title">Reservations · Current page</SectionTitle>
+            <SectionTitle id="reservation-metrics-title">
+              {t('dashboard.reservationsCurrentPage')}
+            </SectionTitle>
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
               <MetricCard
-                label="Reservations"
+                label={t('dashboard.reservations')}
                 value={metricValue(reservations, reservationMetrics.total)}
                 icon="reservations"
-                detail="Current page"
+                detail={t('dashboard.currentPage')}
               />
               <MetricCard
-                label="Medicine units"
+                label={t('dashboard.medicineUnits')}
                 value={metricValue(reservations, reservationMetrics.units)}
                 icon="inventory"
                 accent="cyan"
-                detail="Current page"
+                detail={t('dashboard.currentPage')}
               />
               <MetricCard
-                label="Pending or confirmed"
+                label={t('dashboard.pendingOrConfirmed')}
                 value={metricValue(reservations, reservationMetrics.open)}
                 icon="clock"
                 accent="amber"
-                detail="Current page"
+                detail={t('dashboard.currentPage')}
               />
               <MetricCard
-                label="Ready"
+                label={t('dashboard.ready')}
                 value={metricValue(reservations, reservationMetrics.ready)}
                 icon="reservations"
                 accent="rose"
-                detail="Current page"
+                detail={t('dashboard.currentPage')}
               />
             </div>
             {reservations && reservationMetrics.total > 0 ? (
-              <div
-                aria-label="Current-page reservation status counts"
-                className="flex flex-wrap gap-2"
-              >
+              <div aria-label={t('dashboard.statusCounts')} className="flex flex-wrap gap-2">
                 {RESERVATION_STATUSES.map((status) => (
                   <StatusBadge key={status} tone={statusTone[status]}>
-                    {titleCase(status)}: {reservationMetrics.statuses[status]}
+                    {reservationStatusLabel(status, t)}: {reservationMetrics.statuses[status]}
                   </StatusBadge>
                 ))}
               </div>
@@ -420,26 +433,26 @@ export function DashboardWorkspace() {
           <div className="grid gap-5 2xl:grid-cols-2">
             <SectionCard>
               <PanelHeader
-                title="Stock records"
+                title={t('dashboard.stockRecords')}
                 resultCount={stock?.total}
                 loading={stockLoading}
-                action="Retry stock"
+                action={t('dashboard.retryStock')}
                 onAction={() => void loadStock(providerId)}
               />
-              {stockLoading ? <LoadingState label="Loading current-page stock…" /> : null}
+              {stockLoading ? <LoadingState label={t('dashboard.loadingStock')} /> : null}
               {!stockLoading && stockError ? (
                 <StatePanel
-                  title={errorTitle(stockError, 'Stock is unavailable')}
+                  title={errorTitle(stockError, t('dashboard.stockUnavailable'), t)}
                   detail={stockError.message}
-                  action="Retry stock"
+                  action={t('dashboard.retryStock')}
                   onAction={() => void loadStock(providerId)}
                 />
               ) : null}
               {!stockLoading && !stockError && stock?.data.length === 0 ? (
                 <StatePanel
-                  title="No stock records"
-                  detail="The accepted stock read returned no products for this provider."
-                  action="Refresh stock"
+                  title={t('dashboard.noStock')}
+                  detail={t('dashboard.noStockDetail')}
+                  action={t('dashboard.refreshStock')}
                   onAction={() => void loadStock(providerId)}
                 />
               ) : null}
@@ -450,28 +463,28 @@ export function DashboardWorkspace() {
 
             <SectionCard>
               <PanelHeader
-                title="Reservation records"
+                title={t('dashboard.reservationRecords')}
                 resultCount={reservations?.total}
                 loading={reservationsLoading}
-                action="Retry reservations"
+                action={t('dashboard.retryReservations')}
                 onAction={() => void loadReservations(providerId)}
               />
               {reservationsLoading ? (
-                <LoadingState label="Loading current-page reservations…" />
+                <LoadingState label={t('dashboard.loadingReservations')} />
               ) : null}
               {!reservationsLoading && reservationsError ? (
                 <StatePanel
-                  title={errorTitle(reservationsError, 'Reservations are unavailable')}
+                  title={errorTitle(reservationsError, t('dashboard.reservationsUnavailable'), t)}
                   detail={reservationsError.message}
-                  action="Retry reservations"
+                  action={t('dashboard.retryReservations')}
                   onAction={() => void loadReservations(providerId)}
                 />
               ) : null}
               {!reservationsLoading && !reservationsError && reservations?.data.length === 0 ? (
                 <StatePanel
-                  title="No reservation records"
-                  detail="The accepted reservation read returned no reservations for this provider."
-                  action="Refresh reservations"
+                  title={t('dashboard.noReservations')}
+                  detail={t('dashboard.noReservationsDetail')}
+                  action={t('dashboard.refreshReservations')}
                   onAction={() => void loadReservations(providerId)}
                 />
               ) : null}
@@ -484,7 +497,7 @@ export function DashboardWorkspace() {
       ) : null}
 
       <p className="pb-2 text-center text-[11px] text-[#93a09c]">
-        Read-only bounded data · No operational mutation is available from this overview
+        {t('dashboard.readOnlyBoundary')}
       </p>
     </main>
   );
@@ -530,6 +543,7 @@ function PanelHeader({
   action: string;
   onAction: () => void;
 }) {
+  const { t } = useLanguage();
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#edf1ef] px-5 py-4 sm:px-6">
       <div>
@@ -538,7 +552,9 @@ function PanelHeader({
         </h2>
         {resultCount !== undefined ? (
           <p className="mt-1 text-xs text-[#7a8b85]">
-            {resultCount} exact result{resultCount === 1 ? '' : 's'}
+            {t(resultCount === 1 ? 'dashboard.exactResult' : 'dashboard.exactResults', {
+              count: resultCount,
+            })}
           </p>
         ) : null}
       </div>
@@ -555,17 +571,18 @@ function PanelHeader({
 }
 
 function StockTable({ items }: { items: InventoryStockItem[] }) {
+  const { t } = useLanguage();
   return (
     <>
       <div className="hidden overflow-x-auto lg:block">
         <table className="w-full min-w-[720px] border-collapse text-left">
           <thead>
             <tr className="border-b border-[#edf1ef] bg-[#fbfcfb] text-[10px] font-extrabold uppercase tracking-[.13em] text-[#8a9994]">
-              <th className="px-5 py-3.5 sm:px-6">Product</th>
-              <th className="px-4 py-3.5">Batches</th>
-              <th className="px-4 py-3.5">On hand</th>
-              <th className="px-4 py-3.5">Held</th>
-              <th className="px-5 py-3.5 sm:px-6">Available</th>
+              <th className="px-5 py-3.5 sm:px-6">{t('dashboard.product')}</th>
+              <th className="px-4 py-3.5">{t('dashboard.batches')}</th>
+              <th className="px-4 py-3.5">{t('dashboard.onHand')}</th>
+              <th className="px-4 py-3.5">{t('dashboard.held')}</th>
+              <th className="px-5 py-3.5 sm:px-6">{t('dashboard.available')}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-[#edf1ef]">
@@ -601,13 +618,13 @@ function StockTable({ items }: { items: InventoryStockItem[] }) {
             <dl className="mt-3 grid grid-cols-2 gap-2 rounded-xl bg-[#fbfcfb] p-3 text-center sm:grid-cols-4">
               <div>
                 <dt className="text-[10px] font-bold uppercase tracking-wide text-[#899792]">
-                  {item.batches.length === 1 ? 'Batch' : 'Batches'}
+                  {t(item.batches.length === 1 ? 'dashboard.batch' : 'dashboard.batches')}
                 </dt>
                 <dd className="mt-0.5 text-sm font-bold text-[#28453b]">{item.batches.length}</dd>
               </div>
               <div>
                 <dt className="text-[10px] font-bold uppercase tracking-wide text-[#899792]">
-                  On hand
+                  {t('dashboard.onHand')}
                 </dt>
                 <dd className="mt-0.5 text-sm font-bold text-[#28453b]">
                   {item.totalOnHandQuantity}
@@ -615,7 +632,7 @@ function StockTable({ items }: { items: InventoryStockItem[] }) {
               </div>
               <div>
                 <dt className="text-[10px] font-bold uppercase tracking-wide text-[#899792]">
-                  Held
+                  {t('dashboard.held')}
                 </dt>
                 <dd className="mt-0.5 text-sm font-bold text-[#28453b]">
                   {item.totalHeldQuantity}
@@ -623,7 +640,7 @@ function StockTable({ items }: { items: InventoryStockItem[] }) {
               </div>
               <div>
                 <dt className="text-[10px] font-bold uppercase tracking-wide text-[#899792]">
-                  Available
+                  {t('dashboard.available')}
                 </dt>
                 <dd className="mt-0.5 text-sm font-bold text-emerald-700">
                   {item.totalAvailableQuantity}
@@ -638,17 +655,18 @@ function StockTable({ items }: { items: InventoryStockItem[] }) {
 }
 
 function ReservationTable({ reservations }: { reservations: ProviderReservation[] }) {
+  const { t } = useLanguage();
   return (
     <>
       <div className="hidden overflow-x-auto lg:block">
         <table className="w-full min-w-[720px] border-collapse text-left">
           <thead>
             <tr className="border-b border-[#edf1ef] bg-[#fbfcfb] text-[10px] font-extrabold uppercase tracking-[.13em] text-[#8a9994]">
-              <th className="px-5 py-3.5 sm:px-6">Reservation</th>
-              <th className="px-4 py-3.5">Status</th>
-              <th className="px-4 py-3.5">Products</th>
-              <th className="px-4 py-3.5">Units</th>
-              <th className="px-5 py-3.5 sm:px-6">Created</th>
+              <th className="px-5 py-3.5 sm:px-6">{t('dashboard.reservation')}</th>
+              <th className="px-4 py-3.5">{t('dashboard.status')}</th>
+              <th className="px-4 py-3.5">{t('dashboard.products')}</th>
+              <th className="px-4 py-3.5">{t('dashboard.units')}</th>
+              <th className="px-5 py-3.5 sm:px-6">{t('dashboard.created')}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-[#edf1ef]">
@@ -659,7 +677,7 @@ function ReservationTable({ reservations }: { reservations: ProviderReservation[
                 </td>
                 <td className="px-4 py-4">
                   <StatusBadge tone={statusTone[reservation.status]}>
-                    {titleCase(reservation.status)}
+                    {reservationStatusLabel(reservation.status, t)}
                   </StatusBadge>
                 </td>
                 <td className="px-4 py-4 text-sm text-[#405a52]">{reservation.items.length}</td>
@@ -683,13 +701,15 @@ function ReservationTable({ reservations }: { reservations: ProviderReservation[
                 {shortId(reservation.id)}
               </p>
               <StatusBadge tone={statusTone[reservation.status]}>
-                {titleCase(reservation.status)}
+                {reservationStatusLabel(reservation.status, t)}
               </StatusBadge>
             </div>
             <p className="mt-2 text-xs text-[#536a62]">
-              {reservation.items.length} product{reservation.items.length === 1 ? '' : 's'} ·{' '}
-              {reservation.totalQuantity} units · Created{' '}
-              {formatInventoryDate(reservation.createdAt)}
+              {t('dashboard.mobileReservationSummary', {
+                products: reservation.items.length,
+                units: reservation.totalQuantity,
+                createdAt: formatInventoryDate(reservation.createdAt),
+              })}
             </p>
           </li>
         ))}
@@ -711,12 +731,13 @@ function AttentionCard({
   worklist: InventoryExpiryWorklistPage | null;
   onRetry: () => void;
 }) {
+  const { t } = useLanguage();
   if (!providerSelected) {
     return (
       <Card>
         <EmptyState
-          title="Select a provider"
-          description="Expiry alerts appear once an assigned provider is chosen above."
+          title={t('dashboard.selectProvider')}
+          description={t('dashboard.expirySelectDetail')}
         />
       </Card>
     );
@@ -738,11 +759,11 @@ function AttentionCard({
     return (
       <Card>
         <EmptyState
-          title={errorTitle(error, 'Expiry alerts are unavailable')}
+          title={errorTitle(error, t('dashboard.expiryUnavailable'), t)}
           description={error.message}
           action={
             <Button variant="secondary" onClick={onRetry}>
-              Retry
+              {t('dashboard.retry')}
             </Button>
           }
         />
@@ -754,10 +775,10 @@ function AttentionCard({
     return (
       <Card className="border-emerald-600/20 bg-emerald-50/40">
         <div className="flex items-start gap-3">
-          <StatusIndicator tone="positive" label="All clear" />
+          <StatusIndicator tone="positive" label={t('dashboard.allClear')} />
         </div>
         <p className="mt-2 text-sm text-canvas-700">
-          No batches for this provider expire within the next {EXPIRY_HORIZON_DAYS} days.
+          {t('dashboard.noExpiringBatches', { days: EXPIRY_HORIZON_DAYS })}
         </p>
       </Card>
     );
@@ -774,13 +795,16 @@ function AttentionCard({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <StatusIndicator
           tone={urgent ? 'critical' : 'warning'}
-          label={`${worklist.total} batch${worklist.total === 1 ? '' : 'es'} expiring within ${EXPIRY_HORIZON_DAYS} days`}
+          label={t(worklist.total === 1 ? 'dashboard.batchExpiring' : 'dashboard.batchesExpiring', {
+            count: worklist.total,
+            days: EXPIRY_HORIZON_DAYS,
+          })}
         />
         <Link
           href="/inventory/expiry"
           className="text-xs font-bold text-emerald-700 hover:underline"
         >
-          View expiry worklist →
+          {t('dashboard.viewExpiry')}
         </Link>
       </div>
       <ul className="mt-4 space-y-2">
@@ -794,11 +818,16 @@ function AttentionCard({
               <div className="min-w-0">
                 <p className="truncate text-sm font-bold text-ink-900">{item.name}</p>
                 <p className="truncate text-xs text-canvas-600">
-                  Batch {item.batchNumber} · {formatInventoryDate(item.expiryDate)}
+                  {t('dashboard.batchNumber', {
+                    batchNumber: item.batchNumber,
+                    expiryDate: formatInventoryDate(item.expiryDate),
+                  })}
                 </p>
               </div>
               <Badge tone={itemDays !== null && itemDays <= 7 ? 'rose' : 'amber'}>
-                {itemDays !== null && itemDays >= 0 ? `${itemDays}d` : 'Overdue'}
+                {itemDays !== null && itemDays >= 0
+                  ? t('dashboard.daysShort', { days: itemDays })
+                  : t('dashboard.overdue')}
               </Badge>
             </li>
           );
@@ -819,6 +848,7 @@ function RecentActivityCard({
   events: AuditEvent[] | null;
   onRetry: () => void;
 }) {
+  const { t } = useLanguage();
   if (loading) {
     return (
       <Card>
@@ -838,14 +868,14 @@ function RecentActivityCard({
         <EmptyState
           title={
             permissionRestricted
-              ? 'Recent activity requires audit access'
-              : errorTitle(error, 'Recent activity is unavailable')
+              ? t('dashboard.activityAuditRequired')
+              : errorTitle(error, t('dashboard.activityUnavailable'), t)
           }
           description={permissionRestricted ? undefined : error.message}
           action={
             permissionRestricted ? undefined : (
               <Button variant="secondary" onClick={onRetry}>
-                Retry
+                {t('dashboard.retry')}
               </Button>
             )
           }
@@ -858,8 +888,8 @@ function RecentActivityCard({
     return (
       <Card>
         <EmptyState
-          title="No recent activity"
-          description="Accepted audit events for this tenant will appear here."
+          title={t('dashboard.noActivity')}
+          description={t('dashboard.noActivityDetail')}
         />
       </Card>
     );
@@ -869,7 +899,7 @@ function RecentActivityCard({
     <Card padded={false}>
       <div className="border-b border-[#edf1ef] px-5 py-4">
         <h3 className="text-sm font-extrabold uppercase tracking-[.13em] text-[#38544b]">
-          Recent activity
+          {t('dashboard.recentActivity')}
         </h3>
       </div>
       <ul className="divide-y divide-[#edf1ef]">
@@ -877,21 +907,21 @@ function RecentActivityCard({
           <li key={event.id} className="flex items-center justify-between gap-3 px-5 py-3">
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold text-ink-900">
-                {formatAuditEventType(event.eventType)}
+                {t('dashboard.eventActivity')} · <code>{event.eventType}</code>
               </p>
               <p className="mt-0.5 text-xs text-canvas-600">
                 {formatInventoryDate(event.occurredAt)}
               </p>
             </div>
             <Badge tone={event.outcome === 'SUCCEEDED' ? 'emerald' : 'rose'}>
-              {titleCase(event.outcome)}
+              {auditOutcomeLabel(event.outcome, t)}
             </Badge>
           </li>
         ))}
       </ul>
       <div className="px-5 py-3">
         <Link href="/audit" className="text-xs font-bold text-emerald-700 hover:underline">
-          View audit trail →
+          {t('dashboard.viewAudit')}
         </Link>
       </div>
     </Card>
@@ -956,26 +986,33 @@ function loadedReservationMetrics(items: ProviderReservation[]) {
 
 function toPublicError(error: unknown, fallback: string): PublicError {
   return error instanceof ApiError
-    ? { message: error.message, status: error.status }
+    ? { message: fallback, status: error.status }
     : { message: fallback };
 }
 
-function errorTitle(error: PublicError, fallback: string): string {
-  if (error.status === 401) return 'Your session must be verified';
-  if (error.status === 403) return 'Access is restricted';
+function errorTitle(error: PublicError, fallback: string, t: Translator): string {
+  if (error.status === 401) return t('dashboard.sessionVerify');
+  if (error.status === 403) return t('dashboard.accessRestricted');
   return fallback;
 }
 
-function titleCase(value: string): string {
-  return value.charAt(0) + value.slice(1).toLowerCase();
+function reservationStatusLabel(status: ReservationStatus, t: Translator): string {
+  const keys: Record<ReservationStatus, TranslationKey> = {
+    PENDING: 'dashboard.status.pending',
+    CONFIRMED: 'dashboard.status.confirmed',
+    READY: 'dashboard.status.ready',
+    COMPLETED: 'dashboard.status.completed',
+    CANCELLED: 'dashboard.status.cancelled',
+    EXPIRED: 'dashboard.status.expired',
+  };
+  return t(keys[status]);
 }
 
-function formatAuditEventType(eventType: string): string {
-  return eventType
-    .toLowerCase()
-    .split(/[._]/)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(' ');
+function auditOutcomeLabel(outcome: string, t: Translator): string {
+  if (outcome === 'SUCCEEDED') return t('dashboard.outcome.succeeded');
+  if (outcome === 'DENIED') return t('dashboard.outcome.denied');
+  if (outcome === 'FAILED') return t('dashboard.outcome.failed');
+  return outcome;
 }
 
 function shortId(value: string): string {

@@ -11,7 +11,13 @@ vi.mock('next/navigation', () => ({
 afterEach(() => cleanup());
 
 const session: SessionProfile = {
-  user: { id: 'user-1', email: 'mira@example.test', firstName: 'Mira', lastName: 'Patel' },
+  user: {
+    id: 'user-1',
+    email: 'mira@example.test',
+    firstName: 'Mira',
+    lastName: 'Patel',
+    preferredLanguage: 'en',
+  },
   context: {
     membershipId: '93b31836-6a84-4db9-a935-1c55960c25da',
     tenantId: '2f96df49-54a0-4fac-a3fd-e796cb1f1d3d',

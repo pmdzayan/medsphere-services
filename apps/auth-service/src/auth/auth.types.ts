@@ -56,6 +56,7 @@ export interface LoginIdentity {
     readonly passwordHash: string | null;
     readonly firstName: string;
     readonly lastName: string;
+    readonly preferredLanguage: string;
   };
   readonly membershipId: string;
   readonly tenantId: string;
