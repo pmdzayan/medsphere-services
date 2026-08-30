@@ -23,7 +23,7 @@ type Fields = 'email' | 'password';
  */
 export function LoginForm() {
   const router = useRouter();
-  const { locale } = useLanguage();
+  const { locale, t } = useLanguage();
   const copy = loginCopy[locale];
   const [errors, setErrors] = useState<Partial<Record<Fields | 'form', string>>>({});
   const [pending, setPending] = useState(false);
@@ -57,8 +57,8 @@ export function LoginForm() {
       }
       router.replace('/dashboard');
       router.refresh();
-    } catch (error) {
-      setErrors({ form: error instanceof Error ? error.message : copy.errorGeneric });
+    } catch {
+      setErrors({ form: copy.errorGeneric });
     } finally {
       setPending(false);
     }
@@ -72,8 +72,8 @@ export function LoginForm() {
       await selectOrganizationLogin({ ...credentials, membershipId });
       router.replace('/dashboard');
       router.refresh();
-    } catch (error) {
-      setErrors({ form: error instanceof Error ? error.message : copy.errorGeneric });
+    } catch {
+      setErrors({ form: copy.errorGeneric });
     } finally {
       setPending(false);
     }
@@ -82,7 +82,7 @@ export function LoginForm() {
   if (organizations) {
     return (
       <div className="space-y-4">
-        <p className="text-sm font-bold text-[#43524e]">Choose an organization</p>
+        <p className="text-sm font-bold text-[#43524e]">{t('auth.chooseOrganization')}</p>
         <ul className="space-y-2">
           {organizations.map((organization) => (
             <li key={organization.membershipId}>
@@ -114,7 +114,7 @@ export function LoginForm() {
           }}
           className="text-xs font-bold text-[#264b40] underline"
         >
-          Back
+          {t('auth.back')}
         </button>
       </div>
     );

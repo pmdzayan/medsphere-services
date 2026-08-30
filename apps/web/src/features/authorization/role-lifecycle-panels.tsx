@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { SectionCard, StatusBadge } from '@/components/platform/dashboard-primitives';
 import { Icon } from '@/components/platform/icon';
+import { useLanguage } from '@/components/language-provider';
 import {
   deleteRole,
   getMembershipCatalogue,
@@ -37,6 +38,7 @@ export function RoleEditorPanel({
   onSaved: (role: Role) => void;
   onDeleted: (roleId: string) => void;
 }) {
+  const { t } = useLanguage();
   const [name, setName] = useState(role.name);
   const [description, setDescription] = useState(role.description ?? '');
   const [selected, setSelected] = useState(role.permissionKeys);
@@ -59,7 +61,7 @@ export function RoleEditorPanel({
       canReadPermissions ? permissions.map((permission) => permission.name) : [],
     );
     if (Object.keys(errors).length) {
-      setError(Object.values(errors)[0] ?? 'Invalid role.');
+      setError(t('team.error.invalidRole'));
       return;
     }
     setPending(true);
@@ -72,7 +74,7 @@ export function RoleEditorPanel({
       };
       onSaved(await updateRole(role.id, request));
     } catch (failure) {
-      setError(failure instanceof Error ? failure.message : 'Unable to update role.');
+      setError(t('team.error.update'));
     } finally {
       setPending(false);
     }
@@ -89,7 +91,7 @@ export function RoleEditorPanel({
       await deleteRole(role.id, role.version);
       onDeleted(role.id);
     } catch (failure) {
-      setError(failure instanceof Error ? failure.message : 'Unable to delete role.');
+      setError(t('team.error.delete'));
       setConfirmDelete(false);
     } finally {
       setPending(false);
@@ -102,14 +104,14 @@ export function RoleEditorPanel({
         <div className="flex items-start justify-between border-b border-[#edf1ef] px-6 py-5">
           <div>
             <p className="text-[10px] font-extrabold uppercase tracking-[.18em] text-amber-700">
-              Version-safe mutation · v{role.version}
+              {t('team.editor.eyebrow', { version: role.version })}
             </p>
-            <h2 className="mt-1 text-xl font-bold text-[#173128]">Manage custom role</h2>
+            <h2 className="mt-1 text-xl font-bold text-[#173128]">{t('team.editor.title')}</h2>
           </div>
           <button
             type="button"
             onClick={onCancel}
-            aria-label="Close editor"
+            aria-label={t('team.editor.close')}
             className="grid size-9 place-items-center rounded-xl border border-[#dfe7e3]"
           >
             <Icon name="close" className="size-4" />
@@ -118,7 +120,7 @@ export function RoleEditorPanel({
         <div className="grid gap-5 p-6 lg:grid-cols-2">
           <div className="space-y-4">
             <label className="block text-xs font-bold text-[#435951]">
-              Role name
+              {t('team.roleName')}
               <input
                 value={name}
                 disabled={!canUpdate}
@@ -128,7 +130,7 @@ export function RoleEditorPanel({
               />
             </label>
             <label className="block text-xs font-bold text-[#435951]">
-              Description
+              {t('team.descriptionLabel')}
               <textarea
                 value={description}
                 disabled={!canUpdate}
@@ -142,7 +144,7 @@ export function RoleEditorPanel({
           {canUpdate && canReadPermissions ? (
             <fieldset>
               <legend className="text-xs font-bold text-[#435951]">
-                Permissions · {selected.length} selected
+                {t('team.editor.permissionsSelected', { count: selected.length })}
               </legend>
               <div className="mt-3 grid gap-2 sm:grid-cols-2">
                 {permissions.map((permission) => (
@@ -171,7 +173,9 @@ export function RoleEditorPanel({
             </fieldset>
           ) : (
             <div>
-              <p className="text-xs font-bold text-[#435951]">Current permissions</p>
+              <p className="text-xs font-bold text-[#435951]">
+                {t('team.editor.currentPermissions')}
+              </p>
               <div className="mt-3 flex flex-wrap gap-2">
                 {role.permissionKeys.map((permission) => (
                   <span
@@ -182,7 +186,7 @@ export function RoleEditorPanel({
                   </span>
                 ))}
                 {role.permissionKeys.length === 0 ? (
-                  <span className="text-xs text-[#8a9893]">No permissions assigned.</span>
+                  <span className="text-xs text-[#8a9893]">{t('team.editor.noPermissions')}</span>
                 ) : null}
               </div>
             </div>
@@ -204,7 +208,7 @@ export function RoleEditorPanel({
               onClick={() => void remove()}
               className="rounded-xl border border-rose-200 px-4 py-2.5 text-xs font-bold text-rose-700"
             >
-              {confirmDelete ? 'Confirm permanent removal' : 'Delete role'}
+              {confirmDelete ? t('team.editor.confirmDelete') : t('team.editor.delete')}
             </button>
           ) : (
             <span />
@@ -215,7 +219,7 @@ export function RoleEditorPanel({
               onClick={onCancel}
               className="rounded-xl border border-[#d9e3df] px-4 py-2.5 text-xs font-bold"
             >
-              Cancel
+              {t('team.cancel')}
             </button>
             {canUpdate ? (
               <button
@@ -223,7 +227,7 @@ export function RoleEditorPanel({
                 disabled={pending}
                 className="rounded-xl bg-[#0b5f4b] px-5 py-2.5 text-xs font-bold text-white"
               >
-                {pending ? 'Saving…' : 'Save changes'}
+                {pending ? t('team.editor.saving') : t('team.editor.save')}
               </button>
             ) : null}
           </div>
@@ -240,6 +244,7 @@ export function MembershipDirectory({
   roles: readonly Role[];
   canManage: boolean;
 }) {
+  const { t } = useLanguage();
   const [members, setMembers] = useState<Membership[] | null>(null);
   const [selected, setSelected] = useState<Membership | null>(null);
   const [error, setError] = useState('');
@@ -248,11 +253,9 @@ export function MembershipDirectory({
   useEffect(() => {
     getMembershipCatalogue()
       .then((result) => setMembers(result.data))
-      .catch((failure: unknown) =>
-        setError(failure instanceof Error ? failure.message : 'Unable to load team.'),
-      )
+      .catch(() => setError(t('team.error.loadMembers')))
       .finally(() => setLoading(false));
-  }, []);
+  }, [t]);
 
   async function toggle(role: Role, assigned: boolean) {
     if (!selected) return;
@@ -273,7 +276,7 @@ export function MembershipDirectory({
           current?.map((member) => (member.id === updated.id ? updated : member)) ?? null,
       );
     } catch (failure) {
-      setError(failure instanceof Error ? failure.message : 'Unable to update assignment.');
+      setError(t('team.error.assignment'));
     } finally {
       setPending('');
     }
@@ -283,9 +286,9 @@ export function MembershipDirectory({
     <SectionCard>
       <div className="border-b border-[#edf1ef] px-6 py-5">
         <p className="text-[10px] font-extrabold uppercase tracking-[.18em] text-emerald-700">
-          Membership directory
+          {t('team.directory.eyebrow')}
         </p>
-        <h2 className="mt-1 text-xl font-bold text-[#173128]">Team role assignments</h2>
+        <h2 className="mt-1 text-xl font-bold text-[#173128]">{t('team.directory.title')}</h2>
       </div>
       {error ? (
         <p role="alert" className="m-5 rounded-xl bg-rose-50 px-4 py-3 text-xs text-rose-800">
@@ -293,7 +296,7 @@ export function MembershipDirectory({
         </p>
       ) : null}
       {loading ? (
-        <div className="p-8 text-center text-xs text-[#7c8c86]">Loading tenant memberships…</div>
+        <div className="p-8 text-center text-xs text-[#7c8c86]">{t('team.directory.loading')}</div>
       ) : members ? (
         <div className="grid lg:grid-cols-[1fr_1.15fr]">
           <div className="divide-y divide-[#edf1ef]">
@@ -315,7 +318,7 @@ export function MembershipDirectory({
                   <span className="mt-1 block truncate text-xs text-[#85938f]">{member.email}</span>
                 </span>
                 <StatusBadge tone={member.status === 'ACTIVE' ? 'emerald' : 'slate'}>
-                  {member.status.toLowerCase()}
+                  {member.status === 'ACTIVE' ? t('team.status.active') : t('team.status.inactive')}
                 </StatusBadge>
               </button>
             ))}
@@ -324,12 +327,10 @@ export function MembershipDirectory({
             {selected ? (
               <>
                 <h3 className="text-sm font-bold text-[#1b372d]">
-                  Manage {selected.firstName}&apos;s roles
+                  {t('team.directory.manage', { name: selected.firstName })}
                 </h3>
                 <p className="mt-1 text-xs text-[#85938f]">
-                  {canManage
-                    ? 'Changes are enforced and audited immediately.'
-                    : 'Your current role has read-only assignment access.'}
+                  {canManage ? t('team.directory.enforced') : t('team.directory.readOnly')}
                 </p>
                 <div className="mt-4 space-y-2">
                   {canManage
@@ -353,7 +354,9 @@ export function MembershipDirectory({
                               {role.name}
                             </span>
                             <span className="text-[9px] text-[#899691]">
-                              {role.type === 'SYSTEM' ? 'Protected role' : 'Custom'}
+                              {role.type === 'SYSTEM'
+                                ? t('team.directory.protectedRole')
+                                : t('team.filter.custom')}
                             </span>
                           </label>
                         );
@@ -366,19 +369,21 @@ export function MembershipDirectory({
                           <span className="flex-1 text-xs font-bold text-[#315247]">
                             {role.name}
                           </span>
-                          <span className="text-[9px] text-[#899691]">Assigned</span>
+                          <span className="text-[9px] text-[#899691]">
+                            {t('team.directory.assigned')}
+                          </span>
                         </div>
                       ))}
                   {!canManage && selected.roles.length === 0 ? (
                     <p className="rounded-xl border border-dashed border-[#dfe7e3] p-4 text-xs text-[#899691]">
-                      No roles assigned.
+                      {t('team.directory.noRoles')}
                     </p>
                   ) : null}
                 </div>
               </>
             ) : (
               <div className="py-12 text-center text-xs text-[#84928d]">
-                Select a team member to manage assignments.
+                {t('team.directory.select')}
               </div>
             )}
           </div>

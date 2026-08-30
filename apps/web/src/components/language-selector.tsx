@@ -1,7 +1,7 @@
 'use client';
 
 import { useLanguage } from '@/components/language-provider';
-import { localeOptions, type Locale } from '@/lib/i18n';
+import { enabledLocaleOptions, type Locale } from '@/lib/i18n';
 
 export function LanguageSelector() {
   const { locale, setLocale, t } = useLanguage();
@@ -15,7 +15,7 @@ export function LanguageSelector() {
         aria-label={t('language.label')}
         className="max-w-44 rounded-lg border border-[#10201c]/[.1] bg-[#fbfaf5] px-2.5 py-1.5 text-xs font-bold text-[#10201c] outline-none focus:border-emerald-600"
       >
-        {localeOptions.map((option) => (
+        {enabledLocaleOptions.map((option) => (
           <option key={option.code} value={option.code}>
             {option.label}
           </option>

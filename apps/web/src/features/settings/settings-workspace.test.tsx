@@ -1,5 +1,6 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { LanguageProvider } from '@/components/language-provider';
 import {
   getPrivacyPreferences,
   getSupportedLanguages,
@@ -7,6 +8,14 @@ import {
   updatePrivacyPreferences,
 } from '@/lib/api-client';
 import { SettingsWorkspace } from './settings-workspace';
+
+function renderWorkspace(identity: Parameters<typeof SettingsWorkspace>[0]['identity']) {
+  return render(
+    <LanguageProvider initialLocale="en">
+      <SettingsWorkspace identity={identity} />
+    </LanguageProvider>,
+  );
+}
 
 vi.mock('@/lib/api-client', async () => {
   const actual = await vi.importActual<typeof import('@/lib/api-client')>('@/lib/api-client');
@@ -55,7 +64,7 @@ afterEach(() => cleanup());
 
 describe('SettingsWorkspace interactions', () => {
   it('renders connected preferences and signed identity context', async () => {
-    render(<SettingsWorkspace identity={identity} />);
+    renderWorkspace(identity);
 
     expect(await screen.findByText('Preference controls')).toBeVisible();
     expect(screen.getByText('Mira Patel')).toBeVisible();
@@ -68,7 +77,7 @@ describe('SettingsWorkspace interactions', () => {
   });
 
   it('sends only changed privacy preferences', async () => {
-    render(<SettingsWorkspace identity={identity} />);
+    renderWorkspace(identity);
 
     fireEvent.click(await screen.findByRole('switch', { name: 'Private medicine pickup' }));
     fireEvent.click(screen.getByRole('button', { name: 'Save preferences' }));
@@ -80,7 +89,7 @@ describe('SettingsWorkspace interactions', () => {
   });
 
   it('resets unsaved privacy changes without a mutation', async () => {
-    render(<SettingsWorkspace identity={identity} />);
+    renderWorkspace(identity);
 
     fireEvent.click(await screen.findByRole('switch', { name: 'Share email' }));
     expect(screen.getByText('Unsaved changes')).toBeVisible();
@@ -95,7 +104,7 @@ describe('SettingsWorkspace interactions', () => {
   });
 
   it('updates a reviewed supported language without guessing the current value', async () => {
-    render(<SettingsWorkspace identity={identity} />);
+    renderWorkspace(identity);
 
     fireEvent.change(await screen.findByLabelText('Preferred language'), {
       target: { value: 'ta' },
@@ -105,15 +114,33 @@ describe('SettingsWorkspace interactions', () => {
     await waitFor(() =>
       expect(updatePreferredLanguage).toHaveBeenCalledWith({ preferredLanguage: 'ta' }),
     );
-    expect(await screen.findByText('Language updated')).toBeVisible();
+    expect(await screen.findByText('Preferred language updated.')).toBeVisible();
+  });
+
+  it('updates the live rendered UI immediately, not only after a future reload', async () => {
+    // This is the exact bug this task closes: saving a language in
+    // Settings previously persisted server-side but never touched the
+    // document's own lang/dir, unlike the top-navigation LanguageSelector.
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(Response.json({}));
+    renderWorkspace(identity);
+
+    fireEvent.change(await screen.findByLabelText('Preferred language'), {
+      target: { value: 'ta' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Update language' }));
+
+    await waitFor(() => expect(updatePreferredLanguage).toHaveBeenCalled());
+    await waitFor(() => expect(document.documentElement.lang).toBe('ta'));
+    expect(fetchSpy).not.toHaveBeenCalled();
+    fetchSpy.mockRestore();
   });
 
   it('fails closed when initial settings cannot be loaded', async () => {
     vi.mocked(getPrivacyPreferences).mockRejectedValue(new Error('Session expired'));
 
-    render(<SettingsWorkspace identity={identity} />);
+    renderWorkspace(identity);
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Session expired');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Unable to load settings.');
     expect(screen.queryByText('Preference controls')).not.toBeInTheDocument();
   });
 });

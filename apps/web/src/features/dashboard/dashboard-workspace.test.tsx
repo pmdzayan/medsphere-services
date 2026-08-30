@@ -1,5 +1,6 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { LanguageProvider } from '@/components/language-provider';
 import {
   ApiError,
   getAssignedProviders,
@@ -93,9 +94,17 @@ beforeEach(() => {
 
 afterEach(() => cleanup());
 
+function renderDashboard() {
+  return render(
+    <LanguageProvider initialLocale="en">
+      <DashboardWorkspace />
+    </LanguageProvider>,
+  );
+}
+
 describe('DashboardWorkspace live operations overview', () => {
   it('loads each accepted boundary independently with exact bounded requests', async () => {
-    render(<DashboardWorkspace />);
+    renderDashboard();
 
     expect(
       screen
@@ -126,7 +135,7 @@ describe('DashboardWorkspace live operations overview', () => {
   });
 
   it('renders accepted current-page calculations, rows, exact result counts, and links', async () => {
-    render(<DashboardWorkspace />);
+    renderDashboard();
     expect((await screen.findAllByText('Metformin 500 mg'))[0]).toBeVisible();
 
     expect(metric('Products')).toHaveTextContent('1');
@@ -153,7 +162,7 @@ describe('DashboardWorkspace live operations overview', () => {
   });
 
   it('shows the same batch count on the mobile stock card as the desktop table, from one fetch', async () => {
-    render(<DashboardWorkspace />);
+    renderDashboard();
     await screen.findAllByText('Metformin 500 mg');
     const stockSection = screen.getByText('Stock records').closest('section');
     if (!stockSection) throw new Error('Stock records section not found');
@@ -182,7 +191,7 @@ describe('DashboardWorkspace live operations overview', () => {
   it('shows independent loading states without presenting unloaded metrics as zero', async () => {
     vi.mocked(getProviderStock).mockReturnValueOnce(pending());
     vi.mocked(getProviderReservations).mockReturnValueOnce(pending());
-    render(<DashboardWorkspace />);
+    renderDashboard();
 
     expect(await screen.findByText('Loading current-page stock…')).toBeVisible();
     expect(screen.getByText('Loading current-page reservations…')).toBeVisible();
@@ -191,7 +200,7 @@ describe('DashboardWorkspace live operations overview', () => {
   });
 
   it('changes provider and replaces both datasets with new bounded requests', async () => {
-    render(<DashboardWorkspace />);
+    renderDashboard();
     await screen.findAllByText('Metformin 500 mg');
     fireEvent.change(screen.getByLabelText('Assigned provider'), {
       target: { value: providers[1].providerId },
@@ -227,7 +236,7 @@ describe('DashboardWorkspace live operations overview', () => {
         : Promise.resolve(reservationPage),
     );
 
-    render(<DashboardWorkspace />);
+    renderDashboard();
     await screen.findByText(/Showing bounded reads for Central Pharmacy/);
     fireEvent.change(screen.getByLabelText('Assigned provider'), {
       target: { value: providers[1].providerId },
@@ -242,7 +251,7 @@ describe('DashboardWorkspace live operations overview', () => {
 
   it('handles an empty assignment and retries provider loading after unauthenticated failure', async () => {
     vi.mocked(getAssignedProviders).mockResolvedValueOnce([]);
-    const { unmount } = render(<DashboardWorkspace />);
+    const { unmount } = renderDashboard();
     expect(
       await screen.findByRole('heading', { name: 'No active provider assignment' }),
     ).toBeVisible();
@@ -254,7 +263,7 @@ describe('DashboardWorkspace live operations overview', () => {
     vi.mocked(getAssignedProviders)
       .mockRejectedValueOnce(new ApiError('Authentication required', 401))
       .mockResolvedValueOnce(providers);
-    render(<DashboardWorkspace />);
+    renderDashboard();
     expect(
       await screen.findByRole('heading', { name: 'Your session must be verified' }),
     ).toBeVisible();
@@ -265,15 +274,18 @@ describe('DashboardWorkspace live operations overview', () => {
 
   it('shows restricted provider access and fails closed for a malformed provider response', async () => {
     vi.mocked(getAssignedProviders).mockRejectedValueOnce(new ApiError('Permission denied', 403));
-    const { unmount } = render(<DashboardWorkspace />);
+    const { unmount } = renderDashboard();
     expect(await screen.findByRole('heading', { name: 'Access is restricted' })).toBeVisible();
     unmount();
 
     vi.mocked(getAssignedProviders).mockRejectedValueOnce(
-      new ApiError('Assigned-provider response was invalid.', 502),
+      new ApiError('unbounded provider response must not be reflected', 502),
     );
-    render(<DashboardWorkspace />);
-    expect(await screen.findByText('Assigned-provider response was invalid.')).toBeVisible();
+    renderDashboard();
+    expect(await screen.findByText('Unable to load assigned providers.')).toBeVisible();
+    expect(
+      screen.queryByText('unbounded provider response must not be reflected'),
+    ).not.toBeInTheDocument();
     expect(
       screen.queryByLabelText('Current-page reservation status counts'),
     ).not.toBeInTheDocument();
@@ -281,11 +293,12 @@ describe('DashboardWorkspace live operations overview', () => {
 
   it('keeps reservations visible when stock fails and retries stock independently', async () => {
     vi.mocked(getProviderStock)
-      .mockRejectedValueOnce(new ApiError('Stock response was invalid.', 502))
+      .mockRejectedValueOnce(new ApiError('unbounded stock response', 502))
       .mockResolvedValueOnce(stockPage);
-    render(<DashboardWorkspace />);
+    renderDashboard();
 
-    expect(await screen.findByText('Stock response was invalid.')).toBeVisible();
+    expect(await screen.findByText('Unable to load provider stock.')).toBeVisible();
+    expect(screen.queryByText('unbounded stock response')).not.toBeInTheDocument();
     expect(screen.getAllByText('F63F50DD')[0]).toBeVisible();
     fireEvent.click(screen.getAllByRole('button', { name: 'Retry stock' }).at(-1)!);
     expect((await screen.findAllByText('Metformin 500 mg'))[0]).toBeVisible();
@@ -295,11 +308,12 @@ describe('DashboardWorkspace live operations overview', () => {
 
   it('keeps stock visible when reservations fail and retries reservations independently', async () => {
     vi.mocked(getProviderReservations)
-      .mockRejectedValueOnce(new ApiError('Reservation response was invalid.', 502))
+      .mockRejectedValueOnce(new ApiError('unbounded reservation response', 502))
       .mockResolvedValueOnce(reservationPage);
-    render(<DashboardWorkspace />);
+    renderDashboard();
 
-    expect(await screen.findByText('Reservation response was invalid.')).toBeVisible();
+    expect(await screen.findByText('Unable to load provider reservations.')).toBeVisible();
+    expect(screen.queryByText('unbounded reservation response')).not.toBeInTheDocument();
     expect(screen.getAllByText('Metformin 500 mg')[0]).toBeVisible();
     fireEvent.click(screen.getAllByRole('button', { name: 'Retry reservations' }).at(-1)!);
     expect((await screen.findAllByText('F63F50DD'))[0]).toBeVisible();
@@ -314,16 +328,16 @@ describe('DashboardWorkspace live operations overview', () => {
       data: [],
       total: 0,
     });
-    render(<DashboardWorkspace />);
+    renderDashboard();
 
     expect(await screen.findByRole('heading', { name: 'No stock records' })).toBeVisible();
-    expect(screen.getByRole('heading', { name: 'No reservation records' })).toBeVisible();
+    expect(await screen.findByRole('heading', { name: 'No reservation records' })).toBeVisible();
     expect(metric('Products')).toHaveTextContent('0');
     expect(metric('Reservations')).toHaveTextContent('0');
   });
 
   it('contains no fabricated analytics, patient identity, or mutation controls', async () => {
-    render(<DashboardWorkspace />);
+    renderDashboard();
     await screen.findAllByText('Metformin 500 mg');
     await screen.findByText(/batches? expiring within/);
     const prohibited =
@@ -338,7 +352,7 @@ describe('DashboardWorkspace live operations overview', () => {
   });
 
   it('renders real expiry-worklist data in the attention card, not a fabricated count', async () => {
-    render(<DashboardWorkspace />);
+    renderDashboard();
     await screen.findAllByText('Metformin 500 mg');
 
     expect(getProviderExpiryWorklist).toHaveBeenCalledWith({
@@ -363,7 +377,7 @@ describe('DashboardWorkspace live operations overview', () => {
       total: 0,
     });
 
-    render(<DashboardWorkspace />);
+    renderDashboard();
     await screen.findAllByText('Metformin 500 mg');
 
     expect(await screen.findByText('All clear')).toBeVisible();
@@ -374,12 +388,13 @@ describe('DashboardWorkspace live operations overview', () => {
 
   it('shows an attention-card error state and can retry independently', async () => {
     vi.mocked(getProviderExpiryWorklist)
-      .mockRejectedValueOnce(new ApiError('Expiry worklist response was invalid.', 502))
+      .mockRejectedValueOnce(new ApiError('unbounded expiry response', 502))
       .mockResolvedValueOnce(expiryPage);
-    render(<DashboardWorkspace />);
+    renderDashboard();
     await screen.findAllByText('Metformin 500 mg');
 
-    expect(await screen.findByText('Expiry worklist response was invalid.')).toBeVisible();
+    expect(await screen.findByText('Unable to load the expiry worklist.')).toBeVisible();
+    expect(screen.queryByText('unbounded expiry response')).not.toBeInTheDocument();
     const attentionSection = screen.getByText('Needs attention').closest('section')!;
     fireEvent.click(within(attentionSection).getByRole('button', { name: 'Retry' }));
     expect(
@@ -388,9 +403,9 @@ describe('DashboardWorkspace live operations overview', () => {
   });
 
   it('renders real recent-activity data from the audit contract', async () => {
-    render(<DashboardWorkspace />);
+    renderDashboard();
     expect(getAuditEvents).toHaveBeenCalledWith({ limit: 5 });
-    expect(await screen.findByText('Authorization Role Created')).toBeVisible();
+    expect(await screen.findByText(auditEvent.eventType)).toBeVisible();
     expect(screen.getByText('Succeeded')).toBeVisible();
     expect(screen.getByRole('link', { name: /View audit trail/ })).toHaveAttribute(
       'href',
@@ -400,13 +415,13 @@ describe('DashboardWorkspace live operations overview', () => {
 
   it('shows a permission-restricted message for recent activity without alarming error copy', async () => {
     vi.mocked(getAuditEvents).mockRejectedValue(new ApiError('Permission denied', 403));
-    render(<DashboardWorkspace />);
+    renderDashboard();
     expect(await screen.findByText('Recent activity requires audit access')).toBeVisible();
   });
 
   it('shows an empty state when there is no recent activity, not a fabricated feed', async () => {
     vi.mocked(getAuditEvents).mockResolvedValue({ data: [], nextCursor: null });
-    render(<DashboardWorkspace />);
+    renderDashboard();
     expect(await screen.findByText('No recent activity')).toBeVisible();
   });
 });
@@ -431,7 +446,7 @@ describe('Attention card expiry urgency (calendar-day boundaries)', () => {
       expiryFixtureWithDate('2026-08-20T03:00:00.000Z'),
     );
 
-    render(<DashboardWorkspace />);
+    renderDashboard();
     expect(await screen.findByText('0d')).toBeVisible();
   });
 
@@ -442,7 +457,7 @@ describe('Attention card expiry urgency (calendar-day boundaries)', () => {
       expiryFixtureWithDate('2026-08-21T00:15:00.000Z'),
     );
 
-    render(<DashboardWorkspace />);
+    renderDashboard();
     expect(await screen.findByText('1d')).toBeVisible();
   });
 
@@ -453,7 +468,7 @@ describe('Attention card expiry urgency (calendar-day boundaries)', () => {
       expiryFixtureWithDate('2026-08-27T23:55:00.000Z'),
     );
 
-    const { unmount } = render(<DashboardWorkspace />);
+    const { unmount } = renderDashboard();
     expect(await screen.findByText('7d')).toHaveClass('bg-rose-50');
     unmount();
 
@@ -461,7 +476,7 @@ describe('Attention card expiry urgency (calendar-day boundaries)', () => {
       expiryFixtureWithDate('2026-08-28T00:05:00.000Z'),
     );
 
-    render(<DashboardWorkspace />);
+    renderDashboard();
     expect(await screen.findByText('8d')).toHaveClass('bg-amber-50');
   });
 });

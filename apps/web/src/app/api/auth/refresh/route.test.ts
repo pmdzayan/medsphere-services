@@ -12,6 +12,7 @@ const profile: SessionProfile = {
     email: 'admin@example.com',
     firstName: 'Aisha',
     lastName: 'Zahra',
+    preferredLanguage: 'en',
   },
   context: {
     membershipId: 'membership-id',

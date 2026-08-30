@@ -75,7 +75,10 @@ beforeEach(() => {
   vi.clearAllMocks();
   window.localStorage.clear();
 });
-afterEach(() => cleanup());
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
+});
 
 function renderSearch() {
   return render(
@@ -137,14 +140,19 @@ describe('PublicMedicineSearch', () => {
     expect(screen.getByText(/nonexistent-medicine/)).toBeVisible();
   });
 
-  it('shows the exact server error message on failure', async () => {
-    vi.mocked(searchPublicMedicine).mockRejectedValue(new ApiError('Provider not found', 404));
+  it('maps a backend failure to bounded localized copy without reflecting its message', async () => {
+    vi.mocked(searchPublicMedicine).mockRejectedValue(
+      new ApiError('unbounded backend English must not be reflected', 404),
+    );
     renderSearch();
 
     fillAndSubmit('paracetamol');
 
     expect(await screen.findByText('Pharmacy not found')).toBeVisible();
-    expect(screen.getByText('Provider not found')).toBeVisible();
+    expect(screen.getByText('Search is unavailable right now.')).toBeVisible();
+    expect(
+      screen.queryByText('unbounded backend English must not be reflected'),
+    ).not.toBeInTheDocument();
   });
 
   it('shows a loading state and prevents duplicate submission while pending', async () => {
@@ -244,8 +252,7 @@ describe('PublicMedicineSearch', () => {
   it('does not persist precise location coordinates in browser storage', async () => {
     mockGeolocationSuccess(12.9716, 77.5946);
 
-    const localStorageSpy = vi.spyOn(Storage.prototype, 'setItem');
-    const sessionStorageSpy = vi.spyOn(Storage.prototype, 'setItem');
+    const storageSpy = vi.spyOn(Storage.prototype, 'setItem');
 
     vi.mocked(searchNearbyMedicine).mockResolvedValue({
       data: [],
@@ -264,8 +271,12 @@ describe('PublicMedicineSearch', () => {
 
     await screen.findByText(/No matches/i);
 
-    expect(localStorageSpy).not.toHaveBeenCalled();
-    expect(sessionStorageSpy).not.toHaveBeenCalled();
+    const serializedWrites = JSON.stringify(storageSpy.mock.calls);
+    expect(serializedWrites).not.toContain('12.9716');
+    expect(serializedWrites).not.toContain('77.5946');
+    expect(storageSpy.mock.calls.some(([key]) => /latitude|longitude|location/i.test(key))).toBe(
+      false,
+    );
   });
 });
 

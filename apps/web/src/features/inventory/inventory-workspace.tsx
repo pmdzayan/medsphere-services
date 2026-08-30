@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { MetricCard, SectionCard, StatusBadge } from '@/components/platform/dashboard-primitives';
 import { Icon } from '@/components/platform/icon';
+import { useLanguage } from '@/components/language-provider';
 import {
   ApiError,
   getAssignedProviders,
@@ -23,21 +24,21 @@ import type {
   ProviderAccess,
 } from '@/lib/inventory-contract';
 import { BATCH_QUARANTINE_REASONS } from '@/lib/inventory-contract';
+import type { TranslationKey, TranslationValues } from '@/lib/i18n';
 import {
   daysUntilExpiry,
   expiryUrgency,
-  expiryUrgencyLabel,
   formatInventoryCurrency,
   formatInventoryDate,
   loadedInventoryMetrics,
 } from './inventory-data';
 
 const PAGE_SIZE = 25;
-const QUARANTINE_REASON_LABELS: Record<BatchQuarantineReason, string> = {
-  QUALITY_SUSPECT: 'Quality concern',
-  TEMPERATURE_EXCURSION: 'Temperature excursion',
-  PACKAGING_COMPROMISED: 'Packaging compromised',
-  STORAGE_DEVIATION: 'Storage deviation',
+const QUARANTINE_REASON_KEYS: Record<BatchQuarantineReason, TranslationKey> = {
+  QUALITY_SUSPECT: 'inventory.dialog.quarantine.quality',
+  TEMPERATURE_EXCURSION: 'inventory.dialog.quarantine.temperature',
+  PACKAGING_COMPROMISED: 'inventory.dialog.quarantine.packaging',
+  STORAGE_DEVIATION: 'inventory.dialog.quarantine.storage',
 };
 
 interface QuarantineTarget {
@@ -59,6 +60,7 @@ interface TransferTarget {
 }
 
 export function InventoryWorkspace() {
+  const { locale, t } = useLanguage();
   const [providers, setProviders] = useState<ProviderAccess[]>([]);
   const [providerId, setProviderId] = useState('');
   const [page, setPage] = useState<InventoryStockPage | null>(null);
@@ -125,32 +127,35 @@ export function InventoryWorkspace() {
     } catch (loadError) {
       setProviders([]);
       setProviderId('');
-      setError(toPublicError(loadError, 'Unable to load assigned providers.'));
+      setError(toPublicError(loadError, t('inventory.error.providers')));
     } finally {
       setProvidersLoading(false);
     }
-  }, []);
+  }, [t]);
 
-  const loadStock = useCallback(async (selectedProvider: string, search: string, start: number) => {
-    if (!selectedProvider) return;
-    setStockLoading(true);
-    setError(null);
-    try {
-      setPage(
-        await getProviderStock({
-          providerId: selectedProvider,
-          query: search || undefined,
-          limit: PAGE_SIZE,
-          offset: start,
-        }),
-      );
-    } catch (loadError) {
-      setPage(null);
-      setError(toPublicError(loadError, 'Unable to load provider stock.'));
-    } finally {
-      setStockLoading(false);
-    }
-  }, []);
+  const loadStock = useCallback(
+    async (selectedProvider: string, search: string, start: number) => {
+      if (!selectedProvider) return;
+      setStockLoading(true);
+      setError(null);
+      try {
+        setPage(
+          await getProviderStock({
+            providerId: selectedProvider,
+            query: search || undefined,
+            limit: PAGE_SIZE,
+            offset: start,
+          }),
+        );
+      } catch (loadError) {
+        setPage(null);
+        setError(toPublicError(loadError, t('inventory.error.stock')));
+      } finally {
+        setStockLoading(false);
+      }
+    },
+    [t],
+  );
 
   useEffect(() => void loadProviders(), [loadProviders]);
   useEffect(() => {
@@ -191,7 +196,7 @@ export function InventoryWorkspace() {
       setQuarantineTarget(null);
       await loadStock(providerId, query, offset);
     } catch (mutationError) {
-      setQuarantineError(toPublicError(mutationError, 'Unable to quarantine this batch.').message);
+      setQuarantineError(toPublicError(mutationError, t('inventory.error.quarantine')).message);
     } finally {
       setQuarantineSubmitting(false);
     }
@@ -220,7 +225,7 @@ export function InventoryWorkspace() {
       reason.length < 1 ||
       reason.length > 500
     ) {
-      setDamageError('Enter a valid available quantity and a reason of 1–500 characters.');
+      setDamageError(t('inventory.error.damageValidation'));
       return;
     }
     setDamageSubmitting(true);
@@ -236,9 +241,7 @@ export function InventoryWorkspace() {
       setDamageTarget(null);
       await loadStock(providerId, query, offset);
     } catch (mutationError) {
-      setDamageError(
-        toPublicError(mutationError, 'Unable to record damaged stock for this batch.').message,
-      );
+      setDamageError(toPublicError(mutationError, t('inventory.error.damage')).message);
     } finally {
       setDamageSubmitting(false);
     }
@@ -273,7 +276,7 @@ export function InventoryWorkspace() {
       quantity > transferTarget.batch.availableQuantity ||
       reason.length > 500
     ) {
-      setTransferError('Select another assigned provider and enter a valid available quantity.');
+      setTransferError(t('inventory.error.transferValidation'));
       return;
     }
     setTransferSubmitting(true);
@@ -291,9 +294,7 @@ export function InventoryWorkspace() {
       setTransferTarget(null);
       await loadStock(providerId, query, offset);
     } catch (mutationError) {
-      setTransferError(
-        toPublicError(mutationError, 'Unable to record the completed transfer.').message,
-      );
+      setTransferError(toPublicError(mutationError, t('inventory.error.transfer')).message);
     } finally {
       setTransferSubmitting(false);
     }
@@ -302,9 +303,9 @@ export function InventoryWorkspace() {
   if (!providersLoading && error?.status === 403 && providers.length === 0) {
     return (
       <InventoryState
-        title="Inventory access is not assigned"
-        detail="Your membership needs authorization.provider-access.read before assigned provider stock can be viewed."
-        action="Retry access check"
+        title={t('inventory.accessTitle')}
+        detail={t('inventory.accessDetail')}
+        action={t('inventory.retryAccess')}
         onAction={() => void loadProviders()}
       />
     );
@@ -315,14 +316,13 @@ export function InventoryWorkspace() {
       <header className="flex flex-col justify-between gap-5 lg:flex-row lg:items-end">
         <div>
           <p className="text-xs font-extrabold uppercase tracking-[.18em] text-emerald-700">
-            Live assigned-provider stock
+            {t('inventory.eyebrow')}
           </p>
           <h1 className="mt-3 font-[var(--font-display)] text-3xl font-bold tracking-[-.045em] text-[#10271f] sm:text-[2.45rem]">
-            Medicine inventory
+            {t('inventory.title')}
           </h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-[#71817c]">
-            Live stock and bounded batch-safety actions for providers assigned to your authenticated
-            membership.
+            {t('inventory.description')}
           </p>
         </div>
         <div className="flex flex-wrap gap-3">
@@ -330,7 +330,7 @@ export function InventoryWorkspace() {
             href="/inventory/expiry"
             className="inline-flex w-fit items-center rounded-xl bg-amber-600 px-4 py-2.5 text-sm font-bold text-white"
           >
-            Expiry worklist
+            {t('inventory.expiry.title')}
           </Link>
           <button
             type="button"
@@ -339,38 +339,38 @@ export function InventoryWorkspace() {
             className="inline-flex w-fit items-center gap-2 rounded-xl border border-[#d8e2de] bg-white px-4 py-2.5 text-sm font-bold text-[#436158] disabled:cursor-wait disabled:opacity-50"
           >
             <Icon name="refresh" className={`size-4 ${stockLoading ? 'animate-spin' : ''}`} />
-            Refresh stock
+            {t('inventory.refreshStock')}
           </button>
         </div>
       </header>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard
-          label="Products on page"
+          label={t('inventory.metric.products')}
           value={String(metrics.products)}
           icon="inventory"
-          detail="Current loaded page only"
+          detail={t('inventory.metric.detail')}
         />
         <MetricCard
-          label="Available units"
+          label={t('inventory.metric.available')}
           value={String(metrics.available)}
           icon="inventory"
           accent="cyan"
-          detail="Current loaded page only"
+          detail={t('inventory.metric.detail')}
         />
         <MetricCard
-          label="Held units"
+          label={t('inventory.metric.held')}
           value={String(metrics.held)}
           icon="clock"
           accent="amber"
-          detail="Current loaded page only"
+          detail={t('inventory.metric.detail')}
         />
         <MetricCard
-          label="Batches on page"
+          label={t('inventory.metric.batches')}
           value={String(metrics.batches)}
           icon="calendar"
           accent="rose"
-          detail="Current loaded page only"
+          detail={t('inventory.metric.detail')}
         />
       </div>
 
@@ -378,10 +378,10 @@ export function InventoryWorkspace() {
         <div className="grid gap-3 border-b border-[#edf1ef] bg-[#fbfcfb] p-4 sm:p-5 lg:grid-cols-[minmax(14rem,22rem)_1fr] lg:px-6">
           <label>
             <span className="mb-1.5 block text-[10px] font-extrabold uppercase tracking-[.14em] text-[#70827b]">
-              Assigned provider
+              {t('inventory.common.assignedProvider')}
             </span>
             <select
-              aria-label="Assigned provider"
+              aria-label={t('inventory.common.assignedProvider')}
               value={providerId}
               disabled={providersLoading || providers.length === 0}
               onChange={(event) => {
@@ -390,11 +390,15 @@ export function InventoryWorkspace() {
               }}
               className="h-11 w-full rounded-xl border border-[#dce5e1] bg-white px-3 text-sm font-semibold text-[#38544b] disabled:opacity-60"
             >
-              {providers.length === 0 ? <option value="">No assigned provider</option> : null}
+              {providers.length === 0 ? (
+                <option value="">{t('inventory.common.noProvider')}</option>
+              ) : null}
               {providers.map((provider) => (
                 <option key={provider.providerId} value={provider.providerId}>
                   {provider.businessName} ·{' '}
-                  {provider.providerType === 'PHARMACY' ? 'Pharmacy' : 'Hospital'}
+                  {provider.providerType === 'PHARMACY'
+                    ? t('inventory.common.pharmacy')
+                    : t('inventory.common.hospital')}
                 </option>
               ))}
             </select>
@@ -402,15 +406,15 @@ export function InventoryWorkspace() {
           <form onSubmit={submitSearch} className="flex items-end gap-2">
             <label className="min-w-0 flex-1">
               <span className="mb-1.5 block text-[10px] font-extrabold uppercase tracking-[.14em] text-[#70827b]">
-                Product search
+                {t('inventory.search.label')}
               </span>
               <input
-                aria-label="Product search"
+                aria-label={t('inventory.search.label')}
                 type="search"
                 maxLength={120}
                 value={draftQuery}
                 onChange={(event) => setDraftQuery(event.target.value)}
-                placeholder="Name, generic name, brand, or SKU"
+                placeholder={t('inventory.search.placeholder')}
                 className="h-11 w-full rounded-xl border border-[#dce5e1] bg-white px-4 text-sm text-[#264239]"
               />
             </label>
@@ -419,46 +423,47 @@ export function InventoryWorkspace() {
               disabled={!providerId || stockLoading}
               className="h-11 rounded-xl bg-[#0b5f4b] px-4 text-sm font-bold text-white disabled:opacity-50"
             >
-              Search
+              {t('inventory.search.action')}
             </button>
           </form>
         </div>
 
-        {providersLoading ? <InventoryLoading label="Checking assigned providers…" /> : null}
+        {providersLoading ? <InventoryLoading label={t('inventory.checkingProviders')} /> : null}
         {!providersLoading && !error && providers.length === 0 ? (
           <InventoryState
-            title="No active provider assignment"
-            detail="Ask a tenant administrator to assign this membership to an active pharmacy or hospital."
-            action="Check again"
+            title={t('inventory.noActiveProvider')}
+            detail={t('inventory.noActiveProviderDetail')}
+            action={t('inventory.checkAgain')}
             onAction={() => void loadProviders()}
           />
         ) : null}
         {!providersLoading && error ? (
           <InventoryState
             title={
-              error.status === 404
-                ? 'Provider stock is no longer available'
-                : 'Inventory could not be loaded'
+              error.status === 404 ? t('inventory.providerUnavailable') : t('inventory.loadFailure')
             }
             detail={error.message}
-            action="Try again"
+            action={t('inventory.common.tryAgain')}
             onAction={() =>
               providerId ? void loadStock(providerId, query, offset) : void loadProviders()
             }
           />
         ) : null}
         {!providersLoading && !error && stockLoading && !page ? (
-          <InventoryLoading label="Loading live stock…" />
+          <InventoryLoading label={t('inventory.loading')} />
         ) : null}
         {!providersLoading && !error && !stockLoading && page?.data.length === 0 ? (
           <InventoryState
-            title="No stock matched"
+            title={t('inventory.noMatch')}
             detail={
               query
-                ? `No products matched “${query}” for ${selectedProvider?.businessName ?? 'this provider'}.`
-                : 'This assigned provider has no stock listings in the current result.'
+                ? t('inventory.noMatchQuery', {
+                    query,
+                    provider: selectedProvider?.businessName ?? t('inventory.noMatchProvider'),
+                  })
+                : t('inventory.noStock')
             }
-            action={query ? 'Clear search' : 'Refresh'}
+            action={query ? t('inventory.clearSearch') : t('inventory.common.refresh')}
             onAction={() => {
               if (query) {
                 setDraftQuery('');
@@ -471,6 +476,8 @@ export function InventoryWorkspace() {
         {!error && page?.data.length ? (
           <InventoryTable
             page={page}
+            locale={locale}
+            t={t}
             onQuarantine={openQuarantine}
             onDamage={openDamage}
             onTransfer={providers.length > 1 ? openTransfer : undefined}
@@ -480,8 +487,11 @@ export function InventoryWorkspace() {
         {!error && page && page.total > 0 ? (
           <div className="flex items-center justify-between gap-3 border-t border-[#edf1ef] px-5 py-4 text-xs text-[#70827b] sm:px-6">
             <p>
-              {page.offset + 1}–{Math.min(page.offset + page.data.length, page.total)} of{' '}
-              {page.total} products
+              {t('inventory.range', {
+                start: page.offset + 1,
+                end: Math.min(page.offset + page.data.length, page.total),
+                total: page.total,
+              })}
             </p>
             <div className="flex gap-2">
               <button
@@ -490,7 +500,7 @@ export function InventoryWorkspace() {
                 onClick={() => setOffset(Math.max(0, page.offset - PAGE_SIZE))}
                 className="rounded-lg border border-[#dce5e1] px-3 py-2 font-bold disabled:opacity-40"
               >
-                Previous
+                {t('inventory.common.previous')}
               </button>
               <button
                 type="button"
@@ -498,7 +508,7 @@ export function InventoryWorkspace() {
                 onClick={() => setOffset(page.offset + PAGE_SIZE)}
                 className="rounded-lg border border-[#dce5e1] px-3 py-2 font-bold disabled:opacity-40"
               >
-                Next
+                {t('inventory.common.next')}
               </button>
             </div>
           </div>
@@ -510,9 +520,11 @@ export function InventoryWorkspace() {
           role="status"
           className="rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm text-emerald-900"
         >
-          Batch quarantined. Physical quantity remains {quarantineReceipt.onHandQuantity};{' '}
-          {quarantineReceipt.affectedReservationCount} reservation(s) were cancelled and{' '}
-          {quarantineReceipt.releasedUnitCount} held unit(s) were released.
+          {t('inventory.receipt.quarantine', {
+            onHand: quarantineReceipt.onHandQuantity,
+            reservations: quarantineReceipt.affectedReservationCount,
+            released: quarantineReceipt.releasedUnitCount,
+          })}
         </div>
       ) : null}
 
@@ -521,8 +533,11 @@ export function InventoryWorkspace() {
           role="status"
           className="rounded-2xl border border-rose-200 bg-rose-50 px-5 py-4 text-sm text-rose-900"
         >
-          Damaged stock recorded. {damageReceipt.quantity} unit(s) were removed from physical
-          on-hand quantity: {damageReceipt.onHandBefore} → {damageReceipt.onHandAfter}.
+          {t('inventory.receipt.damage', {
+            quantity: damageReceipt.quantity,
+            before: damageReceipt.onHandBefore,
+            after: damageReceipt.onHandAfter,
+          })}
         </div>
       ) : null}
 
@@ -531,9 +546,11 @@ export function InventoryWorkspace() {
           role="status"
           className="rounded-2xl border border-cyan-200 bg-cyan-50 px-5 py-4 text-sm text-cyan-900"
         >
-          Completed transfer recorded for {transferReceipt.quantity} unit(s). Source on-hand is now{' '}
-          {transferReceipt.sourceOnHandAfter}; destination on-hand is{' '}
-          {transferReceipt.destinationOnHandAfter}.
+          {t('inventory.receipt.transfer', {
+            quantity: transferReceipt.quantity,
+            source: transferReceipt.sourceOnHandAfter,
+            destination: transferReceipt.destinationOnHandAfter,
+          })}
         </div>
       ) : null}
 
@@ -549,25 +566,27 @@ export function InventoryWorkspace() {
             className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl"
           >
             <p className="text-xs font-extrabold uppercase tracking-[.16em] text-amber-700">
-              One-way safety action
+              {t('inventory.dialog.quarantine.eyebrow')}
             </p>
             <h2
               id="quarantine-title"
               className="mt-2 font-[var(--font-display)] text-2xl font-bold text-[#17352a]"
             >
-              Quarantine batch {quarantineTarget.batch.batchNumber}
+              {t('inventory.dialog.quarantine.title', {
+                batch: quarantineTarget.batch.batchNumber,
+              })}
             </h2>
             <p className="mt-2 text-sm leading-6 text-[#647870]">
-              {quarantineTarget.medicineName} will become unavailable. Active reservations holding
-              this batch will be cancelled and their holds released. Physical stock is not removed,
-              and this action cannot be reversed in V1.
+              {t('inventory.dialog.quarantine.description', {
+                medicine: quarantineTarget.medicineName,
+              })}
             </p>
             <label className="mt-5 block">
               <span className="mb-1.5 block text-xs font-bold text-[#38544b]">
-                Quarantine reason
+                {t('inventory.dialog.quarantine.reason')}
               </span>
               <select
-                aria-label="Quarantine reason"
+                aria-label={t('inventory.dialog.quarantine.reason')}
                 value={quarantineReason}
                 onChange={(event) =>
                   setQuarantineReason(event.target.value as BatchQuarantineReason)
@@ -577,7 +596,7 @@ export function InventoryWorkspace() {
               >
                 {BATCH_QUARANTINE_REASONS.map((reason) => (
                   <option key={reason} value={reason}>
-                    {QUARANTINE_REASON_LABELS[reason]}
+                    {t(QUARANTINE_REASON_KEYS[reason])}
                   </option>
                 ))}
               </select>
@@ -597,14 +616,16 @@ export function InventoryWorkspace() {
                 onClick={() => setQuarantineTarget(null)}
                 className="rounded-xl border border-[#dce5e1] px-4 py-2.5 text-sm font-bold text-[#536a62] disabled:opacity-50"
               >
-                Cancel
+                {t('inventory.dialog.cancel')}
               </button>
               <button
                 type="submit"
                 disabled={quarantineSubmitting}
                 className="rounded-xl bg-amber-700 px-4 py-2.5 text-sm font-bold text-white disabled:cursor-wait disabled:opacity-50"
               >
-                {quarantineSubmitting ? 'Quarantining…' : 'Confirm quarantine'}
+                {quarantineSubmitting
+                  ? t('inventory.dialog.quarantining')
+                  : t('inventory.dialog.confirmQuarantine')}
               </button>
             </div>
           </form>
@@ -624,26 +645,26 @@ export function InventoryWorkspace() {
             className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl"
           >
             <p className="text-xs font-extrabold uppercase tracking-[.16em] text-rose-700">
-              Completed physical write-off
+              {t('inventory.dialog.damage.eyebrow')}
             </p>
             <h2
               id="damage-title"
               className="mt-2 font-[var(--font-display)] text-2xl font-bold text-[#17352a]"
             >
-              Record damage for batch {damageTarget.batch.batchNumber}
+              {t('inventory.dialog.damage.title', { batch: damageTarget.batch.batchNumber })}
             </h2>
             <p className="mt-2 text-sm leading-6 text-[#647870]">
-              Use this only after damage is physically confirmed for {damageTarget.medicineName}.
-              The accepted quantity is permanently removed from on-hand stock. This records the
-              write-off; it does not claim disposal or approval.
+              {t('inventory.dialog.damage.description', {
+                medicine: damageTarget.medicineName,
+              })}
             </p>
             <div className="mt-5 grid gap-4">
               <label>
                 <span className="mb-1.5 block text-xs font-bold text-[#38544b]">
-                  Damaged quantity
+                  {t('inventory.dialog.damage.quantity')}
                 </span>
                 <input
-                  aria-label="Damaged quantity"
+                  aria-label={t('inventory.dialog.damage.quantity')}
                   type="number"
                   min="1"
                   max={damageTarget.batch.availableQuantity}
@@ -654,15 +675,17 @@ export function InventoryWorkspace() {
                   className="h-11 w-full rounded-xl border border-[#dce5e1] px-3 text-sm text-[#38544b]"
                 />
                 <span className="mt-1 block text-xs text-[#80908b]">
-                  Up to {damageTarget.batch.availableQuantity} currently available unit(s)
+                  {t('inventory.dialog.damage.limit', {
+                    quantity: damageTarget.batch.availableQuantity,
+                  })}
                 </span>
               </label>
               <label>
                 <span className="mb-1.5 block text-xs font-bold text-[#38544b]">
-                  Confirmed damage reason
+                  {t('inventory.dialog.damage.reason')}
                 </span>
                 <textarea
-                  aria-label="Confirmed damage reason"
+                  aria-label={t('inventory.dialog.damage.reason')}
                   maxLength={500}
                   value={damageReason}
                   onChange={(event) => setDamageReason(event.target.value)}
@@ -687,14 +710,16 @@ export function InventoryWorkspace() {
                 onClick={() => setDamageTarget(null)}
                 className="rounded-xl border border-[#dce5e1] px-4 py-2.5 text-sm font-bold text-[#536a62] disabled:opacity-50"
               >
-                Cancel
+                {t('inventory.dialog.cancel')}
               </button>
               <button
                 type="submit"
                 disabled={damageSubmitting}
                 className="rounded-xl bg-rose-700 px-4 py-2.5 text-sm font-bold text-white disabled:cursor-wait disabled:opacity-50"
               >
-                {damageSubmitting ? 'Recording…' : 'Confirm damaged stock'}
+                {damageSubmitting
+                  ? t('inventory.dialog.recording')
+                  : t('inventory.dialog.confirmDamage')}
               </button>
             </div>
           </form>
@@ -714,25 +739,24 @@ export function InventoryWorkspace() {
             className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl"
           >
             <p className="text-xs font-extrabold uppercase tracking-[.16em] text-cyan-700">
-              Completed physical transfer
+              {t('inventory.dialog.transfer.eyebrow')}
             </p>
             <h2
               id="transfer-title"
               className="mt-2 font-[var(--font-display)] text-2xl font-bold text-[#17352a]"
             >
-              Record transfer of {transferTarget.medicineName}
+              {t('inventory.dialog.transfer.title', { medicine: transferTarget.medicineName })}
             </h2>
             <p className="mt-2 text-sm leading-6 text-[#647870]">
-              Use this only after the stock has physically moved. The command atomically records
-              both provider balances; it does not create a shipment, transit, or approval workflow.
+              {t('inventory.dialog.transfer.description')}
             </p>
             <div className="mt-5 grid gap-4">
               <label>
                 <span className="mb-1.5 block text-xs font-bold text-[#38544b]">
-                  Destination provider
+                  {t('inventory.dialog.transfer.destination')}
                 </span>
                 <select
-                  aria-label="Destination provider"
+                  aria-label={t('inventory.dialog.transfer.destination')}
                   value={transferDestinationId}
                   onChange={(event) => setTransferDestinationId(event.target.value)}
                   disabled={transferSubmitting}
@@ -748,9 +772,11 @@ export function InventoryWorkspace() {
                 </select>
               </label>
               <label>
-                <span className="mb-1.5 block text-xs font-bold text-[#38544b]">Quantity</span>
+                <span className="mb-1.5 block text-xs font-bold text-[#38544b]">
+                  {t('inventory.dialog.transfer.quantityShort')}
+                </span>
                 <input
-                  aria-label="Transfer quantity"
+                  aria-label={t('inventory.dialog.transfer.quantity')}
                   type="number"
                   min="1"
                   max={transferTarget.batch.availableQuantity}
@@ -763,10 +789,10 @@ export function InventoryWorkspace() {
               </label>
               <label>
                 <span className="mb-1.5 block text-xs font-bold text-[#38544b]">
-                  Optional operational reason
+                  {t('inventory.dialog.transfer.reason')}
                 </span>
                 <textarea
-                  aria-label="Transfer reason"
+                  aria-label={t('inventory.dialog.transfer.reasonAria')}
                   maxLength={500}
                   value={transferReason}
                   onChange={(event) => setTransferReason(event.target.value)}
@@ -791,34 +817,38 @@ export function InventoryWorkspace() {
                 onClick={() => setTransferTarget(null)}
                 className="rounded-xl border border-[#dce5e1] px-4 py-2.5 text-sm font-bold text-[#536a62] disabled:opacity-50"
               >
-                Cancel
+                {t('inventory.dialog.cancel')}
               </button>
               <button
                 type="submit"
                 disabled={transferSubmitting}
                 className="rounded-xl bg-cyan-700 px-4 py-2.5 text-sm font-bold text-white disabled:cursor-wait disabled:opacity-50"
               >
-                {transferSubmitting ? 'Recording…' : 'Confirm completed transfer'}
+                {transferSubmitting
+                  ? t('inventory.dialog.recording')
+                  : t('inventory.dialog.confirmTransfer')}
               </button>
             </div>
           </form>
         </div>
       ) : null}
 
-      <p className="pb-2 text-center text-[11px] text-[#93a09c]">
-        Live data · Provider assignment and command permission are rechecked for every request
-      </p>
+      <p className="pb-2 text-center text-[11px] text-[#93a09c]">{t('inventory.footer')}</p>
     </div>
   );
 }
 
 function InventoryTable({
   page,
+  locale,
+  t,
   onQuarantine,
   onDamage,
   onTransfer,
 }: {
   page: InventoryStockPage;
+  locale: string;
+  t: Translator;
   onQuarantine: (batch: InventoryBatchStock, medicineName: string) => void;
   onDamage: (batch: InventoryBatchStock, medicineName: string) => void;
   onTransfer?: (batch: InventoryBatchStock, medicineName: string) => void;
@@ -833,11 +863,11 @@ function InventoryTable({
         <table className="w-full min-w-[1000px] border-collapse text-left">
           <thead>
             <tr className="border-b border-[#edf1ef] bg-[#fbfcfb] text-[10px] font-extrabold uppercase tracking-[.13em] text-[#8a9994]">
-              <th className="px-6 py-3.5">Medicine</th>
-              <th className="px-4 py-3.5">Pricing</th>
-              <th className="px-4 py-3.5">Stock totals</th>
-              <th className="px-4 py-3.5">Batches</th>
-              <th className="px-6 py-3.5">Visibility</th>
+              <th className="px-6 py-3.5">{t('inventory.table.medicine')}</th>
+              <th className="px-4 py-3.5">{t('inventory.table.pricing')}</th>
+              <th className="px-4 py-3.5">{t('inventory.table.stockTotals')}</th>
+              <th className="px-4 py-3.5">{t('inventory.table.batches')}</th>
+              <th className="px-6 py-3.5">{t('inventory.table.visibility')}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-[#edf1ef]">
@@ -846,31 +876,36 @@ function InventoryTable({
                 <td className="px-6 py-4">
                   <p className="text-sm font-bold text-[#1b372d]">{item.name}</p>
                   <p className="mt-1 text-xs text-[#758780]">
-                    {item.genericName ?? 'Generic name unavailable'} · {item.brand}
+                    {item.genericName ?? t('inventory.table.genericUnavailable')} · {item.brand}
                   </p>
                   <p className="mt-1 font-mono text-[11px] text-[#8a9893]">
-                    SKU {item.sku ?? 'not assigned'}
+                    {t('inventory.table.sku')} {item.sku ?? t('inventory.table.notAssigned')}
                   </p>
                 </td>
                 <td className="px-4 py-4 text-xs text-[#536a62]">
                   <p>
-                    <strong>Selling:</strong> {formatInventoryCurrency(item.sellingPrice)}
+                    <strong>{t('inventory.table.selling')}:</strong>{' '}
+                    {formatInventoryCurrency(item.sellingPrice, locale)}
                   </p>
                   <p className="mt-1">
-                    <strong>MRP:</strong> {formatInventoryCurrency(item.mrp)}
+                    <strong>{t('inventory.table.mrp')}:</strong>{' '}
+                    {formatInventoryCurrency(item.mrp, locale)}
                   </p>
                 </td>
                 <td className="px-4 py-4 text-xs text-[#536a62]">
                   <p>
-                    <strong>{item.totalAvailableQuantity}</strong> available
+                    <strong>{item.totalAvailableQuantity}</strong> {t('inventory.common.available')}
                   </p>
                   <p className="mt-1">
-                    {item.totalOnHandQuantity} on hand · {item.totalHeldQuantity} held
+                    {item.totalOnHandQuantity} {t('inventory.table.onHand')} ·{' '}
+                    {item.totalHeldQuantity} {t('inventory.common.held')}
                   </p>
                 </td>
                 <td className="px-4 py-4">
                   <BatchList
                     item={item}
+                    locale={locale}
+                    t={t}
                     onQuarantine={onQuarantine}
                     onDamage={onDamage}
                     onTransfer={onTransfer}
@@ -878,7 +913,7 @@ function InventoryTable({
                 </td>
                 <td className="px-6 py-4">
                   <StatusBadge tone={item.isVisible ? 'emerald' : 'amber'}>
-                    {item.isVisible ? 'Visible' : 'Hidden'}
+                    {item.isVisible ? t('inventory.table.visible') : t('inventory.table.hidden')}
                   </StatusBadge>
                 </td>
               </tr>
@@ -894,17 +929,17 @@ function InventoryTable({
               <div className="min-w-0">
                 <p className="text-sm font-bold text-[#1b372d]">{item.name}</p>
                 <p className="mt-1 text-xs text-[#758780]">
-                  {item.genericName ?? 'Generic name unavailable'} · {item.brand}
+                  {item.genericName ?? t('inventory.table.genericUnavailable')} · {item.brand}
                 </p>
               </div>
               <StatusBadge tone={item.isVisible ? 'emerald' : 'amber'}>
-                {item.isVisible ? 'Visible' : 'Hidden'}
+                {item.isVisible ? t('inventory.table.visible') : t('inventory.table.hidden')}
               </StatusBadge>
             </div>
             <dl className="mt-3 grid grid-cols-3 gap-2 rounded-xl bg-[#fbfcfb] p-3 text-center">
               <div>
                 <dt className="text-[10px] font-bold uppercase tracking-wide text-[#899792]">
-                  On hand
+                  {t('inventory.table.onHand')}
                 </dt>
                 <dd className="mt-0.5 text-sm font-bold text-[#28453b]">
                   {item.totalOnHandQuantity}
@@ -912,7 +947,7 @@ function InventoryTable({
               </div>
               <div>
                 <dt className="text-[10px] font-bold uppercase tracking-wide text-[#899792]">
-                  Held
+                  {t('inventory.common.held')}
                 </dt>
                 <dd className="mt-0.5 text-sm font-bold text-[#28453b]">
                   {item.totalHeldQuantity}
@@ -920,7 +955,7 @@ function InventoryTable({
               </div>
               <div>
                 <dt className="text-[10px] font-bold uppercase tracking-wide text-[#899792]">
-                  Available
+                  {t('inventory.common.available')}
                 </dt>
                 <dd className="mt-0.5 text-sm font-bold text-emerald-700">
                   {item.totalAvailableQuantity}
@@ -928,12 +963,14 @@ function InventoryTable({
               </div>
             </dl>
             <p className="mt-2 text-xs text-[#536a62]">
-              Selling {formatInventoryCurrency(item.sellingPrice)} · MRP{' '}
-              {formatInventoryCurrency(item.mrp)}
+              {t('inventory.table.selling')} {formatInventoryCurrency(item.sellingPrice, locale)} ·{' '}
+              {t('inventory.table.mrp')} {formatInventoryCurrency(item.mrp, locale)}
             </p>
             <div className="mt-3">
               <BatchList
                 item={item}
+                locale={locale}
+                t={t}
                 onQuarantine={onQuarantine}
                 onDamage={onDamage}
                 onTransfer={onTransfer}
@@ -948,17 +985,21 @@ function InventoryTable({
 
 function BatchList({
   item,
+  locale,
+  t,
   onQuarantine,
   onDamage,
   onTransfer,
 }: {
   item: InventoryStockItem;
+  locale: string;
+  t: Translator;
   onQuarantine: (batch: InventoryBatchStock, medicineName: string) => void;
   onDamage: (batch: InventoryBatchStock, medicineName: string) => void;
   onTransfer?: (batch: InventoryBatchStock, medicineName: string) => void;
 }) {
   if (!item.batches.length) {
-    return <span className="text-xs text-[#899792]">No batches</span>;
+    return <span className="text-xs text-[#899792]">{t('inventory.table.noBatches')}</span>;
   }
   return (
     <div className="space-y-2">
@@ -974,16 +1015,19 @@ function BatchList({
             <p className="flex flex-wrap items-center gap-2">
               <span className="font-mono font-semibold">{batch.batchNumber}</span>
               <StatusBadge tone={batchStatusTone(batch.status)}>
-                {batch.status === 'QUARANTINED' ? 'Quarantined' : batch.status}
+                {batchStatusLabel(batch.status, t)}
               </StatusBadge>
               {showUrgencyChip ? (
                 <StatusBadge tone={urgency === 'overdue' ? 'rose' : 'amber'}>
-                  {expiryUrgencyLabel(daysUntil)}
+                  {localizedExpiryUrgency(daysUntil, t)}
                 </StatusBadge>
               ) : null}
             </p>
             <p className="mt-0.5 text-[#899792]">
-              Expires {formatInventoryDate(batch.expiryDate)} · {batch.availableQuantity} available
+              {t('inventory.batch.expires', {
+                date: formatInventoryDate(batch.expiryDate, locale),
+                quantity: batch.availableQuantity,
+              })}
             </p>
             {batch.status === 'ACTIVE' ? (
               <span className="mt-1.5 flex flex-wrap gap-3">
@@ -991,9 +1035,9 @@ function BatchList({
                   type="button"
                   onClick={() => onQuarantine(batch, item.name)}
                   className="font-bold text-amber-700 hover:text-amber-800"
-                  aria-label={`Quarantine batch ${batch.batchNumber}`}
+                  aria-label={t('inventory.batch.quarantineAria', { batch: batch.batchNumber })}
                 >
-                  Quarantine batch
+                  {t('inventory.batch.quarantine')}
                 </button>
                 {batch.availableQuantity > 0 ? (
                   <>
@@ -1001,18 +1045,20 @@ function BatchList({
                       type="button"
                       onClick={() => onDamage(batch, item.name)}
                       className="font-bold text-rose-700 hover:text-rose-800"
-                      aria-label={`Record damage for batch ${batch.batchNumber}`}
+                      aria-label={t('inventory.batch.damageAria', { batch: batch.batchNumber })}
                     >
-                      Record damage
+                      {t('inventory.batch.damage')}
                     </button>
                     {onTransfer ? (
                       <button
                         type="button"
                         onClick={() => onTransfer(batch, item.name)}
                         className="font-bold text-cyan-700 hover:text-cyan-800"
-                        aria-label={`Record completed transfer for batch ${batch.batchNumber}`}
+                        aria-label={t('inventory.batch.transferAria', {
+                          batch: batch.batchNumber,
+                        })}
                       >
-                        Record transfer
+                        {t('inventory.batch.transfer')}
                       </button>
                     ) : null}
                   </>
@@ -1084,7 +1130,23 @@ function InventoryState({
 
 function toPublicError(error: unknown, fallback: string): { message: string; status?: number } {
   return {
-    message: error instanceof Error ? error.message : fallback,
+    message: fallback,
     status: error instanceof ApiError ? error.status : undefined,
   };
+}
+
+type Translator = (key: TranslationKey, values?: TranslationValues) => string;
+
+function batchStatusLabel(status: InventoryBatchStock['status'], t: Translator): string {
+  if (status === 'ACTIVE') return t('inventory.batch.active');
+  if (status === 'QUARANTINED') return t('inventory.batch.quarantined');
+  return t('inventory.batch.expired');
+}
+
+function localizedExpiryUrgency(daysUntil: number | null, t: Translator): string {
+  if (daysUntil === null) return t('inventory.expiry.urgency.unknown');
+  if (daysUntil < 0) return t('inventory.expiry.urgency.overdue', { days: Math.abs(daysUntil) });
+  if (daysUntil === 0) return t('inventory.expiry.urgency.today');
+  if (daysUntil === 1) return t('inventory.expiry.urgency.tomorrow');
+  return t('inventory.expiry.urgency.days', { days: daysUntil });
 }

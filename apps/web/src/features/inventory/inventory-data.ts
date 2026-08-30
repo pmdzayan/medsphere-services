@@ -21,10 +21,10 @@ export function loadedInventoryMetrics(items: InventoryStockItem[]): LoadedInven
   );
 }
 
-export function formatInventoryCurrency(value: string): string {
+export function formatInventoryCurrency(value: string, locale = 'en-IN'): string {
   const amount = Number(value);
   return Number.isFinite(amount)
-    ? new Intl.NumberFormat('en-IN', {
+    ? new Intl.NumberFormat(locale, {
         style: 'currency',
         currency: 'INR',
         minimumFractionDigits: 2,
@@ -33,8 +33,8 @@ export function formatInventoryCurrency(value: string): string {
     : value;
 }
 
-export function formatInventoryDate(value: string): string {
-  return new Intl.DateTimeFormat('en-IN', {
+export function formatInventoryDate(value: string, locale = 'en-IN'): string {
+  return new Intl.DateTimeFormat(locale, {
     day: '2-digit',
     month: 'short',
     year: 'numeric',

@@ -12,6 +12,9 @@ export class AuthenticatedUserResponseDto {
 
   @ApiProperty()
   lastName!: string;
+
+  @ApiProperty({ example: 'en', description: 'Persisted whole-app UI language preference' })
+  preferredLanguage!: string;
 }
 
 export class TenantContextResponseDto {

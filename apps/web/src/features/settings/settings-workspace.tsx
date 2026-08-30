@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Icon } from '@/components/platform/icon';
 import { MetricCard, SectionCard, StatusBadge } from '@/components/platform/dashboard-primitives';
+import { useLanguage } from '@/components/language-provider';
+import { isLocale, type TranslationKey } from '@/lib/i18n';
 import {
   getPrivacyPreferences,
   getSupportedLanguages,
@@ -26,43 +28,44 @@ interface SettingsIdentity {
 
 const privacyOptions: Array<{
   key: keyof PrivacyPreferences;
-  title: string;
-  description: string;
+  titleKey: TranslationKey;
+  descriptionKey: TranslationKey;
   tone: 'emerald' | 'cyan' | 'amber';
 }> = [
   {
     key: 'hideSensitiveNotifications',
-    title: 'Hide sensitive notification previews',
-    description: 'Reduce sensitive detail shown in notification previews where supported.',
+    titleKey: 'settings.privacy.hidePreview.title',
+    descriptionKey: 'settings.privacy.hidePreview.description',
     tone: 'emerald',
   },
   {
     key: 'privatePickup',
-    title: 'Private medicine pickup',
-    description: 'Request privacy-aware pickup handling in workflows that support this preference.',
+    titleKey: 'settings.privacy.privatePickup.title',
+    descriptionKey: 'settings.privacy.privatePickup.description',
     tone: 'cyan',
   },
   {
     key: 'allowInAppChat',
-    title: 'Allow in-app chat',
-    description: 'Allow approved MedSphere workflows to contact you through in-app chat.',
+    titleKey: 'settings.privacy.chat.title',
+    descriptionKey: 'settings.privacy.chat.description',
     tone: 'emerald',
   },
   {
     key: 'shareEmail',
-    title: 'Share email',
-    description: 'Allow your email to be used when an accepted care workflow requests it.',
+    titleKey: 'settings.privacy.email.title',
+    descriptionKey: 'settings.privacy.email.description',
     tone: 'amber',
   },
   {
     key: 'sharePhone',
-    title: 'Share phone number',
-    description: 'Allow your phone number to be used when an accepted care workflow requests it.',
+    titleKey: 'settings.privacy.phone.title',
+    descriptionKey: 'settings.privacy.phone.description',
     tone: 'amber',
   },
 ];
 
 export function SettingsWorkspace({ identity }: { identity: SettingsIdentity }) {
+  const { setLocale, t } = useLanguage();
   const [privacy, setPrivacy] = useState<PrivacyPreferences | null>(null);
   const [privacyDraft, setPrivacyDraft] = useState<PrivacyPreferences | null>(null);
   const [languages, setLanguages] = useState<SupportedLanguage[]>([]);
@@ -89,11 +92,11 @@ export function SettingsWorkspace({ identity }: { identity: SettingsIdentity }) 
       setPrivacy(null);
       setPrivacyDraft(null);
       setLanguages([]);
-      setError(loadError instanceof Error ? loadError.message : 'Unable to load settings.');
+      setError(t('settings.error.load'));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     void load();
@@ -116,11 +119,9 @@ export function SettingsWorkspace({ identity }: { identity: SettingsIdentity }) 
       const saved = await updatePrivacyPreferences(privacyChanges);
       setPrivacy(saved);
       setPrivacyDraft(saved);
-      setPrivacyNotice('Privacy preferences saved.');
+      setPrivacyNotice(t('settings.notice.privacySaved'));
     } catch (saveError) {
-      setPrivacyNotice(
-        saveError instanceof Error ? saveError.message : 'Unable to save privacy preferences.',
-      );
+      setPrivacyNotice(t('settings.error.savePrivacy'));
     } finally {
       setSavingPrivacy(false);
     }
@@ -131,12 +132,17 @@ export function SettingsWorkspace({ identity }: { identity: SettingsIdentity }) 
     setSavingLanguage(true);
     setLanguageNotice(null);
     try {
-      const response = await updatePreferredLanguage({ preferredLanguage: selectedLanguage });
-      setLanguageNotice(response.message);
+      await updatePreferredLanguage({ preferredLanguage: selectedLanguage });
+      setLanguageNotice(t('settings.notice.languageSaved'));
+      // The Settings panel persists the preference server-side; it must
+      // also update the live, rendered UI immediately (the same
+      // requirement the top-navigation LanguageSelector already meets),
+      // not only take effect after a future page reload.
+      if (isLocale(selectedLanguage)) {
+        setLocale(selectedLanguage, { persist: false });
+      }
     } catch (saveError) {
-      setLanguageNotice(
-        saveError instanceof Error ? saveError.message : 'Unable to update language.',
-      );
+      setLanguageNotice(t('settings.error.saveLanguage'));
     } finally {
       setSavingLanguage(false);
     }
@@ -152,18 +158,17 @@ export function SettingsWorkspace({ identity }: { identity: SettingsIdentity }) 
             <div className="flex flex-wrap items-center gap-2.5">
               <span className="inline-flex items-center gap-2 text-[10px] font-extrabold uppercase tracking-[.2em] text-emerald-300">
                 <Icon name="settings" className="size-4" />
-                Personal control centre
+                {t('settings.hero.eyebrow')}
               </span>
               <span className="rounded-full border border-cyan-200/15 bg-cyan-300/10 px-2.5 py-1 text-[9px] font-bold text-cyan-100">
-                Authenticated settings
+                {t('settings.hero.badge')}
               </span>
             </div>
             <h1 className="mt-4 font-[var(--font-display)] text-3xl font-bold tracking-[-.045em] sm:text-[2.55rem]">
-              Privacy &amp; preferences
+              {t('settings.hero.title')}
             </h1>
             <p className="mt-3 max-w-2xl text-sm leading-7 text-white/50">
-              Review the identity bound to this session and control the personal preferences exposed
-              by MedSphere&apos;s accepted account APIs.
+              {t('settings.hero.description')}
             </p>
           </div>
           <button
@@ -173,36 +178,36 @@ export function SettingsWorkspace({ identity }: { identity: SettingsIdentity }) 
             className="inline-flex w-fit items-center gap-2 rounded-xl border border-white/10 bg-white/[.06] px-4 py-2.5 text-xs font-bold text-white/75 transition hover:bg-white/10 disabled:cursor-wait disabled:opacity-50"
           >
             <Icon name="refresh" className={`size-4 ${loading ? 'animate-spin' : ''}`} />
-            Refresh settings
+            {t('settings.refresh')}
           </button>
         </div>
       </header>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard
-          label="Privacy controls"
+          label={t('settings.metric.privacy')}
           value="5"
-          detail="Accepted personal preferences"
+          detail={t('settings.metric.privacyDetail')}
           icon="shield"
         />
         <MetricCard
-          label="Protection options"
+          label={t('settings.metric.protection')}
           value={loading ? '—' : `${enabledProtections}/2`}
-          detail="Sensitive preview and pickup"
+          detail={t('settings.metric.protectionDetail')}
           icon="key"
           accent="cyan"
         />
         <MetricCard
-          label="Supported languages"
+          label={t('settings.metric.languages')}
           value={loading ? '—' : String(languages.length)}
-          detail="Provided by the language service"
+          detail={t('settings.metric.languagesDetail')}
           icon="documents"
           accent="amber"
         />
         <MetricCard
-          label="Session context"
-          value="Verified"
-          detail="Signed identity and tenant"
+          label={t('settings.metric.session')}
+          value={t('settings.metric.verified')}
+          detail={t('settings.metric.sessionDetail')}
           icon="team"
           accent="emerald"
         />
@@ -260,19 +265,20 @@ function PrivacyPanel({
   onReset: () => void;
   onSave: () => void;
 }) {
+  const { t } = useLanguage();
   return (
     <SectionCard>
       <div className="flex flex-col gap-3 border-b border-[#edf1ef] px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
         <div>
           <p className="text-[10px] font-extrabold uppercase tracking-[.18em] text-emerald-700">
-            Personal privacy
+            {t('settings.privacy.eyebrow')}
           </p>
           <h2 className="mt-1 font-[var(--font-display)] text-xl font-bold tracking-[-.03em] text-[#173128]">
-            Preference controls
+            {t('settings.privacy.title')}
           </h2>
         </div>
         <StatusBadge tone={dirty ? 'amber' : 'emerald'}>
-          {dirty ? 'Unsaved changes' : 'Saved'}
+          {dirty ? t('settings.privacy.unsaved') : t('settings.privacy.saved')}
         </StatusBadge>
       </div>
 
@@ -280,8 +286,8 @@ function PrivacyPanel({
         {privacyOptions.map((option) => (
           <PreferenceToggle
             key={option.key}
-            title={option.title}
-            description={option.description}
+            title={t(option.titleKey)}
+            description={t(option.descriptionKey)}
             tone={option.tone}
             checked={draft[option.key]}
             onToggle={() => onChange({ ...draft, [option.key]: !draft[option.key] })}
@@ -291,7 +297,7 @@ function PrivacyPanel({
 
       <div className="flex flex-col gap-3 border-t border-[#edf1ef] bg-[#fbfcfb] px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
         <p aria-live="polite" className="min-h-5 text-xs text-[#60756d]">
-          {notice ?? 'Changes are sent only when you choose Save preferences.'}
+          {notice ?? t('settings.privacy.pending')}
         </p>
         <div className="flex gap-2">
           <button
@@ -300,7 +306,7 @@ function PrivacyPanel({
             disabled={!dirty || saving}
             className="rounded-xl border border-[#d7e2dd] bg-white px-4 py-2.5 text-xs font-bold text-[#587168] transition hover:bg-[#f4f8f6] disabled:cursor-not-allowed disabled:opacity-45"
           >
-            Reset
+            {t('settings.privacy.reset')}
           </button>
           <button
             type="button"
@@ -308,7 +314,7 @@ function PrivacyPanel({
             disabled={!dirty || saving}
             className="rounded-xl bg-[#0a342a] px-4 py-2.5 text-xs font-black text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-45"
           >
-            {saving ? 'Saving…' : 'Save preferences'}
+            {saving ? t('settings.privacy.saving') : t('settings.privacy.save')}
           </button>
         </div>
       </div>
@@ -360,11 +366,12 @@ function PreferenceToggle({
 }
 
 function IdentityPanel({ identity }: { identity: SettingsIdentity }) {
+  const { t } = useLanguage();
   return (
     <SectionCard>
       <div className="bg-[#0a2a22] px-5 py-5 text-white">
         <p className="text-[9px] font-extrabold uppercase tracking-[.18em] text-emerald-300">
-          Read-only identity
+          {t('settings.identity.eyebrow')}
         </p>
         <h2 className="mt-2 font-[var(--font-display)] text-xl font-bold tracking-[-.03em]">
           {identity.name}
@@ -372,12 +379,20 @@ function IdentityPanel({ identity }: { identity: SettingsIdentity }) {
         <p className="mt-1 text-xs text-white/45">{identity.email}</p>
       </div>
       <dl className="divide-y divide-[#edf1ef] px-5">
-        <IdentityItem label="Organization" value={identity.tenantName} />
-        <IdentityItem label="Tenant" value={abbreviate(identity.tenantId)} mono />
-        <IdentityItem label="Membership" value={abbreviate(identity.membershipId)} mono />
+        <IdentityItem label={t('settings.identity.organization')} value={identity.tenantName} />
+        <IdentityItem
+          label={t('settings.identity.tenant')}
+          value={abbreviate(identity.tenantId)}
+          mono
+        />
+        <IdentityItem
+          label={t('settings.identity.membership')}
+          value={abbreviate(identity.membershipId)}
+          mono
+        />
       </dl>
       <p className="border-t border-[#edf1ef] bg-emerald-50 px-5 py-3 text-[10px] leading-5 text-emerald-800">
-        Identity and tenant context come from the signed session and cannot be changed here.
+        {t('settings.identity.boundary')}
       </p>
     </SectionCard>
   );
@@ -417,28 +432,29 @@ function LanguagePanel({
   onSelect: (value: '' | SupportedLanguageCode) => void;
   onSave: () => void;
 }) {
+  const { t } = useLanguage();
   return (
     <SectionCard>
       <div className="border-b border-[#edf1ef] px-5 py-5">
         <p className="text-[10px] font-extrabold uppercase tracking-[.18em] text-emerald-700">
-          Language
+          {t('settings.language.eyebrow')}
         </p>
         <h2 className="mt-1 font-[var(--font-display)] text-lg font-bold tracking-[-.025em] text-[#173128]">
-          Preferred language
+          {t('settings.language.title')}
         </h2>
       </div>
       <div className="space-y-4 px-5 py-5">
         <label className="block space-y-2">
           <span className="text-[10px] font-extrabold uppercase tracking-[.12em] text-[#74857f]">
-            Choose a language
+            {t('settings.language.choose')}
           </span>
           <select
-            aria-label="Preferred language"
+            aria-label={t('settings.language.title')}
             value={selected}
             onChange={(event) => onSelect(event.target.value as '' | SupportedLanguageCode)}
             className="h-11 w-full rounded-xl border border-[#dbe4e0] bg-[#fbfcfb] px-3 text-xs text-[#18352c] focus:border-emerald-500"
           >
-            <option value="">Select language</option>
+            <option value="">{t('settings.language.select')}</option>
             {languages.map((language) => (
               <option key={language.code} value={language.code}>
                 {language.name}
@@ -446,17 +462,14 @@ function LanguagePanel({
             ))}
           </select>
         </label>
-        <p className="text-[10px] leading-5 text-[#82918c]">
-          The accepted API can update this preference but does not expose the currently stored
-          value. This screen will not guess it.
-        </p>
+        <p className="text-[10px] leading-5 text-[#82918c]">{t('settings.language.boundary')}</p>
         <button
           type="button"
           onClick={onSave}
           disabled={!selected || saving}
           className="w-full rounded-xl bg-[#0a342a] px-4 py-2.5 text-xs font-black text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-45"
         >
-          {saving ? 'Updating…' : 'Update language'}
+          {saving ? t('settings.language.updating') : t('settings.language.update')}
         </button>
         <p aria-live="polite" className="min-h-5 text-xs text-[#60756d]">
           {notice}
@@ -467,10 +480,11 @@ function LanguagePanel({
 }
 
 function SettingsLoading() {
+  const { t } = useLanguage();
   return (
     <div
       className="grid gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(20rem,.65fr)]"
-      aria-label="Loading settings"
+      aria-label={t('settings.loading')}
     >
       <div className="h-[32rem] animate-pulse rounded-[1.4rem] bg-white" />
       <div className="space-y-5">
@@ -482,6 +496,7 @@ function SettingsLoading() {
 }
 
 function SettingsError({ message, onRetry }: { message: string; onRetry: () => void }) {
+  const { t } = useLanguage();
   return (
     <div
       role="alert"
@@ -490,14 +505,14 @@ function SettingsError({ message, onRetry }: { message: string; onRetry: () => v
       <span className="mx-auto grid size-12 place-items-center rounded-2xl bg-rose-50 text-rose-700">
         <Icon name="warning" className="size-5" />
       </span>
-      <p className="mt-4 text-sm font-bold text-[#28463c]">Settings could not be loaded</p>
+      <p className="mt-4 text-sm font-bold text-[#28463c]">{t('settings.loadFailure')}</p>
       <p className="mx-auto mt-2 max-w-lg text-xs leading-6 text-[#7c8c86]">{message}</p>
       <button
         type="button"
         onClick={onRetry}
         className="mt-5 rounded-xl border border-[#d7e2dd] px-4 py-2.5 text-xs font-bold text-emerald-800"
       >
-        Try again
+        {t('settings.tryAgain')}
       </button>
     </div>
   );

@@ -364,7 +364,7 @@ export function RegistrationForm() {
       <div className="space-y-4">
         <div className="flex items-center gap-3" aria-hidden="true">
           <span className="h-px flex-1 bg-[#10201c]/10" />
-          <span className="text-xs font-semibold text-[#71807b]">or</span>
+          <span className="text-xs font-semibold text-[#71807b]">{t('common.or')}</span>
           <span className="h-px flex-1 bg-[#10201c]/10" />
         </div>
 

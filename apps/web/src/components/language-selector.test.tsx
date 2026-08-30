@@ -2,7 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { LanguageProvider, useLanguage } from '@/components/language-provider';
 import { LanguageSelector } from '@/components/language-selector';
-import { localeOptions } from '@/lib/i18n';
+import { enabledLocaleOptions, localeOptions } from '@/lib/i18n';
 
 beforeEach(() => {
   window.localStorage.clear();
@@ -13,15 +13,33 @@ beforeEach(() => {
 afterEach(() => cleanup());
 
 describe('LanguageSelector', () => {
-  it('lists English plus all 22 Eighth Schedule languages', () => {
+  it('lists only translation-complete locales, not every known locale code', () => {
     render(
       <LanguageProvider>
         <LanguageSelector />
       </LanguageProvider>,
     );
 
-    expect(screen.getAllByRole('option')).toHaveLength(23);
-    expect(localeOptions).toHaveLength(23);
+    // The Eighth Schedule locale catalog currently has 23 known codes,
+    // but only translation-complete ones may appear in a production
+    // selector -- see lib/i18n.ts's isLocaleComplete/enabledLocaleOptions.
+    expect(localeOptions.length).toBeGreaterThan(enabledLocaleOptions.length);
+    expect(screen.getAllByRole('option')).toHaveLength(enabledLocaleOptions.length);
+  });
+
+  it('never renders an option for a known-incomplete locale', () => {
+    render(
+      <LanguageProvider>
+        <LanguageSelector />
+      </LanguageProvider>,
+    );
+
+    const optionValues = screen
+      .getAllByRole('option')
+      .map((option) => option.getAttribute('value'));
+    expect(optionValues).not.toContain('bn');
+    expect(optionValues).not.toContain('sd');
+    expect(optionValues).not.toContain('ks');
   });
 
   it('switches to Tamil, persists the choice, and updates document language', () => {
@@ -40,7 +58,7 @@ describe('LanguageSelector', () => {
     expect(document.documentElement.dir).toBe('ltr');
   });
 
-  it('applies right-to-left direction for Urdu', () => {
+  it('applies right-to-left direction for Urdu (a complete, enabled RTL locale)', () => {
     render(
       <LanguageProvider>
         <LanguageSelector />

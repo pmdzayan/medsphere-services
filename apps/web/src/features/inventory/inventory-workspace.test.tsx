@@ -1,5 +1,6 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { LanguageProvider } from '@/components/language-provider';
 import {
   ApiError,
   getAssignedProviders,
@@ -141,9 +142,17 @@ async function findTable() {
   return screen.findByRole('table');
 }
 
+function renderWorkspace() {
+  return render(
+    <LanguageProvider initialLocale="en">
+      <InventoryWorkspace />
+    </LanguageProvider>,
+  );
+}
+
 describe('InventoryWorkspace live integration', () => {
   it('renders live accepted fields and current-page metrics without preview claims', async () => {
-    render(<InventoryWorkspace />);
+    renderWorkspace();
     const scope = within(await findTable());
     expect(await scope.findByText('Metformin 500 mg')).toBeVisible();
     expect(metric('Available units')).toHaveTextContent('17');
@@ -154,7 +163,7 @@ describe('InventoryWorkspace live integration', () => {
   });
 
   it('changes assigned provider and applies server-side search', async () => {
-    render(<InventoryWorkspace />);
+    renderWorkspace();
     await within(await findTable()).findByText('Metformin 500 mg');
     fireEvent.change(screen.getByLabelText('Assigned provider'), {
       target: { value: providers[1].providerId },
@@ -180,7 +189,7 @@ describe('InventoryWorkspace live integration', () => {
   });
 
   it('paginates with accepted offsets', async () => {
-    render(<InventoryWorkspace />);
+    renderWorkspace();
     fireEvent.click(await screen.findByRole('button', { name: 'Next' }));
     await waitFor(() =>
       expect(getProviderStock).toHaveBeenLastCalledWith({
@@ -194,7 +203,7 @@ describe('InventoryWorkspace live integration', () => {
 
   it('confirms a version-safe one-way quarantine and refreshes live stock', async () => {
     vi.stubGlobal('crypto', { randomUUID: () => '11111111-1111-4111-8111-111111111111' });
-    render(<InventoryWorkspace />);
+    renderWorkspace();
     fireEvent.click(
       within(await findTable()).getByRole('button', { name: 'Quarantine batch BATCH-1' }),
     );
@@ -223,17 +232,17 @@ describe('InventoryWorkspace live integration', () => {
 
   it('keeps the confirmation open and surfaces bounded mutation errors', async () => {
     vi.mocked(quarantineBatch).mockRejectedValueOnce(new ApiError('Batch version conflict', 409));
-    render(<InventoryWorkspace />);
+    renderWorkspace();
     fireEvent.click(
       within(await findTable()).getByRole('button', { name: 'Quarantine batch BATCH-1' }),
     );
     fireEvent.click(screen.getByRole('button', { name: 'Confirm quarantine' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent('Batch version conflict');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Unable to quarantine this batch.');
     expect(screen.getByRole('dialog')).toBeVisible();
   });
 
   it('dismisses the quarantine confirmation dialog on Escape', async () => {
-    render(<InventoryWorkspace />);
+    renderWorkspace();
     fireEvent.click(
       within(await findTable()).getByRole('button', { name: 'Quarantine batch BATCH-1' }),
     );
@@ -248,7 +257,7 @@ describe('InventoryWorkspace live integration', () => {
   it('does not dismiss the quarantine dialog on Escape while the submission is in flight', async () => {
     const pendingQuarantine = deferred<BatchQuarantineResponse>();
     vi.mocked(quarantineBatch).mockReturnValueOnce(pendingQuarantine.promise);
-    render(<InventoryWorkspace />);
+    renderWorkspace();
     fireEvent.click(
       within(await findTable()).getByRole('button', { name: 'Quarantine batch BATCH-1' }),
     );
@@ -273,7 +282,7 @@ describe('InventoryWorkspace live integration', () => {
 
   it('records only a confirmed available damaged quantity and refreshes live stock', async () => {
     vi.stubGlobal('crypto', { randomUUID: () => '22222222-2222-4222-8222-222222222222' });
-    render(<InventoryWorkspace />);
+    renderWorkspace();
     fireEvent.click(
       within(await findTable()).getByRole('button', { name: 'Record damage for batch BATCH-1' }),
     );
@@ -301,7 +310,7 @@ describe('InventoryWorkspace live integration', () => {
   });
 
   it('rejects damage above available stock before the API call', async () => {
-    render(<InventoryWorkspace />);
+    renderWorkspace();
     fireEvent.click(
       within(await findTable()).getByRole('button', { name: 'Record damage for batch BATCH-1' }),
     );
@@ -316,7 +325,7 @@ describe('InventoryWorkspace live integration', () => {
 
   it('records only a completed physical transfer and refreshes source stock', async () => {
     vi.stubGlobal('crypto', { randomUUID: () => '44444444-4444-4444-8444-444444444444' });
-    render(<InventoryWorkspace />);
+    renderWorkspace();
     fireEvent.click(
       within(await findTable()).getByRole('button', {
         name: 'Record completed transfer for batch BATCH-1',
@@ -344,7 +353,7 @@ describe('InventoryWorkspace live integration', () => {
   });
 
   it('rejects a transfer above available stock before the API call', async () => {
-    render(<InventoryWorkspace />);
+    renderWorkspace();
     fireEvent.click(
       within(await findTable()).getByRole('button', {
         name: 'Record completed transfer for batch BATCH-1',
@@ -358,20 +367,20 @@ describe('InventoryWorkspace live integration', () => {
 
   it('shows assignment-empty and permission-restricted states', async () => {
     vi.mocked(getAssignedProviders).mockResolvedValueOnce([]);
-    const { unmount } = render(<InventoryWorkspace />);
+    const { unmount } = renderWorkspace();
     expect(
       await screen.findByRole('heading', { name: 'No active provider assignment' }),
     ).toBeVisible();
     unmount();
     vi.mocked(getAssignedProviders).mockRejectedValueOnce(new ApiError('Permission denied', 403));
-    render(<InventoryWorkspace />);
+    renderWorkspace();
     expect(
       await screen.findByRole('heading', { name: 'Inventory access is not assigned' }),
     ).toBeVisible();
   });
 
   it('renders both the desktop table and a mobile card list from the same data', async () => {
-    render(<InventoryWorkspace />);
+    renderWorkspace();
     await within(await findTable()).findByText('Metformin 500 mg');
     // The mobile list is a <ul> sibling structure, not a table -- it exists
     // for narrow viewports (CSS-hidden above lg, not a separate fetch/data
@@ -407,13 +416,13 @@ describe('InventoryWorkspace live integration', () => {
         },
       ],
     });
-    render(<InventoryWorkspace />);
+    renderWorkspace();
     const scope = within(await findTable());
     await scope.findByText('BATCH-URGENT');
-    expect(scope.getByText('5d remaining')).toBeVisible();
+    expect(scope.getByText('Expires in 5d')).toBeVisible();
     expect(scope.getByText('BATCH-DISTANT')).toBeVisible();
     // Only one urgency chip should exist -- the distant batch gets none.
-    expect(scope.getAllByText(/\d+d remaining|Overdue/)).toHaveLength(1);
+    expect(scope.getAllByText(/Expires in \d+d|Overdue/)).toHaveLength(1);
     vi.useRealTimers();
   });
 });

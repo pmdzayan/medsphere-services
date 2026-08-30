@@ -1,4 +1,7 @@
+'use client';
+
 import type { InputHTMLAttributes, ReactNode } from 'react';
+import { useLanguage } from '@/components/language-provider';
 
 /**
  * Shared MedSphere visual primitives (Task 1 — design-system foundation).
@@ -91,6 +94,7 @@ export function Button({
   loadingLabel?: string;
   className?: string;
 } & Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'children'>) {
+  const { t } = useLanguage();
   return (
     <button
       {...rest}
@@ -99,7 +103,7 @@ export function Button({
       aria-busy={loading || undefined}
       className={`inline-flex items-center justify-center gap-2 rounded-xl px-5 py-3.5 text-sm font-bold transition disabled:cursor-wait disabled:opacity-60 disabled:hover:translate-y-0 ${buttonVariants[variant]} ${className}`}
     >
-      {loading ? (loadingLabel ?? 'Working…') : children}
+      {loading ? (loadingLabel ?? t('common.working')) : children}
     </button>
   );
 }
@@ -221,11 +225,12 @@ export function EmptyState({
 // handling already present in globals.css for the rest of the app.
 // ---------------------------------------------------------------------------
 export function Skeleton({ className = '' }: { className?: string }) {
+  const { t } = useLanguage();
   return (
     <div
       className={`animate-pulse rounded-lg bg-canvas-300/70 motion-reduce:animate-none ${className}`}
       role="status"
-      aria-label="Loading"
+      aria-label={t('common.loading')}
     />
   );
 }

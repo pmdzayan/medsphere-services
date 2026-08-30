@@ -3,11 +3,12 @@ import hi from './locales/hi.json';
 import ta from './locales/ta.json';
 import te from './locales/te.json';
 import kn from './locales/kn.json';
+import ur from './locales/ur.json';
 import {
   SupportedLanguage,
   isLanguageSupported,
   LANGUAGE_NAMES,
-  SUPPORTED_LANGUAGES,
+  ENABLED_UI_LANGUAGES,
 } from './language.enum';
 
 type TranslationMap = Record<string, unknown>;
@@ -18,6 +19,7 @@ const translations: Record<SupportedLanguage, TranslationMap> = {
   [SupportedLanguage.TA]: ta as unknown as TranslationMap,
   [SupportedLanguage.TE]: te as unknown as TranslationMap,
   [SupportedLanguage.KN]: kn as unknown as TranslationMap,
+  [SupportedLanguage.UR]: ur as unknown as TranslationMap,
 };
 
 /**
@@ -79,12 +81,15 @@ export class I18nService {
   }
 
   /**
-   * Returns all supported languages with their display names.
+   * Returns languages safe to offer as a user's whole-app language
+   * preference -- restricted to ENABLED_UI_LANGUAGES (translation-complete
+   * on the frontend), not every SupportedLanguage this service can
+   * produce a backend-generated string fallback for.
    */
   getSupportedLanguages(): Array<{ code: string; name: string }> {
-    return SUPPORTED_LANGUAGES.map((code: string) => ({
+    return ENABLED_UI_LANGUAGES.map((code) => ({
       code,
-      name: LANGUAGE_NAMES[code as SupportedLanguage] || code,
+      name: LANGUAGE_NAMES[code] || code,
     }));
   }
 }

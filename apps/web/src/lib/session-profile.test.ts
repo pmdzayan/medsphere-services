@@ -10,6 +10,7 @@ const profile: SessionProfile = {
     email: 'admin@example.com',
     firstName: 'Aisha',
     lastName: 'Zahra',
+    preferredLanguage: 'en',
   },
   context: {
     membershipId: 'membership-id',
@@ -37,5 +38,24 @@ describe('sealed session profile', () => {
   it('rejects malformed profile data without throwing', () => {
     expect(readSessionProfile('not-a-profile', 'access-secret')).toBeNull();
     expect(readSessionProfile(undefined, 'access-secret')).toBeNull();
+  });
+
+  it('keeps a signed legacy language preference readable during rollout', () => {
+    const legacy = { ...profile, user: { ...profile.user, preferredLanguage: 'hi' as const } };
+    const sealed = sealSessionProfile(legacy, 'access-secret');
+
+    expect(readSessionProfile(sealed, 'access-secret')).toEqual(legacy);
+  });
+
+  it('defaults a pre-language session profile to English without invalidating it', () => {
+    const { preferredLanguage: _preferredLanguage, ...legacyUser } = profile.user;
+    expect(_preferredLanguage).toBe('en');
+    const legacy = { ...profile, user: legacyUser };
+    const sealed = sealSessionProfile(legacy as SessionProfile, 'access-secret');
+
+    expect(readSessionProfile(sealed, 'access-secret')).toEqual({
+      ...legacy,
+      user: { ...legacyUser, preferredLanguage: 'en' },
+    });
   });
 });

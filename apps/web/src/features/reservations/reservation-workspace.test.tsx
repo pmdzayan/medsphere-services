@@ -1,5 +1,6 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { LanguageProvider } from '@/components/language-provider';
 import {
   ApiError,
   createProviderReservation,
@@ -45,6 +46,14 @@ const providers: ProviderAccess[] = [
 const page = structuredClone(validReservationPage) as unknown as ProviderReservationPage;
 const stockPage = structuredClone(validStockPage) as unknown as InventoryStockPage;
 
+function renderWorkspace() {
+  return render(
+    <LanguageProvider initialLocale="en">
+      <ReservationWorkspace />
+    </LanguageProvider>,
+  );
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(getAssignedProviders).mockResolvedValue(providers);
@@ -73,7 +82,7 @@ afterEach(() => {
 
 describe('ReservationWorkspace live integration', () => {
   it('renders accepted live fields and expands details without patient claims', async () => {
-    render(<ReservationWorkspace />);
+    renderWorkspace();
     fireEvent.click(
       within(await screen.findByRole('table')).getByRole('button', {
         name: /View reservation .* details/,
@@ -88,7 +97,7 @@ describe('ReservationWorkspace live integration', () => {
 
   it('confirms a version-safe lifecycle action and refreshes reservations', async () => {
     vi.stubGlobal('crypto', { randomUUID: () => '33333333-3333-4333-8333-333333333333' });
-    render(<ReservationWorkspace />);
+    renderWorkspace();
     fireEvent.click(
       within(await screen.findByRole('table')).getByRole('button', {
         name: /View reservation .* details/,
@@ -96,7 +105,7 @@ describe('ReservationWorkspace live integration', () => {
     );
     fireEvent.click(screen.getByRole('button', { name: 'Mark ready' }));
     expect(screen.getByRole('dialog')).toHaveTextContent('recheck provider assignment');
-    fireEvent.click(screen.getByRole('button', { name: 'Confirm mark ready' }));
+    fireEvent.click(screen.getByRole('button', { name: /Confirm Mark ready/i }));
 
     await waitFor(() =>
       expect(transitionProviderReservation).toHaveBeenCalledWith(
@@ -115,7 +124,7 @@ describe('ReservationWorkspace live integration', () => {
 
   it('creates a single-product FEFO reservation and refreshes authoritative records', async () => {
     vi.stubGlobal('crypto', { randomUUID: () => '33333333-3333-4333-8333-333333333333' });
-    render(<ReservationWorkspace />);
+    renderWorkspace();
     fireEvent.click(await screen.findByRole('button', { name: 'New reservation' }));
     const dialog = await screen.findByRole('dialog');
     expect(dialog).toHaveTextContent('No name, contact, prescription, clinical');
@@ -144,7 +153,7 @@ describe('ReservationWorkspace live integration', () => {
     vi.mocked(createProviderReservation).mockRejectedValueOnce(
       new ApiError('Insufficient eligible stock', 409),
     );
-    render(<ReservationWorkspace />);
+    renderWorkspace();
     fireEvent.click(await screen.findByRole('button', { name: 'New reservation' }));
     fireEvent.change(await screen.findByLabelText('Tenant user ID'), {
       target: { value: 'f63f50dd-49b0-4a77-bc04-f7d00db58dd5' },
@@ -153,12 +162,12 @@ describe('ReservationWorkspace live integration', () => {
       target: { value: '2027-08-01T12:00' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Confirm reservation' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent('Insufficient eligible stock');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Unable to create reservation');
     expect(screen.getByRole('dialog')).toBeVisible();
   });
 
   it('dismisses the reservation creation dialog on Escape', async () => {
-    render(<ReservationWorkspace />);
+    renderWorkspace();
     fireEvent.click(await screen.findByRole('button', { name: 'New reservation' }));
     expect(await screen.findByRole('dialog')).toBeVisible();
 
@@ -172,20 +181,20 @@ describe('ReservationWorkspace live integration', () => {
     vi.mocked(transitionProviderReservation).mockRejectedValueOnce(
       new ApiError('Medicine reservation version conflict', 409),
     );
-    render(<ReservationWorkspace />);
+    renderWorkspace();
     fireEvent.click(
       within(await screen.findByRole('table')).getByRole('button', {
         name: /View reservation .* details/,
       }),
     );
     fireEvent.click(screen.getByRole('button', { name: 'Mark ready' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Confirm mark ready' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent('version conflict');
+    fireEvent.click(screen.getByRole('button', { name: /Confirm Mark ready/i }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Unable to transition reservation');
     expect(screen.getByRole('dialog')).toBeVisible();
   });
 
   it('changes provider and applies accepted status filtering', async () => {
-    render(<ReservationWorkspace />);
+    renderWorkspace();
     await screen.findByText('Confirmed');
     fireEvent.change(screen.getByLabelText('Assigned provider'), {
       target: { value: providers[1].providerId },
@@ -210,7 +219,7 @@ describe('ReservationWorkspace live integration', () => {
   });
 
   it('paginates with accepted offsets', async () => {
-    render(<ReservationWorkspace />);
+    renderWorkspace();
     fireEvent.click(await screen.findByRole('button', { name: 'Next' }));
     await waitFor(() =>
       expect(getProviderReservations).toHaveBeenLastCalledWith({
@@ -223,7 +232,7 @@ describe('ReservationWorkspace live integration', () => {
   });
 
   it('renders both the desktop table and a mobile card list from the same data', async () => {
-    render(<ReservationWorkspace />);
+    renderWorkspace();
     const table = await screen.findByRole('table');
     await within(table).findByText(/Version/);
     const detailButtons = screen.getAllByRole('button', {
@@ -237,13 +246,13 @@ describe('ReservationWorkspace live integration', () => {
 
   it('shows empty-assignment and permission-restricted states', async () => {
     vi.mocked(getAssignedProviders).mockResolvedValueOnce([]);
-    const { unmount } = render(<ReservationWorkspace />);
+    const { unmount } = renderWorkspace();
     expect(
       await screen.findByRole('heading', { name: 'No active provider assignment' }),
     ).toBeVisible();
     unmount();
     vi.mocked(getAssignedProviders).mockRejectedValueOnce(new ApiError('Permission denied', 403));
-    render(<ReservationWorkspace />);
+    renderWorkspace();
     expect(
       await screen.findByRole('heading', { name: 'Reservation access is not assigned' }),
     ).toBeVisible();

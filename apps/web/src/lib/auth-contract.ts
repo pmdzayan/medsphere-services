@@ -1,4 +1,5 @@
 import { ORGANIZATION_TYPES, type OrganizationType } from './organization-types';
+import { isKnownLanguageCode, type KnownLanguageCode } from './settings-contract';
 
 export interface GoogleLoginRequest {
   tenantSlug: string;
@@ -79,6 +80,7 @@ export interface AuthenticatedUser {
   email: string;
   firstName: string;
   lastName: string;
+  preferredLanguage: KnownLanguageCode;
 }
 
 export interface LoginResponse {
@@ -274,7 +276,13 @@ export function isLoginResponse(value: unknown): value is LoginResponse {
     typeof candidate.expiresIn !== 'number' ||
     !Number.isSafeInteger(candidate.expiresIn) ||
     candidate.expiresIn <= 0 ||
-    !hasExactStringKeys(candidate.user, ['email', 'firstName', 'id', 'lastName']) ||
+    !hasExactStringKeys(candidate.user, [
+      'email',
+      'firstName',
+      'id',
+      'lastName',
+      'preferredLanguage',
+    ]) ||
     !hasExactStringKeys(candidate.context, [
       'membershipId',
       'organizationType',
@@ -290,6 +298,7 @@ export function isLoginResponse(value: unknown): value is LoginResponse {
   return (
     user.id.length > 0 &&
     user.email.length > 0 &&
+    isKnownLanguageCode(user.preferredLanguage) &&
     context.membershipId.length > 0 &&
     context.tenantId.length > 0 &&
     context.tenantName.length > 0 &&

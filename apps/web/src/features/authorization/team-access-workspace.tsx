@@ -3,6 +3,7 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { Icon } from '@/components/platform/icon';
 import { SectionCard, StatusBadge } from '@/components/platform/dashboard-primitives';
+import { useLanguage } from '@/components/language-provider';
 import { ApiError, createRole, getAuthorizationCatalogue } from '@/lib/api-client';
 import { MembershipDirectory, RoleEditorPanel } from './role-lifecycle-panels';
 import {
@@ -20,6 +21,7 @@ import {
 type RoleFilter = 'ALL' | 'SYSTEM' | 'TENANT';
 
 export function TeamAccessWorkspace() {
+  const { t } = useLanguage();
   const [catalogue, setCatalogue] = useState<AuthorizationCatalogue | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<{ message: string; status?: number } | null>(null);
@@ -61,13 +63,13 @@ export function TeamAccessWorkspace() {
       setCatalogue(await getAuthorizationCatalogue());
     } catch (loadError) {
       setError({
-        message: loadError instanceof Error ? loadError.message : 'Unable to load access controls.',
+        message: t('team.error.load'),
         status: loadError instanceof ApiError ? loadError.status : undefined,
       });
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     void load();
@@ -108,18 +110,17 @@ export function TeamAccessWorkspace() {
             <div className="flex flex-wrap items-center gap-2.5">
               <span className="inline-flex items-center gap-2 text-[10px] font-extrabold uppercase tracking-[.2em] text-emerald-300">
                 <Icon name="shield" className="size-4" />
-                Identity governance
+                {t('team.eyebrow')}
               </span>
               <span className="rounded-full border border-emerald-200/15 bg-emerald-300/10 px-2.5 py-1 text-[9px] font-bold text-emerald-200">
-                Live authorization data
+                {t('team.liveData')}
               </span>
             </div>
             <h1 className="mt-4 font-[var(--font-display)] text-3xl font-bold tracking-[-.045em] sm:text-[2.55rem]">
-              Team &amp; access
+              {t('team.title')}
             </h1>
             <p className="mt-3 max-w-2xl text-sm leading-7 text-white/50">
-              Build least-privilege roles from the tenant permission catalogue. Every successful
-              change is enforced and audited by the authorization service.
+              {t('team.description')}
             </p>
           </div>
           <div className="flex flex-wrap gap-2.5">
@@ -130,7 +131,7 @@ export function TeamAccessWorkspace() {
               className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[.06] px-4 py-2.5 text-xs font-bold text-white/75 transition hover:bg-white/10 disabled:cursor-wait disabled:opacity-50"
             >
               <Icon name="refresh" className={`size-4 ${loading ? 'animate-spin' : ''}`} />
-              Refresh
+              {t('team.refresh')}
             </button>
             {canCreateRoles ? (
               <button
@@ -139,7 +140,7 @@ export function TeamAccessWorkspace() {
                 className="inline-flex items-center gap-2 rounded-xl bg-emerald-300 px-4 py-2.5 text-xs font-black text-[#08231d] shadow-[0_14px_28px_-16px_rgba(110,231,183,.75)] transition hover:-translate-y-0.5 hover:bg-emerald-200"
               >
                 <Icon name="plus" className="size-4" />
-                Create custom role
+                {t('team.create')}
               </button>
             ) : null}
           </div>
@@ -196,16 +197,16 @@ export function TeamAccessWorkspace() {
         <div className="flex flex-col gap-4 border-b border-[#edf1ef] px-5 py-5 sm:px-6 lg:flex-row lg:items-center">
           <div className="min-w-0 flex-1">
             <p className="text-[10px] font-extrabold uppercase tracking-[.18em] text-emerald-700">
-              Role registry
+              {t('team.registry.eyebrow')}
             </p>
             <h2 className="mt-1 font-[var(--font-display)] text-xl font-bold tracking-[-.03em] text-[#173128]">
-              Tenant roles
+              {t('team.registry.title')}
             </h2>
           </div>
           {canReadRoles ? (
             <div className="flex flex-col gap-2.5 sm:flex-row">
               <label className="relative min-w-64">
-                <span className="sr-only">Search roles</span>
+                <span className="sr-only">{t('team.search')}</span>
                 <Icon
                   name="search"
                   className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-[#82918c]"
@@ -214,7 +215,7 @@ export function TeamAccessWorkspace() {
                   type="search"
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
-                  placeholder="Search roles"
+                  placeholder={t('team.search')}
                   className="h-10 w-full rounded-xl border border-[#dbe4e0] bg-[#fbfcfb] pl-10 pr-3 text-xs text-[#18352c] placeholder:text-[#93a09c] focus:border-emerald-500"
                 />
               </label>
@@ -230,7 +231,11 @@ export function TeamAccessWorkspace() {
                         : 'text-[#7b8b85] hover:text-[#3e5b51]'
                     }`}
                   >
-                    {value === 'ALL' ? 'All' : value === 'SYSTEM' ? 'System' : 'Custom'}
+                    {value === 'ALL'
+                      ? t('team.filter.all')
+                      : value === 'SYSTEM'
+                        ? t('team.filter.system')
+                        : t('team.filter.custom')}
                   </button>
                 ))}
               </div>
@@ -241,7 +246,7 @@ export function TeamAccessWorkspace() {
         {loading && !catalogue ? <LoadingState /> : null}
         {error && !catalogue ? <ErrorState error={error} onRetry={load} /> : null}
         {catalogue && !canReadRoles ? (
-          <AccessUnavailable message="Your current role cannot read the tenant role registry." />
+          <AccessUnavailable message={t('team.access.registry')} />
         ) : null}
         {catalogue && canReadRoles && visibleRoles.length > 0 ? (
           <RoleTable
@@ -253,8 +258,8 @@ export function TeamAccessWorkspace() {
         ) : null}
         {catalogue && canReadRoles && visibleRoles.length === 0 ? (
           <div className="px-6 py-16 text-center">
-            <p className="text-sm font-bold text-[#28463c]">No matching roles</p>
-            <p className="mt-2 text-xs text-[#7c8c86]">Adjust the search or role type filter.</p>
+            <p className="text-sm font-bold text-[#28463c]">{t('team.empty.title')}</p>
+            <p className="mt-2 text-xs text-[#7c8c86]">{t('team.empty.detail')}</p>
           </div>
         ) : null}
       </SectionCard>
@@ -272,29 +277,35 @@ function AccessMetrics({
   catalogue: AuthorizationCatalogue;
   canReadPermissions: boolean;
 }) {
+  const { t } = useLanguage();
   const systemRoles = catalogue.roles.filter((role) => role.type === 'SYSTEM').length;
   const customRoles = catalogue.roles.filter((role) => role.type === 'TENANT').length;
   const assignments = catalogue.roles.reduce((total, role) => total + role.assignmentCount, 0);
   const metrics = [
     {
-      label: 'Total roles',
+      label: t('team.metric.total'),
       value: catalogue.total,
-      detail: 'Active in this tenant',
+      detail: t('team.metric.totalDetail'),
       icon: 'team' as const,
     },
     {
-      label: 'System roles',
+      label: t('team.metric.system'),
       value: systemRoles,
-      detail: 'Protected by policy',
+      detail: t('team.metric.systemDetail'),
       icon: 'shield' as const,
     },
-    { label: 'Custom roles', value: customRoles, detail: 'Tenant managed', icon: 'key' as const },
     {
-      label: 'Assignments',
+      label: t('team.metric.custom'),
+      value: customRoles,
+      detail: t('team.metric.customDetail'),
+      icon: 'key' as const,
+    },
+    {
+      label: t('team.metric.assignments'),
       value: assignments,
       detail: canReadPermissions
-        ? `${catalogue.permissions.length} permissions available`
-        : 'Permission catalogue restricted',
+        ? t('team.metric.permissions', { count: catalogue.permissions.length })
+        : t('team.metric.permissionsRestricted'),
       icon: 'trend' as const,
     },
   ];
@@ -334,6 +345,7 @@ function RoleTable({
   canUpdate: boolean;
   canDelete: boolean;
 }) {
+  const { t } = useLanguage();
   return (
     <>
       {/* Desktop/tablet: full table. Below lg, a stacked card list takes
@@ -344,19 +356,19 @@ function RoleTable({
           <thead>
             <tr className="border-b border-[#edf1ef] bg-[#fbfcfb] text-[10px] font-extrabold uppercase tracking-[.13em] text-[#8a9994]">
               <th className="px-6 py-3.5" scope="col">
-                Role
+                {t('team.table.role')}
               </th>
               <th className="px-4 py-3.5" scope="col">
-                Type
+                {t('team.table.type')}
               </th>
               <th className="px-4 py-3.5" scope="col">
-                Permissions
+                {t('team.table.permissions')}
               </th>
               <th className="px-4 py-3.5" scope="col">
-                Assignments
+                {t('team.table.assignments')}
               </th>
               <th className="px-6 py-3.5" scope="col">
-                <span className="sr-only">Actions</span>
+                <span className="sr-only">{t('team.table.actions')}</span>
               </th>
             </tr>
           </thead>
@@ -366,12 +378,12 @@ function RoleTable({
                 <td className="px-6 py-4">
                   <p className="text-sm font-bold text-[#1b372d]">{formatRoleName(role.name)}</p>
                   <p className="mt-1 max-w-md text-xs text-[#85938f]">
-                    {role.description ?? 'No description provided.'}
+                    {role.description ?? t('team.noDescription')}
                   </p>
                 </td>
                 <td className="px-4 py-4">
                   <StatusBadge tone={role.type === 'SYSTEM' ? 'cyan' : 'emerald'}>
-                    {role.type === 'SYSTEM' ? 'System' : 'Custom'}
+                    {role.type === 'SYSTEM' ? t('team.filter.system') : t('team.filter.custom')}
                   </StatusBadge>
                 </td>
                 <td className="px-4 py-4">
@@ -401,11 +413,11 @@ function RoleTable({
               <div className="min-w-0">
                 <p className="text-sm font-bold text-[#1b372d]">{formatRoleName(role.name)}</p>
                 <p className="mt-1 text-xs text-[#85938f]">
-                  {role.description ?? 'No description provided.'}
+                  {role.description ?? t('team.noDescription')}
                 </p>
               </div>
               <StatusBadge tone={role.type === 'SYSTEM' ? 'cyan' : 'emerald'}>
-                {role.type === 'SYSTEM' ? 'System' : 'Custom'}
+                {role.type === 'SYSTEM' ? t('team.filter.system') : t('team.filter.custom')}
               </StatusBadge>
             </div>
             <div className="mt-3">
@@ -413,7 +425,7 @@ function RoleTable({
             </div>
             <div className="mt-3 flex items-center justify-between gap-3">
               <span className="text-xs font-bold text-[#405a52]">
-                {role.assignmentCount} assignment{role.assignmentCount === 1 ? '' : 's'}
+                {t('team.assignmentCount', { count: role.assignmentCount })}
               </span>
               <RoleAction role={role} onEdit={onEdit} canUpdate={canUpdate} canDelete={canDelete} />
             </div>
@@ -425,6 +437,7 @@ function RoleTable({
 }
 
 function PermissionChips({ role }: { role: Role }) {
+  const { t } = useLanguage();
   return (
     <div className="flex max-w-sm flex-wrap gap-1.5">
       {role.permissionKeys.slice(0, 2).map((permission) => (
@@ -441,7 +454,7 @@ function PermissionChips({ role }: { role: Role }) {
         </span>
       ) : null}
       {role.permissionKeys.length === 0 ? (
-        <span className="text-xs text-[#98a49f]">None</span>
+        <span className="text-xs text-[#98a49f]">{t('team.none')}</span>
       ) : null}
     </div>
   );
@@ -458,6 +471,7 @@ function RoleAction({
   canUpdate: boolean;
   canDelete: boolean;
 }) {
+  const { t } = useLanguage();
   if (role.type === 'TENANT' && (canUpdate || canDelete)) {
     return (
       <button
@@ -465,21 +479,22 @@ function RoleAction({
         onClick={() => onEdit(role)}
         className="rounded-xl border border-[#dbe4e0] bg-white px-3 py-2 text-[10px] font-bold text-emerald-800 hover:bg-emerald-50"
       >
-        Manage · v{role.version}
+        {t('team.manageVersion', { version: role.version })}
       </button>
     );
   }
   if (role.type === 'TENANT') {
-    return <span className="text-[10px] font-semibold text-[#93a09c]">Read only</span>;
+    return <span className="text-[10px] font-semibold text-[#93a09c]">{t('team.readOnly')}</span>;
   }
-  return <span className="text-[10px] font-semibold text-[#93a09c]">Protected</span>;
+  return <span className="text-[10px] font-semibold text-[#93a09c]">{t('team.protected')}</span>;
 }
 
 function AccessUnavailable({ message }: { message: string }) {
+  const { t } = useLanguage();
   return (
     <div className="px-6 py-14 text-center">
       <Icon name="shield" className="mx-auto size-6 text-[#9aa7a2]" />
-      <p className="mt-3 text-sm font-bold text-[#28463c]">Limited access</p>
+      <p className="mt-3 text-sm font-bold text-[#28463c]">{t('team.limitedAccess')}</p>
       <p className="mt-2 text-xs text-[#7c8c86]">{message}</p>
     </div>
   );
@@ -494,6 +509,7 @@ function CreateRolePanel({
   onCancel: () => void;
   onCreated: (role: Role) => void;
 }) {
+  const { t } = useLanguage();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [selected, setSelected] = useState<string[]>([]);
@@ -513,7 +529,11 @@ function CreateRolePanel({
       permissions.map((permission) => permission.name),
     );
     if (Object.keys(validation).length > 0) {
-      setErrors(validation);
+      setErrors({
+        ...(validation.name ? { name: t('team.error.invalidRole') } : {}),
+        ...(validation.description ? { description: t('team.error.invalidRole') } : {}),
+        ...(validation.permissionKeys ? { permissionKeys: t('team.error.invalidRole') } : {}),
+      });
       return;
     }
     setPending(true);
@@ -522,7 +542,7 @@ function CreateRolePanel({
       onCreated(await createRole(request));
     } catch (submitError) {
       setErrors({
-        form: submitError instanceof Error ? submitError.message : 'Unable to create role.',
+        form: t('team.error.create'),
       });
     } finally {
       setPending(false);
@@ -535,20 +555,18 @@ function CreateRolePanel({
         <div className="flex items-start justify-between gap-5 border-b border-[#edf1ef] px-5 py-5 sm:px-6">
           <div>
             <p className="text-[10px] font-extrabold uppercase tracking-[.18em] text-emerald-700">
-              Least privilege
+              {t('team.create.eyebrow')}
             </p>
             <h2 className="mt-1 font-[var(--font-display)] text-xl font-bold text-[#173128]">
-              Create custom role
+              {t('team.create.title')}
             </h2>
-            <p className="mt-2 text-xs leading-5 text-[#7a8a84]">
-              Choose only the capabilities this job function needs.
-            </p>
+            <p className="mt-2 text-xs leading-5 text-[#7a8a84]">{t('team.create.detail')}</p>
           </div>
           <button
             type="button"
             onClick={onCancel}
             className="grid size-9 place-items-center rounded-xl border border-[#dfe7e3] text-[#6f8079] hover:bg-[#f7f9f8]"
-            aria-label="Close role form"
+            aria-label={t('team.create.close')}
           >
             <Icon name="close" className="size-4" />
           </button>
@@ -557,7 +575,9 @@ function CreateRolePanel({
         <div className="grid gap-6 p-5 sm:p-6 xl:grid-cols-[.75fr_1.25fr]">
           <div className="space-y-4">
             <label className="block">
-              <span className="mb-2 block text-xs font-bold text-[#435951]">Role name</span>
+              <span className="mb-2 block text-xs font-bold text-[#435951]">
+                {t('team.roleName')}
+              </span>
               <input
                 value={name}
                 onChange={(event) => setName(event.target.value)}
@@ -570,28 +590,29 @@ function CreateRolePanel({
             </label>
             <label className="block">
               <span className="mb-2 block text-xs font-bold text-[#435951]">
-                Description <span className="font-medium text-[#8b9894]">(optional)</span>
+                {t('team.descriptionLabel')}{' '}
+                <span className="font-medium text-[#8b9894]">{t('team.optional')}</span>
               </span>
               <textarea
                 value={description}
                 onChange={(event) => setDescription(event.target.value)}
                 maxLength={240}
                 rows={4}
-                placeholder="What this role is responsible for"
+                placeholder={t('team.descriptionPlaceholder')}
                 aria-invalid={Boolean(errors.description)}
                 className="w-full resize-none rounded-xl border border-[#dbe4e0] bg-[#fbfcfb] px-4 py-3 text-sm text-[#17342b] placeholder:text-[#9aa6a2] focus:border-emerald-500"
               />
               <div className="mt-2 flex justify-between gap-3 text-[10px] text-[#899691]">
-                <span>{errors.description ?? 'Visible to access administrators.'}</span>
+                <span>{errors.description ?? t('team.descriptionBoundary')}</span>
                 <span>{description.length}/240</span>
               </div>
             </label>
           </div>
 
           <fieldset>
-            <legend className="text-xs font-bold text-[#435951]">Permissions</legend>
+            <legend className="text-xs font-bold text-[#435951]">{t('team.permissions')}</legend>
             <p className="mt-1 text-[11px] text-[#83908c]">
-              {selected.length} of {permissions.length} selected
+              {t('team.selectedCount', { selected: selected.length, total: permissions.length })}
             </p>
             <div className="mt-3 grid gap-3 md:grid-cols-2">
               {Object.entries(grouped).map(([group, groupPermissions]) => (
@@ -651,14 +672,14 @@ function CreateRolePanel({
             onClick={onCancel}
             className="rounded-xl border border-[#d9e3df] bg-white px-4 py-2.5 text-xs font-bold text-[#526a61]"
           >
-            Cancel
+            {t('team.cancel')}
           </button>
           <button
             type="submit"
             disabled={pending}
             className="rounded-xl bg-[#0b5f4b] px-5 py-2.5 text-xs font-bold text-white shadow-[0_10px_24px_rgba(11,95,75,.18)] disabled:cursor-wait disabled:opacity-60"
           >
-            {pending ? 'Creating role…' : 'Create role'}
+            {pending ? t('team.creating') : t('team.createAction')}
           </button>
         </div>
       </form>
@@ -667,12 +688,13 @@ function CreateRolePanel({
 }
 
 function LoadingState() {
+  const { t } = useLanguage();
   return (
     <div className="grid gap-3 p-6 sm:grid-cols-2" role="status">
       {[0, 1, 2, 3].map((item) => (
         <div key={item} className="h-24 animate-pulse rounded-2xl bg-[#f0f4f2]" />
       ))}
-      <span className="sr-only">Loading access controls</span>
+      <span className="sr-only">{t('team.loading')}</span>
     </div>
   );
 }
@@ -684,6 +706,7 @@ function ErrorState({
   error: { message: string; status?: number };
   onRetry: () => Promise<void>;
 }) {
+  const { t } = useLanguage();
   const signedOut = error.status === 401;
   return (
     <div className="px-6 py-16 text-center">
@@ -692,10 +715,10 @@ function ErrorState({
       </span>
       <p className="mt-4 text-sm font-bold text-[#28463c]">
         {signedOut
-          ? 'Session expired'
+          ? t('team.sessionExpired')
           : error.status === 403
-            ? 'Access denied'
-            : 'Access controls unavailable'}
+            ? t('team.accessDenied')
+            : t('team.unavailable')}
       </p>
       <p className="mx-auto mt-2 max-w-md text-xs leading-5 text-[#7c8c86]">{error.message}</p>
       {signedOut ? (
@@ -703,7 +726,7 @@ function ErrorState({
           href="/login"
           className="mt-5 inline-flex rounded-xl bg-[#0b5f4b] px-4 py-2.5 text-xs font-bold text-white"
         >
-          Sign in again
+          {t('team.signInAgain')}
         </a>
       ) : (
         <button
@@ -711,7 +734,7 @@ function ErrorState({
           onClick={() => void onRetry()}
           className="mt-5 rounded-xl border border-[#d9e3df] bg-white px-4 py-2.5 text-xs font-bold text-[#426157]"
         >
-          Try again
+          {t('team.tryAgain')}
         </button>
       )}
     </div>

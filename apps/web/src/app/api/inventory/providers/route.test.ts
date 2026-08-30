@@ -10,7 +10,13 @@ const refreshToken = 'refresh-secret';
 const profile = sealSessionProfile(
   {
     expiresIn: 900,
-    user: { id: 'user-id', email: 'user@example.com', firstName: 'Test', lastName: 'User' },
+    user: {
+      id: 'user-id',
+      email: 'user@example.com',
+      firstName: 'Test',
+      lastName: 'User',
+      preferredLanguage: 'en',
+    },
     context: {
       membershipId: validProviders[0].membershipId,
       tenantId: 'tenant-id',

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  isKnownLanguageCode,
   isLanguageUpdateRequest,
   isLanguageUpdateResponse,
   isPrivacyPreferences,
@@ -62,9 +63,16 @@ describe('settings frontend contract', () => {
   });
 
   it('validates exact language mutation contracts', () => {
-    expect(isLanguageUpdateRequest({ preferredLanguage: 'hi' })).toBe(true);
+    expect(isLanguageUpdateRequest({ preferredLanguage: 'ur' })).toBe(true);
+    expect(isLanguageUpdateRequest({ preferredLanguage: 'hi' })).toBe(false);
     expect(isLanguageUpdateRequest({ preferredLanguage: 'ar' })).toBe(false);
     expect(isLanguageUpdateResponse({ message: 'Language updated' })).toBe(true);
     expect(isLanguageUpdateResponse({ message: '', internalId: 'secret' })).toBe(false);
+  });
+
+  it('recognizes legacy stored preferences without exposing them for new updates', () => {
+    expect(isKnownLanguageCode('hi')).toBe(true);
+    expect(isKnownLanguageCode('kn')).toBe(true);
+    expect(isKnownLanguageCode('ar')).toBe(false);
   });
 });

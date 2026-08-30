@@ -57,6 +57,7 @@ describe('accepted login contract', () => {
         email: request.email,
         firstName: 'Test',
         lastName: 'User',
+        preferredLanguage: 'hi',
       },
       context: {
         membershipId: 'membership-id',
@@ -73,6 +74,12 @@ describe('accepted login contract', () => {
     expect(
       isLoginResponse({ ...response, user: { ...response.user, permissions: ['unexpected'] } }),
     ).toBe(false);
+    expect(
+      isLoginResponse({ ...response, user: { ...response.user, preferredLanguage: 'unknown' } }),
+    ).toBe(false);
+    const { preferredLanguage: _preferredLanguage, ...legacyUser } = response.user;
+    expect(_preferredLanguage).toBe('hi');
+    expect(isLoginResponse({ ...response, user: legacyUser })).toBe(false);
   });
 
   it('rejects malformed tenant, email, and short password values', () => {

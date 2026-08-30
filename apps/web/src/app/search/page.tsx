@@ -1,10 +1,13 @@
 import type { Metadata } from 'next';
 import { PublicMedicineSearch } from '@/features/public-search/public-medicine-search';
 import { PublicSearchMissingProvider } from '@/features/public-search/public-search-missing-provider';
+import { translate } from '@/lib/i18n';
+import { getServerLocale } from '@/lib/server-locale';
 
-export const metadata: Metadata = {
-  title: 'Medicine availability search — MedSphere',
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await getServerLocale();
+  return { title: translate(locale, 'meta.search.title') };
+}
 
 export default async function PublicSearchPage({
   searchParams,
