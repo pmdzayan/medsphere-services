@@ -10,5 +10,6 @@ test('exports the approved immutable AIM identity', () => {
   assert.equal(BRAND.fullName, 'All In Medico');
   assert.equal(BRAND.accessibleName, 'AIM — All In Medico');
   assert.equal(BRAND.applicationTitle, 'AIM — All In Medico');
+  assert.equal(Object.hasOwn(BRAND, 'tagline'), false);
   assert.equal(Object.isFrozen(BRAND), true);
 });

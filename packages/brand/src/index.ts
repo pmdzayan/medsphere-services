@@ -8,7 +8,6 @@ export const BRAND = Object.freeze({
   fullName: 'All In Medico',
   accessibleName: 'AIM — All In Medico',
   applicationTitle: 'AIM — All In Medico',
-  tagline: 'One connected healthcare operating system.',
 } as const);
 
 export type BrandConfiguration = typeof BRAND;

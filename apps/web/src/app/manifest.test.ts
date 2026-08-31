@@ -9,6 +9,7 @@ describe('AIM PWA manifest', () => {
     const value = manifest();
     expect(value.name).toBe(BRAND.fullName);
     expect(value.short_name).toBe(BRAND.shortName);
+    expect(value).not.toHaveProperty('description');
     expect(value.display).toBe('standalone');
     expect(value.start_url).toBe('/');
     expect(value.icons).toEqual([
