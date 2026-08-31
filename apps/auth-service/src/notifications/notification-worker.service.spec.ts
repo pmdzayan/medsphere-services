@@ -31,8 +31,8 @@ describe('NotificationWorkerService', () => {
           templateKey: 'reservation-ready',
           templateVersion: 1,
           locale: 'en',
-          subject: 'Your reservation is ready',
-          body: 'Your reserved item is ready for collection.',
+          subject: 'AIM: Your reservation is ready',
+          body: 'Your All In Medico reservation is ready for collection.',
           metadata: {
             workflowKey: 'reservation-ready-membership-v1',
             contentClass: 'OPERATIONAL',

@@ -1,6 +1,8 @@
 'use client';
 
+import { BRAND } from '@medsphere/brand';
 import Link from 'next/link';
+import { AimSpine } from '@/components/brand/aim-spine';
 import { LanguageSelector } from '@/components/language-selector';
 import { useLanguage } from '@/components/language-provider';
 import type { TranslationKey } from '@/lib/i18n';
@@ -145,17 +147,20 @@ export default function HomePage() {
 
 function BrandMark({ dark = true }: { dark?: boolean }) {
   return (
-    <Link href="/" className="inline-flex items-center gap-3 font-[var(--font-display)] font-bold">
+    <Link
+      href="/"
+      className="inline-flex items-center gap-3 font-[var(--font-display)] font-bold"
+      aria-label={BRAND.accessibleName}
+    >
       <span
-        className={`grid size-10 place-items-center rounded-[.9rem] border text-sm shadow-inner ${
+        className={`grid min-h-12 min-w-20 place-items-center rounded-[.9rem] border px-3 py-2 shadow-inner ${
           dark
             ? 'border-emerald-300/25 bg-emerald-300/10 text-emerald-300'
             : 'border-emerald-950/10 bg-emerald-950 text-emerald-300'
         }`}
       >
-        M
+        <AimSpine expanded tone={dark ? 'dark' : 'light'} size="sm" decorative />
       </span>
-      <span className="tracking-[-.02em]">MedSphere</span>
     </Link>
   );
 }

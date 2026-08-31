@@ -1,4 +1,4 @@
-# MedSphere AI Handoff
+# AIM — All In Medico AI Handoff
 
 **Last updated:** 2026-08-20
 

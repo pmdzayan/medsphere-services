@@ -1,4 +1,4 @@
-# MedSphere Project Status
+# AIM — All In Medico Project Status
 
 **Status date:** 2026-08-15
 

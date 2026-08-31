@@ -1,5 +1,5 @@
 /**
- * Minimal E.164 normalization and validation. MedSphere has no telecom
+ * Minimal E.164 normalization and validation. The application has no telecom
  * integration to do carrier-aware parsing (no libphonenumber dependency
  * exists in this repo), so this deliberately only enforces the E.164
  * shape: an optional leading '+', then 8-15 digits, no formatting

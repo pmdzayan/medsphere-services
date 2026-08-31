@@ -1,6 +1,6 @@
-# MedSphere
+# AIM — All In Medico
 
-MedSphere is a multi-tenant healthcare visibility and medicine-operations platform being developed for patients, pharmacies, hospitals, suppliers, and authorized healthcare staff.
+AIM — All In Medico, formerly developed under the MedSphere working name, is a multi-tenant healthcare visibility and medicine-operations platform being developed for patients, pharmacies, hospitals, suppliers, and authorized healthcare staff.
 
 > **Release state: NOT approved for production or real healthcare data.** Development, testing, and demonstrations must use synthetic data only. Repository progress, successful CI, or completed features do not by themselves establish regulatory compliance or production approval.
 
@@ -37,7 +37,7 @@ Current planning estimate: **approximately 73% of the launch-targeted V1 enginee
 
 ## Product definition and engineering authority
 
-MedSphere is not developed from a single AI prompt. Product and implementation decisions are governed through repository evidence and explicit documents covering:
+AIM is not developed from a single AI prompt. Product and implementation decisions are governed through repository evidence and explicit documents covering:
 
 1. product vision, users, problems, and V1 scope;
 2. architecture and bounded-module responsibilities;
@@ -84,7 +84,7 @@ The repository must not currently be described as production-certified, HIPAA-co
 
 ## Reliability and failure handling
 
-MedSphere uses evidence-driven failure handling rather than hiding failing tests or weakening safety checks.
+AIM uses evidence-driven failure handling rather than hiding failing tests or weakening safety checks.
 
 Current foundations include:
 
@@ -119,7 +119,7 @@ The working planning estimate is roughly **20–25 major tasks remaining**, subj
 
 ## Version 1 architecture
 
-MedSphere V1 is being consolidated around a **modular-monolith** architecture with explicit bounded modules and future service-extraction seams. Existing additional service applications in the repository are migration inputs/prototypes unless separately accepted.
+AIM V1 is being consolidated around a **modular-monolith** architecture with explicit bounded modules and future service-extraction seams. Existing additional service applications in the repository are migration inputs/prototypes unless separately accepted.
 
 Core architectural decisions are recorded under [`docs/adr/`](docs/adr/) and the Development Bible under [`docs/development-bible/`](docs/development-bible/).
 
@@ -131,7 +131,7 @@ Every developer and AI agent must read these documents before making changes:
 2. [PROJECT_STATUS.md](PROJECT_STATUS.md)
 3. [AI_HANDOFF.md](AI_HANDOFF.md)
 4. [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md)
-5. [MedSphere Development Bible](docs/development-bible/README.md)
+5. [AIM Development Bible](docs/development-bible/README.md)
 6. [Architecture Decision Records](docs/adr/README.md)
 
 Accepted ADRs, merged implementation evidence, exact-head CI, and sprint acceptance records are the engineering authority. If a summary document is stale, it must not override newer accepted repository evidence.

@@ -1,3 +1,4 @@
+import { BRAND } from '@medsphere/brand';
 import {
   landingEnglishMessages,
   landingTamilMessages,
@@ -1144,14 +1145,22 @@ export function translate(
   values: TranslationValues = {},
 ): string {
   const template = localeMessages[locale]?.[key] ?? englishMessages[key];
+  const interpolationValues: TranslationValues = {
+    ...values,
+    brandShortName: BRAND.shortName,
+    brandFullName: BRAND.fullName,
+    brandAccessibleName: BRAND.accessibleName,
+  };
   return template.replace(/\{([A-Za-z][A-Za-z0-9]*)\}/g, (placeholder, name: string) =>
-    Object.prototype.hasOwnProperty.call(values, name) ? String(values[name]) : placeholder,
+    Object.prototype.hasOwnProperty.call(interpolationValues, name)
+      ? String(interpolationValues[name])
+      : placeholder,
   );
 }
 
 /**
  * The full set of keys every locale must translate to be considered
- * "complete" -- every key MedSphere currently renders through this
+ * "complete" -- every key the application currently renders through this
  * system, not just the navigation shell.
  */
 export const translationKeys = Object.keys(englishMessages) as TranslationKey[];

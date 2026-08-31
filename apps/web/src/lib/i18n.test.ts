@@ -9,6 +9,7 @@ import {
   translate,
   translationKeys,
 } from './i18n';
+import { BRAND } from '@medsphere/brand';
 
 const EXPECTED_V1_LOCALES = [
   'en',
@@ -138,6 +139,20 @@ describe('RTL direction', () => {
 });
 
 describe('translate', () => {
+  it('keeps the approved brand proper nouns invariant across complete locales', () => {
+    for (const { code } of enabledLocaleOptions) {
+      expect(translate(code, 'common.brandHome')).toContain(BRAND.accessibleName);
+      expect(translate(code, 'landing.enter')).toContain(BRAND.shortName);
+      expect(translate(code, 'settings.hero.description')).toContain(BRAND.fullName);
+    }
+  });
+
+  it('does not allow callers to override official brand interpolation values', () => {
+    expect(
+      translate('en', 'common.brandHome', { brandAccessibleName: 'unapproved-name' }),
+    ).toContain(BRAND.accessibleName);
+  });
+
   it('falls back to English when the target locale has no override for a key', () => {
     expect(translate('bn', 'registration.title')).toBe('Request onboarding.');
   });

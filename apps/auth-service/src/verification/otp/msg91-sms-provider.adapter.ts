@@ -13,10 +13,10 @@ import { isValidE164PhoneNumber } from './phone-normalization';
 
 /**
  * ADR-024: production MSG91 delivery adapter behind ADR-023's existing
- * fail-closed SMS provider boundary. MedSphere remains the sole OTP
+ * fail-closed SMS provider boundary. The application remains the sole OTP
  * authority: the service generates, hashes, expires, verifies, throttles,
  * and invalidates OTP challenges. This adapter only transmits the exact
- * OTP MedSphere already generated through MSG91's Flow API.
+ * OTP the application already generated through MSG91's Flow API.
  *
  * It never calls MSG91 SendOTP or Verify OTP and therefore never creates a
  * second OTP state machine. It also never logs or returns credentials,
@@ -37,7 +37,7 @@ export interface Msg91SmsProviderConfig {
   readonly flowId: string;
   /** Sender/header configured in MSG91 and DLT-approved where required. */
   readonly senderId: string;
-  /** Named Flow variable that receives MedSphere's OTP. Defaults to OTP. */
+  /** Named Flow variable that receives the application's OTP. Defaults to OTP. */
   readonly otpVariableName?: string;
   readonly timeoutMs: number;
 }
@@ -98,7 +98,7 @@ export class Msg91SmsProviderAdapter implements ActivatedSmsProviderAdapter {
         signal: AbortSignal.timeout(this.config.timeoutMs),
       });
     } catch {
-      // Network/DNS failures and timeout aborts are retryable at MedSphere's
+      // Network/DNS failures and timeout aborts are retryable at the application's
       // existing bounded retry boundary. Provider details are deliberately
       // discarded so secrets or message data cannot leak into errors.
       throw failure('PROVIDER_NETWORK_FAILURE', 'TRANSIENT');

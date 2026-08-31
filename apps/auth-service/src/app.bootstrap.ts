@@ -1,5 +1,6 @@
 import { INestApplication } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { BRAND } from '@medsphere/brand';
 import { configureHttpSecurityHeaders, GlobalExceptionFilter } from '@medsphere/common';
 import type { ServiceLogger } from '@medsphere/logger';
 import { createValidationPipe } from '@medsphere/validation';
@@ -23,7 +24,7 @@ export function configureAuthApplication(app: INestApplication, logger?: Service
 
   if (process.env.ENABLE_SWAGGER === 'true') {
     const openApiConfig = new DocumentBuilder()
-      .setTitle('MedSphere Platform API')
+      .setTitle(`${BRAND.fullName} Platform API`)
       .setDescription(
         'Accepted identity, authorization, audit, provider-scope, and bounded inventory endpoints',
       )

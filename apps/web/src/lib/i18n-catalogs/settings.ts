@@ -8,7 +8,7 @@ export const settingsEnglishMessages = {
   'settings.hero.badge': 'Authenticated settings',
   'settings.hero.title': 'Privacy & preferences',
   'settings.hero.description':
-    "Review the identity bound to this session and control the personal preferences exposed by MedSphere's accepted account APIs.",
+    "Review the identity bound to this session and control the personal preferences exposed by {brandFullName}'s accepted account APIs.",
   'settings.refresh': 'Refresh settings',
   'settings.metric.privacy': 'Privacy controls',
   'settings.metric.privacyDetail': 'Accepted personal preferences',
@@ -35,7 +35,7 @@ export const settingsEnglishMessages = {
     'Request privacy-aware pickup handling in workflows that support this preference.',
   'settings.privacy.chat.title': 'Allow in-app chat',
   'settings.privacy.chat.description':
-    'Allow approved MedSphere workflows to contact you through in-app chat.',
+    'Allow approved {brandFullName} workflows to contact you through in-app chat.',
   'settings.privacy.email.title': 'Share email',
   'settings.privacy.email.description':
     'Allow your email to be used when an accepted care workflow requests it.',
@@ -71,7 +71,7 @@ export const settingsTamilMessages: Record<keyof typeof settingsEnglishMessages,
   'settings.hero.badge': 'உறுதிப்படுத்தப்பட்ட அமைப்புகள்',
   'settings.hero.title': 'தனியுரிமை மற்றும் விருப்பங்கள்',
   'settings.hero.description':
-    'இந்த அமர்வுடன் இணைக்கப்பட்ட அடையாளத்தைப் பார்வையிட்டு, MedSphere ஏற்றுக்கொண்ட கணக்கு API-கள் வழங்கும் தனிப்பட்ட விருப்பங்களைக் கட்டுப்படுத்துங்கள்.',
+    'இந்த அமர்வுடன் இணைக்கப்பட்ட அடையாளத்தைப் பார்வையிட்டு, {brandFullName} ஏற்றுக்கொண்ட கணக்கு API-கள் வழங்கும் தனிப்பட்ட விருப்பங்களைக் கட்டுப்படுத்துங்கள்.',
   'settings.refresh': 'அமைப்புகளைப் புதுப்பி',
   'settings.metric.privacy': 'தனியுரிமைக் கட்டுப்பாடுகள்',
   'settings.metric.privacyDetail': 'ஏற்றுக்கொள்ளப்பட்ட தனிப்பட்ட விருப்பங்கள்',
@@ -99,7 +99,7 @@ export const settingsTamilMessages: Record<keyof typeof settingsEnglishMessages,
     'இந்த விருப்பத்தை ஆதரிக்கும் செயல்முறைகளில் தனியுரிமையைப் பேணும் பெற்றுக்கொள்ளல் முறையைக் கோருங்கள்.',
   'settings.privacy.chat.title': 'செயலிக்குள் உரையாடலை அனுமதி',
   'settings.privacy.chat.description':
-    'அங்கீகரிக்கப்பட்ட MedSphere செயல்முறைகள் செயலிக்குள் உங்களைத் தொடர்புகொள்ள அனுமதிக்கவும்.',
+    'அங்கீகரிக்கப்பட்ட {brandFullName} செயல்முறைகள் செயலிக்குள் உங்களைத் தொடர்புகொள்ள அனுமதிக்கவும்.',
   'settings.privacy.email.title': 'மின்னஞ்சலைப் பகிர்',
   'settings.privacy.email.description':
     'ஏற்றுக்கொள்ளப்பட்ட பராமரிப்புச் செயல்முறை கோரும்போது உங்கள் மின்னஞ்சலைப் பயன்படுத்த அனுமதிக்கவும்.',
@@ -135,7 +135,7 @@ export const settingsUrduMessages: Record<keyof typeof settingsEnglishMessages, 
   'settings.hero.badge': 'تصدیق شدہ ترتیبات',
   'settings.hero.title': 'رازداری اور ترجیحات',
   'settings.hero.description':
-    'اس سیشن سے منسلک شناخت کا جائزہ لیں اور MedSphere کے منظور شدہ اکاؤنٹ APIs کی ذاتی ترجیحات کو کنٹرول کریں۔',
+    'اس سیشن سے منسلک شناخت کا جائزہ لیں اور {brandFullName} کے منظور شدہ اکاؤنٹ APIs کی ذاتی ترجیحات کو کنٹرول کریں۔',
   'settings.refresh': 'ترتیبات تازہ کریں',
   'settings.metric.privacy': 'رازداری کنٹرولز',
   'settings.metric.privacyDetail': 'منظور شدہ ذاتی ترجیحات',
@@ -162,7 +162,7 @@ export const settingsUrduMessages: Record<keyof typeof settingsEnglishMessages, 
     'اس ترجیح کو سہارا دینے والے عمل میں رازداری کے مطابق وصولی کی درخواست کریں۔',
   'settings.privacy.chat.title': 'ایپ کے اندر چیٹ کی اجازت دیں',
   'settings.privacy.chat.description':
-    'منظور شدہ MedSphere عمل کو ایپ کے اندر آپ سے رابطے کی اجازت دیں۔',
+    'منظور شدہ {brandFullName} عمل کو ایپ کے اندر آپ سے رابطے کی اجازت دیں۔',
   'settings.privacy.email.title': 'ای میل شیئر کریں',
   'settings.privacy.email.description':
     'منظور شدہ نگہداشت کا عمل درخواست کرے تو اپنی ای میل کے استعمال کی اجازت دیں۔',

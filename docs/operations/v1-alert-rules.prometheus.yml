@@ -1,4 +1,4 @@
-# MedSphere V1 alert rules -- provider-neutral, standard Prometheus
+# AIM V1 alert rules -- provider-neutral, standard Prometheus
 # rule-file syntax. Importable into any Prometheus-compatible alerting
 # system (Prometheus + Alertmanager, or any OTLP/Prometheus-compatible
 # hosted backend) without modification.
@@ -21,7 +21,7 @@ groups:
         labels:
           severity: critical
         annotations:
-          summary: 'MedSphere auth-service is unreachable'
+          summary: 'AIM auth-service is unreachable'
           description: 'The scrape target has been down for 2 minutes.'
 
       - alert: MedSphereRepeatedReadinessFailure

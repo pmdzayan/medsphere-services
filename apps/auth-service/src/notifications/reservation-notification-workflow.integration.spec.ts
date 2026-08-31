@@ -101,8 +101,8 @@ infrastructure('G3.27 end-to-end queued reservation notification workflow', () =
         variables: { status: 'READY' },
         composedContent: expect.objectContaining({
           locale: 'en',
-          subject: 'Your reservation is ready',
-          body: 'Your reserved item is ready for collection.',
+          subject: 'AIM: Your reservation is ready',
+          body: 'Your All In Medico reservation is ready for collection.',
         }),
       }),
     );

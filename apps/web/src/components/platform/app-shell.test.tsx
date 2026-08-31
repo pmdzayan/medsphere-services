@@ -1,14 +1,20 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { BRAND } from '@medsphere/brand';
 import { LanguageProvider } from '@/components/language-provider';
 import type { SessionProfile } from '@/lib/session-profile';
 import { AppShell } from './app-shell';
 
+let pathname = '/dashboard';
+
 vi.mock('next/navigation', () => ({
-  usePathname: () => '/dashboard',
+  usePathname: () => pathname,
 }));
 
-afterEach(() => cleanup());
+afterEach(() => {
+  cleanup();
+  pathname = '/dashboard';
+});
 
 const session: SessionProfile = {
   user: {
@@ -44,6 +50,25 @@ function renderShell() {
 }
 
 describe('AppShell mobile navigation', () => {
+  it.each(['/dashboard', '/settings'])(
+    'carries the approved brand through the protected %s workspace',
+    (route) => {
+      pathname = route;
+      renderShell();
+      expect(
+        screen.getAllByRole('link', { name: /AIM.*All In Medico.*home/i }).length,
+      ).toBeGreaterThan(0);
+    },
+  );
+
+  it('uses the compact AIM identity with the full accessible brand name', () => {
+    renderShell();
+    const brandLinks = screen.getAllByRole('link', { name: /AIM.*All In Medico/i });
+    expect(brandLinks.length).toBeGreaterThan(0);
+    expect(screen.getAllByText(BRAND.shortName).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(BRAND.fullName).length).toBeGreaterThan(0);
+  });
+
   it('does not move focus to the navigation trigger on initial render', () => {
     renderShell();
     const trigger = screen.getByRole('button', { name: 'Open navigation' });

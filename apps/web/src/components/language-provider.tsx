@@ -38,7 +38,7 @@ export function resolveCompleteLocale(value: string | null | undefined): Locale 
   return value && isLocale(value) && isLocaleComplete(value) ? value : null;
 }
 
-/** Best-effort match of the browser's locale against a complete, enabled MedSphere locale. */
+/** Best-effort match of the browser's locale against a complete, enabled application locale. */
 function detectBrowserLocale(): Locale | null {
   if (typeof navigator === 'undefined') return null;
   const candidates = navigator.languages ?? [navigator.language];

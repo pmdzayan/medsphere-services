@@ -53,7 +53,7 @@ Client responses continue to use the generic server-error envelope and may inclu
 
 ## Request-ID handling
 
-Inbound `x-request-id` values are accepted only when they satisfy the shared MedSphere request-ID contract.
+Inbound `x-request-id` values are accepted only when they satisfy the shared application request-ID contract.
 
 If the inbound identifier is absent or invalid, the service generates a new UUID.
 

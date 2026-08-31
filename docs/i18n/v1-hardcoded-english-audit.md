@@ -33,8 +33,8 @@ literal in those locations is a failing audit result.
 
 ### Developer, protocol, or locale-independent content
 
-The justified literals are limited to the MedSphere product name, an email-address format
-example, UUID/role/permission/status/protocol codes, an invitation-code format example, and
+The justified literals are limited to an email-address format example,
+UUID/role/permission/status/protocol codes, an invitation-code format example, and
 internal expiry-urgency discriminators. These values are not English prose and must remain
 stable across locales. The JSON audit names the reason for every occurrence.
 

@@ -1,4 +1,6 @@
 import type { Metadata } from 'next';
+import { BRAND } from '@medsphere/brand';
+import { BrandStartup } from '@/components/brand/brand-startup';
 import { LanguageProvider } from '@/components/language-provider';
 import { getLocaleDirection, translate } from '@/lib/i18n';
 import { getServerLocale, getServerLocalePreference } from '@/lib/server-locale';
@@ -7,8 +9,21 @@ import './globals.css';
 export async function generateMetadata(): Promise<Metadata> {
   const locale = await getServerLocale();
   return {
-    title: { default: 'MedSphere', template: '%s | MedSphere' },
+    applicationName: BRAND.fullName,
+    title: { default: BRAND.applicationTitle, template: `%s | ${BRAND.shortName}` },
     description: translate(locale, 'meta.description'),
+    manifest: '/manifest.webmanifest',
+    appleWebApp: {
+      capable: true,
+      title: BRAND.shortName,
+      statusBarStyle: 'black-translucent',
+    },
+    openGraph: {
+      type: 'website',
+      siteName: BRAND.fullName,
+      title: BRAND.applicationTitle,
+      description: translate(locale, 'meta.description'),
+    },
   };
 }
 
@@ -21,7 +36,10 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
   return (
     <html lang={serverLocale} dir={getLocaleDirection(serverLocale)}>
       <body className="font-[var(--font-body)]">
-        <LanguageProvider initialLocale={serverPreference}>{children}</LanguageProvider>
+        <LanguageProvider initialLocale={serverPreference}>
+          <BrandStartup />
+          {children}
+        </LanguageProvider>
       </body>
     </html>
   );

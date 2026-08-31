@@ -1,4 +1,4 @@
-# MedSphere Project Rules
+# AIM — All In Medico Project Rules
 
 **Version:** 1.0
 
@@ -8,7 +8,7 @@
 
 ## 1. Order of work
 
-MedSphere follows this lifecycle without skipping steps:
+AIM follows this lifecycle without skipping steps:
 
 1. Design
 2. Review

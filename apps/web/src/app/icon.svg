@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title">
+  <title id="title">AIM — All In Medico</title>
+  <rect width="512" height="512" rx="112" fill="#07110f"/>
+  <path d="M164 104v304" stroke="#6ee7b7" stroke-width="12" stroke-linecap="round" opacity=".55"/>
+  <g fill="#ecfdf5" font-family="system-ui, sans-serif" font-weight="800" font-size="104" text-anchor="middle">
+    <text x="164" y="184">A</text>
+    <text x="164" y="304">I</text>
+    <text x="164" y="424">M</text>
+  </g>
+  <g fill="#a7f3d0" font-family="system-ui, sans-serif" font-weight="500" font-size="54">
+    <text x="232" y="178">ll</text>
+    <text x="232" y="298">n</text>
+    <text x="232" y="418">edico</text>
+  </g>
+</svg>

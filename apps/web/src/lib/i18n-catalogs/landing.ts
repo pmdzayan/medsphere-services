@@ -8,7 +8,7 @@ export const landingEnglishMessages = {
   'landing.heroAccent': 'beautifully connected.',
   'landing.heroDescription':
     'One secure operating layer that brings identity, coordination, inventory, and care into a clear, trusted workspace.',
-  'landing.enter': 'Enter MedSphere',
+  'landing.enter': 'Enter {brandShortName}',
   'landing.stabilizationEnvironment': 'Stabilization environment',
   'landing.noRealPatientData': 'No real patient data',
   'landing.metricTenantContext': 'Tenant context',
@@ -47,7 +47,7 @@ export const landingTamilMessages: Record<LandingTranslationKey, string> = {
   'landing.heroAccent': 'அழகாக இணைக்கப்பட்டுள்ளது.',
   'landing.heroDescription':
     'அடையாளம், ஒருங்கிணைப்பு, சரக்கு மற்றும் பராமரிப்பை தெளிவான, நம்பகமான பணியிடத்தில் இணைக்கும் ஒரே பாதுகாப்பான செயல்பாட்டு தளம்.',
-  'landing.enter': 'MedSphere-ஐத் திறக்கவும்',
+  'landing.enter': '{brandShortName}-ஐத் திறக்கவும்',
   'landing.stabilizationEnvironment': 'நிலைப்படுத்தல் சூழல்',
   'landing.noRealPatientData': 'உண்மையான நோயாளர் தரவு இல்லை',
   'landing.metricTenantContext': 'நிறுவனச் சூழல்',
@@ -85,7 +85,7 @@ export const landingUrduMessages: Record<LandingTranslationKey, string> = {
   'landing.heroAccent': 'خوبصورتی سے منسلک۔',
   'landing.heroDescription':
     'ایک محفوظ عملی نظام جو شناخت، رابطہ کاری، انوینٹری اور نگہداشت کو واضح اور قابلِ اعتماد ورک اسپیس میں جوڑتا ہے۔',
-  'landing.enter': 'MedSphere کھولیں',
+  'landing.enter': '{brandShortName} کھولیں',
   'landing.stabilizationEnvironment': 'استحکامی ماحول',
   'landing.noRealPatientData': 'حقیقی مریضوں کا ڈیٹا نہیں',
   'landing.metricTenantContext': 'ادارے کا سیاق',

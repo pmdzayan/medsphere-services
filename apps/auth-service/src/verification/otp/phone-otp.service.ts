@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
+import { BRAND } from '@medsphere/brand';
 import { appMetrics } from '@medsphere/common';
 import { withSerializableRetry, type Prisma } from '@medsphere/database';
 import { AuditWriter } from '../../audit/audit-writer.service';
@@ -150,7 +151,7 @@ export class PhoneOtpService {
       const provider = this.smsProviderRegistry.provider();
       await provider.deliver({
         to: dispatch.phone,
-        body: `Your MedSphere verification code is ${dispatch.code}. It expires in 10 minutes.`,
+        body: `Your ${BRAND.shortName} verification code is ${dispatch.code}. It expires in 10 minutes.`,
         otpCode: dispatch.code,
       });
       appMetrics.otpDispatchTotal.increment({ outcome: 'success' });

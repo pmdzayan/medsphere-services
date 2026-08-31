@@ -1,4 +1,4 @@
-# MedSphere Monorepo — Engineering Review
+# AIM — All In Medico Monorepo Engineering Review
 
 > **Historical document:** This review describes an earlier implementation pass and is not current architecture authority. Its decision to preserve microservices was superseded by [ADR-001](adr/0001-modular-monolith-for-version-1.md) after the 2026-07-20 CTO baseline audit. Use `PROJECT_STATUS.md` for current acceptance and blockers.
 

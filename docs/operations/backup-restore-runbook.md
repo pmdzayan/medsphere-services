@@ -1,7 +1,7 @@
 # PostgreSQL Backup, Restore & Disaster-Recovery Runbook
 
 This runbook covers the mechanics of creating a PostgreSQL backup for
-MedSphere, verifying it, and restoring it into a clean database, plus how
+AIM, verifying it, and restoring it into a clean database, plus how
 to run the automated certification that proves the round trip preserves
 schema and data. It is deliberately scoped to **portability and restore
 correctness** -- it does not select a production backup storage vendor,
@@ -11,7 +11,7 @@ cover" at the end.
 ## What this proves
 
 ```
-PostgreSQL running MedSphere schema/data
+PostgreSQL running AIM schema/data
         |
         v
 verified backup (pg_dump, custom format, SHA-256 hashed)
@@ -167,7 +167,7 @@ vendor/location selection (e.g. object storage, offsite replication) are
 explicitly **separate, not-yet-defined launch-operations work** and are
 out of scope here, per the V1 launch-readiness gap already tracked in
 `PROJECT_STATUS.md` and `README.md`. This runbook only certifies that a
-backup taken from a MedSphere PostgreSQL database can be restored into a
+backup taken from an AIM PostgreSQL database can be restored into a
 clean database, that the required representative tables exist with matching
 row counts and canonical content hashes, and that applied migration-history
 count matches the source -- restore _correctness_ for this certification
