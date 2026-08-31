@@ -86,7 +86,7 @@ describe('central browser permission capability', () => {
     await expect(requestBrowserNotifications()).resolves.toBe('error');
   });
 
-  it('never treats a MedSphere preference as browser notification permission', async () => {
+  it('never treats an application preference as browser notification permission', async () => {
     const medSphereNotificationPreference = true;
     installNotification('denied', vi.fn());
 
