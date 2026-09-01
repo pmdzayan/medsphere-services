@@ -17,6 +17,7 @@ import type {
   SupportedLanguage,
   SupportedLanguageCode,
 } from '@/lib/settings-contract';
+import { DevicePermissionsSection } from './device-permissions-section';
 
 interface SettingsIdentity {
   readonly name: string;
@@ -61,6 +62,18 @@ const privacyOptions: Array<{
     titleKey: 'settings.privacy.phone.title',
     descriptionKey: 'settings.privacy.phone.description',
     tone: 'amber',
+  },
+  {
+    key: 'wantsReservationNotifications',
+    titleKey: 'settings.privacy.reservationNotifications.title',
+    descriptionKey: 'settings.privacy.reservationNotifications.description',
+    tone: 'emerald',
+  },
+  {
+    key: 'wantsOperationalAlerts',
+    titleKey: 'settings.privacy.operationalAlerts.title',
+    descriptionKey: 'settings.privacy.operationalAlerts.description',
+    tone: 'cyan',
   },
 ];
 
@@ -241,6 +254,7 @@ export function SettingsWorkspace({ identity }: { identity: SettingsIdentity }) 
               onSelect={setSelectedLanguage}
               onSave={() => void saveLanguage()}
             />
+            <DevicePermissionsSection />
           </div>
         </div>
       ) : null}

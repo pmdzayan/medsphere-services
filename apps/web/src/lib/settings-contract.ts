@@ -22,6 +22,9 @@ export interface PrivacyPreferences {
   readonly allowInAppChat: boolean;
   readonly privatePickup: boolean;
   readonly hideSensitiveNotifications: boolean;
+  /** Application preference only -- never overrides a browser notification-permission denial. */
+  readonly wantsReservationNotifications: boolean;
+  readonly wantsOperationalAlerts: boolean;
 }
 
 export type PrivacyPreferenceUpdate = {
@@ -42,6 +45,8 @@ const privacyKeys = [
   'allowInAppChat',
   'privatePickup',
   'hideSensitiveNotifications',
+  'wantsReservationNotifications',
+  'wantsOperationalAlerts',
 ] as const;
 
 const supportedLanguageCodes = new Set<string>(SUPPORTED_LANGUAGE_CODES);
@@ -107,6 +112,60 @@ export function isLanguageUpdateResponse(value: unknown): value is LanguageUpdat
     typeof value.message === 'string' &&
     value.message.trim().length > 0 &&
     value.message.length <= 240
+  );
+}
+
+export const CONSENT_CATEGORIES = [
+  'LOCATION_USE',
+  'NOTIFICATIONS_RESERVATIONS',
+  'NOTIFICATIONS_OPERATIONAL',
+] as const;
+export type ConsentCategory = (typeof CONSENT_CATEGORIES)[number];
+
+export const CONSENT_SOURCES = [
+  'settings_privacy_page',
+  'nearby_search_prompt',
+  'notification_prompt',
+] as const;
+export type ConsentSource = (typeof CONSENT_SOURCES)[number];
+
+export type ConsentStatusValue = 'GRANTED' | 'WITHDRAWN';
+
+export interface ConsentStatus {
+  readonly category: ConsentCategory;
+  readonly status: ConsentStatusValue | null;
+  readonly updatedAt: string | null;
+}
+
+export interface RecordConsentRequest {
+  readonly category: ConsentCategory;
+  readonly status: ConsentStatusValue;
+  readonly source: ConsentSource;
+}
+
+const consentCategorySet = new Set<string>(CONSENT_CATEGORIES);
+
+export function isConsentStatusList(value: unknown): value is ConsentStatus[] {
+  if (!Array.isArray(value)) return false;
+  return value.every(
+    (item) =>
+      isRecord(item) &&
+      hasExactKeys(item, ['category', 'status', 'updatedAt']) &&
+      typeof item.category === 'string' &&
+      consentCategorySet.has(item.category) &&
+      (item.status === 'GRANTED' || item.status === 'WITHDRAWN' || item.status === null) &&
+      (item.updatedAt === null || typeof item.updatedAt === 'string'),
+  );
+}
+
+export function isConsentStatus(value: unknown): value is ConsentStatus {
+  return (
+    isRecord(value) &&
+    hasExactKeys(value, ['category', 'status', 'updatedAt']) &&
+    typeof value.category === 'string' &&
+    consentCategorySet.has(value.category) &&
+    (value.status === 'GRANTED' || value.status === 'WITHDRAWN' || value.status === null) &&
+    (value.updatedAt === null || typeof value.updatedAt === 'string')
   );
 }
 

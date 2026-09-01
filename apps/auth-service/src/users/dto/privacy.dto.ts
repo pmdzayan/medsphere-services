@@ -26,6 +26,22 @@ export class UpdatePrivacyDto {
   @IsBoolean()
   @IsOptional()
   hideSensitiveNotifications?: boolean;
+
+  @ApiPropertyOptional({
+    description:
+      'Application preference for reservation-update notifications (distinct from browser notification permission)',
+  })
+  @IsBoolean()
+  @IsOptional()
+  wantsReservationNotifications?: boolean;
+
+  @ApiPropertyOptional({
+    description:
+      'Application preference for operational/expiry/stock alerts (distinct from browser notification permission)',
+  })
+  @IsBoolean()
+  @IsOptional()
+  wantsOperationalAlerts?: boolean;
 }
 
 export class PrivacyResponseDto {
@@ -43,4 +59,10 @@ export class PrivacyResponseDto {
 
   @ApiProperty()
   hideSensitiveNotifications!: boolean;
+
+  @ApiProperty()
+  wantsReservationNotifications!: boolean;
+
+  @ApiProperty()
+  wantsOperationalAlerts!: boolean;
 }

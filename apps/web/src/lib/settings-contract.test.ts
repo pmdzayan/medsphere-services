@@ -14,6 +14,8 @@ const privacy = {
   allowInAppChat: true,
   privatePickup: false,
   hideSensitiveNotifications: true,
+  wantsReservationNotifications: false,
+  wantsOperationalAlerts: false,
 };
 
 describe('settings frontend contract', () => {

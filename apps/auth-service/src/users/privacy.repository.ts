@@ -19,6 +19,8 @@ export class PrivacyRepository {
       allowInAppChat?: boolean;
       privatePickup?: boolean;
       hideSensitiveNotifications?: boolean;
+      wantsReservationNotifications?: boolean;
+      wantsOperationalAlerts?: boolean;
     },
   ) {
     return this.prisma.client.userPrivacy.upsert({

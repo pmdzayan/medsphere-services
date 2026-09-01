@@ -13,6 +13,7 @@ import { AuditModule } from './audit/audit.module';
 import { InventoryModule } from './inventory/inventory.module';
 import { NotificationModule } from './notifications/notification.module';
 import { VerificationModule } from './verification/verification.module';
+import { ConsentModule } from './consent/consent.module';
 import { AuthReadinessService } from './health/auth-readiness.service';
 
 @Module({
@@ -34,6 +35,7 @@ import { AuthReadinessService } from './health/auth-readiness.service';
     InventoryModule,
     NotificationModule,
     VerificationModule,
+    ConsentModule,
     MetricsModule,
   ],
   providers: [
