@@ -36,6 +36,11 @@ import {
 } from './i18n-catalogs/reservations';
 import { auditEnglishMessages, auditTamilMessages, auditUrduMessages } from './i18n-catalogs/audit';
 import { teamEnglishMessages, teamTamilMessages, teamUrduMessages } from './i18n-catalogs/team';
+import {
+  permissionsEnglishMessages,
+  permissionsTamilMessages,
+  permissionsUrduMessages,
+} from './i18n-catalogs/permissions';
 
 export const localeOptions = [
   { code: 'en', label: 'English', dir: 'ltr' },
@@ -78,6 +83,7 @@ const englishMessages = {
   ...reservationsEnglishMessages,
   ...auditEnglishMessages,
   ...teamEnglishMessages,
+  ...permissionsEnglishMessages,
   'language.label': 'Language',
   'meta.description': 'One connected healthcare operating system.',
   'meta.login.title': 'Sign in',
@@ -216,6 +222,7 @@ const tamilMessages: MessageOverrides = {
   ...reservationsTamilMessages,
   ...auditTamilMessages,
   ...teamTamilMessages,
+  ...permissionsTamilMessages,
   'language.label': 'மொழி',
   'meta.description': 'இணைக்கப்பட்ட ஒரே சுகாதார இயக்க முறைமை.',
   'meta.login.title': 'உள்நுழைக',
@@ -387,6 +394,7 @@ const urduMessages: MessageOverrides = {
   ...reservationsUrduMessages,
   ...auditUrduMessages,
   ...teamUrduMessages,
+  ...permissionsUrduMessages,
   'language.label': 'زبان',
   'meta.description': 'ایک مربوط صحت نگہداشت عملی نظام۔',
   'meta.login.title': 'سائن ان',

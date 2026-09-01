@@ -26,7 +26,7 @@
     "dev:app": "turbo run dev --filter=@medsphere/auth-service --filter=@medsphere/web",
     "dev:check": "node scripts/dev-check.js",
     "test": "pnpm test:architecture && turbo run test --concurrency=1",
-    "test:architecture": "node --test scripts/architecture-boundary-check.spec.js scripts/brand-audit.spec.js && node scripts/architecture-boundary-check.js && node scripts/brand-audit.js && node scripts/i18n-hardcoded-ui-audit.mjs",
+    "test:architecture": "node --test scripts/architecture-boundary-check.spec.js scripts/brand-audit.spec.js scripts/browser-permission-boundary-check.spec.js && node scripts/architecture-boundary-check.js && node scripts/brand-audit.js && node scripts/browser-permission-boundary-check.mjs && node scripts/i18n-hardcoded-ui-audit.mjs",
     "audit:brand": "node scripts/brand-audit.js",
     "test:cov": "turbo run test:cov --concurrency=1",
     "lint": "turbo run lint",
