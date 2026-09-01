@@ -10,6 +10,8 @@ const privacy = {
   allowInAppChat: true,
   privatePickup: false,
   hideSensitiveNotifications: true,
+  wantsReservationNotifications: false,
+  wantsOperationalAlerts: false,
 };
 
 afterEach(() => vi.unstubAllGlobals());

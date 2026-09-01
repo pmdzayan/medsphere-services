@@ -213,6 +213,17 @@ enum JoinCodeStatus {
   REVOKED
 }
 
+enum ConsentCategory {
+  LOCATION_USE
+  NOTIFICATIONS_RESERVATIONS
+  NOTIFICATIONS_OPERATIONAL
+}
+
+enum ConsentStatus {
+  GRANTED
+  WITHDRAWN
+}
+
 model Tenant {
   id String @id @default(uuid()) @db.Uuid
 
@@ -339,6 +350,7 @@ model User {
   verificationAttempts   AccountVerificationAttempt[]
   externalAuthIdentities ExternalAuthIdentity[]
   phoneOtpChallenges     PhoneOtpChallenge[]
+  consentRecords         ConsentRecord[]
 }
 
 model ExternalAuthIdentity {
@@ -466,12 +478,54 @@ model UserPrivacy {
   hideSensitiveNotifications Boolean @default(true)
   preferredLanguage          String  @default("en")
 
+  /// Task 0013: MedSphere-preference (not browser permission) for
+  /// whether the person wants reservation-update notifications, when
+  /// their browser notification permission is separately granted. A
+  /// true value here never causes a notification to be sent if the
+  /// browser permission is denied/unsupported -- see the frontend
+  /// browser-permissions boundary, which always checks both states.
+  wantsReservationNotifications Boolean @default(false)
+  /// Same distinction, for operational/expiry/stock alerts aimed at
+  /// authorized staff.
+  wantsOperationalAlerts        Boolean @default(false)
+
   version Int @default(1)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([userId])
+}
+
+/// Append-only consent event log (Task 0013). Never updated or deleted --
+/// a withdrawal is a NEW row with status=WITHDRAWN, never a mutation of
+/// the granting row, so historical evidence of what was actually granted
+/// and when is preserved even after withdrawal. The user's *current*
+/// effective consent for a category is always the single latest row for
+/// that (userId, category) pair -- there is deliberately no separate
+/// "current state" table to keep out of sync with this log.
+model ConsentRecord {
+  id String @id @default(uuid()) @db.Uuid
+
+  userId String @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  category ConsentCategory
+  status   ConsentStatus
+
+  /// Schema version of the consent category's disclosure text at the
+  /// time this event was recorded, so a future copy change can be
+  /// distinguished from a no-op re-confirmation.
+  version Int @default(1)
+
+  /// Bounded, non-identifying context string (e.g. "settings_privacy_page",
+  /// "nearby_search_prompt") -- never free-form user text, never a URL
+  /// with query parameters, never anything from request headers.
+  source String @db.VarChar(64)
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, category, createdAt])
 }
 
 model Role {

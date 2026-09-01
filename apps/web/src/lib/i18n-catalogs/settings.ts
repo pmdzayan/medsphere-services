@@ -59,6 +59,42 @@ export const settingsEnglishMessages = {
   'settings.loading': 'Loading settings',
   'settings.loadFailure': 'Settings could not be loaded',
   'settings.tryAgain': 'Try again',
+  'settings.privacy.reservationNotifications.title': 'Reservation update notifications',
+  'settings.privacy.reservationNotifications.description':
+    'Receive notifications about your reservation status, when your browser notification permission is also granted.',
+  'settings.privacy.operationalAlerts.title': 'Operational alerts',
+  'settings.privacy.operationalAlerts.description':
+    'For authorized staff: receive expiry and stock alerts, when your browser notification permission is also granted.',
+  'settings.device.eyebrow': 'Browser & device',
+  'settings.device.title': 'Device permissions',
+  'settings.device.description':
+    "These reflect your browser's own permission settings, which {brandFullName} cannot override. Your {brandFullName} preferences only take effect when the matching browser permission is also granted.",
+  'settings.device.location.title': 'Location',
+  'settings.device.location.description':
+    '{brandFullName} only asks for your location when you use a feature that needs it, such as finding nearby pharmacies. Your precise location is not stored unless an accepted workflow explicitly requires it.',
+  'settings.device.location.granted': 'Allowed in this browser',
+  'settings.device.location.denied': 'Blocked in this browser',
+  'settings.device.location.prompt': 'Not yet asked',
+  'settings.device.location.unknown': 'Unknown (this browser cannot report this in advance)',
+  'settings.device.location.unsupported': 'Not supported by this browser',
+  'settings.device.location.deniedGuidance':
+    'Location permission is blocked in your browser. Enable it from your browser/site settings if you want to use nearby search.',
+  'settings.device.notifications.title': 'Notifications',
+  'settings.device.notifications.description':
+    '{brandFullName} can notify you about reservation updates and, for authorized staff, operational alerts. You can keep using {brandFullName} if you decline.',
+  'settings.device.notifications.granted': 'Allowed in this browser',
+  'settings.device.notifications.denied': 'Blocked in this browser',
+  'settings.device.notifications.default': 'Not yet asked',
+  'settings.device.notifications.unsupported': 'Not supported by this browser',
+  'settings.device.notifications.deniedGuidance':
+    'Notification permission is blocked in your browser. Enable it from your browser/site settings if you want to receive alerts.',
+  'settings.device.notifications.enable': 'Enable notifications',
+  'settings.device.consent.status': 'Consent status',
+  'settings.device.consent.granted': 'Granted',
+  'settings.device.consent.withdrawn': 'Withdrawn',
+  'settings.device.consent.notAsked': 'Not asked',
+  'settings.device.consent.withdrawLocation': 'Withdraw location-use consent',
+  'settings.device.consent.withdrawNotifications': 'Withdraw notification consent',
 } as const;
 
 export const settingsTamilMessages: Record<keyof typeof settingsEnglishMessages, string> = {
@@ -123,6 +159,42 @@ export const settingsTamilMessages: Record<keyof typeof settingsEnglishMessages,
   'settings.loading': 'அமைப்புகள் ஏற்றப்படுகின்றன',
   'settings.loadFailure': 'அமைப்புகளை ஏற்ற முடியவில்லை',
   'settings.tryAgain': 'மீண்டும் முயலவும்',
+  'settings.privacy.reservationNotifications.title': 'முன்பதிவு புதுப்பிப்பு அறிவிப்புகள்',
+  'settings.privacy.reservationNotifications.description':
+    'உங்கள் உலாவி அறிவிப்பு அனுமதியும் வழங்கப்பட்டால், உங்கள் முன்பதிவு நிலை குறித்த அறிவிப்புகளைப் பெறுங்கள்.',
+  'settings.privacy.operationalAlerts.title': 'செயல்பாட்டு எச்சரிக்கைகள்',
+  'settings.privacy.operationalAlerts.description':
+    'அங்கீகரிக்கப்பட்ட பணியாளர்களுக்கு: உங்கள் உலாவி அறிவிப்பு அனுமதியும் வழங்கப்பட்டால், காலாவதி மற்றும் சரக்கு எச்சரிக்கைகளைப் பெறுங்கள்.',
+  'settings.device.eyebrow': 'உலாவி & சாதனம்',
+  'settings.device.title': 'சாதன அனுமதிகள்',
+  'settings.device.description':
+    'இவை உங்கள் உலாவியின் சொந்த அனுமதி அமைப்புகள்; {brandFullName} அவற்றை மாற்ற முடியாது. தொடர்புடைய உலாவி அனுமதியும் வழங்கப்பட்டால் மட்டுமே உங்கள் {brandFullName} விருப்பங்கள் செயல்படும்.',
+  'settings.device.location.title': 'இருப்பிடம்',
+  'settings.device.location.description':
+    'அருகிலுள்ள மருந்தகங்களைக் கண்டறிவது போன்ற, இருப்பிடம் தேவைப்படும் அம்சத்தை நீங்கள் பயன்படுத்தும்போது மட்டுமே {brandFullName} உங்கள் இருப்பிடத்தைக் கேட்கும். ஏற்றுக்கொள்ளப்பட்ட செயல்முறை வெளிப்படையாகத் தேவைப்படாவிட்டால் உங்கள் துல்லியமான இருப்பிடம் சேமிக்கப்படாது.',
+  'settings.device.location.granted': 'இந்த உலாவியில் அனுமதிக்கப்பட்டது',
+  'settings.device.location.denied': 'இந்த உலாவியில் தடுக்கப்பட்டது',
+  'settings.device.location.prompt': 'இன்னும் கேட்கப்படவில்லை',
+  'settings.device.location.unknown': 'தெரியவில்லை (இந்த உலாவி முன்கூட்டியே தெரிவிக்க முடியாது)',
+  'settings.device.location.unsupported': 'இந்த உலாவியால் ஆதரிக்கப்படவில்லை',
+  'settings.device.location.deniedGuidance':
+    'இருப்பிட அனுமதி உங்கள் உலாவியில் தடுக்கப்பட்டுள்ளது. அருகிலுள்ள தேடலைப் பயன்படுத்த விரும்பினால் உலாவி/தள அமைப்புகளில் இயக்கவும்.',
+  'settings.device.notifications.title': 'அறிவிப்புகள்',
+  'settings.device.notifications.description':
+    'முன்பதிவு புதுப்பிப்புகள் குறித்தும், அங்கீகரிக்கப்பட்ட பணியாளர்களுக்கான செயல்பாட்டு எச்சரிக்கைகள் குறித்தும் {brandFullName} உங்களுக்கு அறிவிக்கலாம். நீங்கள் மறுத்தால் {brandFullName} ஐ தொடர்ந்து பயன்படுத்தலாம்.',
+  'settings.device.notifications.granted': 'இந்த உலாவியில் அனுமதிக்கப்பட்டது',
+  'settings.device.notifications.denied': 'இந்த உலாவியில் தடுக்கப்பட்டது',
+  'settings.device.notifications.default': 'இன்னும் கேட்கப்படவில்லை',
+  'settings.device.notifications.unsupported': 'இந்த உலாவியால் ஆதரிக்கப்படவில்லை',
+  'settings.device.notifications.deniedGuidance':
+    'அறிவிப்பு அனுமதி உங்கள் உலாவியில் தடுக்கப்பட்டுள்ளது. எச்சரிக்கைகளைப் பெற விரும்பினால் உலாவி/தள அமைப்புகளில் இயக்கவும்.',
+  'settings.device.notifications.enable': 'அறிவிப்புகளை இயக்கு',
+  'settings.device.consent.status': 'சம்மத நிலை',
+  'settings.device.consent.granted': 'வழங்கப்பட்டது',
+  'settings.device.consent.withdrawn': 'திரும்பப் பெறப்பட்டது',
+  'settings.device.consent.notAsked': 'கேட்கப்படவில்லை',
+  'settings.device.consent.withdrawLocation': 'இருப்பிடப் பயன்பாட்டு சம்மதத்தைத் திரும்பப் பெறு',
+  'settings.device.consent.withdrawNotifications': 'அறிவிப்பு சம்மதத்தைத் திரும்பப் பெறு',
 };
 
 export const settingsUrduMessages: Record<keyof typeof settingsEnglishMessages, string> = {
@@ -186,4 +258,40 @@ export const settingsUrduMessages: Record<keyof typeof settingsEnglishMessages, 
   'settings.loading': 'ترتیبات لوڈ ہو رہی ہیں',
   'settings.loadFailure': 'ترتیبات لوڈ نہیں ہو سکیں',
   'settings.tryAgain': 'دوبارہ کوشش کریں',
+  'settings.privacy.reservationNotifications.title': 'ریزرویشن اپ ڈیٹ اطلاعات',
+  'settings.privacy.reservationNotifications.description':
+    'اپنی ریزرویشن حیثیت کے بارے میں اطلاعات حاصل کریں، جب آپ کی براؤزر اطلاع اجازت بھی دی گئی ہو۔',
+  'settings.privacy.operationalAlerts.title': 'آپریشنل الرٹس',
+  'settings.privacy.operationalAlerts.description':
+    'مجاز عملے کے لیے: میعاد ختم ہونے اور اسٹاک کے الرٹس حاصل کریں، جب آپ کی براؤزر اطلاع اجازت بھی دی گئی ہو۔',
+  'settings.device.eyebrow': 'براؤزر اور ڈیوائس',
+  'settings.device.title': 'ڈیوائس اجازتیں',
+  'settings.device.description':
+    'یہ آپ کے براؤزر کی اپنی اجازت کی ترتیبات ہیں، جنہیں {brandFullName} تبدیل نہیں کر سکتا۔ آپ کی {brandFullName} ترجیحات صرف اس وقت اثر انداز ہوتی ہیں جب متعلقہ براؤزر اجازت بھی دی گئی ہو۔',
+  'settings.device.location.title': 'مقام',
+  'settings.device.location.description':
+    '{brandFullName} صرف اس وقت آپ کا مقام پوچھتا ہے جب آپ کوئی ایسی خصوصیت استعمال کرتے ہیں جسے اس کی ضرورت ہو، جیسے قریبی فارمیسی تلاش کرنا۔ جب تک کوئی منظور شدہ عمل واضح طور پر اس کا تقاضا نہ کرے، آپ کا درست مقام محفوظ نہیں کیا جاتا۔',
+  'settings.device.location.granted': 'اس براؤزر میں اجازت دی گئی',
+  'settings.device.location.denied': 'اس براؤزر میں مسدود',
+  'settings.device.location.prompt': 'ابھی نہیں پوچھا گیا',
+  'settings.device.location.unknown': 'نامعلوم (یہ براؤزر پیشگی اطلاع نہیں دے سکتا)',
+  'settings.device.location.unsupported': 'اس براؤزر کے ذریعے تعاون یافتہ نہیں',
+  'settings.device.location.deniedGuidance':
+    'مقام کی اجازت آپ کے براؤزر میں مسدود ہے۔ اگر آپ قریبی تلاش استعمال کرنا چاہتے ہیں تو اسے براؤزر/سائٹ کی ترتیبات سے فعال کریں۔',
+  'settings.device.notifications.title': 'اطلاعات',
+  'settings.device.notifications.description':
+    '{brandFullName} آپ کو ریزرویشن اپ ڈیٹس اور، مجاز عملے کے لیے، آپریشنل الرٹس کے بارے میں اطلاع دے سکتا ہے۔ اگر آپ انکار کرتے ہیں تو آپ {brandFullName} استعمال جاری رکھ سکتے ہیں۔',
+  'settings.device.notifications.granted': 'اس براؤزر میں اجازت دی گئی',
+  'settings.device.notifications.denied': 'اس براؤزر میں مسدود',
+  'settings.device.notifications.default': 'ابھی نہیں پوچھا گیا',
+  'settings.device.notifications.unsupported': 'اس براؤزر کے ذریعے تعاون یافتہ نہیں',
+  'settings.device.notifications.deniedGuidance':
+    'اطلاع کی اجازت آپ کے براؤزر میں مسدود ہے۔ اگر آپ الرٹس وصول کرنا چاہتے ہیں تو اسے براؤزر/سائٹ کی ترتیبات سے فعال کریں۔',
+  'settings.device.notifications.enable': 'اطلاعات فعال کریں',
+  'settings.device.consent.status': 'رضامندی کی حیثیت',
+  'settings.device.consent.granted': 'دی گئی',
+  'settings.device.consent.withdrawn': 'واپس لے لی گئی',
+  'settings.device.consent.notAsked': 'نہیں پوچھی گئی',
+  'settings.device.consent.withdrawLocation': 'مقام کے استعمال کی رضامندی واپس لیں',
+  'settings.device.consent.withdrawNotifications': 'اطلاع کی رضامندی واپس لیں',
 };

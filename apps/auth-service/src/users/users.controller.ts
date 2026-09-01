@@ -34,7 +34,7 @@ export class UsersController {
   @ApiOkResponse({ type: PrivacyResponseDto })
   @ApiBadRequestResponse({ description: 'Invalid or empty privacy update' })
   updatePrivacy(@CurrentIdentity() identity: AuthenticatedIdentity, @Body() dto: UpdatePrivacyDto) {
-    return this.usersService.updatePrivacy(identity.userId, dto);
+    return this.usersService.updatePrivacy(identity, dto);
   }
 
   @Patch('me/language')

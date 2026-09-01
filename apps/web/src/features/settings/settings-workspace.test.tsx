@@ -2,6 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { LanguageProvider } from '@/components/language-provider';
 import {
+  getConsentStatus,
   getPrivacyPreferences,
   getSupportedLanguages,
   updatePreferredLanguage,
@@ -25,6 +26,8 @@ vi.mock('@/lib/api-client', async () => {
     getSupportedLanguages: vi.fn(),
     updatePrivacyPreferences: vi.fn(),
     updatePreferredLanguage: vi.fn(),
+    getConsentStatus: vi.fn(),
+    recordConsent: vi.fn(),
   };
 });
 
@@ -34,6 +37,8 @@ const privacy = {
   allowInAppChat: true,
   privatePickup: false,
   hideSensitiveNotifications: true,
+  wantsReservationNotifications: false,
+  wantsOperationalAlerts: false,
 };
 
 const languages = [
@@ -49,6 +54,12 @@ const identity = {
   membershipId: '93b31836-6a84-4db9-a935-1c55960c25da',
 };
 
+const emptyConsent = [
+  { category: 'LOCATION_USE' as const, status: null, updatedAt: null },
+  { category: 'NOTIFICATIONS_RESERVATIONS' as const, status: null, updatedAt: null },
+  { category: 'NOTIFICATIONS_OPERATIONAL' as const, status: null, updatedAt: null },
+];
+
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(getPrivacyPreferences).mockResolvedValue(privacy);
@@ -58,6 +69,7 @@ beforeEach(() => {
     ...update,
   }));
   vi.mocked(updatePreferredLanguage).mockResolvedValue({ message: 'Language updated' });
+  vi.mocked(getConsentStatus).mockResolvedValue(emptyConsent);
 });
 
 afterEach(() => cleanup());
@@ -114,7 +126,7 @@ describe('SettingsWorkspace interactions', () => {
     await waitFor(() =>
       expect(updatePreferredLanguage).toHaveBeenCalledWith({ preferredLanguage: 'ta' }),
     );
-    expect(await screen.findByText('Preferred language updated.')).toBeVisible();
+    await waitFor(() => expect(screen.getByText('Preferred language updated.')).toBeVisible());
   });
 
   it('updates the live rendered UI immediately, not only after a future reload', async () => {

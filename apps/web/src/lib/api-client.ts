@@ -41,10 +41,12 @@ import {
   type ProviderAccess,
 } from './inventory-contract';
 import type {
+  ConsentStatus,
   LanguageUpdateRequest,
   LanguageUpdateResponse,
   PrivacyPreferences,
   PrivacyPreferenceUpdate,
+  RecordConsentRequest,
   SupportedLanguage,
 } from './settings-contract';
 import {
@@ -401,6 +403,19 @@ export async function updatePrivacyPreferences(
 
 export async function getSupportedLanguages(): Promise<SupportedLanguage[]> {
   return requestJson<SupportedLanguage[]>('/api/settings/languages');
+}
+
+export async function getConsentStatus(): Promise<ConsentStatus[]> {
+  const response = await requestJson<{ data: ConsentStatus[] }>('/api/settings/consent');
+  return response.data;
+}
+
+export async function recordConsent(request: RecordConsentRequest): Promise<ConsentStatus> {
+  return requestJson<ConsentStatus>('/api/settings/consent', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(request),
+  });
 }
 
 export async function updatePreferredLanguage(
