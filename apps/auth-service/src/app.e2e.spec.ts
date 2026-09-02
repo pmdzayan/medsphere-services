@@ -416,6 +416,7 @@ describe('S0.4 authentication and authorization HTTP security boundary', () => {
       tenantId,
       sessionId,
       tokenId: issued.tokenId,
+      securityVersion: 1,
     };
     validateAccessIdentity.mockResolvedValue(identity);
 
@@ -429,7 +430,7 @@ describe('S0.4 authentication and authorization HTTP security boundary', () => {
 
     expect(response.status).toBe(200);
     expect(validateAccessIdentity).toHaveBeenCalledWith(
-      { userId, membershipId, tenantId, sessionId },
+      { userId, membershipId, tenantId, sessionId, securityVersion: 1 },
       issued.tokenId,
     );
     expect(getPrivacy).toHaveBeenCalledWith(userId);
@@ -443,6 +444,7 @@ describe('S0.4 authentication and authorization HTTP security boundary', () => {
       tenantId,
       sessionId,
       tokenId: issued.tokenId,
+      securityVersion: 1,
     };
     validateAccessIdentity.mockResolvedValueOnce(identity).mockResolvedValueOnce(null);
 
@@ -483,6 +485,7 @@ describe('S0.4 authentication and authorization HTTP security boundary', () => {
       tenantId,
       sessionId,
       tokenId: issued.tokenId,
+      securityVersion: 1,
     };
     validateAccessIdentity.mockResolvedValue(identity);
     hasAllPermissions.mockResolvedValue(true);
@@ -521,6 +524,7 @@ describe('S0.4 authentication and authorization HTTP security boundary', () => {
       tenantId,
       sessionId,
       tokenId: issued.tokenId,
+      securityVersion: 1,
     };
     validateAccessIdentity.mockResolvedValue(identity);
     hasAllPermissions.mockResolvedValue(true);
@@ -554,6 +558,7 @@ describe('S0.4 authentication and authorization HTTP security boundary', () => {
       tenantId,
       sessionId,
       tokenId: issued.tokenId,
+      securityVersion: 1,
     };
     validateAccessIdentity.mockResolvedValue(identity);
     hasAllPermissions.mockResolvedValue(true);
@@ -607,6 +612,7 @@ describe('S0.4 authentication and authorization HTTP security boundary', () => {
       tenantId,
       sessionId,
       tokenId: issued.tokenId,
+      securityVersion: 1,
     };
     validateAccessIdentity.mockResolvedValue(identity);
     hasAllPermissions.mockResolvedValue(true);
@@ -658,6 +664,7 @@ describe('S0.4 authentication and authorization HTTP security boundary', () => {
       tenantId,
       sessionId,
       tokenId: issued.tokenId,
+      securityVersion: 1,
     };
     validateAccessIdentity.mockResolvedValue(identity);
     hasAllPermissions.mockResolvedValue(true);
@@ -741,6 +748,7 @@ describe('S0.4 authentication and authorization HTTP security boundary', () => {
       tenantId,
       sessionId,
       tokenId: issued.tokenId,
+      securityVersion: 1,
     };
     validateAccessIdentity.mockResolvedValue(identity);
     hasAllPermissions.mockResolvedValue(true);
@@ -789,6 +797,7 @@ describe('S0.4 authentication and authorization HTTP security boundary', () => {
       tenantId,
       sessionId,
       tokenId: issued.tokenId,
+      securityVersion: 1,
     };
     validateAccessIdentity.mockResolvedValue(identity);
     hasAllPermissions.mockResolvedValue(true);
@@ -815,6 +824,7 @@ describe('S0.4 authentication and authorization HTTP security boundary', () => {
       tenantId,
       sessionId,
       tokenId: issued.tokenId,
+      securityVersion: 1,
     };
     validateAccessIdentity.mockResolvedValue(identity);
     hasAllPermissions.mockResolvedValue(false);
@@ -877,6 +887,7 @@ describe('S0.4 authentication and authorization HTTP security boundary', () => {
       tenantId,
       sessionId,
       tokenId: issued.tokenId,
+      securityVersion: 1,
     };
     validateAccessIdentity.mockResolvedValue(identity);
     hasAllPermissions.mockResolvedValue(true);
@@ -919,6 +930,7 @@ describe('S0.4 authentication and authorization HTTP security boundary', () => {
       tenantId,
       sessionId,
       tokenId: issued.tokenId,
+      securityVersion: 1,
     };
     validateAccessIdentity.mockResolvedValue(identity);
     hasAllPermissions.mockResolvedValue(true);
@@ -948,7 +960,13 @@ describe('S0.4 authentication and authorization HTTP security boundary', () => {
   });
 
   function issueAccessToken() {
-    return tokenService.issueAccessToken({ userId, membershipId, tenantId, sessionId });
+    return tokenService.issueAccessToken({
+      userId,
+      membershipId,
+      tenantId,
+      sessionId,
+      securityVersion: 1,
+    });
   }
 
   async function sendRequest(path: string, options: RequestOptions = {}): Promise<ApiResponse> {

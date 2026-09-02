@@ -43,6 +43,16 @@ export function setSessionProfileCookie(
   });
 }
 
+export function clearAccessCookie(response: NextResponse): void {
+  response.cookies.set(ACCESS_COOKIE, '', {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    path: '/',
+    maxAge: 0,
+  });
+}
+
 export function clearSessionProfileCookie(response: NextResponse): void {
   response.cookies.set(PROFILE_COOKIE, '', {
     httpOnly: true,

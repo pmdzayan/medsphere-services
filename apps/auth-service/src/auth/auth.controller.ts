@@ -1,6 +1,4 @@
-import { Body, Controller, HttpCode, HttpStatus, Post, Req } from '@nestjs/common';
-import { PublicEndpoint } from '@medsphere/common';
-import { Throttle } from '@nestjs/throttler';
+import { Body, Controller, HttpCode, HttpStatus, Post, Req, UseGuards } from '@nestjs/common';
 import {
   ApiAcceptedResponse,
   ApiBearerAuth,
@@ -12,6 +10,8 @@ import {
   ApiUnauthorizedResponse,
   getSchemaPath,
 } from '@nestjs/swagger';
+import { PublicEndpoint } from '@medsphere/common';
+import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
@@ -21,6 +21,12 @@ import { OrganizationSelectionRequiredDto } from './dto/organization-selection-r
 import { GoogleLoginDto } from './dto/google-login.dto';
 import { GoogleRegisterDto } from './dto/google-register.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
+import { LockSessionDto } from './dto/lock-session.dto';
+import { UnlockSessionDto } from './dto/unlock-session.dto';
+import { ReauthenticateSessionDto } from './dto/reauthenticate-session.dto';
+import { LockedSessionGuard } from './locked-session.guard';
+import { SessionStateGuard } from './session-state.guard';
+import { DedicatedAuthEndpoint } from './dedicated-auth-endpoint.decorator';
 import { CurrentIdentity } from '../common/decorators/current-identity.decorator';
 import { AuthenticatedIdentity } from './auth.types';
 import { LoginResponseDto } from './dto/login-response.dto';
@@ -176,5 +182,117 @@ export class AuthController {
     @Req() request: MetadataHttpRequest,
   ) {
     return this.authService.logoutAllDevices(identity, extractRequestMetadata(request));
+  }
+
+  @Post('lock')
+  @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Lock the current workstation session (Task 0014)' })
+  @ApiOkResponse({ description: 'Workstation locked' })
+  @ApiUnauthorizedResponse({ description: 'Authentication required' })
+  lock(
+    @CurrentIdentity() identity: AuthenticatedIdentity,
+    @Body() lockSessionDto: LockSessionDto,
+    @Req() request: MetadataHttpRequest,
+  ) {
+    return this.authService.lock(identity, lockSessionDto, extractRequestMetadata(request));
+  }
+
+  @Post('unlock')
+  @HttpCode(HttpStatus.OK)
+  @DedicatedAuthEndpoint()
+  @UseGuards(LockedSessionGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary:
+      'Unlock the current workstation session with a same-identity credential proof (Task 0014)',
+  })
+  @ApiOkResponse({ type: LoginResponseDto })
+  @ApiUnauthorizedResponse({ description: 'Invalid unlock credential' })
+  unlock(
+    @CurrentIdentity() identity: AuthenticatedIdentity,
+    @Body() unlockSessionDto: UnlockSessionDto,
+    @Req() request: MetadataHttpRequest,
+  ) {
+    return this.authService.unlock(identity, unlockSessionDto, extractRequestMetadata(request));
+  }
+
+  @Post('reauthenticate')
+  @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Re-authenticate the current active session for step-up security (Task 0014)',
+  })
+  @ApiOkResponse({
+    schema: {
+      type: 'object',
+      properties: {
+        reauthenticated: { type: 'boolean', enum: [true] },
+        recentAuthenticatedAt: { type: 'string', format: 'date-time' },
+      },
+      required: ['reauthenticated', 'recentAuthenticatedAt'],
+    },
+  })
+  @ApiUnauthorizedResponse({ description: 'Authentication or credential proof failed' })
+  reauthenticate(
+    @CurrentIdentity() identity: AuthenticatedIdentity,
+    @Body() dto: ReauthenticateSessionDto,
+    @Req() request: MetadataHttpRequest,
+  ) {
+    return this.authService.reauthenticate(identity, dto, extractRequestMetadata(request));
+  }
+
+  @Post('logout-locked')
+  @HttpCode(HttpStatus.OK)
+  @DedicatedAuthEndpoint()
+  @UseGuards(LockedSessionGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Log out while the workstation is locked (Task 0014)' })
+  @ApiOkResponse({ type: LogoutResponseDto })
+  @ApiUnauthorizedResponse({ description: 'Authentication required' })
+  logoutLocked(
+    @CurrentIdentity() identity: AuthenticatedIdentity,
+    @Req() request: MetadataHttpRequest,
+  ) {
+    return this.authService.logoutLocked(identity, extractRequestMetadata(request));
+  }
+
+  @Post('switch-user')
+  @HttpCode(HttpStatus.OK)
+  @DedicatedAuthEndpoint()
+  @UseGuards(LockedSessionGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'End the current session and switch to another operator (Task 0014)' })
+  @ApiOkResponse({ type: LogoutResponseDto })
+  @ApiUnauthorizedResponse({ description: 'Authentication required' })
+  switchUser(
+    @CurrentIdentity() identity: AuthenticatedIdentity,
+    @Req() request: MetadataHttpRequest,
+  ) {
+    return this.authService.switchUser(identity, extractRequestMetadata(request));
+  }
+
+  @Post('session-state')
+  @HttpCode(HttpStatus.OK)
+  @DedicatedAuthEndpoint()
+  @UseGuards(SessionStateGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Report server-authoritative workstation session state (Task 0014): locked or active',
+  })
+  @ApiOkResponse({
+    schema: {
+      type: 'object',
+      properties: {
+        locked: { type: 'boolean' },
+        lockedAt: { type: 'string', format: 'date-time', nullable: true },
+        securityVersion: { type: 'integer' },
+      },
+      required: ['locked', 'lockedAt', 'securityVersion'],
+    },
+  })
+  @ApiUnauthorizedResponse({ description: 'Authentication required' })
+  sessionState(@Req() request: MetadataHttpRequest & { sessionState?: unknown }) {
+    return request.sessionState;
   }
 }

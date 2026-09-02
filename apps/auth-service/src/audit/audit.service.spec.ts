@@ -12,6 +12,7 @@ describe('AuditService tenant read boundary', () => {
     tenantId: randomUUID(),
     sessionId: randomUUID(),
     tokenId: randomUUID(),
+    securityVersion: 1,
   };
   let repository: jest.Mocked<AuditRepository>;
   let service: AuditService;

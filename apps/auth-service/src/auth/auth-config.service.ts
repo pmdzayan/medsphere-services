@@ -13,6 +13,7 @@ export interface AuthConfiguration {
   readonly audience: string;
   readonly keyId: string;
   readonly accessTokenTtlSeconds: number;
+  readonly recentAuthTtlSeconds: number;
   readonly refreshIdleTtlSeconds: number;
   readonly refreshAbsoluteTtlSeconds: number;
   readonly refreshTokenPepper: Buffer;
@@ -151,6 +152,8 @@ export function parseAuthEnvironment(environment: AuthEnvironment): AuthConfigur
     60,
     3600,
   );
+  const recentAuthTtlSeconds = parseInteger(environment, 'AUTH_RECENT_AUTH_TTL_SECONDS', 60, 3600);
+
   const refreshIdleTtlSeconds = parseInteger(
     environment,
     'AUTH_REFRESH_IDLE_TTL_SECONDS',
@@ -198,6 +201,7 @@ export function parseAuthEnvironment(environment: AuthEnvironment): AuthConfigur
     audience,
     keyId,
     accessTokenTtlSeconds,
+    recentAuthTtlSeconds,
     refreshIdleTtlSeconds,
     refreshAbsoluteTtlSeconds,
     refreshTokenPepper: Buffer.from(refreshTokenPepper),

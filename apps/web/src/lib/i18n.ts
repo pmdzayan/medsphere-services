@@ -41,6 +41,7 @@ import {
   permissionsTamilMessages,
   permissionsUrduMessages,
 } from './i18n-catalogs/permissions';
+import { workstationSecurityLocaleMessages } from './i18n-catalogs/workstation-security';
 
 export const localeOptions = [
   { code: 'en', label: 'English', dir: 'ltr' },
@@ -85,7 +86,6 @@ const englishMessages = {
   ...teamEnglishMessages,
   ...permissionsEnglishMessages,
   'language.label': 'Language',
-  'meta.description': 'One connected healthcare operating system.',
   'meta.login.title': 'Sign in',
   'meta.register.title': 'Request access',
   'meta.search.title': 'Medicine availability search',
@@ -112,6 +112,21 @@ const englishMessages = {
   'shell.authenticatedMember': 'Authenticated member',
   'shell.signingOut': 'Signing out…',
   'shell.signOutSecurely': 'Sign out securely',
+  'shell.lockWorkstation': 'Lock workstation',
+  'shell.lockingWorkstation': 'Locking workstation…',
+  'shell.workstationLocked': 'Workstation locked',
+  'shell.workstationLockedDescription':
+    'Protected healthcare information is hidden until the current operator verifies their identity.',
+  'shell.password': 'Password',
+  'shell.unlockWorkstation': 'Unlock workstation',
+  'shell.unlockingWorkstation': 'Unlocking…',
+  'shell.switchUser': 'Switch user',
+  'shell.switchingUser': 'Switching user…',
+  'shell.lockedSignOut': 'Sign out',
+  'shell.unlockFailed': 'Unable to unlock the workstation. Check your credential and try again.',
+  'shell.lockFailed': 'Unable to lock the workstation. Try again.',
+  'shell.switchUserFailed': 'Unable to switch users securely. Try again.',
+  'shell.lockedSignOutFailed': 'Unable to sign out securely. Try again.',
   'shell.mobileNavigation': 'Mobile navigation',
   'shell.moreNavigation': 'More navigation, team, and settings',
   'shell.more': 'More',
@@ -224,7 +239,6 @@ const tamilMessages: MessageOverrides = {
   ...teamTamilMessages,
   ...permissionsTamilMessages,
   'language.label': 'மொழி',
-  'meta.description': 'இணைக்கப்பட்ட ஒரே சுகாதார இயக்க முறைமை.',
   'meta.login.title': 'உள்நுழைக',
   'meta.register.title': 'அணுகலைக் கோருங்கள்',
   'meta.search.title': 'மருந்து கிடைப்புத் தேடல்',
@@ -376,6 +390,18 @@ const shellKeys = [
   'shell.needHelp',
   'shell.helpText',
   'shell.tenant',
+  'shell.lockWorkstation',
+  'shell.lockingWorkstation',
+  'shell.workstationLocked',
+  'shell.workstationLockedDescription',
+  'shell.password',
+  'shell.unlockWorkstation',
+  'shell.unlockingWorkstation',
+  'shell.switchUser',
+  'shell.switchingUser',
+  'shell.lockedSignOut',
+  'shell.unlockFailed',
+  'shell.lockFailed',
 ] as const satisfies readonly TranslationKey[];
 
 function shell(values: readonly string[]): MessageOverrides {
@@ -396,7 +422,6 @@ const urduMessages: MessageOverrides = {
   ...teamUrduMessages,
   ...permissionsUrduMessages,
   'language.label': 'زبان',
-  'meta.description': 'ایک مربوط صحت نگہداشت عملی نظام۔',
   'meta.login.title': 'سائن ان',
   'meta.register.title': 'رسائی کی درخواست',
   'meta.search.title': 'دوا کی دستیابی کی تلاش',
@@ -1138,6 +1163,21 @@ const localeMessages: Partial<Record<Locale, MessageOverrides>> = {
     'సంస్థ',
   ]),
 };
+
+// Task 0014 security copy is deliberately keyed instead of extending the
+// legacy positional shell arrays. Merge it into each non-English locale so
+// completeness checks and runtime translation use the same authoritative map.
+for (const locale of supportedLocales) {
+  if (locale === 'en') continue;
+
+  const workstationMessages =
+    workstationSecurityLocaleMessages[locale as keyof typeof workstationSecurityLocaleMessages];
+
+  localeMessages[locale] = {
+    ...localeMessages[locale],
+    ...workstationMessages,
+  } as MessageOverrides;
+}
 
 export function isLocale(value: string | null): value is Locale {
   return localeOptions.some((option) => option.code === value);

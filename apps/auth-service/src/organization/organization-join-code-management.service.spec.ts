@@ -8,6 +8,7 @@ const identity = {
   tenantId: 'tenant-1',
   sessionId: 'session-1',
   tokenId: 'token-1',
+  securityVersion: 1,
 };
 
 function buildHarness() {

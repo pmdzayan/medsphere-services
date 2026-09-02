@@ -7,7 +7,14 @@ export type AuthenticationSecurityEvent =
   | 'refresh'
   | 'refresh-replay'
   | 'logout'
-  | 'logout-all';
+  | 'logout-all'
+  | 'session-locked'
+  | 'session-unlocked'
+  | 'session-unlock-failed'
+  | 'session-reauthenticated'
+  | 'session-reauthentication-failed'
+  | 'logout-locked'
+  | 'switch-user';
 
 export interface AuthenticationSecurityEventContext {
   readonly outcome: 'success' | 'denied';
@@ -19,7 +26,10 @@ export interface AuthenticationSecurityEventContext {
     | 'invalid-credentials'
     | 'invalid-refresh-credential'
     | 'refresh-replay'
-    | 'registration-processed';
+    | 'registration-processed'
+    | 'session-locked'
+    | 'invalid-unlock-credential'
+    | 'invalid-reauthentication-credential';
 }
 
 /**

@@ -85,7 +85,9 @@ describeSessionInfra('SessionRepository PostgreSQL security integration', () => 
     const sessionId = randomUUID();
     const familyId = randomUUID();
     const hash = (randomUUID() + randomUUID()).replace(/-/g, '').slice(0, 64);
+    const beforeCreate = new Date();
     await createActiveSession(sessionId, familyId, hash);
+    const afterCreate = new Date();
 
     const session = await prisma.client.userSession.findUniqueOrThrow({
       where: { id: sessionId },
@@ -94,6 +96,9 @@ describeSessionInfra('SessionRepository PostgreSQL security integration', () => 
     expect(session.userId).toBe(userId);
     expect(session.tenantId).toBe(tenantId);
     expect(session.version).toBe(1);
+    expect(session.recentAuthenticatedAt).not.toBeNull();
+    expect(session.recentAuthenticatedAt!.getTime()).toBeGreaterThanOrEqual(beforeCreate.getTime());
+    expect(session.recentAuthenticatedAt!.getTime()).toBeLessThanOrEqual(afterCreate.getTime());
     expect(session.refreshCredentials).toHaveLength(1);
     expect(session.refreshCredentials[0]).toMatchObject({
       hash,
@@ -110,28 +115,28 @@ describeSessionInfra('SessionRepository PostgreSQL security integration', () => 
 
     await expect(
       repository.validateAccessIdentity(
-        { userId, membershipId, tenantId, sessionId },
+        { userId, membershipId, tenantId, sessionId, securityVersion: 1 },
         randomUUID(),
       ),
     ).resolves.toMatchObject({ userId, membershipId, tenantId, sessionId });
 
     await expect(
       repository.validateAccessIdentity(
-        { userId, membershipId, tenantId: otherTenantId, sessionId },
+        { userId, membershipId, tenantId: otherTenantId, sessionId, securityVersion: 1 },
         randomUUID(),
       ),
     ).resolves.toBeNull();
 
     await expect(
       repository.validateAccessIdentity(
-        { userId: otherUserId, membershipId, tenantId, sessionId },
+        { userId: otherUserId, membershipId, tenantId, sessionId, securityVersion: 1 },
         randomUUID(),
       ),
     ).resolves.toBeNull();
 
     await expect(
       repository.validateAccessIdentity(
-        { userId, membershipId: otherMembershipId, tenantId, sessionId },
+        { userId, membershipId: otherMembershipId, tenantId, sessionId, securityVersion: 1 },
         randomUUID(),
       ),
     ).resolves.toBeNull();
@@ -144,6 +149,11 @@ describeSessionInfra('SessionRepository PostgreSQL security integration', () => 
     const h2 = (randomUUID() + randomUUID()).replace(/-/g, '').slice(0, 64);
     const h3 = (randomUUID() + randomUUID()).replace(/-/g, '').slice(0, 64);
     const absoluteExpiresAt = await createActiveSession(sessionId, familyId, h1);
+    const originalRecentAuthenticatedAt = new Date('2000-01-01T00:00:00.000Z');
+    await prisma.client.userSession.update({
+      where: { id: sessionId },
+      data: { recentAuthenticatedAt: originalRecentAuthenticatedAt },
+    });
 
     const rotated = await repository.rotateSession({
       currentSessionId: sessionId,
@@ -157,6 +167,11 @@ describeSessionInfra('SessionRepository PostgreSQL security integration', () => 
     if (rotated.status === 'ROTATED') {
       expect(rotated.absoluteExpiresAt).toEqual(absoluteExpiresAt);
       expect(rotated.identity.sessionId).not.toBe(sessionId);
+
+      const successor = await prisma.client.userSession.findUniqueOrThrow({
+        where: { id: rotated.identity.sessionId },
+      });
+      expect(successor.recentAuthenticatedAt).toEqual(originalRecentAuthenticatedAt);
     }
 
     const oldCredential = await prisma.client.userSessionRefreshCredential.findFirstOrThrow({
@@ -182,6 +197,171 @@ describeSessionInfra('SessionRepository PostgreSQL security integration', () => 
     });
     expect(family).toHaveLength(2);
     expect(family.every((session) => session.status === 'COMPROMISED')).toBe(true);
+  });
+
+  it('blocks normal refresh for a locked workstation session and creates no successor', async () => {
+    const sessionId = randomUUID();
+    const familyId = randomUUID();
+    const nextSessionId = randomUUID();
+    const h1 = (randomUUID() + randomUUID()).replace(/-/g, '').slice(0, 64);
+    const h2 = (randomUUID() + randomUUID()).replace(/-/g, '').slice(0, 64);
+
+    await createActiveSession(sessionId, familyId, h1);
+
+    await expect(
+      repository.lockSession(
+        {
+          userId,
+          membershipId,
+          tenantId,
+          sessionId,
+          tokenId: randomUUID(),
+          securityVersion: 1,
+        },
+        'manual',
+        metadata,
+      ),
+    ).resolves.toEqual({ securityVersion: 2 });
+
+    await expect(
+      repository.rotateSession({
+        currentSessionId: sessionId,
+        presentedHash: h1,
+        nextSessionId,
+        nextRefreshTokenHash: h2,
+        idleTtlSeconds: 3600,
+        metadata,
+      }),
+    ).resolves.toEqual({ status: 'LOCKED' });
+
+    const lockedSession = await prisma.client.userSession.findUniqueOrThrow({
+      where: { id: sessionId },
+    });
+
+    expect(lockedSession.status).toBe('ACTIVE');
+    expect(lockedSession.lockedAt).not.toBeNull();
+    expect(lockedSession.securityVersion).toBe(2);
+
+    await expect(
+      prisma.client.userSession.findUnique({
+        where: { id: nextSessionId },
+      }),
+    ).resolves.toBeNull();
+
+    const originalCredential = await prisma.client.userSessionRefreshCredential.findFirstOrThrow({
+      where: {
+        sessionId,
+        hash: h1,
+      },
+    });
+
+    expect(originalCredential.status).toBe('ACTIVE');
+
+    const family = await prisma.client.userSession.findMany({
+      where: { familyId },
+    });
+
+    expect(family).toHaveLength(1);
+  });
+
+  it('records a fresh recent-authentication time after successful workstation unlock', async () => {
+    const sessionId = randomUUID();
+    const familyId = randomUUID();
+    const nextSessionId = randomUUID();
+    const h1 = (randomUUID() + randomUUID()).replace(/-/g, '').slice(0, 64);
+    const h2 = (randomUUID() + randomUUID()).replace(/-/g, '').slice(0, 64);
+    const oldRecentAuthenticatedAt = new Date('2000-01-01T00:00:00.000Z');
+
+    await createActiveSession(sessionId, familyId, h1);
+    await prisma.client.userSession.update({
+      where: { id: sessionId },
+      data: { recentAuthenticatedAt: oldRecentAuthenticatedAt },
+    });
+
+    await repository.lockSession(
+      {
+        userId,
+        membershipId,
+        tenantId,
+        sessionId,
+        tokenId: randomUUID(),
+        securityVersion: 1,
+      },
+      'manual',
+      metadata,
+    );
+
+    const beforeUnlock = new Date();
+
+    const result = await repository.unlockSession({
+      currentSessionId: sessionId,
+      presentedHash: h1,
+      nextSessionId,
+      nextRefreshTokenHash: h2,
+      unlockMethod: 'PASSWORD',
+      idleTtlSeconds: 3600,
+      metadata,
+    });
+
+    const afterUnlock = new Date();
+
+    expect(result).toMatchObject({ status: 'ROTATED' });
+
+    const successor = await prisma.client.userSession.findUniqueOrThrow({
+      where: { id: nextSessionId },
+    });
+
+    expect(successor.recentAuthenticatedAt).not.toBeNull();
+    expect(successor.recentAuthenticatedAt).not.toEqual(oldRecentAuthenticatedAt);
+    expect(successor.recentAuthenticatedAt!.getTime()).toBeGreaterThanOrEqual(
+      beforeUnlock.getTime(),
+    );
+    expect(successor.recentAuthenticatedAt!.getTime()).toBeLessThanOrEqual(afterUnlock.getTime());
+  });
+
+  it('advances recent-authentication only for the exact active unlocked session', async () => {
+    const sessionId = randomUUID();
+    const familyId = randomUUID();
+    const hash = (randomUUID() + randomUUID()).replace(/-/g, '').slice(0, 64);
+    const oldRecentAuthenticatedAt = new Date('2000-01-01T00:00:00.000Z');
+
+    await createActiveSession(sessionId, familyId, hash);
+    await prisma.client.userSession.update({
+      where: { id: sessionId },
+      data: { recentAuthenticatedAt: oldRecentAuthenticatedAt },
+    });
+
+    const beforeReauthentication = new Date();
+
+    const result = await repository.reauthenticateSession(
+      {
+        userId,
+        membershipId,
+        tenantId,
+        sessionId,
+        tokenId: randomUUID(),
+        securityVersion: 1,
+      },
+      'PASSWORD',
+      metadata,
+    );
+
+    const afterReauthentication = new Date();
+
+    expect(result).not.toBeNull();
+    expect(result!.recentAuthenticatedAt.getTime()).toBeGreaterThanOrEqual(
+      beforeReauthentication.getTime(),
+    );
+    expect(result!.recentAuthenticatedAt.getTime()).toBeLessThanOrEqual(
+      afterReauthentication.getTime(),
+    );
+
+    const persisted = await prisma.client.userSession.findUniqueOrThrow({
+      where: { id: sessionId },
+    });
+
+    expect(persisted.recentAuthenticatedAt).toEqual(result!.recentAuthenticatedAt);
+    expect(persisted.recentAuthenticatedAt).not.toEqual(oldRecentAuthenticatedAt);
   });
 
   it('returns INVALID for an unknown hash without revoking the family', async () => {
@@ -295,6 +475,7 @@ describeSessionInfra('SessionRepository PostgreSQL security integration', () => 
       tenantId,
       sessionId,
       tokenId: randomUUID(),
+      securityVersion: 1,
     };
 
     await repository.revokeAllForUser(identity, metadata);
@@ -329,6 +510,7 @@ describeSessionInfra('SessionRepository PostgreSQL security integration', () => 
       tenantId,
       sessionId: targetSessionId,
       tokenId: randomUUID(),
+      securityVersion: 1,
     };
     const revokedCount = await repository.revokeAllForUser(identity, metadata);
     expect(revokedCount).toBe(1);

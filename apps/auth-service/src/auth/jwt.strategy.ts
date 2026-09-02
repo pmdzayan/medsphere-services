@@ -46,6 +46,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
         membershipId: claims.mid,
         tenantId: claims.tid,
         sessionId: claims.sid,
+        securityVersion: claims.sv,
       },
       claims.jti,
     );

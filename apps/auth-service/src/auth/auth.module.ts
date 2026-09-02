@@ -8,7 +8,11 @@ import { AuthConfigService } from './auth-config.service';
 import { GoogleIdentityVerifierService } from './google-identity-verifier.service';
 import { AuthSecurityEventService } from './auth-security-event.service';
 import { JwtStrategy } from './jwt.strategy';
+import { LockedSessionGuard } from './locked-session.guard';
+import { LockedSessionVerifierService } from './locked-session-verifier.service';
 import { PasswordService } from './password.service';
+import { RecentAuthGuard } from './recent-auth.guard';
+import { SessionStateGuard } from './session-state.guard';
 import { RegistrationService } from './registration.service';
 import { SessionRepository } from './session.repository';
 import { TokenService } from './token.service';
@@ -33,11 +37,21 @@ import { AuditPersistenceModule } from '../audit/audit-persistence.module';
     GoogleIdentityVerifierService,
     AuthSecurityEventService,
     JwtStrategy,
+    LockedSessionGuard,
+    LockedSessionVerifierService,
     PasswordService,
+    RecentAuthGuard,
     RegistrationService,
+    SessionRepository,
+    SessionStateGuard,
+    TokenService,
+  ],
+  exports: [
+    AuthConfigService,
+    LockedSessionVerifierService,
+    RecentAuthGuard,
     SessionRepository,
     TokenService,
   ],
-  exports: [AuthConfigService, SessionRepository, TokenService],
 })
 export class AuthModule {}

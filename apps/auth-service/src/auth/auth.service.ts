@@ -10,6 +10,7 @@ import { SessionRepository } from './session.repository';
 import { AuthConfigService } from './auth-config.service';
 import { AuthSecurityEventService } from './auth-security-event.service';
 import { GoogleIdentityVerifierService } from './google-identity-verifier.service';
+import { PrismaService } from '../prisma/prisma.service';
 import { AuthenticatedIdentity, LoginIdentity, RequestMetadata } from './auth.types';
 import { RegisterDto } from './dto/register.dto';
 import { GoogleRegisterDto } from './dto/google-register.dto';
@@ -20,6 +21,9 @@ import { OrganizationSelectionRequiredDto } from './dto/organization-selection-r
 import { LoginResponseDto } from './dto/login-response.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { RegistrationResponseDto } from './dto/registration-response.dto';
+import { LockSessionDto } from './dto/lock-session.dto';
+import { UnlockSessionDto } from './dto/unlock-session.dto';
+import { ReauthenticateSessionDto } from './dto/reauthenticate-session.dto';
 
 const INVALID_CREDENTIALS_MESSAGE = 'Invalid credentials';
 const INVALID_REFRESH_MESSAGE = 'Invalid refresh credential';
@@ -36,6 +40,7 @@ export class AuthService {
     private readonly authConfig: AuthConfigService,
     private readonly securityEvents: AuthSecurityEventService,
     private readonly googleIdentityVerifier: GoogleIdentityVerifierService,
+    private readonly prisma: PrismaService,
   ) {}
 
   async register(registerDto: RegisterDto): Promise<RegistrationResponseDto> {
@@ -263,6 +268,7 @@ export class AuthService {
       membershipId: loginIdentity.membershipId,
       tenantId: loginIdentity.tenantId,
       sessionId: refreshCredential.sessionId,
+      securityVersion: 1,
     });
 
     const eventContext = {
@@ -321,12 +327,13 @@ export class AuthService {
       rotation.status === 'INVALID' ||
       rotation.status === 'EXPIRED' ||
       rotation.status === 'REVOKED' ||
-      rotation.status === 'IDENTITY_DISABLED'
+      rotation.status === 'IDENTITY_DISABLED' ||
+      rotation.status === 'LOCKED'
     ) {
       this.securityEvents.record('refresh', {
         outcome: 'denied',
         sessionId: refreshParts.sessionId,
-        reason: 'invalid-refresh-credential',
+        reason: rotation.status === 'LOCKED' ? 'session-locked' : 'invalid-refresh-credential',
       });
       throw new UnauthorizedException(INVALID_REFRESH_MESSAGE);
     }
@@ -351,6 +358,288 @@ export class AuthService {
     await this.sessionRepository.revokeCurrentFamily(identity, metadata);
     this.securityEvents.record('logout', { outcome: 'success', ...identity });
     return { message: 'Logged out successfully' };
+  }
+
+  /**
+   * Task 0014: explicit workstation lock. The session stays ACTIVE
+   * (server-authoritative) but is marked locked and its securityVersion is
+   * incremented so every previously issued access token fails closed.
+   */
+  async lock(
+    identity: AuthenticatedIdentity,
+    lockSessionDto: LockSessionDto,
+    metadata: RequestMetadata = {},
+  ): Promise<{ locked: true }> {
+    await this.sessionRepository.lockSession(identity, lockSessionDto.reason, metadata);
+    this.securityEvents.record('session-locked', { outcome: 'success', ...identity });
+    return { locked: true };
+  }
+
+  /**
+   * Task 0014: secure unlock / re-authentication. Unlock proves the SAME
+   * authenticated operator's identity and consumes the CURRENT locked
+   * session's opaque refresh credential before rotating to a fresh session.
+   *
+   * Exact-one-credential enforcement is handled at the DTO boundary:
+   * exactly one of password OR Google identity token must be present, never
+   * zero and never both. Google verification runs through the same server-side
+   * verifier used everywhere else and fails closed on any verifier rejection.
+   */
+  async unlock(
+    identity: AuthenticatedIdentity,
+    unlockSessionDto: UnlockSessionDto,
+    metadata: RequestMetadata = {},
+  ): Promise<LoginResponseDto> {
+    const refreshParts = this.tokenService.parseRefreshCredential(unlockSessionDto.refreshToken);
+
+    let unlockMethod: string | null;
+
+    try {
+      unlockMethod = await this.resolveSameUserCredentialMethod(unlockSessionDto, identity);
+    } catch (error) {
+      this.auditUnlockFailure(identity, refreshParts.sessionId, metadata);
+      throw error;
+    }
+
+    if (!unlockMethod) {
+      this.auditUnlockFailure(identity, refreshParts.sessionId, metadata);
+      throw new UnauthorizedException('Invalid unlock credential');
+    }
+
+    const nextCredential = this.tokenService.issueRefreshCredential();
+    const rotation = await this.sessionRepository.unlockSession({
+      currentSessionId: refreshParts.sessionId,
+      presentedHash: this.tokenService.hashRefreshCredential(unlockSessionDto.refreshToken),
+      nextSessionId: nextCredential.sessionId,
+      nextRefreshTokenHash: nextCredential.hash,
+      unlockMethod,
+      idleTtlSeconds: this.authConfig.value.refreshIdleTtlSeconds,
+      metadata,
+    });
+
+    if (rotation.status !== 'ROTATED') {
+      this.auditUnlockFailure(identity, refreshParts.sessionId, metadata);
+      throw new UnauthorizedException('Invalid unlock credential');
+    }
+
+    const loginIdentity = await this.usersRepository.findLoginIdentityByMembershipId(
+      identity.userId,
+      identity.membershipId,
+    );
+    if (!loginIdentity) {
+      throw new UnauthorizedException('Invalid unlock credential');
+    }
+
+    const accessToken = this.tokenService.issueAccessToken(rotation.identity);
+    this.securityEvents.record('session-unlocked', { outcome: 'success', ...identity });
+
+    return {
+      accessToken: accessToken.value,
+      refreshToken: nextCredential.value,
+      expiresIn: accessToken.expiresIn,
+      user: {
+        id: loginIdentity.user.id,
+        email: loginIdentity.user.email,
+        firstName: loginIdentity.user.firstName,
+        lastName: loginIdentity.user.lastName,
+        preferredLanguage: loginIdentity.user.preferredLanguage,
+      },
+      context: {
+        membershipId: loginIdentity.membershipId,
+        tenantId: loginIdentity.tenantId,
+        tenantName: loginIdentity.tenant.name,
+        organizationType: loginIdentity.tenant.organizationType,
+      },
+    };
+  }
+
+  /**
+   * Task 0014: explicit recent-authentication proof for an already-active
+   * session. A normal refresh never reaches this path and therefore cannot
+   * extend the recent-authentication window.
+   */
+  async reauthenticate(
+    identity: AuthenticatedIdentity,
+    dto: ReauthenticateSessionDto,
+    metadata: RequestMetadata = {},
+  ): Promise<{ reauthenticated: true; recentAuthenticatedAt: Date }> {
+    let method: string | null;
+
+    try {
+      method = await this.resolveSameUserCredentialMethod(dto, identity);
+    } catch (error) {
+      this.securityEvents.record('session-reauthentication-failed', {
+        outcome: 'denied',
+        ...identity,
+        reason: 'invalid-reauthentication-credential',
+      });
+      throw error;
+    }
+
+    if (!method) {
+      this.securityEvents.record('session-reauthentication-failed', {
+        outcome: 'denied',
+        ...identity,
+        reason: 'invalid-reauthentication-credential',
+      });
+      throw new UnauthorizedException('Invalid re-authentication credential');
+    }
+
+    const result = await this.sessionRepository.reauthenticateSession(identity, method, metadata);
+
+    if (!result) {
+      this.securityEvents.record('session-reauthentication-failed', {
+        outcome: 'denied',
+        ...identity,
+        reason: 'invalid-reauthentication-credential',
+      });
+      throw new UnauthorizedException('Authentication required');
+    }
+
+    this.securityEvents.record('session-reauthenticated', {
+      outcome: 'success',
+      ...identity,
+    });
+
+    return {
+      reauthenticated: true,
+      recentAuthenticatedAt: result.recentAuthenticatedAt,
+    };
+  }
+
+  /**
+   * Task 0014: logout while the workstation is locked. Revokes the locked
+   * session family server-side so a copied/stale credential cannot resume it.
+   */
+  async logoutLocked(
+    identity: AuthenticatedIdentity,
+    metadata: RequestMetadata = {},
+  ): Promise<{ message: string; revokedCount: number }> {
+    const revokedCount = await this.sessionRepository.revokeLockedFamily(
+      identity,
+      metadata,
+      'authentication.session.logout.locked',
+    );
+    this.securityEvents.record('logout-locked', { outcome: 'success', ...identity });
+    return { message: 'Logged out successfully', revokedCount };
+  }
+
+  /**
+   * Task 0014: switch user on a shared workstation. The prior session is
+   * securely ended/revoked server-side before the next operator is allowed
+   * a fresh authenticated workspace. No "user picker" preserves multiple
+   * active healthcare identities in frontend memory.
+   */
+  async switchUser(
+    identity: AuthenticatedIdentity,
+    metadata: RequestMetadata = {},
+  ): Promise<{ message: string; revokedCount: number }> {
+    const revokedCount = await this.sessionRepository.revokeLockedFamily(
+      identity,
+      metadata,
+      'authentication.session.switched',
+    );
+    this.securityEvents.record('switch-user', { outcome: 'success', ...identity });
+    return { message: 'Session ended. Sign in as the next operator.', revokedCount };
+  }
+
+  private auditUnlockFailure(
+    identity: AuthenticatedIdentity,
+    sessionId: string,
+    _metadata: RequestMetadata,
+  ): void {
+    // The durable audit event for unlock failure is written by
+    // SessionRepository.unlockSession inside the transaction. This
+    // security-event seam records only the bounded structured log line
+    // without sensitive details.
+    this.securityEvents.record('session-unlock-failed', {
+      outcome: 'denied',
+      userId: identity.userId,
+      membershipId: identity.membershipId,
+      tenantId: identity.tenantId,
+      sessionId,
+      reason: 'invalid-unlock-credential',
+    });
+  }
+
+  /**
+   * Task 0014: verifies the same-operator credential proof for unlock.
+   *
+   * Exactly one credential mechanism is expected (enforced at DTO
+   * validation); this method never accepts zero or conflates both. A
+   * Google proof goes through the same server-side verifier used for
+   * login -- it is never trusted client-side -- and any verifier
+   * rejection leaves the workstation locked (fail-closed, no downgrade).
+   */
+  private async resolveSameUserCredentialMethod(
+    dto: Pick<UnlockSessionDto, 'password' | 'googleIdToken'>,
+    identity: AuthenticatedIdentity,
+  ): Promise<string | null> {
+    const password =
+      typeof dto.password === 'string' && dto.password.trim().length > 0 ? dto.password : null;
+    const googleIdToken =
+      typeof dto.googleIdToken === 'string' && dto.googleIdToken.trim().length > 0
+        ? dto.googleIdToken
+        : null;
+
+    if ((password === null) === (googleIdToken === null)) {
+      // Either zero or both; both are invalid at the boundary. This line
+      // is a defensive second gate even though DTO validation already
+      // rejects these shapes.
+      return null;
+    }
+
+    if (password !== null) {
+      const loginIdentity = await this.usersRepository.findLoginIdentityByMembershipId(
+        identity.userId,
+        identity.membershipId,
+      );
+      if (!loginIdentity || !loginIdentity.user.passwordHash) {
+        await this.passwordService.verifyAgainstDummy(password);
+        return null;
+      }
+      const valid = await this.passwordService.verify(loginIdentity.user.passwordHash, password);
+      return valid ? 'PASSWORD' : null;
+    }
+
+    if (googleIdToken === null) {
+      return null;
+    }
+
+    // Google proof: server-side verification only. Any rejection (bad
+    // token, verifier unavailable, missing configured client) propagates
+    // as an UnauthorizedException and the workstation stays locked.
+    const googleIdentity = await this.googleIdentityVerifier.verify(googleIdToken);
+
+    const matchingIdentity = await this.usersRepository.findLoginIdentityByMembershipId(
+      identity.userId,
+      identity.membershipId,
+    );
+    if (!matchingIdentity) {
+      return null;
+    }
+
+    const hasLinkedGoogle = await this.hasLinkedGoogleSubject(
+      identity.userId,
+      googleIdentity.subject,
+    );
+    if (!hasLinkedGoogle) {
+      return null;
+    }
+
+    if (matchingIdentity.user.email.trim().toLowerCase() !== googleIdentity.email) {
+      return null;
+    }
+
+    return 'GOOGLE';
+  }
+
+  private async hasLinkedGoogleSubject(userId: string, subject: string): Promise<boolean> {
+    const linked = await this.prisma.client.externalAuthIdentity.findFirst({
+      where: { userId, provider: 'GOOGLE', subject },
+      select: { id: true },
+    });
+    return linked !== null;
   }
 
   async logoutAllDevices(

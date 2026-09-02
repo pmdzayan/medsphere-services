@@ -468,3 +468,92 @@ function hasExactKeys(value: unknown, expectedKeys: readonly string[]): value is
     actualKeys.every((key, index) => key === expectedKeys[index])
   );
 }
+
+/* -------------------------------------------------------------------------- */
+/* Task 0014 — shared-workstation session security contracts                  */
+/* -------------------------------------------------------------------------- */
+
+export type WorkstationLockReason = 'manual' | 'walked-away';
+
+export interface WorkstationLockRequest {
+  reason: WorkstationLockReason;
+}
+
+export interface WorkstationLockResponse {
+  locked: true;
+}
+
+export interface WorkstationSessionState {
+  locked: boolean;
+  lockedAt: string | null;
+  securityVersion: number;
+}
+
+/**
+ * Browser-facing unlock request.
+ * The refresh credential is deliberately absent: the BFF adds it from the
+ * HTTP-only cookie and never exposes it to browser JavaScript.
+ */
+export type WorkstationUnlockRequest =
+  { password: string; googleIdToken?: never } | { googleIdToken: string; password?: never };
+
+export function isWorkstationLockRequest(value: unknown): value is WorkstationLockRequest {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+
+  const candidate = value as Record<string, unknown>;
+  return (
+    Object.keys(candidate).sort().join(',') === 'reason' &&
+    (candidate.reason === 'manual' || candidate.reason === 'walked-away')
+  );
+}
+
+export function isWorkstationLockResponse(value: unknown): value is WorkstationLockResponse {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+
+  const candidate = value as Record<string, unknown>;
+  return Object.keys(candidate).sort().join(',') === 'locked' && candidate.locked === true;
+}
+
+export function isWorkstationSessionState(value: unknown): value is WorkstationSessionState {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+
+  const candidate = value as Record<string, unknown>;
+  if (Object.keys(candidate).sort().join(',') !== 'locked,lockedAt,securityVersion') {
+    return false;
+  }
+
+  return (
+    typeof candidate.locked === 'boolean' &&
+    (candidate.lockedAt === null ||
+      (typeof candidate.lockedAt === 'string' &&
+        candidate.lockedAt.length > 0 &&
+        !Number.isNaN(Date.parse(candidate.lockedAt)))) &&
+    Number.isSafeInteger(candidate.securityVersion) &&
+    (candidate.securityVersion as number) >= 0
+  );
+}
+
+export function isWorkstationUnlockRequest(value: unknown): value is WorkstationUnlockRequest {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+
+  const candidate = value as Record<string, unknown>;
+  const keys = Object.keys(candidate).sort();
+
+  if (keys.length !== 1 || (keys[0] !== 'googleIdToken' && keys[0] !== 'password')) {
+    return false;
+  }
+
+  if (keys[0] === 'password') {
+    return (
+      typeof candidate.password === 'string' &&
+      candidate.password.length >= 15 &&
+      candidate.password.length <= 128
+    );
+  }
+
+  return (
+    typeof candidate.googleIdToken === 'string' &&
+    candidate.googleIdToken.trim().length > 0 &&
+    candidate.googleIdToken.trim().length <= 10000
+  );
+}

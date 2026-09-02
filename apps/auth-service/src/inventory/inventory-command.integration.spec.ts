@@ -27,6 +27,7 @@ describeInventoryInfrastructure('G3.2 PostgreSQL inventory command integrity', (
     tenantId,
     sessionId: randomUUID(),
     tokenId: randomUUID(),
+    securityVersion: 1,
   };
   const unassignedIdentity: AuthenticatedIdentity = {
     userId: unassignedUserId,
@@ -34,6 +35,7 @@ describeInventoryInfrastructure('G3.2 PostgreSQL inventory command integrity', (
     tenantId,
     sessionId: randomUUID(),
     tokenId: randomUUID(),
+    securityVersion: 1,
   };
 
   beforeAll(async () => {

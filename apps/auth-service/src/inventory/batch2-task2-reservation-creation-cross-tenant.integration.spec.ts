@@ -45,6 +45,7 @@ infra('Batch 2 Task 2 cross-tenant reservation-creation rejection', () => {
     membershipId: membershipBId,
     sessionId: randomUUID(),
     tokenId: randomUUID(),
+    securityVersion: 1,
   };
 
   function providerFixture(id: string, tenantId: string, name: string) {

@@ -2,16 +2,14 @@ import type { Metadata } from 'next';
 import { BRAND } from '@medsphere/brand';
 import { BrandStartup } from '@/components/brand/brand-startup';
 import { LanguageProvider } from '@/components/language-provider';
-import { getLocaleDirection, translate } from '@/lib/i18n';
-import { getServerLocale, getServerLocalePreference } from '@/lib/server-locale';
+import { getLocaleDirection } from '@/lib/i18n';
+import { getServerLocalePreference } from '@/lib/server-locale';
 import './globals.css';
 
 export async function generateMetadata(): Promise<Metadata> {
-  const locale = await getServerLocale();
   return {
     applicationName: BRAND.fullName,
     title: { default: BRAND.applicationTitle, template: `%s | ${BRAND.shortName}` },
-    description: translate(locale, 'meta.description'),
     manifest: '/manifest.webmanifest',
     appleWebApp: {
       capable: true,
@@ -22,7 +20,6 @@ export async function generateMetadata(): Promise<Metadata> {
       type: 'website',
       siteName: BRAND.fullName,
       title: BRAND.applicationTitle,
-      description: translate(locale, 'meta.description'),
     },
   };
 }

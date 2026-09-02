@@ -16,6 +16,7 @@ describe('PermissionsGuard', () => {
     tenantId: randomUUID(),
     sessionId: randomUUID(),
     tokenId: randomUUID(),
+    securityVersion: 1,
   };
   const getAllAndOverride = jest.fn();
   const hasAllPermissions = jest.fn();

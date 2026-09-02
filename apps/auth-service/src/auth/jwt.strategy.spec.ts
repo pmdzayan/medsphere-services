@@ -14,6 +14,7 @@ describe('JwtStrategy', () => {
     tenantId: randomUUID(),
     sessionId: randomUUID(),
     tokenId: randomUUID(),
+    securityVersion: 1,
   };
   const now = Math.floor(Date.now() / 1000);
   const claims: AccessTokenClaims = {
@@ -21,6 +22,7 @@ describe('JwtStrategy', () => {
     mid: identity.membershipId,
     tid: identity.tenantId,
     sid: identity.sessionId,
+    sv: 1,
     jti: identity.tokenId,
     tokenUse: 'access',
     iat: now,
@@ -47,6 +49,7 @@ describe('JwtStrategy', () => {
         membershipId: identity.membershipId,
         tenantId: identity.tenantId,
         sessionId: identity.sessionId,
+        securityVersion: 1,
       },
       identity.tokenId,
     );
