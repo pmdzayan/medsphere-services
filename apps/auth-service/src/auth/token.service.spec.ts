@@ -17,6 +17,7 @@ describe('TokenService', () => {
     membershipId: randomUUID(),
     tenantId: randomUUID(),
     sessionId: randomUUID(),
+    securityVersion: 1,
   };
 
   it('issues and strictly verifies a minimal RS256 access token', () => {
@@ -29,6 +30,7 @@ describe('TokenService', () => {
       mid: identity.membershipId,
       tid: identity.tenantId,
       sid: identity.sessionId,
+      sv: 1,
       tokenUse: 'access',
     });
     expect(decoded).toMatchObject({
@@ -45,6 +47,7 @@ describe('TokenService', () => {
         mid: identity.membershipId,
         tid: identity.tenantId,
         sid: identity.sessionId,
+        sv: 1,
         jti: randomUUID(),
         tokenUse: 'access',
       },

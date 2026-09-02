@@ -14,6 +14,7 @@ describe('AuthorizationService', () => {
     tenantId: randomUUID(),
     sessionId: randomUUID(),
     tokenId: randomUUID(),
+    securityVersion: 1,
   };
   const transaction = {} as Prisma.TransactionClient;
   const transactionClient = {

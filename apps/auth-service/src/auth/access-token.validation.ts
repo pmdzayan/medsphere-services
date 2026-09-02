@@ -49,6 +49,8 @@ export function assertValidAccessTokenClaims(value: unknown): asserts value is A
     !isUuid(claims.mid) ||
     !isUuid(claims.tid) ||
     !isUuid(claims.sid) ||
+    !Number.isSafeInteger(claims.sv) ||
+    (claims.sv as number) < 1 ||
     !isUuid(claims.jti) ||
     !Number.isInteger(claims.iat) ||
     !Number.isInteger(claims.exp) ||

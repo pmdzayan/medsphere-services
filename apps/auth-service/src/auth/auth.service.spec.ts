@@ -6,6 +6,7 @@ import { AuthService } from './auth.service';
 import { GoogleIdentityVerifierService } from './google-identity-verifier.service';
 import { OrganizationOnboardingService } from '../organization/organization-onboarding.service';
 import { PasswordService } from './password.service';
+import { PrismaService } from '../prisma/prisma.service';
 import { RegistrationService } from './registration.service';
 import { SessionRepository } from './session.repository';
 import { TokenService } from './token.service';
@@ -46,6 +47,7 @@ describe('AuthService', () => {
   let sessionRepository: jest.Mocked<SessionRepository>;
   let securityEvents: jest.Mocked<AuthSecurityEventService>;
   let googleIdentityVerifier: jest.Mocked<GoogleIdentityVerifierService>;
+  let prisma: jest.Mocked<PrismaService>;
   let service: AuthService;
 
   beforeEach(() => {
@@ -82,6 +84,10 @@ describe('AuthService', () => {
       rotateSession: jest.fn(),
       revokeCurrentFamily: jest.fn(),
       revokeAllForUser: jest.fn(),
+      lockSession: jest.fn(),
+      unlockSession: jest.fn(),
+      reauthenticateSession: jest.fn(),
+      revokeLockedFamily: jest.fn(),
     } as unknown as jest.Mocked<SessionRepository>;
     securityEvents = {
       record: jest.fn(),
@@ -89,6 +95,13 @@ describe('AuthService', () => {
     googleIdentityVerifier = {
       verify: jest.fn(),
     } as unknown as jest.Mocked<GoogleIdentityVerifierService>;
+    prisma = {
+      client: {
+        externalAuthIdentity: {
+          findFirst: jest.fn(),
+        },
+      },
+    } as unknown as jest.Mocked<PrismaService>;
 
     service = new AuthService(
       usersRepository,
@@ -106,6 +119,7 @@ describe('AuthService', () => {
       } as unknown as AuthConfigService,
       securityEvents,
       googleIdentityVerifier,
+      prisma,
     );
   });
 
@@ -144,6 +158,7 @@ describe('AuthService', () => {
       membershipId,
       tenantId,
       sessionId,
+      securityVersion: 1,
     });
     expect(result.context).toEqual({
       membershipId,
@@ -329,7 +344,13 @@ describe('AuthService', () => {
     });
     sessionRepository.rotateSession.mockResolvedValue({
       status: 'ROTATED',
-      identity: { userId, membershipId, tenantId, sessionId: nextSessionId },
+      identity: {
+        userId,
+        membershipId,
+        tenantId,
+        sessionId: nextSessionId,
+        securityVersion: 1,
+      },
       expiresAt: new Date(),
       absoluteExpiresAt: new Date(),
     });
@@ -344,6 +365,28 @@ describe('AuthService', () => {
       refreshToken: 'next-refresh',
       expiresIn: 900,
     });
+  });
+
+  it('rejects normal refresh when the workstation session is locked', async () => {
+    tokenService.parseRefreshCredential.mockReturnValue({
+      sessionId,
+      verifier: 'v'.repeat(43),
+    });
+    tokenService.hashRefreshCredential.mockReturnValue('a'.repeat(64));
+    tokenService.issueRefreshCredential.mockReturnValue({
+      value: 'must-not-be-issued',
+      hash: 'b'.repeat(64),
+      sessionId: nextSessionId,
+    });
+
+    sessionRepository.rotateSession.mockResolvedValue({ status: 'LOCKED' });
+
+    await expect(
+      service.refresh({ refreshToken: 'locked-session-refresh' }, metadata),
+    ).rejects.toThrow(UnauthorizedException);
+
+    expect(sessionRepository.rotateSession).toHaveBeenCalled();
+    expect(tokenService.issueAccessToken).not.toHaveBeenCalled();
   });
 
   it('rejects replay after the repository revokes the session family', async () => {
@@ -366,7 +409,7 @@ describe('AuthService', () => {
   });
 
   it('scopes logout and logout-all to the authenticated identity', async () => {
-    const identity = { userId, membershipId, tenantId, sessionId, tokenId };
+    const identity = { userId, membershipId, tenantId, sessionId, tokenId, securityVersion: 1 };
     sessionRepository.revokeCurrentFamily.mockResolvedValue(1);
     sessionRepository.revokeAllForUser.mockResolvedValue(3);
 
@@ -374,6 +417,287 @@ describe('AuthService', () => {
     await expect(service.logoutAllDevices(identity)).resolves.toEqual({ revokedCount: 3 });
     expect(sessionRepository.revokeCurrentFamily).toHaveBeenCalledWith(identity, {});
     expect(sessionRepository.revokeAllForUser).toHaveBeenCalledWith(identity, {});
+  });
+
+  describe('Task 0014 workstation lock/unlock', () => {
+    const identity = { userId, membershipId, tenantId, sessionId, tokenId, securityVersion: 1 };
+
+    it('locks the workstation and records the security event', async () => {
+      (sessionRepository.lockSession as jest.Mock).mockResolvedValue({ securityVersion: 2 });
+
+      await expect(service.lock(identity, { reason: 'manual' }, metadata)).resolves.toEqual({
+        locked: true,
+      });
+      expect(sessionRepository.lockSession).toHaveBeenCalledWith(identity, 'manual', metadata);
+      expect(securityEvents.record).toHaveBeenCalledWith(
+        'session-locked',
+        expect.objectContaining({ outcome: 'success' }),
+      );
+    });
+
+    it('unlocks with a valid password and rotates to a fresh session', async () => {
+      tokenService.parseRefreshCredential.mockReturnValue({ sessionId, verifier: 'v'.repeat(43) });
+      tokenService.hashRefreshCredential.mockReturnValue('a'.repeat(64));
+      tokenService.issueRefreshCredential.mockReturnValue({
+        value: 'next-refresh',
+        hash: 'b'.repeat(64),
+        sessionId: nextSessionId,
+      });
+      usersRepository.findLoginIdentityByMembershipId.mockResolvedValue(loginIdentity);
+      passwordService.verify.mockResolvedValue(true);
+      (sessionRepository.unlockSession as jest.Mock).mockResolvedValue({
+        status: 'ROTATED',
+        identity: { userId, membershipId, tenantId, sessionId: nextSessionId, securityVersion: 2 },
+        expiresAt: new Date(),
+        absoluteExpiresAt: new Date(),
+      });
+      tokenService.issueAccessToken.mockReturnValue({
+        value: 'unlocked-access',
+        expiresIn: 900,
+        tokenId,
+      });
+
+      const result = await service.unlock(
+        identity,
+        { refreshToken: 'msr.presented', password: 'a secure passphrase' },
+        metadata,
+      );
+
+      expect(passwordService.verify).toHaveBeenCalledWith('password-hash', 'a secure passphrase');
+      expect(sessionRepository.unlockSession).toHaveBeenCalledWith(
+        expect.objectContaining({
+          currentSessionId: sessionId,
+          unlockMethod: 'PASSWORD',
+        }),
+      );
+      expect(result.accessToken).toBe('unlocked-access');
+      expect(securityEvents.record).toHaveBeenCalledWith(
+        'session-unlocked',
+        expect.objectContaining({ outcome: 'success' }),
+      );
+    });
+
+    it('rejects a wrong password and stays locked', async () => {
+      tokenService.parseRefreshCredential.mockReturnValue({ sessionId, verifier: 'v'.repeat(43) });
+      tokenService.hashRefreshCredential.mockReturnValue('a'.repeat(64));
+      tokenService.issueRefreshCredential.mockReturnValue({
+        value: 'unused',
+        hash: 'b'.repeat(64),
+        sessionId: nextSessionId,
+      });
+      usersRepository.findLoginIdentityByMembershipId.mockResolvedValue(loginIdentity);
+      passwordService.verify.mockResolvedValue(false);
+
+      await expect(
+        service.unlock(identity, { refreshToken: 'msr.presented', password: 'wrong' }, metadata),
+      ).rejects.toThrow(UnauthorizedException);
+      expect(sessionRepository.unlockSession).not.toHaveBeenCalled();
+      expect(securityEvents.record).toHaveBeenCalledWith(
+        'session-unlock-failed',
+        expect.objectContaining({ outcome: 'denied' }),
+      );
+    });
+
+    it('rejects zero credentials and multiple credentials at the boundary', async () => {
+      tokenService.parseRefreshCredential.mockReturnValue({ sessionId, verifier: 'v'.repeat(43) });
+      tokenService.hashRefreshCredential.mockReturnValue('a'.repeat(64));
+      tokenService.issueRefreshCredential.mockReturnValue({
+        value: 'unused',
+        hash: 'b'.repeat(64),
+        sessionId: nextSessionId,
+      });
+
+      await expect(
+        service.unlock(identity, { refreshToken: 'msr.presented' }, metadata),
+      ).rejects.toThrow(UnauthorizedException);
+      await expect(
+        service.unlock(
+          identity,
+          { refreshToken: 'msr.presented', password: 'a secure passphrase', googleIdToken: 'g' },
+          metadata,
+        ),
+      ).rejects.toThrow(UnauthorizedException);
+      expect(sessionRepository.unlockSession).not.toHaveBeenCalled();
+    });
+
+    it('fails closed when Google verification rejects the unlock proof', async () => {
+      tokenService.parseRefreshCredential.mockReturnValue({ sessionId, verifier: 'v'.repeat(43) });
+      tokenService.hashRefreshCredential.mockReturnValue('a'.repeat(64));
+      tokenService.issueRefreshCredential.mockReturnValue({
+        value: 'unused',
+        hash: 'b'.repeat(64),
+        sessionId: nextSessionId,
+      });
+      googleIdentityVerifier.verify.mockRejectedValue(
+        new UnauthorizedException('Invalid Google identity'),
+      );
+
+      await expect(
+        service.unlock(identity, { refreshToken: 'msr.presented', googleIdToken: 'bad' }, metadata),
+      ).rejects.toThrow(UnauthorizedException);
+      expect(sessionRepository.unlockSession).not.toHaveBeenCalled();
+    });
+
+    it('unlocks with a verified Google identity linked to the same user', async () => {
+      tokenService.parseRefreshCredential.mockReturnValue({ sessionId, verifier: 'v'.repeat(43) });
+      tokenService.hashRefreshCredential.mockReturnValue('a'.repeat(64));
+      tokenService.issueRefreshCredential.mockReturnValue({
+        value: 'next-refresh',
+        hash: 'b'.repeat(64),
+        sessionId: nextSessionId,
+      });
+      usersRepository.findLoginIdentityByMembershipId.mockResolvedValue(loginIdentity);
+      googleIdentityVerifier.verify.mockResolvedValue({
+        subject: 'google-subject-123',
+        email: loginDto.email,
+        emailVerified: true,
+      });
+      (prisma.client.externalAuthIdentity.findFirst as jest.Mock).mockResolvedValue({ id: 'x' });
+      (sessionRepository.unlockSession as jest.Mock).mockResolvedValue({
+        status: 'ROTATED',
+        identity: { userId, membershipId, tenantId, sessionId: nextSessionId, securityVersion: 2 },
+        expiresAt: new Date(),
+        absoluteExpiresAt: new Date(),
+      });
+      tokenService.issueAccessToken.mockReturnValue({
+        value: 'google-unlocked-access',
+        expiresIn: 900,
+        tokenId,
+      });
+
+      const result = await service.unlock(
+        identity,
+        { refreshToken: 'msr.presented', googleIdToken: 'valid-google' },
+        metadata,
+      );
+
+      expect(googleIdentityVerifier.verify).toHaveBeenCalledWith('valid-google');
+      expect(sessionRepository.unlockSession).toHaveBeenCalledWith(
+        expect.objectContaining({ unlockMethod: 'GOOGLE' }),
+      );
+      expect(result.accessToken).toBe('google-unlocked-access');
+    });
+
+    it('rejects a Google identity that is not linked to the same user', async () => {
+      tokenService.parseRefreshCredential.mockReturnValue({ sessionId, verifier: 'v'.repeat(43) });
+      tokenService.hashRefreshCredential.mockReturnValue('a'.repeat(64));
+      tokenService.issueRefreshCredential.mockReturnValue({
+        value: 'unused',
+        hash: 'b'.repeat(64),
+        sessionId: nextSessionId,
+      });
+      usersRepository.findLoginIdentityByMembershipId.mockResolvedValue(loginIdentity);
+      googleIdentityVerifier.verify.mockResolvedValue({
+        subject: 'attacker-subject',
+        email: 'attacker@example.com',
+        emailVerified: true,
+      });
+      (prisma.client.externalAuthIdentity.findFirst as jest.Mock).mockResolvedValue(null);
+
+      await expect(
+        service.unlock(
+          identity,
+          { refreshToken: 'msr.presented', googleIdToken: 'other' },
+          metadata,
+        ),
+      ).rejects.toThrow(UnauthorizedException);
+      expect(sessionRepository.unlockSession).not.toHaveBeenCalled();
+    });
+
+    it('re-authenticates an active session with the same user password', async () => {
+      usersRepository.findLoginIdentityByMembershipId.mockResolvedValue(loginIdentity);
+      passwordService.verify.mockResolvedValue(true);
+      (sessionRepository.reauthenticateSession as jest.Mock).mockResolvedValue({
+        recentAuthenticatedAt: new Date('2026-09-02T08:00:00.000Z'),
+      });
+
+      const result = await service.reauthenticate(
+        identity,
+        { password: 'correct-password-123' },
+        metadata,
+      );
+
+      expect(sessionRepository.reauthenticateSession).toHaveBeenCalledWith(
+        identity,
+        'PASSWORD',
+        metadata,
+      );
+      expect(result).toEqual({
+        reauthenticated: true,
+        recentAuthenticatedAt: new Date('2026-09-02T08:00:00.000Z'),
+      });
+    });
+
+    it('re-authenticates an active session with the same linked Google identity', async () => {
+      usersRepository.findLoginIdentityByMembershipId.mockResolvedValue(loginIdentity);
+      googleIdentityVerifier.verify.mockResolvedValue({
+        subject: 'google-subject-123',
+        email: loginDto.email,
+        emailVerified: true,
+      });
+      (prisma.client.externalAuthIdentity.findFirst as jest.Mock).mockResolvedValue({ id: 'x' });
+      (sessionRepository.reauthenticateSession as jest.Mock).mockResolvedValue({
+        recentAuthenticatedAt: new Date('2026-09-02T08:01:00.000Z'),
+      });
+
+      await expect(
+        service.reauthenticate(identity, { googleIdToken: 'valid-google' }, metadata),
+      ).resolves.toMatchObject({ reauthenticated: true });
+
+      expect(sessionRepository.reauthenticateSession).toHaveBeenCalledWith(
+        identity,
+        'GOOGLE',
+        metadata,
+      );
+    });
+
+    it('rejects failed re-authentication without advancing recent-auth state', async () => {
+      usersRepository.findLoginIdentityByMembershipId.mockResolvedValue(loginIdentity);
+      passwordService.verify.mockResolvedValue(false);
+
+      await expect(
+        service.reauthenticate(identity, { password: 'wrong-password-123' }, metadata),
+      ).rejects.toThrow(UnauthorizedException);
+
+      expect(sessionRepository.reauthenticateSession).not.toHaveBeenCalled();
+    });
+
+    it('revokes the locked family on locked logout', async () => {
+      (sessionRepository.revokeLockedFamily as jest.Mock).mockResolvedValue(2);
+
+      const result = await service.logoutLocked(identity, metadata);
+
+      expect(result).toEqual({ message: 'Logged out successfully', revokedCount: 2 });
+      expect(sessionRepository.revokeLockedFamily).toHaveBeenCalledWith(
+        identity,
+        metadata,
+        'authentication.session.logout.locked',
+      );
+      expect(securityEvents.record).toHaveBeenCalledWith(
+        'logout-locked',
+        expect.objectContaining({ outcome: 'success' }),
+      );
+    });
+
+    it('ends the old session on switch-user', async () => {
+      (sessionRepository.revokeLockedFamily as jest.Mock).mockResolvedValue(1);
+
+      const result = await service.switchUser(identity, metadata);
+
+      expect(result).toEqual({
+        message: 'Session ended. Sign in as the next operator.',
+        revokedCount: 1,
+      });
+      expect(sessionRepository.revokeLockedFamily).toHaveBeenCalledWith(
+        identity,
+        metadata,
+        'authentication.session.switched',
+      );
+      expect(securityEvents.record).toHaveBeenCalledWith(
+        'switch-user',
+        expect.objectContaining({ outcome: 'success' }),
+      );
+    });
   });
 
   describe('identifyLogin (Task 0010 slug-free login, step 1)', () => {

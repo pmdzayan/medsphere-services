@@ -26,6 +26,7 @@ infrastructure('G3.18 PostgreSQL assigned-provider expiry worklist', () => {
     tenantId,
     sessionId: randomUUID(),
     tokenId: randomUUID(),
+    securityVersion: 1,
   };
   const unassignedIdentity: AuthenticatedIdentity = {
     userId: unassignedUserId,
@@ -33,6 +34,7 @@ infrastructure('G3.18 PostgreSQL assigned-provider expiry worklist', () => {
     tenantId,
     sessionId: randomUUID(),
     tokenId: randomUUID(),
+    securityVersion: 1,
   };
 
   beforeAll(async () => {

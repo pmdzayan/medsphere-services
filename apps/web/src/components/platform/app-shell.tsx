@@ -3,8 +3,14 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
+import { GoogleCredentialButton } from '@/components/auth/google-credential-button';
 import { useLanguage } from '@/components/language-provider';
 import type { TranslationKey } from '@/lib/i18n';
+import {
+  isWorkstationSessionState,
+  type WorkstationSessionState,
+  type WorkstationUnlockRequest,
+} from '@/lib/auth-contract';
 import type { SessionProfile } from '@/lib/session-profile';
 import { PlatformBrand } from './brand';
 import { Icon, type IconName } from './icon';
@@ -26,18 +32,37 @@ const organizationNavigation: NavigationItem[] = [
 export function AppShell({
   children,
   session,
-}: Readonly<{ children: React.ReactNode; session: SessionProfile }>) {
+  initialWorkstationState,
+}: Readonly<{
+  children: React.ReactNode;
+  session: SessionProfile;
+  initialWorkstationState: WorkstationSessionState;
+}>) {
   const pathname = usePathname();
   const { t } = useLanguage();
   const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
+  const [workstationState, setWorkstationState] = useState(initialWorkstationState);
+  const [lockingWorkstation, setLockingWorkstation] = useState(false);
+  const [workstationError, setWorkstationError] = useState<string | null>(null);
+  const [unlockPassword, setUnlockPassword] = useState('');
+  const [unlockingWorkstation, setUnlockingWorkstation] = useState(false);
+  const [switchingUser, setSwitchingUser] = useState(false);
+  const [lockedSigningOut, setLockedSigningOut] = useState(false);
   const mobileNavCloseRef = useRef<HTMLButtonElement>(null);
   const mobileNavTriggerRef = useRef<HTMLButtonElement>(null);
   const accountMenuRef = useRef<HTMLDivElement>(null);
   const accountMenuTriggerRef = useRef<HTMLButtonElement>(null);
+  const workstationUnlockInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => setMobileNavigationOpen(false), [pathname]);
+
+  useEffect(() => {
+    if (workstationState.locked) {
+      workstationUnlockInputRef.current?.focus();
+    }
+  }, [workstationState.locked]);
 
   const mobileNavWasOpenRef = useRef(false);
   useEffect(() => {
@@ -72,6 +97,255 @@ export function AppShell({
     document.addEventListener('pointerdown', handlePointerDown);
     return () => document.removeEventListener('pointerdown', handlePointerDown);
   }, [accountMenuOpen]);
+
+  async function lockWorkstation(): Promise<void> {
+    setAccountMenuOpen(false);
+    setWorkstationError(null);
+    setLockingWorkstation(true);
+
+    // Hide protected content immediately. If the network result is uncertain,
+    // remain fail-closed until server state is verified again.
+    setWorkstationState((current) => ({
+      ...current,
+      locked: true,
+      lockedAt: current.lockedAt ?? new Date().toISOString(),
+    }));
+
+    try {
+      const response = await fetch('/api/auth/lock', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ reason: 'manual' }),
+      });
+
+      if (!response.ok) {
+        setWorkstationError(t('shell.lockFailed'));
+
+        // The lock result is uncertain. Remain fail-closed unless the
+        // server-authoritative session state explicitly proves ACTIVE/unlocked.
+        const stateResponse = await fetch('/api/auth/session-state', {
+          method: 'POST',
+        });
+
+        if (stateResponse.ok) {
+          const state: unknown = await stateResponse.json();
+          if (isWorkstationSessionState(state) && !state.locked) {
+            setWorkstationState(state);
+            setWorkstationError(null);
+          }
+        }
+
+        return;
+      }
+
+      const stateResponse = await fetch('/api/auth/session-state', {
+        method: 'POST',
+      });
+
+      if (stateResponse.ok) {
+        const state: unknown = await stateResponse.json();
+        if (isWorkstationSessionState(state) && state.locked) {
+          setWorkstationState(state);
+        }
+      }
+    } catch {
+      setWorkstationError(t('shell.lockFailed'));
+    } finally {
+      setLockingWorkstation(false);
+    }
+  }
+
+  async function unlockWithCredential(credential: WorkstationUnlockRequest): Promise<void> {
+    setWorkstationError(null);
+    setUnlockingWorkstation(true);
+
+    try {
+      const response = await fetch('/api/auth/unlock', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(credential),
+      });
+
+      if (!response.ok) {
+        setWorkstationError(t('shell.unlockFailed'));
+        return;
+      }
+
+      // Never restore protected content from the unlock response alone.
+      // The rotated session must independently verify ACTIVE + unlocked.
+      const stateResponse = await fetch('/api/auth/session-state', {
+        method: 'POST',
+      });
+
+      if (!stateResponse.ok) {
+        setWorkstationError(t('shell.unlockFailed'));
+        return;
+      }
+
+      const state: unknown = await stateResponse.json();
+      if (!isWorkstationSessionState(state) || state.locked) {
+        setWorkstationError(t('shell.unlockFailed'));
+        return;
+      }
+
+      setUnlockPassword('');
+      setWorkstationState(state);
+    } catch {
+      setWorkstationError(t('shell.unlockFailed'));
+    } finally {
+      setUnlockingWorkstation(false);
+    }
+  }
+
+  async function unlockWithPassword(event: React.FormEvent<HTMLFormElement>): Promise<void> {
+    event.preventDefault();
+
+    if (unlockPassword.length < 15 || unlockPassword.length > 128) {
+      setWorkstationError(t('shell.unlockFailed'));
+      return;
+    }
+
+    await unlockWithCredential({ password: unlockPassword });
+  }
+
+  async function unlockWithGoogleCredential(credential?: string): Promise<void> {
+    if (!credential) {
+      setWorkstationError(t('auth.googleCredentialInvalid'));
+      return;
+    }
+
+    await unlockWithCredential({ googleIdToken: credential });
+  }
+
+  async function leaveLockedSession(
+    endpoint: '/api/auth/logout-locked' | '/api/auth/switch-user',
+    mode: 'logout' | 'switch',
+  ): Promise<void> {
+    setWorkstationError(null);
+
+    if (mode === 'switch') setSwitchingUser(true);
+    else setLockedSigningOut(true);
+
+    try {
+      const response = await fetch(endpoint, { method: 'POST' });
+
+      if (!response.ok) {
+        setWorkstationError(
+          mode === 'switch' ? t('shell.switchUserFailed') : t('shell.lockedSignOutFailed'),
+        );
+        return;
+      }
+
+      window.location.assign('/login');
+    } catch {
+      setWorkstationError(
+        mode === 'switch' ? t('shell.switchUserFailed') : t('shell.lockedSignOutFailed'),
+      );
+    } finally {
+      if (mode === 'switch') setSwitchingUser(false);
+      else setLockedSigningOut(false);
+    }
+  }
+
+  if (workstationState.locked) {
+    const busy = lockingWorkstation || unlockingWorkstation || switchingUser || lockedSigningOut;
+
+    return (
+      <main className="grid min-h-screen place-items-center bg-[#f3f6f3] px-5 py-10 text-[#12231e]">
+        <section
+          className="w-full max-w-md rounded-[2rem] border border-[#102c24]/10 bg-white p-6 shadow-[0_28px_80px_rgba(7,35,28,.12)] sm:p-8"
+          aria-labelledby="workstation-lock-title"
+          aria-busy={busy}
+        >
+          <div className="flex justify-center">
+            <PlatformBrand />
+          </div>
+
+          <div className="mt-8 text-center">
+            <span className="mx-auto grid size-12 place-items-center rounded-2xl bg-emerald-50 text-emerald-800">
+              <Icon name="shield" className="size-5" />
+            </span>
+            <h1
+              id="workstation-lock-title"
+              className="mt-4 text-2xl font-black tracking-[-0.03em] text-[#102c24]"
+            >
+              {t('shell.workstationLocked')}
+            </h1>
+            <p className="mt-2 text-sm leading-6 text-[#65766f]">
+              {t('shell.workstationLockedDescription')}
+            </p>
+          </div>
+
+          <form className="mt-7 space-y-4" onSubmit={(event) => void unlockWithPassword(event)}>
+            <div>
+              <label
+                htmlFor="workstation-unlock-password"
+                className="mb-2 block text-xs font-bold text-[#29483f]"
+              >
+                {t('shell.password')}
+              </label>
+              <input
+                ref={workstationUnlockInputRef}
+                id="workstation-unlock-password"
+                type="password"
+                autoComplete="current-password"
+                minLength={15}
+                maxLength={128}
+                required
+                disabled={busy}
+                value={unlockPassword}
+                onChange={(event) => setUnlockPassword(event.target.value)}
+                className="h-12 w-full rounded-xl border border-[#173b31]/15 bg-white px-4 text-sm outline-none transition focus:border-emerald-600 focus:ring-4 focus:ring-emerald-600/10 disabled:opacity-60"
+              />
+            </div>
+
+            {workstationError ? (
+              <p
+                role="alert"
+                className="rounded-xl bg-rose-50 px-3 py-2.5 text-xs font-semibold text-rose-700"
+              >
+                {workstationError}
+              </p>
+            ) : null}
+
+            <button
+              type="submit"
+              disabled={busy || unlockPassword.length < 15}
+              className="h-12 w-full rounded-xl bg-[#0b342b] px-4 text-sm font-bold text-white transition hover:bg-[#10483c] disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {unlockingWorkstation
+                ? t('shell.unlockingWorkstation')
+                : t('shell.unlockWorkstation')}
+            </button>
+          </form>
+
+          <div className="mt-5">
+            <GoogleCredentialButton pending={busy} onCredential={unlockWithGoogleCredential} />
+          </div>
+
+          <div className="mt-5 grid grid-cols-2 gap-3 border-t border-[#102c24]/10 pt-5">
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void leaveLockedSession('/api/auth/switch-user', 'switch')}
+              className="rounded-xl border border-[#173b31]/15 px-3 py-3 text-xs font-bold text-[#21433a] transition hover:bg-[#f3f6f3] disabled:opacity-50"
+            >
+              {switchingUser ? t('shell.switchingUser') : t('shell.switchUser')}
+            </button>
+
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void leaveLockedSession('/api/auth/logout-locked', 'logout')}
+              className="rounded-xl border border-rose-200 px-3 py-3 text-xs font-bold text-rose-700 transition hover:bg-rose-50 disabled:opacity-50"
+            >
+              {lockedSigningOut ? t('shell.signingOut') : t('shell.lockedSignOut')}
+            </button>
+          </div>
+        </section>
+      </main>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#f3f6f3] text-[#12231e]">
@@ -187,6 +461,16 @@ export function AppShell({
                         {session.context.tenantName}
                       </p>
                     </div>
+                    <button
+                      type="button"
+                      disabled={lockingWorkstation || signingOut}
+                      onClick={() => void lockWorkstation()}
+                      className="mt-1 w-full rounded-xl px-3 py-2.5 text-left text-xs font-bold text-[#17352c] transition hover:bg-emerald-50 disabled:opacity-60"
+                    >
+                      {lockingWorkstation
+                        ? t('shell.lockingWorkstation')
+                        : t('shell.lockWorkstation')}
+                    </button>
                     <button
                       type="button"
                       disabled={signingOut}

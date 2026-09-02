@@ -8,6 +8,7 @@ describe('createAuthConfigFixture', () => {
     const parsed = parseAuthEnvironment(environment);
 
     expect(parsed.accessTokenTtlSeconds).toBe(900);
+    expect(parsed.recentAuthTtlSeconds).toBe(300);
     expect(parsed.refreshIdleTtlSeconds).toBe(604800);
     expect(parsed.refreshAbsoluteTtlSeconds).toBe(2592000);
     expect(parsed.refreshTokenPepper).toHaveLength(32);
@@ -22,6 +23,22 @@ describe('createAuthConfigFixture', () => {
 
     expect(environment.AUTH_ACCESS_TOKEN_TTL_SECONDS).toBe('300');
     expect(process.env).toEqual(originalEnvironment);
+  });
+
+  it('requires a bounded recent-authentication TTL', () => {
+    const tooShort = createAuthConfigFixture({
+      AUTH_RECENT_AUTH_TTL_SECONDS: '30',
+    });
+    const tooLong = createAuthConfigFixture({
+      AUTH_RECENT_AUTH_TTL_SECONDS: '7200',
+    });
+
+    expect(() => parseAuthEnvironment(tooShort)).toThrow(
+      'AUTH_RECENT_AUTH_TTL_SECONDS must be between 60 and 3600',
+    );
+    expect(() => parseAuthEnvironment(tooLong)).toThrow(
+      'AUTH_RECENT_AUTH_TTL_SECONDS must be between 60 and 3600',
+    );
   });
 
   it('fails closed when required asymmetric key material is absent', () => {

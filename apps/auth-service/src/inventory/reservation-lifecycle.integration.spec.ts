@@ -29,6 +29,7 @@ describeReservationInfrastructure('G3.3 PostgreSQL reservation lifecycle integri
     tenantId,
     sessionId: randomUUID(),
     tokenId: randomUUID(),
+    securityVersion: 1,
   };
   const unassignedIdentity: AuthenticatedIdentity = {
     userId: unassignedUserId,
@@ -36,6 +37,7 @@ describeReservationInfrastructure('G3.3 PostgreSQL reservation lifecycle integri
     tenantId,
     sessionId: randomUUID(),
     tokenId: randomUUID(),
+    securityVersion: 1,
   };
 
   beforeAll(async () => {

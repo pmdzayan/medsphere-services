@@ -55,6 +55,7 @@
 | `AUTH_ACCESS_TOKEN_TTL_SECONDS`     | 60–3600                                                 |
 | `AUTH_REFRESH_IDLE_TTL_SECONDS`     | 300–2,592,000 and not shorter than access TTL           |
 | `AUTH_REFRESH_ABSOLUTE_TTL_SECONDS` | 3,600–15,552,000 and not shorter than idle TTL          |
+| `AUTH_RECENT_AUTH_TTL_SECONDS`      | 60–3,600                                                |
 | `AUTH_REFRESH_TOKEN_PEPPER`         | At least 32 random bytes in padded base64               |
 | `AUTH_ARGON2_MEMORY_KIB`            | 19,456–262,144                                          |
 | `AUTH_ARGON2_TIME_COST`             | 2–10                                                    |

@@ -23,6 +23,7 @@ infrastructure('G3.9 PostgreSQL completed damaged-stock integrity', () => {
     membershipId,
     sessionId: randomUUID(),
     tokenId: randomUUID(),
+    securityVersion: 1,
   };
 
   beforeAll(async () => {

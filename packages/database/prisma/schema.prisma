@@ -636,6 +636,23 @@ model UserSession {
 
   status SessionStatus @default(ACTIVE)
 
+  /// Task 0014: workstation-lock state. When lockedAt is non-null the
+  /// session is locked and protected actions must not execute through it.
+  /// securityVersion increments on every lock so access tokens issued
+  /// before the lock are invalidated (fail-closed). Unlock rotates the
+  /// session and issues a fresh access token carrying the new version.
+  lockedAt        DateTime?
+  lockReason      String?   @db.VarChar(120)
+  unlockedAt            DateTime?
+  unlockMethod          String?   @db.VarChar(40)
+  securityVersion       Int       @default(1)
+
+  /// Task 0014: server-authoritative time of the most recent real
+  /// credential proof. Normal refresh must carry this value forward
+  /// unchanged; login, successful unlock, or explicit re-authentication
+  /// may advance it.
+  recentAuthenticatedAt DateTime?
+
   replacedById String?      @unique @db.Uuid
   replacedBy   UserSession? @relation("SessionRotation", fields: [replacedById], references: [id], onDelete: SetNull)
   replaces     UserSession? @relation("SessionRotation")
@@ -657,6 +674,7 @@ model UserSession {
   @@index([userId, status])
   @@index([tenantId, status])
   @@index([familyId, createdAt])
+  @@index([status, lockedAt])
 }
 
 model UserSessionRefreshCredential {

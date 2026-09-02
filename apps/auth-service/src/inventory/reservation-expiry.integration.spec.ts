@@ -33,6 +33,7 @@ describeExpiryInfrastructure('G3.7 PostgreSQL reservation expiry integrity', () 
     tenantId,
     sessionId: randomUUID(),
     tokenId: randomUUID(),
+    securityVersion: 1,
   };
 
   beforeAll(async () => {

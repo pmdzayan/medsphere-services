@@ -6,6 +6,8 @@ export interface AccessTokenIdentity {
   readonly membershipId: string;
   readonly tenantId: string;
   readonly sessionId: string;
+  /** Task 0014: increments on every workstation lock so pre-lock access tokens fail closed. */
+  readonly securityVersion: number;
 }
 
 export interface AccessTokenClaims {
@@ -13,6 +15,7 @@ export interface AccessTokenClaims {
   readonly mid: string;
   readonly tid: string;
   readonly sid: string;
+  readonly sv: number;
   readonly jti: string;
   readonly tokenUse: typeof ACCESS_TOKEN_USE;
   readonly iss?: string;

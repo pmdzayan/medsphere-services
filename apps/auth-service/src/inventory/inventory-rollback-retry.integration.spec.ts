@@ -21,6 +21,7 @@ infrastructure('Post-audit CG-CONC-02 rollback then same-key retry integrity', (
     membershipId,
     sessionId: randomUUID(),
     tokenId: randomUUID(),
+    securityVersion: 1,
   };
   const service = new InventoryDamageService(prisma, new AuditWriter(), new InventoryEventWriter());
 

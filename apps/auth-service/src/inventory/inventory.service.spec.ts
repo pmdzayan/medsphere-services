@@ -12,6 +12,7 @@ describe('InventoryService', () => {
     tenantId: randomUUID(),
     sessionId: randomUUID(),
     tokenId: randomUUID(),
+    securityVersion: 1,
   };
   let repository: jest.Mocked<InventoryRepository>;
   let service: InventoryService;

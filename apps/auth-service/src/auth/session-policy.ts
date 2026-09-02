@@ -16,6 +16,7 @@ export type UserStatusValue = 'ACTIVE' | 'INACTIVE' | 'SUSPENDED' | 'PENDING_VER
 export interface SessionPolicyContext {
   readonly sessionStatus: SessionStatusValue;
   readonly sessionRevokedAt: Date | null;
+  readonly sessionLockedAt: Date | null;
   readonly expiresAt: Date;
   readonly absoluteExpiresAt: Date;
   readonly credentialState: PresentedCredentialState;
@@ -35,7 +36,8 @@ export type RotationDecision =
   | { readonly outcome: 'INVALID' }
   | { readonly outcome: 'EXPIRED' }
   | { readonly outcome: 'REVOKED' }
-  | { readonly outcome: 'IDENTITY_DISABLED' };
+  | { readonly outcome: 'IDENTITY_DISABLED' }
+  | { readonly outcome: 'LOCKED' };
 
 /**
  * Security policy:
@@ -59,6 +61,12 @@ export function decideRotation(context: SessionPolicyContext): RotationDecision 
     context.sessionRevokedAt !== null
   ) {
     return { outcome: 'REVOKED' };
+  }
+
+  // Task 0014: a locked session must not be refreshable through the normal
+  // refresh path. Only the dedicated unlock endpoint may rotate it.
+  if (context.sessionLockedAt !== null) {
+    return { outcome: 'LOCKED' };
   }
 
   if (context.credentialState === 'USED') {

@@ -44,6 +44,7 @@ infra('Batch 2 Task 1 cross-tenant and unauthorized transfer rejection', () => {
     membershipId: membershipAId,
     sessionId: randomUUID(),
     tokenId: randomUUID(),
+    securityVersion: 1,
   };
   const actorBNoAccess: AuthenticatedIdentity = {
     tenantId: tenantBId,
@@ -51,6 +52,7 @@ infra('Batch 2 Task 1 cross-tenant and unauthorized transfer rejection', () => {
     membershipId: membershipBId,
     sessionId: randomUUID(),
     tokenId: randomUUID(),
+    securityVersion: 1,
   };
 
   function providerFixture(id: string, tenantId: string, name: string) {

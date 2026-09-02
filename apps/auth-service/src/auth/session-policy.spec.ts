@@ -5,6 +5,7 @@ function baseContext(overrides: Partial<SessionPolicyContext> = {}): SessionPoli
   return {
     sessionStatus: 'ACTIVE',
     sessionRevokedAt: null,
+    sessionLockedAt: null,
     expiresAt: new Date(now.getTime() + 60 * 60 * 1000),
     absoluteExpiresAt: new Date(now.getTime() + 24 * 60 * 60 * 1000),
     credentialState: 'ACTIVE',
@@ -122,5 +123,22 @@ describe('decideRotation', () => {
     expect(decideRotation(baseContext({ sessionStatus: 'ROTATED' }))).toEqual({
       outcome: 'INVALID',
     });
+  });
+
+  it('returns LOCKED for a locked session even with an active credential', () => {
+    expect(
+      decideRotation(baseContext({ sessionLockedAt: new Date('2026-08-03T11:00:00.000Z') })),
+    ).toEqual({ outcome: 'LOCKED' });
+  });
+
+  it('returns LOCKED before replay detection so a locked session cannot be rotated normally', () => {
+    expect(
+      decideRotation(
+        baseContext({
+          sessionLockedAt: new Date('2026-08-03T11:00:00.000Z'),
+          credentialState: 'USED',
+        }),
+      ),
+    ).toEqual({ outcome: 'LOCKED' });
   });
 });

@@ -42,6 +42,7 @@ describeAuthorizationInfra('S0.4 PostgreSQL authorization and durable-audit inte
     tenantId: tenantAId,
     sessionId: randomUUID(),
     tokenId: randomUUID(),
+    securityVersion: 1,
   };
   const identityB: AuthenticatedIdentity = {
     userId: sharedUserId,
@@ -49,6 +50,7 @@ describeAuthorizationInfra('S0.4 PostgreSQL authorization and durable-audit inte
     tenantId: tenantBId,
     sessionId: randomUUID(),
     tokenId: randomUUID(),
+    securityVersion: 1,
   };
   const identityA2: AuthenticatedIdentity = {
     userId: secondAdministratorUserId,
@@ -56,6 +58,7 @@ describeAuthorizationInfra('S0.4 PostgreSQL authorization and durable-audit inte
     tenantId: tenantAId,
     sessionId: randomUUID(),
     tokenId: randomUUID(),
+    securityVersion: 1,
   };
 
   beforeAll(async () => {

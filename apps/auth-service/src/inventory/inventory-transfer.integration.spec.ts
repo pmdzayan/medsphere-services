@@ -22,6 +22,7 @@ infra('G3.8 PostgreSQL completed transfer integrity', () => {
     membershipId,
     sessionId: randomUUID(),
     tokenId: randomUUID(),
+    securityVersion: 1,
   };
   beforeAll(async () => {
     await prisma.client.tenant.create({

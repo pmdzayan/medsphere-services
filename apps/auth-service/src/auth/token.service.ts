@@ -35,6 +35,7 @@ export class TokenService {
       mid: identity.membershipId,
       tid: identity.tenantId,
       sid: identity.sessionId,
+      sv: identity.securityVersion,
       jti: tokenId,
       tokenUse: ACCESS_TOKEN_USE,
     };
