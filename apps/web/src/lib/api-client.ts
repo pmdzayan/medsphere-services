@@ -21,6 +21,7 @@ import type {
 import type {
   AuthorizationCatalogue,
   CreateRoleRequest,
+  Membership,
   MembershipCatalogue,
   Role,
   UpdateRoleRequest,
@@ -239,6 +240,20 @@ export async function verifyPhoneOtp(
 
 export async function getAuthorizationCatalogue(): Promise<AuthorizationCatalogue> {
   return requestJson<AuthorizationCatalogue>('/api/authorization/catalogue');
+}
+
+export async function updateMembershipStatus(
+  membershipId: string,
+  status: 'SUSPENDED' | 'REVOKED',
+): Promise<Membership> {
+  return requestJson<Membership>(
+    `/api/authorization/memberships/${encodeURIComponent(membershipId)}/status`,
+    {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ status }),
+    },
+  );
 }
 
 export async function getAuditEvents(filters: AuditEventFilters = {}): Promise<AuditEventPage> {
