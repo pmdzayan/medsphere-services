@@ -14,6 +14,7 @@ import { AuthorizationRepository } from './authorization.repository';
 import { AuthorizationListQueryDto } from './dto/authorization-list-query.dto';
 import { CreateRoleDto } from './dto/create-role.dto';
 import { UpdateRoleDto } from './dto/update-role.dto';
+import { UpdateMembershipStatusDto } from './dto/update-membership-status.dto';
 import {
   AssignmentResponseDto,
   EffectivePermissionsResponseDto,
@@ -555,5 +556,99 @@ export class AuthorizationService {
       permissionKeys: role.rolePermissions.map((mapping) => mapping.permission.name),
       assignmentCount: role._count.roleAssignments,
     };
+  }
+
+  async updateMembershipStatus(
+    identity: AuthenticatedIdentity,
+    membershipId: string,
+    dto: UpdateMembershipStatusDto,
+    request: RequestMetadata = {},
+  ) {
+    if (membershipId === identity.membershipId) {
+      throw new ForbiddenException('Self-suspension or self-revocation is not permitted');
+    }
+
+    return withSerializableRetry(this.repository.transactionClient, async (transaction) => {
+      await this.repository.bumpTenantVersion(transaction, identity.tenantId);
+
+      const targetMembership = await this.repository.findMembership(
+        transaction,
+        identity.tenantId,
+        membershipId,
+        false,
+      );
+
+      if (!targetMembership) {
+        throw new NotFoundException('Membership not found');
+      }
+
+      if (targetMembership.status !== 'ACTIVE') {
+        throw new ConflictException('Only active memberships can be suspended or revoked');
+      }
+
+      const isTenantAdmin = targetMembership.roleAssignments.some(
+        (assignment) =>
+          assignment.role.type === 'SYSTEM' && assignment.role.name === TENANT_ADMINISTRATOR_ROLE,
+      );
+
+      if (isTenantAdmin) {
+        const activeAdminCount = await this.repository.countActiveTenantAdministrators(
+          transaction,
+          identity.tenantId,
+        );
+        if (activeAdminCount <= 1) {
+          throw new ConflictException(
+            'The last active tenant administrator cannot be suspended or revoked',
+          );
+        }
+      }
+
+      await this.repository.updateMembershipStatusAndRevokeSessions(
+        transaction,
+        identity.tenantId,
+        membershipId,
+        dto.status,
+      );
+
+      const eventType =
+        dto.status === 'SUSPENDED'
+          ? 'authorization.membership.suspended'
+          : 'authorization.membership.revoked';
+
+      await this.auditWriter.appendTenantUser(transaction, {
+        tenantId: identity.tenantId,
+        actorMembershipId: identity.membershipId,
+        eventType,
+        outcome: 'SUCCEEDED',
+        resourceType: 'tenant-membership',
+        resourceId: membershipId,
+        metadata: {
+          targetMembershipId: membershipId,
+          previousStatus: 'ACTIVE',
+          resultingStatus: dto.status,
+        },
+        request,
+      });
+
+      const updated = await this.repository.findMembership(
+        transaction,
+        identity.tenantId,
+        membershipId,
+        false,
+      );
+      if (!updated) {
+        throw new Error('Updated membership was not readable inside its transaction');
+      }
+
+      return {
+        id: updated.id,
+        userId: updated.userId,
+        email: updated.user.email,
+        firstName: updated.user.firstName,
+        lastName: updated.user.lastName,
+        status: updated.status,
+        roles: updated.roleAssignments.map(({ role }) => role),
+      };
+    });
   }
 }
