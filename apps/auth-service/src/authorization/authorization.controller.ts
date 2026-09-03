@@ -41,6 +41,7 @@ import {
 } from './dto/authorization-response.dto';
 import { CreateRoleDto } from './dto/create-role.dto';
 import { UpdateRoleDto } from './dto/update-role.dto';
+import { UpdateMembershipStatusDto } from './dto/update-membership-status.dto';
 import { parseRequiredVersion } from './if-match';
 import { PERMISSIONS } from './permission.constants';
 import { PermissionsGuard } from './permissions.guard';
@@ -246,6 +247,29 @@ export class AuthorizationController {
       identity,
       membershipId,
       providerId,
+      extractRequestMetadata(request),
+    );
+  }
+
+  @Patch('memberships/:membershipId/status')
+  @RequirePermissions(PERMISSIONS.membershipsManage)
+  @ApiOperation({
+    summary: 'Suspend or revoke a staff membership and immediately invalidate its sessions',
+  })
+  @ApiOkResponse({ description: 'Membership status updated successfully' })
+  @ApiConflictResponse({
+    description: 'Target membership is not active, or is the last active tenant administrator',
+  })
+  updateMembershipStatus(
+    @CurrentIdentity() identity: AuthenticatedIdentity,
+    @Param('membershipId', uuid) membershipId: string,
+    @Body() dto: UpdateMembershipStatusDto,
+    @Req() request: MetadataHttpRequest,
+  ) {
+    return this.authorizationService.updateMembershipStatus(
+      identity,
+      membershipId,
+      dto,
       extractRequestMetadata(request),
     );
   }

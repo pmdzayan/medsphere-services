@@ -9,6 +9,7 @@ export const PERMISSIONS = {
   providerAccessRead: 'authorization.provider-access.read',
   providerAccessManage: 'authorization.provider-access.manage',
   organizationJoinCodesManage: 'organization.join-codes.manage',
+  membershipsManage: 'authorization.memberships.manage',
   auditEventsRead: 'audit.events.read',
   inventoryStockRead: 'inventory.stock.read',
   inventoryListingsManage: 'inventory.listings.manage',

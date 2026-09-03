@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { ConflictException, Injectable } from '@nestjs/common';
 import { Prisma } from '@medsphere/database';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthenticatedIdentity } from '../auth/auth.types';
@@ -14,6 +14,8 @@ type AuthorizationDatabase = Pick<
   | 'rolePermission'
   | 'tenant'
   | 'tenantMembership'
+  | 'userSession'
+  | 'userSessionRefreshCredential'
 >;
 
 const roleInclude = {
@@ -198,15 +200,38 @@ export class AuthorizationRepository {
     membershipId: string,
     requireActive: boolean,
   ) {
-    return database.tenantMembership.findFirst({
+    const membership = await database.tenantMembership.findFirst({
       where: {
         id: membershipId,
         tenantId,
         deletedAt: null,
         ...(requireActive ? { status: 'ACTIVE' as const } : {}),
       },
-      select: { id: true, status: true },
+      select: {
+        id: true,
+        userId: true,
+        status: true,
+        user: { select: { email: true, firstName: true, lastName: true } },
+        roleAssignments: {
+          where: { role: { deletedAt: null } },
+          select: {
+            role: { select: { id: true, name: true, type: true } },
+          },
+        },
+      },
     });
+
+    if (!membership) return null;
+
+    return membership as unknown as {
+      id: string;
+      userId: string;
+      status: 'ACTIVE' | 'SUSPENDED' | 'REVOKED' | 'PENDING';
+      user: { email: string; firstName: string; lastName: string };
+      roleAssignments: Array<{
+        role: { id: string; name: string; type: 'SYSTEM' | 'TENANT' };
+      }>;
+    };
   }
 
   async listMemberships(tenantId: string, limit: number, offset: number) {
@@ -383,6 +408,75 @@ export class AuthorizationRepository {
         },
       },
     });
+  }
+
+  async updateMembershipStatusAndRevokeSessions(
+    database: AuthorizationDatabase,
+    tenantId: string,
+    membershipId: string,
+    targetStatus: 'SUSPENDED' | 'REVOKED',
+    now: Date = new Date(),
+  ): Promise<void> {
+    const updated = await database.tenantMembership.updateMany({
+      where: {
+        id: membershipId,
+        tenantId,
+        status: 'ACTIVE',
+        deletedAt: null,
+      },
+      data: {
+        status: targetStatus,
+        endedAt: targetStatus === 'REVOKED' ? now : null,
+        version: { increment: 1 },
+      },
+    });
+
+    if (updated.count !== 1) {
+      throw new ConflictException(
+        'Target membership is not active or has already transitioned status',
+      );
+    }
+
+    const activeSessions = await database.userSession.findMany({
+      where: {
+        tenantId,
+        membershipId,
+        status: 'ACTIVE',
+      },
+      select: { id: true },
+    });
+
+    const activeSessionIds = activeSessions.map((s) => s.id);
+
+    if (activeSessionIds.length > 0) {
+      const revocationReason =
+        targetStatus === 'SUSPENDED' ? 'membership-suspended' : 'membership-revoked';
+
+      await database.userSessionRefreshCredential.updateMany({
+        where: {
+          sessionId: { in: activeSessionIds },
+          status: 'ACTIVE',
+        },
+        data: {
+          status: 'REVOKED',
+          revokedAt: now,
+        },
+      });
+
+      await database.userSession.updateMany({
+        where: {
+          id: { in: activeSessionIds },
+          tenantId,
+          membershipId,
+          status: 'ACTIVE',
+        },
+        data: {
+          status: 'REVOKED',
+          revokedAt: now,
+          revocationReason,
+        },
+      });
+    }
   }
 
   get transactionClient() {

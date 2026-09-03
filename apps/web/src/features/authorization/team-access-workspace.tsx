@@ -20,7 +20,11 @@ import {
 
 type RoleFilter = 'ALL' | 'SYSTEM' | 'TENANT';
 
-export function TeamAccessWorkspace() {
+export function TeamAccessWorkspace({
+  currentMembershipId,
+}: {
+  readonly currentMembershipId?: string;
+}) {
   const { t } = useLanguage();
   const [catalogue, setCatalogue] = useState<AuthorizationCatalogue | null>(null);
   const [loading, setLoading] = useState(true);
@@ -54,6 +58,9 @@ export function TeamAccessWorkspace() {
     catalogue &&
     canReadRoles &&
     hasAuthorizationPermission(catalogue, AUTHORIZATION_PERMISSIONS.assignmentsManage),
+  );
+  const canManageMemberships = Boolean(
+    catalogue && hasAuthorizationPermission(catalogue, AUTHORIZATION_PERMISSIONS.membershipsManage),
   );
 
   const load = useCallback(async () => {
@@ -264,7 +271,12 @@ export function TeamAccessWorkspace() {
         ) : null}
       </SectionCard>
       {catalogue && canReadAssignments ? (
-        <MembershipDirectory roles={catalogue.roles} canManage={canManageAssignments} />
+        <MembershipDirectory
+          roles={catalogue.roles}
+          canManage={canManageAssignments}
+          canManageMemberships={canManageMemberships}
+          currentMembershipId={currentMembershipId}
+        />
       ) : null}
     </div>
   );

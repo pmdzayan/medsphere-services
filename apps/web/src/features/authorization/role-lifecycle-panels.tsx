@@ -8,6 +8,7 @@ import {
   deleteRole,
   getMembershipCatalogue,
   setRoleAssignment,
+  updateMembershipStatus,
   updateRole,
 } from '@/lib/api-client';
 import {
@@ -237,12 +238,23 @@ export function RoleEditorPanel({
   );
 }
 
+function getStatusTone(status: string): 'emerald' | 'amber' | 'rose' | 'slate' {
+  if (status === 'ACTIVE') return 'emerald';
+  if (status === 'SUSPENDED') return 'amber';
+  if (status === 'REVOKED') return 'rose';
+  return 'slate';
+}
+
 export function MembershipDirectory({
   roles,
   canManage,
+  canManageMemberships,
+  currentMembershipId,
 }: {
   roles: readonly Role[];
   canManage: boolean;
+  canManageMemberships?: boolean;
+  currentMembershipId?: string;
 }) {
   const { t } = useLanguage();
   const [members, setMembers] = useState<Membership[] | null>(null);
@@ -250,6 +262,8 @@ export function MembershipDirectory({
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [pending, setPending] = useState('');
+  const [statusConfirming, setStatusConfirming] = useState<'SUSPENDED' | 'REVOKED' | null>(null);
+
   useEffect(() => {
     getMembershipCatalogue()
       .then((result) => setMembers(result.data))
@@ -275,8 +289,44 @@ export function MembershipDirectory({
         (current) =>
           current?.map((member) => (member.id === updated.id ? updated : member)) ?? null,
       );
-    } catch (failure) {
+    } catch {
       setError(t('team.error.assignment'));
+    } finally {
+      setPending('');
+    }
+  }
+
+  async function executeStatusUpdate(targetStatus: 'SUSPENDED' | 'REVOKED') {
+    if (
+      !selected ||
+      !canManageMemberships ||
+      !currentMembershipId ||
+      selected.id === currentMembershipId ||
+      selected.status !== 'ACTIVE'
+    ) {
+      setStatusConfirming(null);
+      return;
+    }
+
+    setPending(`status:${targetStatus}`);
+    setError('');
+    try {
+      const updated = await updateMembershipStatus(selected.id, targetStatus);
+      setSelected(updated);
+      setMembers(
+        (current) =>
+          current?.map((member) => (member.id === updated.id ? updated : member)) ?? null,
+      );
+      setStatusConfirming(null);
+    } catch (err: unknown) {
+      const msg =
+        err &&
+        typeof err === 'object' &&
+        'message' in err &&
+        typeof (err as { message: unknown }).message === 'string'
+          ? String((err as { message: string }).message)
+          : t('team.error.updateStatus');
+      setError(msg);
     } finally {
       setPending('');
     }
@@ -300,38 +350,130 @@ export function MembershipDirectory({
       ) : members ? (
         <div className="grid lg:grid-cols-[1fr_1.15fr]">
           <div className="divide-y divide-[#edf1ef]">
-            {members.map((member) => (
-              <button
-                key={member.id}
-                type="button"
-                onClick={() => setSelected(member)}
-                className={`flex w-full items-center gap-3 px-6 py-4 text-left ${selected?.id === member.id ? 'bg-emerald-50' : 'hover:bg-[#fbfdfc]'}`}
-              >
-                <span className="grid size-10 place-items-center rounded-xl bg-[#0b342b] text-xs font-bold text-emerald-200">
-                  {member.firstName[0]}
-                  {member.lastName[0]}
-                </span>
-                <span className="min-w-0 flex-1">
-                  <strong className="block truncate text-sm text-[#1b372d]">
-                    {member.firstName} {member.lastName}
-                  </strong>
-                  <span className="mt-1 block truncate text-xs text-[#85938f]">{member.email}</span>
-                </span>
-                <StatusBadge tone={member.status === 'ACTIVE' ? 'emerald' : 'slate'}>
-                  {member.status === 'ACTIVE' ? t('team.status.active') : t('team.status.inactive')}
-                </StatusBadge>
-              </button>
-            ))}
+            {members.map((member) => {
+              const tone = getStatusTone(member.status);
+              const label =
+                member.status === 'ACTIVE'
+                  ? t('team.status.active')
+                  : member.status === 'SUSPENDED'
+                    ? t('team.status.suspended')
+                    : member.status === 'REVOKED'
+                      ? t('team.status.revoked')
+                      : member.status;
+
+              return (
+                <button
+                  key={member.id}
+                  type="button"
+                  onClick={() => {
+                    setSelected(member);
+                    setStatusConfirming(null);
+                    setError('');
+                  }}
+                  className={`flex w-full items-center gap-3 px-6 py-4 text-left ${selected?.id === member.id ? 'bg-emerald-50' : 'hover:bg-[#fbfdfc]'}`}
+                >
+                  <span className="grid size-10 place-items-center rounded-xl bg-[#0b342b] text-xs font-bold text-emerald-200">
+                    {member.firstName[0]}
+                    {member.lastName[0]}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <strong className="block truncate text-sm text-[#1b372d]">
+                      {member.firstName} {member.lastName}
+                    </strong>
+                    <span className="mt-1 block truncate text-xs text-[#85938f]">
+                      {member.email}
+                    </span>
+                  </span>
+                  <StatusBadge tone={tone}>{label}</StatusBadge>
+                </button>
+              );
+            })}
           </div>
           <div className="border-t border-[#edf1ef] bg-[#fbfcfb] p-6 lg:border-l lg:border-t-0">
             {selected ? (
               <>
-                <h3 className="text-sm font-bold text-[#1b372d]">
-                  {t('team.directory.manage', { name: selected.firstName })}
-                </h3>
-                <p className="mt-1 text-xs text-[#85938f]">
-                  {canManage ? t('team.directory.enforced') : t('team.directory.readOnly')}
-                </p>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-sm font-bold text-[#1b372d]">
+                      {t('team.directory.manage', { name: selected.firstName })}
+                    </h3>
+                    <p className="mt-1 text-xs text-[#85938f]">
+                      {canManage ? t('team.directory.enforced') : t('team.directory.readOnly')}
+                    </p>
+                  </div>
+                </div>
+
+                {canManageMemberships &&
+                currentMembershipId &&
+                selected.status === 'ACTIVE' &&
+                selected.id !== currentMembershipId ? (
+                  <div className="mt-4 flex flex-wrap gap-2 border-b border-[#edf1ef] pb-4">
+                    <button
+                      type="button"
+                      onClick={() => setStatusConfirming('SUSPENDED')}
+                      className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-900 transition hover:bg-amber-100"
+                    >
+                      {t('team.action.suspend')}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setStatusConfirming('REVOKED')}
+                      className="rounded-lg border border-rose-300 bg-rose-50 px-3 py-1.5 text-xs font-bold text-rose-900 transition hover:bg-rose-100"
+                    >
+                      {t('team.action.revoke')}
+                    </button>
+                  </div>
+                ) : null}
+
+                {statusConfirming &&
+                canManageMemberships &&
+                currentMembershipId &&
+                selected.status === 'ACTIVE' &&
+                selected.id !== currentMembershipId ? (
+                  <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50/70 p-4">
+                    <h4 className="text-xs font-bold text-amber-950">
+                      {statusConfirming === 'SUSPENDED'
+                        ? t('team.confirm.suspendTitle')
+                        : t('team.confirm.revokeTitle')}
+                    </h4>
+                    <p className="mt-1 text-xs text-amber-900">
+                      {statusConfirming === 'SUSPENDED'
+                        ? t('team.confirm.suspendDetail', {
+                            name: `${selected.firstName} ${selected.lastName}`,
+                          })
+                        : t('team.confirm.revokeDetail', {
+                            name: `${selected.firstName} ${selected.lastName}`,
+                          })}
+                    </p>
+                    <div className="mt-3 flex gap-2">
+                      <button
+                        type="button"
+                        disabled={Boolean(pending)}
+                        onClick={() => void executeStatusUpdate(statusConfirming)}
+                        className={`rounded-lg px-3 py-1.5 text-xs font-bold text-white transition ${
+                          statusConfirming === 'SUSPENDED'
+                            ? 'bg-amber-600 hover:bg-amber-700'
+                            : 'bg-rose-600 hover:bg-rose-700'
+                        }`}
+                      >
+                        {pending === `status:${statusConfirming}`
+                          ? statusConfirming === 'SUSPENDED'
+                            ? t('team.confirm.suspending')
+                            : t('team.confirm.revoking')
+                          : t('team.confirm.confirmAction')}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={Boolean(pending)}
+                        onClick={() => setStatusConfirming(null)}
+                        className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50"
+                      >
+                        {t('team.cancel')}
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
+
                 <div className="mt-4 space-y-2">
                   {canManage
                     ? roles.map((role) => {
