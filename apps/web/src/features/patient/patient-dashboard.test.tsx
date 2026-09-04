@@ -75,6 +75,28 @@ describe('PatientDashboard (candidate Task 0032)', () => {
     expect(screen.queryByText(/Dr\./)).not.toBeInTheDocument();
   });
 
+  it('the reservations card uses reservation-specific copy, not the appointments message (correction pass 1)', async () => {
+    vi.mocked(getPatientProfile).mockResolvedValue(profile);
+    renderDashboard();
+
+    await screen.findByText('Asha');
+    expect(screen.getByText('Your reservations')).toBeVisible();
+    expect(screen.getByText(/Your reservations will appear here once available/)).toBeVisible();
+    // The reservations card must never show the appointments message.
+    const reservationsHeading = screen.getByText('Your reservations');
+    const reservationsCard = reservationsHeading.closest('div');
+    expect(reservationsCard?.textContent).not.toMatch(/Appointments will appear here/);
+  });
+
+  it('shows a separate, accurately-labeled Appointments card', async () => {
+    vi.mocked(getPatientProfile).mockResolvedValue(profile);
+    renderDashboard();
+
+    await screen.findByText('Asha');
+    expect(screen.getByText('Appointments')).toBeVisible();
+    expect(screen.getByText(/Appointments will appear here once available/)).toBeVisible();
+  });
+
   it('entering edit mode and saving submits only the whitelisted, patient-editable fields', async () => {
     vi.mocked(getPatientProfile).mockResolvedValue(profile);
     vi.mocked(updatePatientProfile).mockResolvedValue({ ...profile, firstName: 'Ashwini' });

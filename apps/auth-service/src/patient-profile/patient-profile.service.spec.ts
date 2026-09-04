@@ -1,4 +1,4 @@
-import { NotFoundException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { PatientProfileService } from './patient-profile.service';
 
 const identityA = {
@@ -42,31 +42,44 @@ function buildService() {
     ],
   ]);
 
+  const userOps = {
+    findFirst: jest.fn().mockImplementation(({ where }: { where: { id: string } }) => {
+      const user = users.get(where.id);
+      return Promise.resolve(user ?? null);
+    }),
+    update: jest
+      .fn()
+      .mockImplementation(
+        ({ where, data }: { where: { id: string }; data: Record<string, unknown> }) => {
+          const user = users.get(where.id);
+          if (!user) throw new Error('User not found');
+          const { privacy: privacyUpdate, ...userFields } = data as {
+            privacy?: {
+              upsert: { create: Record<string, unknown>; update: Record<string, unknown> };
+            };
+          } & Record<string, unknown>;
+          Object.assign(user, userFields);
+          if (privacyUpdate) {
+            user.privacy = { ...(user.privacy as object | null), ...privacyUpdate.upsert.update };
+          }
+          return Promise.resolve({ ...user });
+        },
+      ),
+  };
+
+  // Correction pass 1: PatientProfileService now runs the mutation and
+  // the audit write inside withSerializableRetry's $transaction. This
+  // mock mirrors the REAL transaction shape: the callback receives a
+  // transaction client (here, the same mock object) and whatever it
+  // throws propagates out of $transaction uncaught -- exactly Prisma's
+  // real rollback-signalling behavior, which is what the
+  // "forced audit failure never persists the mutation" test below
+  // relies on.
   const client = {
-    user: {
-      findFirst: jest.fn().mockImplementation(({ where }: { where: { id: string } }) => {
-        const user = users.get(where.id);
-        return Promise.resolve(user ?? null);
-      }),
-      update: jest
-        .fn()
-        .mockImplementation(
-          ({ where, data }: { where: { id: string }; data: Record<string, unknown> }) => {
-            const user = users.get(where.id);
-            if (!user) throw new Error('User not found');
-            const { privacy: privacyUpdate, ...userFields } = data as {
-              privacy?: {
-                upsert: { create: Record<string, unknown>; update: Record<string, unknown> };
-              };
-            } & Record<string, unknown>;
-            Object.assign(user, userFields);
-            if (privacyUpdate) {
-              user.privacy = { ...(user.privacy as object | null), ...privacyUpdate.upsert.update };
-            }
-            return Promise.resolve(user);
-          },
-        ),
-    },
+    user: userOps,
+    $transaction: jest.fn().mockImplementation(async (operation: (tx: unknown) => unknown) => {
+      return operation(client);
+    }),
   };
 
   const prisma = { client };
@@ -155,7 +168,7 @@ describe('PatientProfileService -- identity scoping (candidate Task 0032)', () =
     expect(auditCall).not.toHaveProperty('actorMembershipId');
   });
 
-  it('never includes raw field values in audit metadata, only the names of fields changed', async () => {
+  it('never includes raw field values in audit metadata, only a bounded, sorted, comma-joined string of field names', async () => {
     const { service, audit } = buildService();
     await service.updateOwnProfile(
       identityA as never,
@@ -163,11 +176,102 @@ describe('PatientProfileService -- identity scoping (candidate Task 0032)', () =
     );
 
     const auditCall = audit.appendPlatformUser.mock.calls[0][1] as {
-      metadata: { fieldsChanged: string[] };
+      metadata: { fieldsChanged: unknown };
     };
-    expect(auditCall.metadata.fieldsChanged).toEqual(
-      expect.arrayContaining(['firstName', 'preferredLanguage']),
-    );
+    // Correction pass 1: fieldsChanged is a scalar string, never an
+    // array -- the accepted audit contract's validateAuditMetadata
+    // rejects array-valued metadata.
+    expect(typeof auditCall.metadata.fieldsChanged).toBe('string');
+    expect(auditCall.metadata.fieldsChanged).toBe('firstName,preferredLanguage');
     expect(JSON.stringify(auditCall.metadata)).not.toContain('Renamed');
+  });
+
+  it('produces the exact metadata shape independently proven, via a real (unmocked) validator run, to satisfy the accepted audit contract', async () => {
+    // The real, unmocked regression against validateAuditMetadata
+    // cannot be co-located in this file: it needs a relative import
+    // that reaches outside apps/auth-service/src, which this
+    // project's tsconfig rootDir forbids for compiled Jest specs. That
+    // regression lives in
+    // apps/auth-service/test/candidate-0032/verify-real-audit-metadata-validator.ts
+    // (run via ts-node, not Jest) and is the actual proof that this
+    // exact shape passes the real, accepted validateAuditMetadata; see
+    // that file and its README for how to run it and why. This test
+    // only asserts that PatientProfileService continues to produce
+    // that exact, already-verified shape.
+    const { service, audit } = buildService();
+    await service.updateOwnProfile(
+      identityA as never,
+      { firstName: 'Priya', lastName: 'Nair', wantsReservationNotifications: false } as never,
+    );
+
+    const auditCall = audit.appendPlatformUser.mock.calls[0][1] as {
+      eventType: string;
+      metadata: { fieldsChanged: unknown };
+    };
+    expect(auditCall.eventType).toBe('patient.profile.updated');
+    expect(auditCall.metadata).toEqual({
+      fieldsChanged: 'firstName,lastName,wantsReservationNotifications',
+    });
+  });
+
+  it('rejects an empty update (PATCH {}) with BadRequestException -- no database write, no audit event', async () => {
+    const { service, client, audit } = buildService();
+    await expect(service.updateOwnProfile(identityA as never, {} as never)).rejects.toThrow(
+      BadRequestException,
+    );
+    expect(client.user.update).not.toHaveBeenCalled();
+    expect(audit.appendPlatformUser).not.toHaveBeenCalled();
+  });
+
+  it('rejects a whitespace-only firstName -- never silently persists it', async () => {
+    const { service, client } = buildService();
+    await expect(
+      service.updateOwnProfile(identityA as never, { firstName: '   ' } as never),
+    ).rejects.toThrow(BadRequestException);
+    expect(client.user.update).not.toHaveBeenCalled();
+  });
+
+  it('rejects a whitespace-only lastName -- never silently persists it', async () => {
+    const { service, client } = buildService();
+    await expect(
+      service.updateOwnProfile(identityA as never, { lastName: '\t\n ' } as never),
+    ).rejects.toThrow(BadRequestException);
+    expect(client.user.update).not.toHaveBeenCalled();
+  });
+
+  it('trims a legitimately-padded firstName before persisting (backend does not depend on frontend trimming)', async () => {
+    const { service, client } = buildService();
+    await service.updateOwnProfile(identityA as never, { firstName: '  Asha  ' } as never);
+    const writeCall = client.user.update.mock.calls[0][0] as { data: Record<string, unknown> };
+    expect(writeCall.data.firstName).toBe('Asha');
+  });
+
+  it('forced audit failure propagates out of the transaction callback (mocked $transaction propagation)', async () => {
+    const { client, users } = buildService();
+    const failingAudit = {
+      appendPlatformUser: jest.fn().mockRejectedValue(new Error('simulated audit failure')),
+    };
+    const atomicService = new PatientProfileService({ client } as never, failingAudit as never);
+
+    await expect(
+      atomicService.updateOwnProfile(
+        identityA as never,
+        { firstName: 'ShouldNotPersist' } as never,
+      ),
+    ).rejects.toThrow('simulated audit failure');
+
+    // This mock demonstrates that the service PROPAGATES the audit
+    // failure out of the $transaction callback (Prisma's real
+    // mechanism for triggering a rollback) rather than swallowing it;
+    // it does not by itself prove PostgreSQL actually rolled back the
+    // row, since this mock's user.update already mutated the in-memory
+    // map before the throw. The REAL rollback guarantee is proven
+    // separately, against a real PostgreSQL database, in
+    // pg-test/candidate-0032-identity-isolation.js (see that file's
+    // "forced audit failure rolls back the profile mutation" case) --
+    // that is the only evidence this candidate relies on for the
+    // atomicity claim itself.
+    expect(client.$transaction).toHaveBeenCalled();
+    void users;
   });
 });

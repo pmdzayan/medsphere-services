@@ -61,6 +61,7 @@ rather than starting the patient experience from zero at that point.
 
 **Database** (one migration,
 `20260902130000_candidate_0032_patient_profile_audit_event`):
+
 - `Permission`/`Product`/etc. — **untouched**.
 - `AuditEvent_event_type_check` CHECK constraint rebuilt to add exactly one
   new value, `patient.profile.updated`, alongside all 45 pre-existing
@@ -70,6 +71,7 @@ rather than starting the patient experience from zero at that point.
 - No new table. No column added to `User` or `UserPrivacy`.
 
 **Backend** (`apps/auth-service/src/patient-profile/`):
+
 - `patient-profile.module.ts`, `.controller.ts`, `.service.ts`
 - `dto/patient-profile.dto.ts` — `UpdatePatientProfileDto` explicitly
   whitelists `firstName`, `lastName`, `preferredLanguage`,
@@ -82,12 +84,13 @@ rather than starting the patient experience from zero at that point.
   resource has no RBAC dimension).
 
 **Frontend**:
+
 - `apps/web/src/lib/patient-profile-contract.ts` — types + runtime guard.
 - `apps/web/src/lib/api-client.ts` — `getPatientProfile`,
   `updatePatientProfile` (additions only; no existing function changed).
 - `apps/web/src/app/api/patient/profile/route.ts` — BFF GET/PATCH, forwards
   to the backend using the existing session-cookie/access-token pattern.
-- `apps/web/src/app/apps/web/src/app/patient/layout.tsx` — a deliberately minimal layout
+- `apps/web/src/app/patient/layout.tsx` — a deliberately minimal layout
   (session-cookie check only, no `AppShell`). See §9 for the known
   duplication this creates with `apps/web/src/app/(platform)/layout.tsx`.
 - `apps/web/src/app/patient/dashboard/page.tsx`
@@ -106,7 +109,7 @@ at the service layer (a DTO object literal smuggling `email`,
 `phoneVerifiedAt`, `status`, `id` never reaches the Prisma write); the
 privacy relation is only touched when a privacy field is actually supplied;
 `appendPlatformUser` is called with no `tenantId`/`actorMembershipId`;
-audit metadata carries only field *names*, never the new values themselves.
+audit metadata carries only field _names_, never the new values themselves.
 Type-checked clean; execution blocked by the same sandbox-wide
 Prisma-client-generation limitation as every Prisma-touching Jest test
 (`ts-jest`/`@prisma/client` resolution failure — this is an environment
@@ -176,15 +179,15 @@ English for the dashboard title.
   on `context.organizationType === 'NONE'` or whatever the accepted
   equivalent becomes) to send personal-account users to `/patient/dashboard`
   instead of `/dashboard`.
-- **`apps/web/src/app/apps/web/src/app/patient/layout.tsx`**: duplicates the session-cookie
-  verification lines from `apps/web/src/app/apps/web/src/app/(platform)/layout.tsx` rather
+- **`apps/web/src/app/patient/layout.tsx`**: duplicates the session-cookie
+  verification lines from `apps/web/src/app/(platform)/layout.tsx` rather
   than extracting a shared helper, specifically so this duplication is a
   visible, intentional decision for reconciliation rather than a
   rediscovered accident. If 0019–0031 changes session-cookie verification,
   both files need the same update.
 - **`packages/database/src/audit.ts` / the new migration**: if 0019–0031
   also adds audit event types, whichever lands second must rebuild the
-  CHECK constraint from the *other* branch's already-merged list, exactly
+  CHECK constraint from the _other_ branch's already-merged list, exactly
   as this migration did relative to the prior accepted state.
 - **`apps/auth-service/src/patient-profile/dto/patient-profile.dto.ts`**:
   the `SUPPORTED_LANGUAGE_CODES` duplication noted in §7.

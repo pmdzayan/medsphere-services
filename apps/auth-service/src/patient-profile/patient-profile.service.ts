@@ -1,4 +1,5 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { withSerializableRetry } from '@medsphere/database';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditWriter } from '../audit/audit-writer.service';
 import type { AuthenticatedIdentity } from '../auth/auth.types';
@@ -58,9 +59,27 @@ export class PatientProfileService {
     // unknown properties before this method ever runs; this object
     // literal is a second, explicit line of defense against mass
     // assignment).
+    //
+    // Correction pass 1: firstName/lastName are trimmed server-side --
+    // the backend security/correctness boundary must not depend on the
+    // frontend having already trimmed the value. A whitespace-only
+    // string normalizes to '', which is then rejected below exactly
+    // like an empty string, rather than being silently persisted.
     const userData: { firstName?: string; lastName?: string; preferredLanguage?: string } = {};
-    if (dto.firstName !== undefined) userData.firstName = dto.firstName;
-    if (dto.lastName !== undefined) userData.lastName = dto.lastName;
+    if (dto.firstName !== undefined) {
+      const trimmed = dto.firstName.trim();
+      if (trimmed.length === 0) {
+        throw new BadRequestException('firstName cannot be empty or whitespace-only');
+      }
+      userData.firstName = trimmed;
+    }
+    if (dto.lastName !== undefined) {
+      const trimmed = dto.lastName.trim();
+      if (trimmed.length === 0) {
+        throw new BadRequestException('lastName cannot be empty or whitespace-only');
+      }
+      userData.lastName = trimmed;
+    }
     if (dto.preferredLanguage !== undefined) userData.preferredLanguage = dto.preferredLanguage;
 
     const privacyData: {
@@ -74,52 +93,98 @@ export class PatientProfileService {
       privacyData.hideSensitiveNotifications = dto.hideSensitiveNotifications;
     }
 
-    const user = await this.prisma.client.user.update({
-      // Scoped by the server-verified identity.userId ONLY -- there is
-      // no field in this WHERE clause a client can influence.
-      where: { id: identity.userId },
-      data: {
-        ...userData,
-        ...(Object.keys(privacyData).length > 0
-          ? {
-              privacy: {
-                upsert: {
-                  create: { ...privacyData },
-                  update: { ...privacyData },
-                },
-              },
-            }
-          : {}),
-      },
-      select: {
-        id: true,
-        firstName: true,
-        lastName: true,
-        email: true,
-        phone: true,
-        phoneVerifiedAt: true,
-        preferredLanguage: true,
-        privacy: {
-          select: { wantsReservationNotifications: true, hideSensitiveNotifications: true },
-        },
-      },
-    });
+    // Correction pass 1: PATCH {} (zero mutable fields, after the
+    // whitelist above) must never reach the database or produce an
+    // audit event -- there is nothing accountable to record.
+    const changedFieldNames = Object.keys({ ...userData, ...privacyData });
+    if (changedFieldNames.length === 0) {
+      throw new BadRequestException('At least one mutable profile field must be provided');
+    }
 
-    // Candidate Task 0032 (pre-0031) known integration point: this is
-    // a GLOBAL personal-identity action, not a tenant business
-    // operation -- appendPlatformUser (scope PLATFORM, actorType
-    // PLATFORM_USER, keyed by the global userId, no tenant
-    // attribution) is used deliberately instead of appendTenantUser,
-    // matching the same platform/tenant audit-scope distinction
-    // established for global catalog actions elsewhere in this
-    // codebase. Tasks 0019+ may change exact-user accountability
-    // conventions; this call is isolated to one line for easy
-    // reconciliation.
-    await this.audit.appendPlatformUser(this.prisma.client, {
-      eventType: 'patient.profile.updated',
-      outcome: 'SUCCEEDED',
-      platformActorUserId: identity.userId,
-      metadata: { fieldsChanged: Object.keys({ ...userData, ...privacyData }) },
+    // Correction pass 1: the audit contract's validateAuditMetadata
+    // rejects array-valued metadata (values must be bounded scalars:
+    // string/number/boolean/null). fieldsChanged is therefore a
+    // deterministic, sorted, comma-joined string -- never an array --
+    // and this exact value is what a real appendPlatformUser call
+    // validates (see patient-profile.service.spec.ts for a regression
+    // exercising the real validator, not a mock).
+    const fieldsChanged = changedFieldNames.sort().join(',');
+
+    // Correction pass 1: the profile mutation and its accountability
+    // record must be atomic -- an audit failure must never leave a
+    // committed mutation with no corresponding evidence. Both
+    // statements run inside the same PostgreSQL transaction, using
+    // this repository's existing withSerializableRetry convention; if
+    // appendPlatformUser throws (e.g. a metadata validation failure or
+    // a database error), the whole transaction rolls back and the
+    // user's row reverts to its pre-update values.
+    const user = await withSerializableRetry(this.prisma.client, async (transaction) => {
+      const updated = await transaction.user.update({
+        // Scoped by the server-verified identity.userId ONLY -- there
+        // is no field in this WHERE clause a client can influence.
+        // A deletedAt/status filter is deliberately NOT duplicated
+        // here: Prisma's generated UserWhereUniqueInput for .update()
+        // only accepts genuinely unique fields, and adding an
+        // arbitrary additional condition would require switching to
+        // updateMany() (a larger, riskier change to verify without a
+        // working generated Prisma client in this sandbox -- see the
+        // final report). This is not a real gap in practice:
+        // SessionRepository.validateAccessIdentity (run on every
+        // request via the global JwtAuthGuard) already rejects a
+        // session whose underlying User has deletedAt set or status
+        // != 'ACTIVE' before a request ever reaches this service --
+        // confirmed by direct inspection of that query's WHERE clause,
+        // which nests membership.user.status/deletedAt. getOwnProfile
+        // keeps its own deletedAt filter as an independent, low-cost
+        // defensive read-path check; this write path relies on the
+        // session guard, which is the actual, provably-effective
+        // control.
+        where: { id: identity.userId },
+        data: {
+          ...userData,
+          ...(Object.keys(privacyData).length > 0
+            ? {
+                privacy: {
+                  upsert: {
+                    create: { ...privacyData },
+                    update: { ...privacyData },
+                  },
+                },
+              }
+            : {}),
+        },
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          email: true,
+          phone: true,
+          phoneVerifiedAt: true,
+          preferredLanguage: true,
+          privacy: {
+            select: { wantsReservationNotifications: true, hideSensitiveNotifications: true },
+          },
+        },
+      });
+
+      // Candidate Task 0032 (pre-0031) known integration point: this
+      // is a GLOBAL personal-identity action, not a tenant business
+      // operation -- appendPlatformUser (scope PLATFORM, actorType
+      // PLATFORM_USER, keyed by the global userId, no tenant
+      // attribution) is used deliberately instead of appendTenantUser,
+      // matching the same platform/tenant audit-scope distinction
+      // established for global catalog actions elsewhere in this
+      // codebase. Tasks 0019+ may change exact-user accountability
+      // conventions; this call is isolated to one block for easy
+      // reconciliation.
+      await this.audit.appendPlatformUser(transaction, {
+        eventType: 'patient.profile.updated',
+        outcome: 'SUCCEEDED',
+        platformActorUserId: identity.userId,
+        metadata: { fieldsChanged },
+      });
+
+      return updated;
     });
 
     return this.toResponse(user);

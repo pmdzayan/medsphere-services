@@ -147,6 +147,13 @@ export function PatientDashboard() {
           <p className="text-sm font-bold text-[#173128]">{t('patient.dashboard.reservations')}</p>
           <EmptyState
             title={t('patient.dashboard.comingSoon')}
+            description={t('patient.dashboard.reservationsComingSoon')}
+          />
+        </Card>
+        <Card>
+          <p className="text-sm font-bold text-[#173128]">{t('patient.dashboard.appointments')}</p>
+          <EmptyState
+            title={t('patient.dashboard.comingSoon')}
             description={t('patient.dashboard.appointmentsComingSoon')}
           />
         </Card>
