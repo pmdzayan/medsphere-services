@@ -165,6 +165,11 @@ const tenantOne = '10000000-0000-4000-8000-000000000101';
 const tenantTwo = '10000000-0000-4000-8000-000000000102';
 const userOne = '20000000-0000-4000-8000-000000000101';
 const userTwo = '20000000-0000-4000-8000-000000000102';
+// Dedicated platform-user fixture -- distinct from the tenant-user fixtures.
+// PLATFORM_USER audit evidence is attributed through platformActorUserId, which
+// is a required, non-null reference to User(id) under the authoritative
+// pre-0019 schema.
+const platformUser = '20000000-0000-4000-8000-000000000103';
 const membershipOne = '30000000-0000-4000-8000-000000000101';
 const membershipTwo = '30000000-0000-4000-8000-000000000102';
 const auditUserOne = '80000000-0000-4000-8000-000000000101';
@@ -201,20 +206,26 @@ verifyScenario({
   label: 'preserves_historical_evidence',
   seedSql: `
 ${commonSeed}
+${userInsert(platformUser, 'platform-user-0019@medsphere.test')}
 -- Two historical human audit rows (membership-user pairs that exist), plus
--- tenant SYSTEM, PLATFORM_USER, and platform SYSTEM evidence.
-INSERT INTO "AuditEvent" ("id", "scope", "actorType", "outcome", "tenantId", "actorMembershipId", "eventType", "metadata", "occurredAt")
+-- tenant SYSTEM, PLATFORM_USER, and platform SYSTEM evidence. Every row is
+-- valid under the pre-0019 actor-scope contract: PLATFORM_USER evidence is
+-- attributed through platformActorUserId (required non-null under the
+-- authoritative pre-0019 AuditEvent_actor_scope_check).
+INSERT INTO "AuditEvent" ("id", "scope", "actorType", "outcome", "tenantId", "actorMembershipId", "platformActorUserId", "eventType", "metadata", "occurredAt")
 VALUES
-  ('${auditUserOne}', 'TENANT', 'TENANT_USER', 'SUCCEEDED', '${tenantOne}', '${membershipOne}', 'authentication.session.created', '{}', CURRENT_TIMESTAMP),
-  ('${auditUserTwo}', 'TENANT', 'TENANT_USER', 'DENIED', '${tenantTwo}', '${membershipTwo}', 'authorization.permission.denied', '{"requiredPermissions":"authorization.roles.delete"}', CURRENT_TIMESTAMP),
-  ('${auditSystem}', 'TENANT', 'SYSTEM', 'SUCCEEDED', '${tenantOne}', NULL, 'inventory.reservation.expired', '{}', CURRENT_TIMESTAMP),
-  ('${auditPlatformUser}', 'PLATFORM', 'PLATFORM_USER', 'SUCCEEDED', NULL, NULL, 'authentication.sessions.logout.succeeded', '{"revokedCount":1}', CURRENT_TIMESTAMP),
-  ('${auditPlatformSystem}', 'PLATFORM', 'SYSTEM', 'FAILED', NULL, NULL, 'authentication.session.refresh.failed', '{"reason":"session-not-found"}', CURRENT_TIMESTAMP);
+  ('${auditUserOne}', 'TENANT', 'TENANT_USER', 'SUCCEEDED', '${tenantOne}', '${membershipOne}', NULL, 'authentication.session.created', '{}', CURRENT_TIMESTAMP),
+  ('${auditUserTwo}', 'TENANT', 'TENANT_USER', 'DENIED', '${tenantTwo}', '${membershipTwo}', NULL, 'authorization.permission.denied', '{"requiredPermissions":"authorization.roles.delete"}', CURRENT_TIMESTAMP),
+  ('${auditSystem}', 'TENANT', 'SYSTEM', 'SUCCEEDED', '${tenantOne}', NULL, NULL, 'inventory.reservation.expired', '{}', CURRENT_TIMESTAMP),
+  ('${auditPlatformUser}', 'PLATFORM', 'PLATFORM_USER', 'SUCCEEDED', NULL, NULL, '${platformUser}', 'authentication.sessions.logout.succeeded', '{"revokedCount":1}', CURRENT_TIMESTAMP),
+  ('${auditPlatformSystem}', 'PLATFORM', 'SYSTEM', 'FAILED', NULL, NULL, NULL, 'authentication.session.refresh.failed', '{"reason":"session-not-found"}', CURRENT_TIMESTAMP);
 `,
   assertionSql: `
 DO $$
 DECLARE
   totalRows int;
+  tenantUserRows int;
+  systemRows int;
 BEGIN
   IF (SELECT count(*) FROM "AuditEvent") <> 5 THEN
     RAISE EXCEPTION 'Historical audit evidence was not preserved';
@@ -232,9 +243,38 @@ BEGIN
     RAISE EXCEPTION 'TENANT_USER row two was not backfilled with its exact user';
   END IF;
 
-  SELECT count(*) INTO totalRows FROM "AuditEvent" WHERE "actorType" <> 'TENANT_USER' AND "actorUserId" IS NOT NULL;
+  -- PLATFORM_USER retains its exact original platformActorUserId and gains no
+  -- TENANT-scoped actor user id.
+  IF NOT EXISTS (
+    SELECT 1 FROM "AuditEvent"
+    WHERE "id" = '${auditPlatformUser}'
+      AND "platformActorUserId" = '${platformUser}'
+      AND "actorUserId" IS NULL
+      AND "tenantId" IS NULL
+      AND "actorMembershipId" IS NULL
+  ) THEN
+    RAISE EXCEPTION 'PLATFORM_USER evidence must retain its exact platformActorUserId with no tenant actor user id';
+  END IF;
+
+  -- Both historical TENANT_USER rows must carry exactly their membership user.
+  SELECT count(*) INTO tenantUserRows FROM "AuditEvent"
+  WHERE "actorType" = 'TENANT_USER' AND "actorUserId" IS NOT NULL;
+  IF tenantUserRows <> 2 THEN
+    RAISE EXCEPTION 'Expected exactly two TENANT_USER rows with a resolved actor user id';
+  END IF;
+
+  -- tenant/platform SYSTEM rows must carry no actor user id.
+  SELECT count(*) INTO systemRows FROM "AuditEvent"
+  WHERE "actorType" = 'SYSTEM' AND "actorUserId" IS NOT NULL;
+  IF systemRows <> 0 THEN
+    RAISE EXCEPTION 'SYSTEM events must not gain an actor user id';
+  END IF;
+
+  -- No non-TENANT_USER row may gain a tenant actor user id.
+  SELECT count(*) INTO totalRows FROM "AuditEvent"
+  WHERE "actorType" <> 'TENANT_USER' AND "actorUserId" IS NOT NULL;
   IF totalRows <> 0 THEN
-    RAISE EXCEPTION 'SYSTEM/PLATFORM user events must not gain an actor user id';
+    RAISE EXCEPTION 'SYSTEM/PLATFORM_USER rows must not gain a tenant actor user id';
   END IF;
 END $$;
 `,
