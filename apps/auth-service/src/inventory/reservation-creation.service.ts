@@ -217,6 +217,7 @@ export class ReservationCreationService {
           await this.audit.appendTenantUser(transaction, {
             tenantId: command.actor.tenantId,
             actorMembershipId: command.actor.membershipId,
+            actorUserId: command.actor.userId,
             eventType: 'inventory.reservation.created',
             outcome: 'SUCCEEDED',
             resourceType: 'MedicineReservation',

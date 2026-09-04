@@ -344,7 +344,8 @@ model User {
 
   memberships            TenantMembership[]
   sessions               UserSession[]
-  platformAuditEvents    AuditEvent[]
+  platformAuditEvents    AuditEvent[]                 @relation("AuditEventPlatformActor")
+  actorAuditEvents       AuditEvent[]                 @relation("AuditEventActorUser")
   privacy                UserPrivacy?
   medicineReservations   MedicineReservation[]
   verificationAttempts   AccountVerificationAttempt[]
@@ -449,14 +450,14 @@ model TenantMembership {
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
-  sessions               UserSession[]
-  roleAssignments        MembershipRole[]
-  auditEvents            AuditEvent[]
-  stockMovements         StockMovement[]
-  providerAccess         MembershipProviderAccess[]
-  batchQuarantineRecords BatchQuarantineRecord[]
-  outboxEvents           OutboxEvent[]
-  createdOrganizationJoinCodes OrganizationJoinCode[] @relation("OrganizationJoinCodeCreatedBy")
+  sessions                     UserSession[]
+  roleAssignments              MembershipRole[]
+  auditEvents                  AuditEvent[]
+  stockMovements               StockMovement[]
+  providerAccess               MembershipProviderAccess[]
+  batchQuarantineRecords       BatchQuarantineRecord[]
+  outboxEvents                 OutboxEvent[]
+  createdOrganizationJoinCodes OrganizationJoinCode[]     @relation("OrganizationJoinCodeCreatedBy")
 
   @@unique([tenantId, userId])
   @@unique([id, tenantId])
@@ -643,9 +644,9 @@ model UserSession {
   /// session and issues a fresh access token carrying the new version.
   lockedAt        DateTime?
   lockReason      String?   @db.VarChar(120)
-  unlockedAt            DateTime?
-  unlockMethod          String?   @db.VarChar(40)
-  securityVersion       Int       @default(1)
+  unlockedAt      DateTime?
+  unlockMethod    String?   @db.VarChar(40)
+  securityVersion Int       @default(1)
 
   /// Task 0014: server-authoritative time of the most recent real
   /// credential proof. Normal refresh must carry this value forward
@@ -1079,6 +1080,13 @@ model AuditEvent {
   outcome             AuditOutcome
   tenantId            String?        @db.Uuid
   actorMembershipId   String?        @db.Uuid
+  /// Task 0019: immutable exact-user attribution for TENANT_USER events.
+  /// The composite FK (actorMembershipId, actorUserId, tenantId) proves the
+  /// membership-user-tenant triple at write time and prevents cross-tenant
+  /// spoofing or pairing an arbitrary user with another user's membership.
+  /// This remains attributable after membership suspension/revocation because
+  /// the FK is RESTRICT and membership rows are never deleted.
+  actorUserId         String?        @db.Uuid
   platformActorUserId String?        @db.Uuid
   eventType           String         @db.VarChar(120)
   resourceType        String?        @db.VarChar(80)
@@ -1090,12 +1098,14 @@ model AuditEvent {
   occurredAt          DateTime       @default(now())
 
   tenant            Tenant?           @relation(fields: [tenantId], references: [id], onDelete: Restrict)
-  actorMembership   TenantMembership? @relation(fields: [actorMembershipId, tenantId], references: [id, tenantId], onDelete: Restrict)
-  platformActorUser User?             @relation(fields: [platformActorUserId], references: [id], onDelete: Restrict)
+  actorMembership   TenantMembership? @relation(fields: [actorMembershipId, actorUserId, tenantId], references: [id, userId, tenantId], onDelete: Restrict)
+  actorUser         User?             @relation("AuditEventActorUser", fields: [actorUserId], references: [id], onDelete: Restrict)
+  platformActorUser User?             @relation("AuditEventPlatformActor", fields: [platformActorUserId], references: [id], onDelete: Restrict)
 
   @@index([tenantId, occurredAt(sort: Desc), id(sort: Desc)])
   @@index([tenantId, eventType, occurredAt(sort: Desc)])
   @@index([actorMembershipId, occurredAt(sort: Desc)])
+  @@index([actorUserId, occurredAt(sort: Desc)])
   @@index([platformActorUserId, occurredAt(sort: Desc)])
   @@index([resourceType, resourceId, occurredAt(sort: Desc)])
 }

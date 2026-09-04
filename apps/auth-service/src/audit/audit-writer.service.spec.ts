@@ -16,10 +16,12 @@ describe('AuditWriter', () => {
   it('writes a bounded tenant event with an attributable actor and request context', async () => {
     const tenantId = randomUUID();
     const actorMembershipId = randomUUID();
+    const actorUserId = randomUUID();
 
     await writer.appendTenantUser(database, {
       tenantId,
       actorMembershipId,
+      actorUserId,
       eventType: 'authorization.role.created',
       outcome: 'SUCCEEDED',
       resourceType: 'authorization-role',
@@ -42,6 +44,7 @@ describe('AuditWriter', () => {
         actorType: 'TENANT_USER',
         tenantId,
         actorMembershipId,
+        actorUserId,
         eventType: 'authorization.role.created',
         outcome: 'SUCCEEDED',
         requestId: 'request-123',
@@ -50,6 +53,49 @@ describe('AuditWriter', () => {
       }),
       select: { id: true },
     });
+  });
+
+  it('rejects a TENANT_USER event without an exact authenticated user id before persisting', async () => {
+    const tenantId = randomUUID();
+    const actorMembershipId = randomUUID();
+
+    await expect(
+      writer.appendTenantUser(database, {
+        tenantId,
+        actorMembershipId,
+        actorUserId: '',
+        eventType: 'authorization.role.created',
+        outcome: 'SUCCEEDED',
+        resourceType: 'authorization-role',
+        resourceId: randomUUID(),
+        metadata: {
+          roleName: 'PHARMACY_MANAGER',
+          roleVersion: 1,
+          permissionCount: 2,
+        },
+      }),
+    ).rejects.toThrow('Authenticated user id is required for TENANT_USER audit events');
+    expect(create).not.toHaveBeenCalled();
+  });
+
+  it('never writes a user identifier on SYSTEM or platform-system evidence', async () => {
+    await writer.appendSystem(database, {
+      eventType: 'authentication.session.refresh.failed',
+      outcome: 'DENIED',
+      resourceType: 'authentication-session',
+      resourceId: randomUUID(),
+      metadata: { reason: 'session-not-found' },
+    });
+
+    expect(create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        scope: 'PLATFORM',
+        actorType: 'SYSTEM',
+      }),
+      select: { id: true },
+    });
+    expect(create.mock.calls[0]?.[0]?.data).not.toHaveProperty('actorUserId');
+    expect(create.mock.calls[0]?.[0]?.data).not.toHaveProperty('platformActorUserId');
   });
 
   it('rejects an unknown event before touching persistence', async () => {
@@ -124,5 +170,7 @@ describe('AuditWriter', () => {
       select: { id: true },
     });
     expect(create.mock.calls[0]?.[0]?.data).not.toHaveProperty('tenantId');
+    expect(create.mock.calls[0]?.[0]?.data).not.toHaveProperty('actorUserId');
+    expect(create.mock.calls[0]?.[0]?.data).not.toHaveProperty('actorMembershipId');
   });
 });

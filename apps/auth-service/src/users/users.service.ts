@@ -60,6 +60,7 @@ export class UsersService {
       outcome: 'SUCCEEDED',
       tenantId: identity.tenantId,
       actorMembershipId: identity.membershipId,
+      actorUserId: identity.userId,
       metadata: { preferenceKeys },
     });
 

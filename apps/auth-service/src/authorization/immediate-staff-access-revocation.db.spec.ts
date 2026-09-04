@@ -975,6 +975,53 @@ infrastructure('Task 0018 Immediate Staff Access Revocation (DB Integration)', (
     ).rejects.toThrow(ForbiddenException);
   });
 
+  it('attributes revocation evidence to the exact authenticated administrator', async () => {
+    // The target membership must belong to a user who is not already a member
+    // of tenant A (TenantMembership is unique per (tenantId, userId)).
+    const targetUserId = randomUUID();
+    const targetMembershipId = randomUUID();
+    await prisma.client.user.create({
+      data: {
+        id: targetUserId,
+        email: `target-${targetUserId}@medsphere.test`,
+        passwordHash: 'integration-placeholder-hash',
+        firstName: 'Target',
+        lastName: 'User',
+        status: 'ACTIVE',
+      },
+    });
+    await prisma.client.tenantMembership.create({
+      data: {
+        id: targetMembershipId,
+        tenantId: tenantAId,
+        userId: targetUserId,
+        status: 'ACTIVE',
+        joinedAt: new Date(),
+      },
+    });
+
+    await authorizationService.updateMembershipStatus(
+      adminIdentity,
+      targetMembershipId,
+      { status: 'REVOKED' },
+      { requestId: 'req-exact-admin-revoke' },
+    );
+
+    const evidence = await prisma.client.auditEvent.findFirstOrThrow({
+      where: {
+        tenantId: tenantAId,
+        resourceId: targetMembershipId,
+        eventType: 'authorization.membership.revoked',
+        outcome: 'SUCCEEDED',
+      },
+    });
+    // Task 0019: the evidence must name the exact administrator (not merely the
+    // membership) so revocation actions remain attributable after any change.
+    expect(evidence.actorUserId).toBe(secondAdminUserId);
+    expect(evidence.actorMembershipId).toBe(adminMembershipAId);
+    expect(evidence.tenantId).toBe(tenantAId);
+  });
+
   it('writes immutable audit evidence and contains no sensitive credential data', async () => {
     const auditUserId = randomUUID();
     const auditMembershipId = randomUUID();

@@ -291,6 +291,7 @@ describeAuthorizationInfra('S0.4 PostgreSQL authorization and durable-audit inte
       auditWriter.appendTenantUser(prisma.client, {
         tenantId: tenantAId,
         actorMembershipId: membershipBId,
+        actorUserId: sharedUserId,
         eventType: 'authorization.permission.denied',
         outcome: 'DENIED',
         metadata: { requiredPermissions: PERMISSIONS.rolesDelete },
@@ -300,6 +301,7 @@ describeAuthorizationInfra('S0.4 PostgreSQL authorization and durable-audit inte
     await auditWriter.appendTenantUser(prisma.client, {
       tenantId: tenantAId,
       actorMembershipId: membershipAId,
+      actorUserId: sharedUserId,
       eventType: 'authorization.permission.denied',
       outcome: 'DENIED',
       metadata: { requiredPermissions: PERMISSIONS.rolesDelete },
@@ -585,6 +587,7 @@ describeAuthorizationInfra('S0.4 PostgreSQL authorization and durable-audit inte
         outcome: 'DENIED' as const,
         tenantId: tenantAId,
         actorMembershipId: membershipAId,
+        actorUserId: sharedUserId,
         eventType: 'authorization.permission.denied',
         resourceType: 'pagination-probe',
         resourceId,
@@ -612,6 +615,144 @@ describeAuthorizationInfra('S0.4 PostgreSQL authorization and durable-audit inte
           event.resourceId === sharedUserId,
       ),
     ).toBe(false);
+  });
+
+  it('persists the exact authenticated user id and keeps two same-role users distinguishable', async () => {
+    // Both identities hold the same TENANT_ADMINISTRATOR role in tenant A, so
+    // only the exact actorUserId can tell their audit trails apart.
+    const roleName = `DISTINGUISH_PROBE_${randomUUID().replaceAll('-', '').slice(0, 12).toUpperCase()}`;
+    const created = await authorizationService.createRole(identityA, {
+      name: roleName,
+      permissionKeys: [PERMISSIONS.rolesRead],
+    });
+
+    await authorizationService.updateRole(identityA2, created.id, 1, {
+      description: 'Updated by the second administrator',
+    });
+
+    const events = await prisma.client.auditEvent.findMany({
+      where: { tenantId: tenantAId, resourceType: 'authorization-role', resourceId: created.id },
+      orderBy: { occurredAt: 'asc' },
+    });
+
+    expect(events).toHaveLength(2);
+    expect(events.map((event) => event.actorUserId)).toEqual([
+      sharedUserId,
+      secondAdministratorUserId,
+    ]);
+    expect(events.map((event) => event.actorMembershipId).sort()).toEqual(
+      [membershipAId, membershipA2Id].sort(),
+    );
+    expect(events.every((event) => event.tenantId === tenantAId)).toBe(true);
+  });
+
+  it('rejects actor identity spoofing and tenant-boundary crossing below the application layer', async () => {
+    // A user who belongs to the tenant but not to this membership cannot be
+    // paired with the membership: the composite membership-user-tenant FK
+    // rejects the mismatch even though both ids exist independently.
+    await expect(
+      prisma.client.auditEvent.create({
+        data: {
+          id: randomUUID(),
+          scope: 'TENANT',
+          actorType: 'TENANT_USER',
+          outcome: 'DENIED',
+          tenantId: tenantAId,
+          actorMembershipId: membershipAId,
+          actorUserId: secondAdministratorUserId,
+          eventType: 'authorization.permission.denied',
+          metadata: { requiredPermissions: PERMISSIONS.rolesDelete },
+        },
+      }),
+    ).rejects.toBeDefined();
+
+    // A membership from tenant B cannot be recorded as an actor in tenant A,
+    // regardless of the supplied user id.
+    await expect(
+      prisma.client.auditEvent.create({
+        data: {
+          id: randomUUID(),
+          scope: 'TENANT',
+          actorType: 'TENANT_USER',
+          outcome: 'DENIED',
+          tenantId: tenantAId,
+          actorMembershipId: membershipBId,
+          actorUserId: sharedUserId,
+          eventType: 'authorization.permission.denied',
+          metadata: { requiredPermissions: PERMISSIONS.rolesDelete },
+        },
+      }),
+    ).rejects.toBeDefined();
+
+    // TENANT_USER rows must always carry the exact authenticated actor user id.
+    await expect(
+      prisma.client.auditEvent.create({
+        data: {
+          id: randomUUID(),
+          scope: 'TENANT',
+          actorType: 'TENANT_USER',
+          outcome: 'DENIED',
+          tenantId: tenantAId,
+          actorMembershipId: membershipAId,
+          eventType: 'authorization.permission.denied',
+          metadata: { requiredPermissions: PERMISSIONS.rolesDelete },
+        },
+      }),
+    ).rejects.toBeDefined();
+  });
+
+  it('keeps SYSTEM and PLATFORM_USER evidence free of the tenant actor user id', async () => {
+    await auditWriter.appendTenantSystem(prisma.client, {
+      tenantId: tenantAId,
+      eventType: 'inventory.reservation.expired',
+      outcome: 'SUCCEEDED',
+      resourceType: 'MedicineReservation',
+      resourceId: randomUUID(),
+      metadata: { cause: 'BATCH_EXPIRY' },
+    });
+
+    const systemEvent = await prisma.client.auditEvent.findFirstOrThrow({
+      where: { tenantId: tenantAId, eventType: 'inventory.reservation.expired' },
+      orderBy: { occurredAt: 'desc' },
+    });
+    expect(systemEvent.actorType).toBe('SYSTEM');
+    expect(systemEvent.actorUserId).toBeNull();
+    expect(systemEvent.actorMembershipId).toBeNull();
+    expect(systemEvent.platformActorUserId).toBeNull();
+
+    await auditWriter.appendPlatformUser(prisma.client, {
+      platformActorUserId: sharedUserId,
+      eventType: 'authentication.sessions.logout.succeeded',
+      outcome: 'SUCCEEDED',
+      resourceType: 'global-user-sessions',
+      resourceId: sharedUserId,
+      metadata: { revokedCount: 0 },
+    });
+
+    const platformEvent = await prisma.client.auditEvent.findFirstOrThrow({
+      where: { platformActorUserId: sharedUserId },
+      orderBy: { occurredAt: 'desc' },
+    });
+    expect(platformEvent.actorType).toBe('PLATFORM_USER');
+    expect(platformEvent.actorUserId).toBeNull();
+    expect(platformEvent.tenantId).toBeNull();
+    expect(platformEvent.actorMembershipId).toBeNull();
+
+    // SYSTEM events must never accept a user identifier.
+    await expect(
+      prisma.client.auditEvent.create({
+        data: {
+          id: randomUUID(),
+          scope: 'TENANT',
+          actorType: 'SYSTEM',
+          outcome: 'SUCCEEDED',
+          tenantId: tenantAId,
+          actorUserId: sharedUserId,
+          eventType: 'inventory.reservation.expired',
+          metadata: { cause: 'EXPIRY' },
+        },
+      }),
+    ).rejects.toBeDefined();
   });
 
   function queryForPagination(resourceId: string): AuditEventQueryDto {

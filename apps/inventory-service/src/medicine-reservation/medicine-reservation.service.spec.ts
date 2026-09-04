@@ -23,7 +23,7 @@ function createHarness() {
   return { audit, client, service, transaction };
 }
 
-const actor = { tenantId: 'tenant-1', membershipId: 'membership-1' };
+const actor = { tenantId: 'tenant-1', membershipId: 'membership-1', userId: 'user-1' };
 const command = {
   actor,
   providerId: 'provider-1',
@@ -112,6 +112,9 @@ describe('MedicineReservationService', () => {
     expect(harness.audit.appendTenantUser).toHaveBeenCalledWith(
       harness.transaction,
       expect.objectContaining({
+        tenantId: actor.tenantId,
+        actorMembershipId: actor.membershipId,
+        actorUserId: actor.userId,
         eventType: 'inventory.reservation.created',
         metadata: { itemCount: 1, totalQuantity: 7, expiresAt: command.expiresAt.toISOString() },
       }),

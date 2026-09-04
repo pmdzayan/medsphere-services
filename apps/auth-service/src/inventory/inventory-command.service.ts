@@ -143,6 +143,7 @@ export class InventoryCommandService {
         await this.audit.appendTenantUser(transaction, {
           tenantId: command.actor.tenantId,
           actorMembershipId: command.actor.membershipId,
+          actorUserId: command.actor.userId,
           eventType: 'inventory.listing.configured',
           outcome: 'SUCCEEDED',
           resourceType: 'Inventory',
@@ -278,6 +279,7 @@ export class InventoryCommandService {
           await this.audit.appendTenantUser(transaction, {
             tenantId: command.actor.tenantId,
             actorMembershipId: command.actor.membershipId,
+            actorUserId: command.actor.userId,
             eventType: 'inventory.batch.received',
             outcome: 'SUCCEEDED',
             resourceType: 'Batch',
@@ -405,6 +407,7 @@ export class InventoryCommandService {
           await this.audit.appendTenantUser(transaction, {
             tenantId: command.actor.tenantId,
             actorMembershipId: command.actor.membershipId,
+            actorUserId: command.actor.userId,
             eventType: 'inventory.stock.adjusted',
             outcome: 'SUCCEEDED',
             resourceType: 'Batch',

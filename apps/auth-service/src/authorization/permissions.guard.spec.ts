@@ -68,6 +68,7 @@ describe('PermissionsGuard', () => {
     expect(appendTenantUser).toHaveBeenCalledWith(prismaClient, {
       tenantId: identity.tenantId,
       actorMembershipId: identity.membershipId,
+      actorUserId: identity.userId,
       eventType: 'authorization.permission.denied',
       outcome: 'DENIED',
       metadata: {
