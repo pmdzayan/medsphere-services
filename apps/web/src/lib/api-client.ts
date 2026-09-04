@@ -59,6 +59,7 @@ import {
   type ReservationTransitionRequest,
   type ReservationTransitionResponse,
 } from './reservation-contract';
+import type { PatientProfile, UpdatePatientProfileRequest } from './patient-profile-contract';
 
 export class ApiError extends Error {
   constructor(
@@ -478,6 +479,24 @@ export async function setRoleAssignment(
 ): Promise<void> {
   await requestJson<void>(`/api/authorization/memberships/${membershipId}/roles/${roleId}`, {
     method: assigned ? 'PUT' : 'DELETE',
+  });
+}
+
+/**
+ * Candidate Task 0032 (pre-0031). See
+ * docs/candidates/0032-patient-identity-profile-dashboard-pre0031.md
+ */
+export async function getPatientProfile(): Promise<PatientProfile> {
+  return requestJson<PatientProfile>('/api/patient/profile');
+}
+
+export async function updatePatientProfile(
+  request: UpdatePatientProfileRequest,
+): Promise<PatientProfile> {
+  return requestJson<PatientProfile>('/api/patient/profile', {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(request),
   });
 }
 

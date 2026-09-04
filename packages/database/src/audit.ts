@@ -50,6 +50,10 @@ export const AUDIT_EVENT_TYPES = [
   'privacy.consent.withdrawn',
   'privacy.preference.changed',
   'inventory.listing.configured',
+  /// Candidate Task 0032 (pre-0031): a global personal-identity
+  /// action, always written via appendPlatformUser -- see
+  /// PatientProfileService.
+  'patient.profile.updated',
   'inventory.batch.received',
   'inventory.stock.adjusted',
   'inventory.stock.transferred',
@@ -121,6 +125,7 @@ export const AUDIT_METADATA_KEYS = {
   'privacy.consent.withdrawn': ['category'],
   'privacy.preference.changed': ['preferenceKeys'],
   'inventory.listing.configured': ['productId', 'version'],
+  'patient.profile.updated': ['fieldsChanged'],
   'inventory.batch.received': ['productId', 'quantity'],
   'inventory.stock.adjusted': ['productId', 'delta', 'onHandBefore', 'onHandAfter'],
   'inventory.stock.transferred': [
