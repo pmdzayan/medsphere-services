@@ -604,6 +604,101 @@ describeSessionInfra('SessionRepository PostgreSQL security integration', () => 
     ).rejects.toThrow();
   });
 
+  it('records refresh and logout lifecycles with exact-user attribution', async () => {
+    const sessionId = randomUUID();
+    const familyId = randomUUID();
+    const h1 = (randomUUID() + randomUUID()).replace(/-/g, '').slice(0, 64);
+    const h2 = (randomUUID() + randomUUID()).replace(/-/g, '').slice(0, 64);
+    const nextSessionId = randomUUID();
+    await createActiveSession(sessionId, familyId, h1);
+
+    const createdAudit = await prisma.client.auditEvent.findFirstOrThrow({
+      where: { tenantId, eventType: 'authentication.session.created', resourceId: sessionId },
+    });
+    expect(createdAudit.actorUserId).toBe(userId);
+    expect(createdAudit.actorMembershipId).toBe(membershipId);
+
+    const rotated = await repository.rotateSession({
+      currentSessionId: sessionId,
+      presentedHash: h1,
+      nextSessionId,
+      nextRefreshTokenHash: h2,
+      idleTtlSeconds: 3600,
+      metadata,
+    });
+    expect(rotated.status).toBe('ROTATED');
+
+    const refreshAudit = await prisma.client.auditEvent.findFirstOrThrow({
+      where: {
+        tenantId,
+        eventType: 'authentication.session.refresh.succeeded',
+        resourceId: nextSessionId,
+      },
+    });
+    expect(refreshAudit.actorUserId).toBe(userId);
+    expect(refreshAudit.actorMembershipId).toBe(membershipId);
+
+    const logoutCount = await repository.revokeCurrentFamily(
+      {
+        userId,
+        membershipId,
+        tenantId,
+        sessionId: nextSessionId,
+        tokenId: randomUUID(),
+        securityVersion: 1,
+      },
+      metadata,
+    );
+    expect(logoutCount).toBeGreaterThan(0);
+
+    const logoutAudit = await prisma.client.auditEvent.findFirstOrThrow({
+      where: {
+        tenantId,
+        eventType: 'authentication.session.logout.succeeded',
+        resourceId: nextSessionId,
+      },
+    });
+    expect(logoutAudit.actorUserId).toBe(userId);
+    expect(logoutAudit.actorMembershipId).toBe(membershipId);
+  });
+
+  it('never fabricates a user identity for missing-session refresh attempts', async () => {
+    const unknownSessionId = randomUUID();
+    const hProbe = (randomUUID() + randomUUID()).replace(/-/g, '').slice(0, 64);
+
+    await expect(
+      repository.rotateSession({
+        currentSessionId: unknownSessionId,
+        presentedHash: hProbe,
+        nextSessionId: randomUUID(),
+        nextRefreshTokenHash: hProbe,
+        idleTtlSeconds: 3600,
+        metadata,
+      }),
+    ).resolves.toEqual({ status: 'INVALID' });
+
+    const deniedAudit = await prisma.client.auditEvent.findFirstOrThrow({
+      where: {
+        eventType: 'authentication.session.refresh.failed',
+        resourceId: unknownSessionId,
+      },
+      orderBy: { occurredAt: 'desc' },
+    });
+    // No authenticated human actor exists for an unknown session: evidence must
+    // be SYSTEM/service-scoped -- never a fabricated user, membership, or
+    // session-id masquerading as an actor user id.
+    expect(deniedAudit.actorType).toBe('SYSTEM');
+    expect(deniedAudit.actorUserId).toBeNull();
+    expect(deniedAudit.actorMembershipId).toBeNull();
+    expect(deniedAudit.outcome).toBe('DENIED');
+    expect(deniedAudit.metadata).toMatchObject({ reason: 'session-not-found' });
+
+    const fabricated = await prisma.client.auditEvent.count({
+      where: { actorUserId: unknownSessionId },
+    });
+    expect(fabricated).toBe(0);
+  });
+
   async function createActiveSession(
     id: string,
     familyId: string,

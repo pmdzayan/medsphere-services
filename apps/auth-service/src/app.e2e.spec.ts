@@ -843,6 +843,7 @@ describe('S0.4 authentication and authorization HTTP security boundary', () => {
       expect.objectContaining({
         tenantId,
         actorMembershipId: membershipId,
+        actorUserId: userId,
         eventType: 'authorization.permission.denied',
         request: expect.objectContaining({ requestId: 'e2e-denial-1' }),
       }),

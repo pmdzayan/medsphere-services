@@ -124,6 +124,7 @@ export class OrganizationOnboardingService {
       await this.audit.appendTenantUser(transaction, {
         tenantId: identity.tenantId,
         actorMembershipId: identity.membershipId,
+        actorUserId: identity.userId,
         eventType: 'authentication.organization.join.code.issued',
         outcome: 'SUCCEEDED',
         resourceType: 'OrganizationJoinCode',
@@ -167,6 +168,7 @@ export class OrganizationOnboardingService {
       await this.audit.appendTenantUser(transaction, {
         tenantId: identity.tenantId,
         actorMembershipId: identity.membershipId,
+        actorUserId: identity.userId,
         eventType: 'authentication.organization.join.code.revoked',
         outcome: 'SUCCEEDED',
         resourceType: 'OrganizationJoinCode',

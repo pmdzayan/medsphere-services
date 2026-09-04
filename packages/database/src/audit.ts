@@ -145,6 +145,9 @@ interface AuditEventInput {
 export interface TenantUserAuditEventInput extends AuditEventInput {
   readonly tenantId: string;
   readonly actorMembershipId: string;
+  /** Task 0019: exact authenticated user responsible for the action. Must come
+   *  only from trusted server-side authentication context, never client input. */
+  readonly actorUserId: string;
 }
 
 export interface TenantSystemAuditEventInput extends AuditEventInput {
@@ -203,6 +206,9 @@ function validateMetadataValue(value: unknown): asserts value is AuditMetadataVa
 
 export class AuditWriter {
   async appendTenantUser(database: AuditDatabase, input: TenantUserAuditEventInput): Promise<void> {
+    if (typeof input.actorUserId !== 'string' || input.actorUserId.length === 0) {
+      throw new Error('Authenticated user id is required for TENANT_USER audit events');
+    }
     await database.auditEvent.create({
       data: {
         id: randomUUID(),
@@ -211,6 +217,7 @@ export class AuditWriter {
         actorType: 'TENANT_USER',
         tenantId: input.tenantId,
         actorMembershipId: input.actorMembershipId,
+        actorUserId: input.actorUserId,
       },
       select: { id: true },
     });

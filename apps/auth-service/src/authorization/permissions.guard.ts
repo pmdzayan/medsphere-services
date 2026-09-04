@@ -43,6 +43,7 @@ export class PermissionsGuard implements CanActivate {
     await this.auditWriter.appendTenantUser(this.prisma.client, {
       tenantId: identity.tenantId,
       actorMembershipId: identity.membershipId,
+      actorUserId: identity.userId,
       eventType: 'authorization.permission.denied',
       outcome: 'DENIED',
       metadata: { requiredPermissions: [...required].sort().join(',') },

@@ -293,6 +293,7 @@ export class InventoryTransferService {
         await this.audit.appendTenantUser(tx, {
           tenantId: command.actor.tenantId,
           actorMembershipId: command.actor.membershipId,
+          actorUserId: command.actor.userId,
           eventType: 'inventory.stock.transferred',
           outcome: 'SUCCEEDED',
           resourceType: 'InventoryTransfer',

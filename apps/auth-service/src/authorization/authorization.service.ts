@@ -106,6 +106,7 @@ export class AuthorizationService {
         await this.auditWriter.appendTenantUser(transaction, {
           tenantId: identity.tenantId,
           actorMembershipId: identity.membershipId,
+          actorUserId: identity.userId,
           eventType: 'authorization.role.created',
           outcome: 'SUCCEEDED',
           resourceType: 'authorization-role',
@@ -191,6 +192,7 @@ export class AuthorizationService {
         await this.auditWriter.appendTenantUser(transaction, {
           tenantId: identity.tenantId,
           actorMembershipId: identity.membershipId,
+          actorUserId: identity.userId,
           eventType: 'authorization.role.updated',
           outcome: 'SUCCEEDED',
           resourceType: 'authorization-role',
@@ -235,6 +237,7 @@ export class AuthorizationService {
       await this.auditWriter.appendTenantUser(transaction, {
         tenantId: identity.tenantId,
         actorMembershipId: identity.membershipId,
+        actorUserId: identity.userId,
         eventType: 'authorization.role.deleted',
         outcome: 'SUCCEEDED',
         resourceType: 'authorization-role',
@@ -325,6 +328,7 @@ export class AuthorizationService {
           await this.auditWriter.appendTenantUser(transaction, {
             tenantId: identity.tenantId,
             actorMembershipId: identity.membershipId,
+            actorUserId: identity.userId,
             eventType: 'authorization.assignment.added',
             outcome: 'SUCCEEDED',
             resourceType: 'membership-role-assignment',
@@ -383,6 +387,7 @@ export class AuthorizationService {
       await this.auditWriter.appendTenantUser(transaction, {
         tenantId: identity.tenantId,
         actorMembershipId: identity.membershipId,
+        actorUserId: identity.userId,
         eventType: 'authorization.assignment.removed',
         outcome: 'SUCCEEDED',
         resourceType: 'membership-role-assignment',
@@ -450,6 +455,7 @@ export class AuthorizationService {
           await this.auditWriter.appendTenantUser(transaction, {
             tenantId: identity.tenantId,
             actorMembershipId: identity.membershipId,
+            actorUserId: identity.userId,
             eventType: 'authorization.provider-access.added',
             outcome: 'SUCCEEDED',
             resourceType: 'membership-provider-access',
@@ -502,6 +508,7 @@ export class AuthorizationService {
       await this.auditWriter.appendTenantUser(transaction, {
         tenantId: identity.tenantId,
         actorMembershipId: identity.membershipId,
+        actorUserId: identity.userId,
         eventType: 'authorization.provider-access.removed',
         outcome: 'SUCCEEDED',
         resourceType: 'membership-provider-access',
@@ -618,6 +625,7 @@ export class AuthorizationService {
       await this.auditWriter.appendTenantUser(transaction, {
         tenantId: identity.tenantId,
         actorMembershipId: identity.membershipId,
+        actorUserId: identity.userId,
         eventType,
         outcome: 'SUCCEEDED',
         resourceType: 'tenant-membership',

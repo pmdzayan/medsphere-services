@@ -1,6 +1,7 @@
 export interface TrustedTenantActor {
   readonly tenantId: string;
   readonly membershipId: string;
+  readonly userId: string;
 }
 
 export interface FefoCandidate {

@@ -157,6 +157,7 @@ export class InventoryDamageService {
         await this.audit.appendTenantUser(transaction, {
           tenantId: command.actor.tenantId,
           actorMembershipId: command.actor.membershipId,
+          actorUserId: command.actor.userId,
           eventType: 'inventory.stock.damaged',
           outcome: 'SUCCEEDED',
           resourceType: 'Batch',

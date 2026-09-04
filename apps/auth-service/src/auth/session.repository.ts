@@ -74,6 +74,7 @@ export class SessionRepository {
       await this.auditWriter.appendTenantUser(transaction, {
         tenantId: data.tenantId,
         actorMembershipId: data.membershipId,
+        actorUserId: data.userId,
         eventType: 'authentication.session.created',
         outcome: 'SUCCEEDED',
         resourceType: 'authentication-session',
@@ -179,6 +180,7 @@ export class SessionRepository {
       await this.auditWriter.appendTenantUser(transaction, {
         tenantId: identity.tenantId,
         actorMembershipId: identity.membershipId,
+        actorUserId: identity.userId,
         eventType: 'authentication.session.locked',
         outcome: 'SUCCEEDED',
         resourceType: 'authentication-session',
@@ -221,15 +223,34 @@ export class SessionRepository {
         },
       });
 
-      if (!session || session.status !== 'ACTIVE' || session.lockedAt === null) {
-        const actor = session
-          ? { tenantId: session.membership.tenantId, actorMembershipId: session.membershipId }
-          : { tenantId: data.currentSessionId, actorMembershipId: data.currentSessionId };
+      if (!session) {
+        // No session or membership could be resolved for the presented credential
+        // claim: there is NO authenticated human actor. We must never fabricate a
+        // user identity from a session id or any other non-user identifier.
+        // Record the evidence under SYSTEM/service audit semantics instead,
+        // mirroring the unknown-session path used by rotateSession.
+        await this.auditWriter.appendSystem(transaction, {
+          eventType: 'authentication.session.refresh.failed',
+          outcome: 'DENIED',
+          resourceType: 'authentication-session',
+          resourceId: data.currentSessionId,
+          metadata: { reason: 'session-not-found' },
+          request: data.metadata,
+        });
+        return { status: 'INVALID' } as const;
+      }
+
+      if (session.status !== 'ACTIVE' || session.lockedAt === null) {
+        const actor = {
+          tenantId: session.membership.tenantId,
+          actorMembershipId: session.membershipId,
+          actorUserId: session.membership.userId,
+        };
         await this.writeRefreshFailure(
           transaction,
           actor,
-          session?.id ?? data.currentSessionId,
-          session?.familyId ?? 'unknown-family',
+          session.id,
+          session.familyId,
           'session-not-locked',
           data.metadata,
         );
@@ -239,6 +260,7 @@ export class SessionRepository {
       const tenantActor = {
         tenantId: session.membership.tenantId,
         actorMembershipId: session.membershipId,
+        actorUserId: session.membership.userId,
       };
 
       const credential = await transaction.userSessionRefreshCredential.findFirst({
@@ -359,6 +381,7 @@ export class SessionRepository {
       await this.auditWriter.appendTenantUser(transaction, {
         tenantId: identity.tenantId,
         actorMembershipId: identity.membershipId,
+        actorUserId: identity.userId,
         eventType: 'authentication.session.reauthenticated',
         outcome: 'SUCCEEDED',
         resourceType: 'authentication-session',
@@ -409,6 +432,7 @@ export class SessionRepository {
       await this.auditWriter.appendTenantUser(transaction, {
         tenantId: identity.tenantId,
         actorMembershipId: identity.membershipId,
+        actorUserId: identity.userId,
         eventType,
         outcome: 'SUCCEEDED',
         resourceType: 'authentication-session',
@@ -437,7 +461,7 @@ export class SessionRepository {
       unlockMethod: string;
       idleTtlSeconds: number;
       metadata: RequestMetadata;
-      tenantActor: { tenantId: string; actorMembershipId: string };
+      tenantActor: { tenantId: string; actorMembershipId: string; actorUserId: string };
       now: Date;
     },
   ): Promise<RotationResult> {
@@ -595,6 +619,7 @@ export class SessionRepository {
       const tenantActor = {
         tenantId: session.membership.tenantId,
         actorMembershipId: session.membershipId,
+        actorUserId: session.membership.userId,
       };
 
       const credential = await transaction.userSessionRefreshCredential.findFirst({
@@ -777,6 +802,7 @@ export class SessionRepository {
       await this.auditWriter.appendTenantUser(transaction, {
         tenantId: identity.tenantId,
         actorMembershipId: identity.membershipId,
+        actorUserId: identity.userId,
         eventType: 'authentication.session.logout.succeeded',
         outcome: 'SUCCEEDED',
         resourceType: 'authentication-session',
@@ -902,7 +928,7 @@ export class SessionRepository {
       nextRefreshTokenHash: string;
       idleTtlSeconds: number;
       metadata: RequestMetadata;
-      tenantActor: { tenantId: string; actorMembershipId: string };
+      tenantActor: { tenantId: string; actorMembershipId: string; actorUserId: string };
       now: Date;
     },
   ): Promise<RotationResult> {
@@ -1083,7 +1109,7 @@ export class SessionRepository {
 
   private async writeRefreshFailure(
     transaction: Prisma.TransactionClient,
-    tenantActor: { tenantId: string; actorMembershipId: string },
+    tenantActor: { tenantId: string; actorMembershipId: string; actorUserId: string },
     sessionId: string,
     familyId: string,
     reason: string,

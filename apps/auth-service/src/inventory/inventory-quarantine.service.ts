@@ -342,6 +342,7 @@ export class InventoryQuarantineService {
         await this.audit.appendTenantUser(transaction, {
           tenantId: batch.tenantId,
           actorMembershipId: command.actor.membershipId,
+          actorUserId: command.actor.userId,
           eventType: 'inventory.batch.quarantined',
           outcome: 'SUCCEEDED',
           resourceType: 'Batch',

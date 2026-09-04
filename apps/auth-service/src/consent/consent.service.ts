@@ -34,6 +34,7 @@ export class ConsentService {
       outcome: 'SUCCEEDED',
       tenantId: identity.tenantId,
       actorMembershipId: identity.membershipId,
+      actorUserId: identity.userId,
       // Only the bounded category name is recorded -- never the
       // source string verbatim beyond what's already a fixed,
       // non-identifying tag, and never any location/notification
