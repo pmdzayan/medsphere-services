@@ -1,10 +1,13 @@
 import type { AuditRequestContext } from '@medsphere/database';
+import type { TrustedTenantActor } from '@medsphere/security';
 
-export interface TrustedInventoryActor {
-  readonly tenantId: string;
-  readonly membershipId: string;
-  readonly userId: string;
-}
+/**
+ * Task 0020: the canonical trusted server-derived identity contract for
+ * tenant-human actors now lives in `@medsphere/security`. The inventory
+ * command surface keeps this type alias so existing call sites compile
+ * unchanged while sharing one verified identity shape with future verticals.
+ */
+export type TrustedInventoryActor = TrustedTenantActor;
 
 export interface ConfigureInventoryCommand {
   readonly actor: TrustedInventoryActor;
