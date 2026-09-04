@@ -21,6 +21,7 @@
     "@medsphere/database": "workspace:*",
     "@medsphere/i18n": "workspace:*",
     "@medsphere/logger": "workspace:*",
+    "@medsphere/security": "workspace:*",
     "@medsphere/validation": "workspace:*",
     "@nestjs/common": "^11.1.28",
     "@nestjs/core": "^11.1.28",
