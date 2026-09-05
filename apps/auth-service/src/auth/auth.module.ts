@@ -52,6 +52,9 @@ import { AuditPersistenceModule } from '../audit/audit-persistence.module';
     RecentAuthGuard,
     SessionRepository,
     TokenService,
+    PasswordService,
+    GoogleIdentityVerifierService,
+    AuthSecurityEventService,
   ],
 })
 export class AuthModule {}

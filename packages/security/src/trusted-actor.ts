@@ -92,6 +92,18 @@ export function isTrustedSystemActor(value: unknown): value is TrustedSystemActo
  * returning a looser object, so ambiguous/nullable identity can never reach a
  * tenant-scoped call path.
  */
+/**
+ * Fail-closed accessor for the platform-user variant. Throws rather than
+ * returning a looser object, so ambiguous/nullable identity can never reach a
+ * platform-scoped call path.
+ */
+export function requireTrustedPlatformActor(value: unknown): TrustedPlatformActor {
+  if (!isTrustedPlatformActor(value)) {
+    throw new Error('Trusted platform actor identity is missing or incomplete');
+  }
+  return value;
+}
+
 export function requireTrustedTenantActor(value: unknown): TrustedTenantActor {
   if (!isTrustedTenantActor(value)) {
     throw new Error('Trusted tenant actor identity is missing or incomplete');

@@ -308,6 +308,69 @@ describe('S0.4 authentication and authorization HTTP security boundary', () => {
     expect(getPrivacy).not.toHaveBeenCalled();
   });
 
+  it('Task 0021: protects every platform administration route and never registers it as public', async () => {
+    const protectedRoute = await sendRequest('/platform/admins');
+    expect(protectedRoute).toMatchObject({
+      status: 401,
+      body: {
+        error: {
+          code: 'UnauthorizedException',
+          message: 'Authentication required',
+        },
+      },
+    });
+
+    const identityRoute = await sendRequest('/platform/identity');
+    expect(identityRoute.status).toBe(401);
+
+    const invitationsRoute = await sendRequest('/platform/invitations');
+    expect(invitationsRoute.status).toBe(401);
+
+    // A tenant access token must NEVER validate on a platform route. Issue a
+    // structurally valid tenant token and confirm the platform strategy
+    // rejects it before any database access (cryptographic separation).
+    const tenantToken = tokenService.issueAccessToken({
+      userId: randomUUID(),
+      membershipId: randomUUID(),
+      tenantId: randomUUID(),
+      sessionId: randomUUID(),
+      securityVersion: 1,
+    }).value;
+    const rejected = await sendRequest('/platform/admins', {
+      headers: { authorization: `Bearer ${tenantToken}` },
+    });
+    expect(rejected).toMatchObject({
+      status: 401,
+      body: { error: { code: 'UnauthorizedException' } },
+    });
+  });
+
+  it('Task 0021: keeps the platform login boundary public but never self-elevating', async () => {
+    // Platform login is an accepted public authentication boundary (like the
+    // tenant login), but a malformed body is rejected by DTO validation with
+    // the shared error envelope -- there is no "register as platform admin".
+    const login = await sendRequest('/platform/login', {
+      method: 'POST',
+      body: {},
+    });
+    expect(login).toMatchObject({
+      status: 400,
+      body: {
+        error: {
+          code: 'BadRequestException',
+          message: expect.any(String),
+        },
+      },
+    });
+
+    // There is no platform registration endpoint at all.
+    const register = await sendRequest('/platform/register', {
+      method: 'POST',
+      body: { email: 'x@x.test', password: 'y'.repeat(20) },
+    });
+    expect(register.status).toBe(404);
+  });
+
   it('propagates valid request identifiers and replaces unsafe identifiers', async () => {
     const accepted = await sendRequest('/users/me/privacy', {
       headers: { 'x-request-id': 'gateway:request-123' },
