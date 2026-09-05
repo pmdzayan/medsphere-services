@@ -17,7 +17,9 @@ describeUsersInfra('UsersRepository Google identity PostgreSQL isolation', () =>
   const tenantId = randomUUID();
   const otherTenantId = randomUUID();
   const userId = randomUUID();
+  const otherUserId = randomUUID();
   const membershipId = randomUUID();
+  const otherMembershipId = randomUUID();
   const googleIdentityId = randomUUID();
 
   const tenantSlug = `google-auth-${tenantId}`;
@@ -53,11 +55,32 @@ describeUsersInfra('UsersRepository Google identity PostgreSQL isolation', () =>
       },
     });
 
+    await prisma.client.user.create({
+      data: {
+        id: otherUserId,
+        email: `${otherUserId}@medsphere.test`,
+        passwordHash: 'integration-only-placeholder',
+        firstName: 'Other',
+        lastName: 'Account',
+        status: 'ACTIVE',
+      },
+    });
+
     await prisma.client.tenantMembership.create({
       data: {
         id: membershipId,
         tenantId,
         userId,
+        status: 'ACTIVE',
+        joinedAt: new Date(),
+      },
+    });
+
+    await prisma.client.tenantMembership.create({
+      data: {
+        id: otherMembershipId,
+        tenantId: otherTenantId,
+        userId: otherUserId,
         status: 'ACTIVE',
         joinedAt: new Date(),
       },
@@ -107,11 +130,11 @@ describeUsersInfra('UsersRepository Google identity PostgreSQL isolation', () =>
     });
 
     await prisma.client.tenantMembership.deleteMany({
-      where: { userId },
+      where: { userId: { in: [userId, otherUserId] } },
     });
 
     await prisma.client.user.deleteMany({
-      where: { id: userId },
+      where: { id: { in: [userId, otherUserId] } },
     });
 
     await prisma.client.tenant.deleteMany({
@@ -125,22 +148,23 @@ describeUsersInfra('UsersRepository Google identity PostgreSQL isolation', () =>
     await prisma.client.$disconnect();
   });
 
-  it('resolves a linked Google identity only inside its active tenant membership', async () => {
-    const result = await repository.findGoogleLoginIdentity(tenantSlug, googleSubject);
+  it('resolves the active global user from the verified Google subject before tenant choice', async () => {
+    const result = await repository.findGlobalGoogleIdentityBySubject(googleSubject);
 
-    expect(result).not.toBeNull();
-    expect(result).toEqual(
-      expect.objectContaining({
-        membershipId,
-        tenantId,
-      }),
-    );
-    expect(result?.user.id).toBe(userId);
+    expect(result).toEqual({ id: userId, email: `${userId}@medsphere.test` });
   });
 
-  it('does not cross tenant boundaries for the same Google subject', async () => {
+  it('rejects an unknown Google subject', async () => {
+    await expect(repository.findGlobalGoogleIdentityBySubject('wrong-subject')).resolves.toBeNull();
+  });
+
+  it('returns only active memberships belonging to the verified user', async () => {
+    await expect(repository.findActiveMembershipsForUser(userId)).resolves.toEqual([
+      expect.objectContaining({ membershipId, tenantId }),
+    ]);
+
     await expect(
-      repository.findGoogleLoginIdentity(otherTenantSlug, googleSubject),
+      repository.findLoginIdentityByMembershipId(userId, otherMembershipId),
     ).resolves.toBeNull();
   });
 
@@ -150,7 +174,7 @@ describeUsersInfra('UsersRepository Google identity PostgreSQL isolation', () =>
       data: { status: 'SUSPENDED' },
     });
 
-    await expect(repository.findGoogleLoginIdentity(tenantSlug, googleSubject)).resolves.toBeNull();
+    await expect(repository.findActiveMembershipsForUser(userId)).resolves.toEqual([]);
   });
 
   it('rejects a revoked membership immediately', async () => {
@@ -159,7 +183,7 @@ describeUsersInfra('UsersRepository Google identity PostgreSQL isolation', () =>
       data: { status: 'REVOKED' },
     });
 
-    await expect(repository.findGoogleLoginIdentity(tenantSlug, googleSubject)).resolves.toBeNull();
+    await expect(repository.findActiveMembershipsForUser(userId)).resolves.toEqual([]);
   });
 
   it('rejects a deleted membership immediately', async () => {
@@ -168,7 +192,28 @@ describeUsersInfra('UsersRepository Google identity PostgreSQL isolation', () =>
       data: { deletedAt: new Date() },
     });
 
-    await expect(repository.findGoogleLoginIdentity(tenantSlug, googleSubject)).resolves.toBeNull();
+    await expect(repository.findActiveMembershipsForUser(userId)).resolves.toEqual([]);
+  });
+
+  it('rejects every membership in an inactive tenant', async () => {
+    await prisma.client.tenant.update({
+      where: { id: tenantId },
+      data: { isActive: false },
+    });
+
+    await expect(repository.findActiveMembershipsForUser(userId)).resolves.toEqual([]);
+  });
+
+  it.each(['INACTIVE', 'SUSPENDED'] as const)('rejects a %s Google-linked user', async (status) => {
+    await prisma.client.user.update({
+      where: { id: userId },
+      data: { status },
+    });
+
+    await expect(repository.findGlobalGoogleIdentityBySubject(googleSubject)).resolves.toBeNull();
+    await expect(
+      repository.findLoginIdentityByMembershipId(userId, membershipId),
+    ).resolves.toBeNull();
   });
 });
 

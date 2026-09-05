@@ -1,4 +1,4 @@
-name: MedSphere Stock Transfer Runtime Certification
+name: AIM Stock Transfer Runtime Certification
 
 on:
   workflow_dispatch: {}

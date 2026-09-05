@@ -8,6 +8,7 @@ import type {
   RegistrationRequest,
   RegistrationResponse,
   RequestPhoneOtpRequest,
+  SelectGoogleOrganizationLoginRequest,
   SelectOrganizationLoginRequest,
   VerifyPhoneOtpRequest,
   VerifyPhoneOtpResponse,
@@ -104,8 +105,32 @@ export async function googleRegister(
   return (await response.json()) as RegistrationResponse;
 }
 
-export async function googleLogin(request: GoogleLoginRequest): Promise<AuthenticatedSession> {
+export async function googleLogin(
+  request: GoogleLoginRequest,
+): Promise<AuthenticatedSession | OrganizationSelectionRequired> {
   const response = await fetch('/api/auth/google', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(request),
+    cache: 'no-store',
+  });
+
+  if (!response.ok) {
+    throw new ApiError(
+      response.status === 401
+        ? 'Google sign-in could not be authorized.'
+        : 'Google sign-in failed. Try again.',
+      response.status,
+    );
+  }
+
+  return (await response.json()) as AuthenticatedSession | OrganizationSelectionRequired;
+}
+
+export async function selectGoogleOrganizationLogin(
+  request: SelectGoogleOrganizationLoginRequest,
+): Promise<AuthenticatedSession> {
+  const response = await fetch('/api/auth/google/select-organization', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(request),

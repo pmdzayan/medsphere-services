@@ -1,4 +1,4 @@
-name: MedSphere Backup & Restore Certification
+name: AIM Backup & Restore Certification
 
 on:
   workflow_dispatch: {}

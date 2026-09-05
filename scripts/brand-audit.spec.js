@@ -4,7 +4,8 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const { describe, it } = require('node:test');
-const { RETENTION_RULES, classifyOccurrence } = require('./brand-audit');
+const os = require('node:os');
+const { RETENTION_RULES, audit, classifyOccurrence, classifyPath } = require('./brand-audit');
 
 describe('legacy brand audit classification', () => {
   it('keeps the allowlist explicit and reviewable', () => {
@@ -26,6 +27,20 @@ describe('legacy brand audit classification', () => {
 
   it('blocks active-documentation drift', () => {
     assert.equal(classifyOccurrence('README.md', '# MedSphere').category, 'DOCUMENTATION');
+    assert.equal(
+      classifyOccurrence('docs/adr/README.md', 'Current MedSphere decisions').category,
+      'DOCUMENTATION',
+    );
+  });
+
+  it('blocks legacy workflow display names without renaming machine identifiers', () => {
+    assert.equal(
+      classifyOccurrence(
+        '.github/workflows/quality-gates.yml',
+        'name: MedSphere Pull Request Quality Gates',
+      ).category,
+      'USER_FACING',
+    );
   });
 
   it('retains compatibility identifiers and historical evidence with reasons', () => {
@@ -41,6 +56,34 @@ describe('legacy brand audit classification', () => {
       classifyOccurrence('apps/auth-service/src/provider.ts', 'X-MedSphere-Delivery-Id').category,
       'EXTERNAL_CONTRACT',
     );
+  });
+
+  it('classifies filesystem names independently from file content', () => {
+    assert.equal(
+      classifyPath('apps/web/src/assets/medsphere-logo.svg').category,
+      'FILE_OR_DIRECTORY_NAME',
+    );
+    assert.equal(
+      classifyPath('docs/adr/medsphere-auth-decision.md').category,
+      'HISTORICAL/MIGRATION',
+    );
+    assert.equal(classifyPath('misc/medsphere-notes.txt').category, 'FILE_OR_DIRECTORY_NAME');
+    assert.equal(classifyPath('docs/all-in-medico-product-guide.md'), null);
+    assert.equal(classifyPath('apps/web/src/assets/aim-logo.svg'), null);
+  });
+
+  it('fails closed when a new current legacy filename is introduced', () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'aim-brand-audit-'));
+    try {
+      fs.mkdirSync(path.join(root, 'apps/web/src/assets'), { recursive: true });
+      fs.writeFileSync(path.join(root, 'apps/web/src/assets/medsphere-logo.svg'), '<svg />');
+      const report = audit(root);
+      assert.equal(report.pathTotal, 1);
+      assert.equal(report.blocking.length, 1);
+      assert.equal(report.blocking[0].category, 'FILE_OR_DIRECTORY_NAME');
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
   });
 
   it('updates the persisted personal-account display name without renaming its stable slug', () => {

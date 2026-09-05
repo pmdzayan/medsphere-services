@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+  isGoogleLoginRequest,
+  isOrganizationSelectionRequired,
+  isSelectGoogleOrganizationLoginRequest,
   isLoginRequest,
   isLoginResponse,
   isRegistrationRequest,
@@ -10,8 +13,60 @@ import {
   normalizeTenantSlug,
   REGISTRATION_CONFIRMATION_MESSAGE,
   validateLoginRequest,
+  validateGoogleLoginRequest,
   validateRegistrationRequest,
 } from './auth-contract';
+
+describe('slug-free Google login contract', () => {
+  it('accepts only an ID token for identity-first Google login', () => {
+    expect(isGoogleLoginRequest({ idToken: 'google-id-token' })).toBe(true);
+    expect(validateGoogleLoginRequest({ idToken: 'google-id-token' })).toEqual({});
+    expect(
+      isGoogleLoginRequest({ idToken: 'google-id-token', tenantSlug: 'central-pharmacy' }),
+    ).toBe(false);
+  });
+
+  it('requires the Google identity proof again for organization selection', () => {
+    expect(
+      isSelectGoogleOrganizationLoginRequest({
+        idToken: 'google-id-token',
+        membershipId: '93b31836-6a84-4db9-a935-1c55960c25da',
+      }),
+    ).toBe(true);
+    expect(
+      isSelectGoogleOrganizationLoginRequest({
+        membershipId: '93b31836-6a84-4db9-a935-1c55960c25da',
+      }),
+    ).toBe(false);
+  });
+
+  it('strictly bounds every organization choice returned through the BFF', () => {
+    const selection = {
+      requiresOrganizationSelection: true,
+      organizations: [
+        {
+          membershipId: '93b31836-6a84-4db9-a935-1c55960c25da',
+          organizationName: 'Central Pharmacy',
+          organizationType: 'PHARMACY',
+        },
+      ],
+    };
+
+    expect(isOrganizationSelectionRequired(selection)).toBe(true);
+    expect(
+      isOrganizationSelectionRequired({
+        ...selection,
+        organizations: [{ ...selection.organizations[0], tenantId: 'must-not-leak' }],
+      }),
+    ).toBe(false);
+    expect(
+      isOrganizationSelectionRequired({
+        ...selection,
+        organizations: [{ ...selection.organizations[0], membershipId: 'not-a-uuid' }],
+      }),
+    ).toBe(false);
+  });
+});
 
 describe('accepted login contract', () => {
   it('normalizes the tenant locator without inventing a tenant identity', () => {

@@ -39,7 +39,10 @@ beforeEach(() => {
   vi.mocked(identifyLogin).mockResolvedValue(singleMembershipSession);
 });
 
-afterEach(() => cleanup());
+afterEach(() => {
+  cleanup();
+  delete process.env.NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_ID;
+});
 
 function renderLoginForm() {
   return render(
@@ -50,6 +53,14 @@ function renderLoginForm() {
 }
 
 describe('LoginForm interactions', () => {
+  it('mounts the accepted Google sign-in alternative on the real login form', () => {
+    process.env.NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_ID = 'google-client-id';
+
+    renderLoginForm();
+
+    expect(screen.getByText('Loading Google sign-in…')).toBeVisible();
+  });
+
   it('never renders an organization slug or tenant field of any kind', () => {
     renderLoginForm();
     expect(screen.queryByLabelText(/organization slug/i)).not.toBeInTheDocument();

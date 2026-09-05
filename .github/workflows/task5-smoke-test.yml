@@ -1,4 +1,4 @@
-name: MedSphere Dashboard Runtime Certification
+name: AIM Dashboard Runtime Certification
 
 # Temporary validation infrastructure. Each job below is authoritative
 # for exactly one vertical slice; every other slice's checks in the same

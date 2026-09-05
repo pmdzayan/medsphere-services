@@ -7,57 +7,29 @@ import { hasPrismaCode, withSerializableRetry } from '../prisma/transaction.util
 export class UsersRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  async findGoogleLoginIdentity(
-    tenantSlug: string,
+  async findGlobalGoogleIdentityBySubject(
     subject: string,
-  ): Promise<LoginIdentity | null> {
-    const membership = await this.prisma.client.tenantMembership.findFirst({
+  ): Promise<{ id: string; email: string } | null> {
+    const externalIdentity = await this.prisma.client.externalAuthIdentity.findFirst({
       where: {
-        status: 'ACTIVE',
-        deletedAt: null,
-        tenant: {
-          slug: tenantSlug,
-          isActive: true,
-          deletedAt: null,
-        },
+        provider: 'GOOGLE',
+        subject,
         user: {
           status: 'ACTIVE',
           deletedAt: null,
-          externalAuthIdentities: {
-            some: {
-              provider: 'GOOGLE',
-              subject,
-            },
-          },
         },
       },
       select: {
-        id: true,
-        tenantId: true,
-        tenant: { select: { name: true, organizationType: true } },
         user: {
           select: {
             id: true,
             email: true,
-            passwordHash: true,
-            firstName: true,
-            lastName: true,
-            preferredLanguage: true,
           },
         },
       },
     });
 
-    if (!membership) {
-      return null;
-    }
-
-    return {
-      user: membership.user,
-      membershipId: membership.id,
-      tenantId: membership.tenantId,
-      tenant: membership.tenant,
-    };
+    return externalIdentity?.user ?? null;
   }
 
   async findLoginIdentity(tenantSlug: string, email: string): Promise<LoginIdentity | null> {
@@ -135,7 +107,7 @@ export class UsersRepository {
 
   /**
    * Every ACTIVE membership, in an ACTIVE tenant, belonging to the given
-   * (already password-verified) user. Only organization display
+   * (already identity-verified) user. Only organization display
    * information the authenticated user is already authorized to know
    * about their own memberships -- never a general tenant search or
    * listing. A PENDING membership is deliberately excluded: it does not
@@ -155,6 +127,7 @@ export class UsersRepository {
         status: 'ACTIVE',
         deletedAt: null,
         tenant: { isActive: true, deletedAt: null },
+        user: { status: 'ACTIVE', deletedAt: null },
       },
       select: {
         id: true,
@@ -173,7 +146,7 @@ export class UsersRepository {
 
   /**
    * Resolves a single specific membership for session issuance, scoped
-   * to the given (already password-verified) userId -- so a membershipId
+   * to the given (already identity-verified) userId -- so a membershipId
    * alone, without the matching userId, can never resolve to a session.
    * Mirrors findLoginIdentity's ACTIVE/ACTIVE shape exactly.
    */
@@ -188,6 +161,7 @@ export class UsersRepository {
         status: 'ACTIVE',
         deletedAt: null,
         tenant: { isActive: true, deletedAt: null },
+        user: { status: 'ACTIVE', deletedAt: null },
       },
       select: {
         id: true,

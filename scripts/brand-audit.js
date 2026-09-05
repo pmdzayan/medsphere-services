@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const LEGACY_BRAND = /medsphere/gi;
-const SKIP_DIRECTORIES = new Set(['.git', '.next', '.turbo', 'coverage', 'dist', 'node_modules']);
+const SKIP_NAMES = new Set(['.git', '.next', '.turbo', 'coverage', 'dist', 'node_modules']);
 
 /**
  * Ordered, reviewable classification rules for intentionally retained legacy
@@ -37,7 +37,7 @@ const RETENTION_RULES = [
   {
     category: 'HISTORICAL/MIGRATION',
     reason: 'Append-only migration or historical evidence; retained to preserve audit truth.',
-    path: /^(?:packages\/database\/prisma\/migrations\/|docs\/(?:adr|audits|security|sprints)\/|.*\.patch$)/,
+    path: /^(?:packages\/database\/prisma\/migrations\/|docs\/(?:adr\/(?!README\.md$)|audits\/|security\/|sprints\/)|.*\.patch$)/,
   },
   {
     category: 'TEST FIXTURE',
@@ -65,11 +65,18 @@ const RETENTION_RULES = [
 ];
 
 const CURRENT_DOCUMENTATION =
-  /^(?:README\.md|PROJECT_RULES\.md|PROJECT_STATUS\.md|PRODUCT_ROADMAP\.md|AI_HANDOFF\.md|docs\/(?:ENGINEERING_REVIEW\.md|status\/|operations\/|development-bible\/|i18n\/|runtime-cert-inventory\.md))/;
+  /^(?:README\.md|PROJECT_RULES\.md|PROJECT_STATUS\.md|PRODUCT_ROADMAP\.md|AI_HANDOFF\.md|docs\/(?:adr\/README\.md|ENGINEERING_REVIEW\.md|status\/|operations\/|development-bible\/|i18n\/|runtime-cert-inventory\.md))/;
 const USER_FACING_SOURCE =
   /^(?:apps\/web\/src\/(?:app|components|features)\/|apps\/auth-service\/src\/(?:notifications|verification|organization)\/)/;
 
 function classifyOccurrence(file, line) {
+  if (/^\.github\/workflows\/[^/]+\.ya?ml$/.test(file) && /^name:\s*/.test(line)) {
+    return {
+      category: 'USER_FACING',
+      reason: 'Human-readable workflow display names must use the active AIM brand.',
+    };
+  }
+
   for (const rule of RETENTION_RULES) {
     if (rule.path && !rule.path.test(file)) continue;
     if (rule.line && !rule.line.test(line)) continue;
@@ -93,18 +100,54 @@ function classifyOccurrence(file, line) {
   };
 }
 
+function classifyPath(file) {
+  if (!LEGACY_BRAND.test(file)) return null;
+  LEGACY_BRAND.lastIndex = 0;
+
+  if (
+    /^(?:packages\/database\/prisma\/migrations\/|docs\/(?:adr|audits|security|sprints)\/|.*\.patch$)/.test(
+      file,
+    )
+  ) {
+    return {
+      category: 'HISTORICAL/MIGRATION',
+      reason: 'Historical or append-only path retained to preserve audit and migration truth.',
+    };
+  }
+
+  return {
+    category: 'FILE_OR_DIRECTORY_NAME',
+    reason: 'Current or unexplained filesystem names must not use the legacy brand.',
+  };
+}
+
 function walk(root, current = root) {
   return fs.readdirSync(current, { withFileTypes: true }).flatMap((entry) => {
-    if (entry.isDirectory() && SKIP_DIRECTORIES.has(entry.name)) return [];
+    if (SKIP_NAMES.has(entry.name)) return [];
     const absolute = path.join(current, entry.name);
-    return entry.isDirectory() ? walk(root, absolute) : [absolute];
+    const relative = path.relative(root, absolute).split(path.sep).join('/');
+    const item = { absolute, relative, name: entry.name, isDirectory: entry.isDirectory() };
+    return entry.isDirectory() ? [item, ...walk(root, absolute)] : [item];
   });
 }
 
 function audit(repositoryRoot) {
   const occurrences = [];
-  for (const absolute of walk(repositoryRoot)) {
-    const file = path.relative(repositoryRoot, absolute).split(path.sep).join('/');
+  for (const entry of walk(repositoryRoot)) {
+    const { absolute, relative: file, name, isDirectory } = entry;
+    LEGACY_BRAND.lastIndex = 0;
+    const pathCount = [...name.matchAll(LEGACY_BRAND)].length;
+    if (pathCount > 0) {
+      occurrences.push({
+        file,
+        line: null,
+        count: pathCount,
+        kind: isDirectory ? 'DIRECTORY_NAME' : 'FILE_NAME',
+        ...classifyPath(file),
+      });
+    }
+
+    if (isDirectory) continue;
     if (file === '0029-v1-aim-all-in-medico-rebrand-final.patch') continue;
     let contents;
     try {
@@ -118,7 +161,7 @@ function audit(repositoryRoot) {
       const count = [...line.matchAll(LEGACY_BRAND)].length;
       if (count === 0) return;
       const classification = classifyOccurrence(file, line);
-      occurrences.push({ file, line: index + 1, count, ...classification });
+      occurrences.push({ file, line: index + 1, count, kind: 'CONTENT', ...classification });
     });
   }
   const categoryCounts = {};
@@ -129,9 +172,18 @@ function audit(repositoryRoot) {
       (categoryCounts[occurrence.category] ?? 0) + occurrence.count;
   }
   const blocking = occurrences.filter((item) =>
-    ['USER_FACING', 'DOCUMENTATION', 'UNEXPLAINED'].includes(item.category),
+    ['USER_FACING', 'DOCUMENTATION', 'FILE_OR_DIRECTORY_NAME', 'UNEXPLAINED'].includes(
+      item.category,
+    ),
   );
-  return { total, categoryCounts, blocking, occurrences };
+  const pathOccurrences = occurrences.filter((item) => item.kind !== 'CONTENT');
+  return {
+    total,
+    pathTotal: pathOccurrences.reduce((sum, item) => sum + item.count, 0),
+    categoryCounts,
+    blocking,
+    occurrences,
+  };
 }
 
 function run(repositoryRoot = path.resolve(__dirname, '..')) {
@@ -142,11 +194,13 @@ function run(repositoryRoot = path.resolve(__dirname, '..')) {
     process.stdout.write(
       `brand audit: ${report.total} legacy-name occurrence(s); ${report.blocking.length} blocking line(s)\n`,
     );
+    process.stdout.write(`legacy paths: ${report.pathTotal}\n`);
     for (const [category, count] of Object.entries(report.categoryCounts).sort()) {
       process.stdout.write(`${category}: ${count}\n`);
     }
     for (const item of report.blocking) {
-      process.stderr.write(`${item.file}:${item.line} [${item.category}] ${item.reason}\n`);
+      const location = item.line === null ? item.file : `${item.file}:${item.line}`;
+      process.stderr.write(`${location} [${item.category}] ${item.reason}\n`);
     }
   }
   return report.blocking.length === 0 ? 0 : 1;
@@ -154,4 +208,4 @@ function run(repositoryRoot = path.resolve(__dirname, '..')) {
 
 if (require.main === module) process.exitCode = run();
 
-module.exports = { RETENTION_RULES, audit, classifyOccurrence, run };
+module.exports = { RETENTION_RULES, audit, classifyOccurrence, classifyPath, run };
