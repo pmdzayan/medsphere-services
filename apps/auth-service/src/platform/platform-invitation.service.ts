@@ -19,12 +19,90 @@ import {
   hashPlatformInvitation,
   isPlausiblePlatformInvitationProof,
 } from './platform-invitation.util';
-import { INVITATION_GRANTABLE_ROLE_KEYS, PlatformRoleKey } from './platform.constants';
+import {
+  INVITATION_GRANTABLE_ROLE_KEYS,
+  MAX_PLATFORM_INVITATION_PAGE_SIZE,
+  PlatformRoleKey,
+} from './platform.constants';
 
 type GrantableInvitationRoleKey = (typeof INVITATION_GRANTABLE_ROLE_KEYS)[number];
 
 function isGrantableInvitationRoleKey(value: string): value is GrantableInvitationRoleKey {
   return INVITATION_GRANTABLE_ROLE_KEYS.includes(value as GrantableInvitationRoleKey);
+}
+interface PlatformInvitationCursor {
+  readonly createdAt: Date;
+  readonly invitationId: string;
+}
+
+const PLATFORM_INVITATION_CURSOR_UUID_V4 =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function invalidInvitationCursor(): never {
+  throw new BadRequestException('Invalid pagination cursor');
+}
+
+function encodePlatformInvitationCursor(entry: PlatformInvitationCursor): string {
+  return Buffer.from(
+    JSON.stringify({
+      c: entry.createdAt.toISOString(),
+      i: entry.invitationId,
+    }),
+    'utf8',
+  ).toString('base64url');
+}
+
+function decodePlatformInvitationCursor(value: string): PlatformInvitationCursor {
+  if (value.length === 0 || value.length > 1024 || !/^[A-Za-z0-9_-]+$/.test(value)) {
+    return invalidInvitationCursor();
+  }
+
+  let decoded: string;
+  let parsed: unknown;
+
+  try {
+    decoded = Buffer.from(value, 'base64url').toString('utf8');
+
+    // Reject non-canonical encodings rather than accepting alternate cursor
+    // representations for the same payload.
+    if (Buffer.from(decoded, 'utf8').toString('base64url') !== value) {
+      return invalidInvitationCursor();
+    }
+
+    parsed = JSON.parse(decoded);
+  } catch {
+    return invalidInvitationCursor();
+  }
+
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+    return invalidInvitationCursor();
+  }
+
+  const keys = Object.keys(parsed).sort();
+  if (keys.length !== 2 || keys[0] !== 'c' || keys[1] !== 'i') {
+    return invalidInvitationCursor();
+  }
+
+  const cursor = parsed as { c?: unknown; i?: unknown };
+
+  if (
+    typeof cursor.c !== 'string' ||
+    typeof cursor.i !== 'string' ||
+    !PLATFORM_INVITATION_CURSOR_UUID_V4.test(cursor.i)
+  ) {
+    return invalidInvitationCursor();
+  }
+
+  const createdAt = new Date(cursor.c);
+
+  if (Number.isNaN(createdAt.getTime()) || createdAt.toISOString() !== cursor.c) {
+    return invalidInvitationCursor();
+  }
+
+  return {
+    createdAt,
+    invitationId: cursor.i,
+  };
 }
 
 export interface PlatformInvitationAcceptance {
@@ -126,25 +204,56 @@ export class PlatformInvitationService {
       return { invitationId: invitation.id, roleKey, invitationToken: proof.value, expiresAt };
     });
   }
-  async listInvitations(actorUserId: string, limit: number, _cursor: string | undefined) {
-    // Deterministic bounded listing of ALL invitations (including revoked),
-    // newest first. No sensitive fields: never exposes hashes, tokens, or
-    // full recipient personal data.
+  async listInvitations(_actorUserId: string, limit: number, cursor: string | undefined) {
+    if (!Number.isInteger(limit) || limit < 1 || limit > MAX_PLATFORM_INVITATION_PAGE_SIZE) {
+      throw new BadRequestException('Invalid pagination limit');
+    }
+
+    // A supplied malformed cursor is never treated as "first page".
+    const decoded = cursor === undefined ? null : decodePlatformInvitationCursor(cursor);
+
+    const where: Prisma.PlatformInvitationWhereInput = {
+      deletedAt: null,
+    };
+
+    if (decoded) {
+      where.OR = [
+        { createdAt: { lt: decoded.createdAt } },
+        {
+          createdAt: decoded.createdAt,
+          id: { lt: decoded.invitationId },
+        },
+      ];
+    }
+
+    // limit + 1 proves whether another page exists without returning an
+    // unbounded result set.
     const invitations = await this.prisma.client.platformInvitation.findMany({
+      where,
       include: { role: { select: { key: true } } },
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-      take: limit,
+      take: limit + 1,
     });
 
+    const hasMore = invitations.length > limit;
+    const page = invitations.slice(0, limit);
+    const last = page[page.length - 1];
+
     return {
-      data: invitations.map((invitation) => ({
+      data: page.map((invitation) => ({
         invitationId: invitation.id,
         status: invitation.status,
         roleKey: invitation.role.key as PlatformRoleKey,
         expiresAt: invitation.expiresAt.toISOString(),
         acceptedAt: invitation.acceptedAt?.toISOString() ?? null,
       })),
-      nextCursor: null,
+      nextCursor:
+        hasMore && last
+          ? encodePlatformInvitationCursor({
+              createdAt: last.createdAt,
+              invitationId: last.id,
+            })
+          : null,
       limit,
     };
   }
