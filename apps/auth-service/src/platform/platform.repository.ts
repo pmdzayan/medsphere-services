@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { Prisma } from '@medsphere/database';
 import { PrismaService } from '../prisma/prisma.service';
 import { PLATFORM_OWNER_ROLE_KEY, PlatformRoleKey } from './platform.constants';
@@ -133,30 +133,68 @@ export class PlatformRepository {
     return Buffer.from(payload, 'utf8').toString('base64url');
   }
 
-  private decodeCursor(value: string): PlatformCursorEntry | null {
-    try {
-      const payload = JSON.parse(Buffer.from(value, 'base64url').toString('utf8')) as {
-        c?: unknown;
-        i?: unknown;
-      };
-      if (typeof payload.c !== 'string' || typeof payload.i !== 'string') {
-        return null;
-      }
-      const createdAt = new Date(payload.c);
-      if (Number.isNaN(createdAt.getTime())) {
-        return null;
-      }
-      return { createdAt, platformAccountId: payload.i };
-    } catch {
-      return null;
+  private decodeCursor(value: string): PlatformCursorEntry {
+    if (value.length === 0 || value.length > 1024 || !/^[A-Za-z0-9_-]+$/.test(value)) {
+      throw new BadRequestException('Invalid pagination cursor');
     }
+
+    let decoded: string;
+    let parsed: unknown;
+
+    try {
+      decoded = Buffer.from(value, 'base64url').toString('utf8');
+
+      // Require one canonical opaque representation rather than accepting
+      // alternate encodings for the same cursor payload.
+      if (Buffer.from(decoded, 'utf8').toString('base64url') !== value) {
+        throw new Error('Non-canonical pagination cursor');
+      }
+
+      parsed = JSON.parse(decoded);
+    } catch {
+      throw new BadRequestException('Invalid pagination cursor');
+    }
+
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+      throw new BadRequestException('Invalid pagination cursor');
+    }
+
+    const keys = Object.keys(parsed).sort();
+
+    if (keys.length !== 2 || keys[0] !== 'c' || keys[1] !== 'i') {
+      throw new BadRequestException('Invalid pagination cursor');
+    }
+
+    const payload = parsed as {
+      c?: unknown;
+      i?: unknown;
+    };
+
+    if (
+      typeof payload.c !== 'string' ||
+      typeof payload.i !== 'string' ||
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(payload.i)
+    ) {
+      throw new BadRequestException('Invalid pagination cursor');
+    }
+
+    const createdAt = new Date(payload.c);
+
+    if (Number.isNaN(createdAt.getTime()) || createdAt.toISOString() !== payload.c) {
+      throw new BadRequestException('Invalid pagination cursor');
+    }
+
+    return {
+      createdAt,
+      platformAccountId: payload.i,
+    };
   }
 
   async listPlatformAccounts(
     limit: number,
     cursor: string | undefined,
   ): Promise<PlatformAccountCursorPage> {
-    const decoded = cursor ? this.decodeCursor(cursor) : null;
+    const decoded = cursor === undefined ? null : this.decodeCursor(cursor);
     const where: Prisma.PlatformAccountWhereInput = { deletedAt: null };
     if (decoded) {
       where.OR = [
