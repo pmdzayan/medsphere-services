@@ -3,7 +3,6 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { POST } from './route';
 const validRequest = {
-  tenantSlug: 'central-pharmacy',
   idToken: 'google-id-token',
 };
 afterEach(() => {
@@ -25,14 +24,73 @@ describe('Google login session boundary', () => {
     expect(response.status).toBe(400);
     expect(fetchMock).not.toHaveBeenCalled();
   });
-  it('rejects client-controlled tenant identity fields before forwarding credentials', async () => {
+  it('rejects the legacy tenant slug and client-controlled tenant identity fields', async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal('fetch', fetchMock);
     const response = await POST(
-      createRequest({ ...validRequest, tenantId: 'client-controlled-tenant' }),
+      createRequest({
+        ...validRequest,
+        tenantSlug: 'central-pharmacy',
+        tenantId: 'client-controlled-tenant',
+      }),
     );
     expect(response.status).toBe(400);
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+  it('returns bounded organization choices without setting session cookies', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        Response.json({
+          requiresOrganizationSelection: true,
+          organizations: [
+            {
+              membershipId: '93b31836-6a84-4db9-a935-1c55960c25da',
+              organizationName: 'Central Pharmacy',
+              organizationType: 'PHARMACY',
+            },
+          ],
+        }),
+      ),
+    );
+
+    const response = await POST(createRequest(validRequest));
+
+    expect(response.status).toBe(200);
+    expect(response.headers.getSetCookie()).toEqual([]);
+    await expect(response.json()).resolves.toEqual({
+      requiresOrganizationSelection: true,
+      organizations: [
+        {
+          membershipId: '93b31836-6a84-4db9-a935-1c55960c25da',
+          organizationName: 'Central Pharmacy',
+          organizationType: 'PHARMACY',
+        },
+      ],
+    });
+  });
+  it('rejects over-broad organization choices from the upstream service', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        Response.json({
+          requiresOrganizationSelection: true,
+          organizations: [
+            {
+              membershipId: '93b31836-6a84-4db9-a935-1c55960c25da',
+              organizationName: 'Central Pharmacy',
+              organizationType: 'PHARMACY',
+              tenantId: 'must-not-cross-the-bff',
+            },
+          ],
+        }),
+      ),
+    );
+
+    const response = await POST(createRequest(validRequest));
+
+    expect(response.status).toBe(502);
+    expect(response.headers.getSetCookie()).toEqual([]);
   });
   it('does not expose credentials in the response body', async () => {
     vi.stubGlobal(

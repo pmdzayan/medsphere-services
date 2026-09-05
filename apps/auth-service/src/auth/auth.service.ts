@@ -14,6 +14,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AuthenticatedIdentity, LoginIdentity, RequestMetadata } from './auth.types';
 import { RegisterDto } from './dto/register.dto';
 import { GoogleRegisterDto } from './dto/google-register.dto';
+import { SelectGoogleOrganizationLoginDto } from './dto/select-google-organization-login.dto';
 import { LoginDto } from './dto/login.dto';
 import { IdentifyLoginDto } from './dto/identify-login.dto';
 import { SelectOrganizationLoginDto } from './dto/select-organization-login.dto';
@@ -215,15 +216,47 @@ export class AuthService {
   }
 
   async googleLogin(
-    tenantSlug: string,
     idToken: string,
     metadata: RequestMetadata,
-  ): Promise<LoginResponseDto> {
-    const googleIdentity = await this.googleIdentityVerifier.verify(idToken);
+  ): Promise<LoginResponseDto | OrganizationSelectionRequiredDto> {
+    const identity = await this.resolveVerifiedGoogleIdentity(idToken);
+    const memberships = await this.usersRepository.findActiveMembershipsForUser(identity.id);
 
-    const loginIdentity = await this.usersRepository.findGoogleLoginIdentity(
-      tenantSlug,
-      googleIdentity.subject,
+    if (memberships.length === 0) {
+      this.recordInvalidLogin();
+      throw new UnauthorizedException(INVALID_CREDENTIALS_MESSAGE);
+    }
+
+    if (memberships.length > 1) {
+      const response = new OrganizationSelectionRequiredDto();
+      response.organizations = memberships.map((membership) => ({
+        membershipId: membership.membershipId,
+        organizationName: membership.organizationName,
+        organizationType: membership.organizationType,
+      }));
+      return response;
+    }
+
+    const loginIdentity = await this.usersRepository.findLoginIdentityByMembershipId(
+      identity.id,
+      memberships[0].membershipId,
+    );
+    if (!loginIdentity) {
+      this.recordInvalidLogin();
+      throw new UnauthorizedException(INVALID_CREDENTIALS_MESSAGE);
+    }
+
+    return this.createAuthenticatedSession(loginIdentity, metadata);
+  }
+
+  async selectGoogleOrganizationLogin(
+    dto: SelectGoogleOrganizationLoginDto,
+    metadata: RequestMetadata,
+  ): Promise<LoginResponseDto> {
+    const identity = await this.resolveVerifiedGoogleIdentity(dto.idToken);
+    const loginIdentity = await this.usersRepository.findLoginIdentityByMembershipId(
+      identity.id,
+      dto.membershipId,
     );
 
     if (!loginIdentity) {
@@ -231,12 +264,21 @@ export class AuthService {
       throw new UnauthorizedException(INVALID_CREDENTIALS_MESSAGE);
     }
 
-    if (loginIdentity.user.email.trim().toLowerCase() !== googleIdentity.email) {
+    return this.createAuthenticatedSession(loginIdentity, metadata);
+  }
+
+  private async resolveVerifiedGoogleIdentity(idToken: string): Promise<{ id: string }> {
+    const googleIdentity = await this.googleIdentityVerifier.verify(idToken);
+    const identity = await this.usersRepository.findGlobalGoogleIdentityBySubject(
+      googleIdentity.subject,
+    );
+
+    if (!identity || identity.email.trim().toLowerCase() !== googleIdentity.email) {
       this.recordInvalidLogin();
       throw new UnauthorizedException(INVALID_CREDENTIALS_MESSAGE);
     }
 
-    return this.createAuthenticatedSession(loginIdentity, metadata);
+    return identity;
   }
 
   private async createAuthenticatedSession(

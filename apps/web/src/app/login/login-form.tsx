@@ -10,6 +10,7 @@ import {
   type OrganizationChoice,
 } from '@/lib/auth-contract';
 import { loginCopy } from './login-copy';
+import { GoogleSignIn } from './google-sign-in';
 
 type Fields = 'email' | 'password';
 
@@ -29,6 +30,7 @@ export function LoginForm() {
   const [pending, setPending] = useState(false);
   const [organizations, setOrganizations] = useState<OrganizationChoice[] | null>(null);
   const [credentials, setCredentials] = useState<{ email: string; password: string } | null>(null);
+  const [googleSelecting, setGoogleSelecting] = useState(false);
 
   async function handleIdentify(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -121,43 +123,48 @@ export function LoginForm() {
   }
 
   return (
-    <form className="space-y-4" onSubmit={handleIdentify} noValidate>
-      <Field
-        name="email"
-        label={copy.workEmail}
-        placeholder="you@organization.com"
-        type="email"
-        autoComplete="username"
-        error={errors.email}
-      />
-      <Field
-        name="password"
-        label={copy.password}
-        type="password"
-        autoComplete="current-password"
-        error={errors.password}
-      />
-      {errors.form ? (
-        <p
-          className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
-          role="alert"
-        >
-          {errors.form}
-        </p>
+    <div className="space-y-4">
+      {!googleSelecting ? (
+        <form className="space-y-4" onSubmit={handleIdentify} noValidate>
+          <Field
+            name="email"
+            label={copy.workEmail}
+            placeholder="you@organization.com"
+            type="email"
+            autoComplete="username"
+            error={errors.email}
+          />
+          <Field
+            name="password"
+            label={copy.password}
+            type="password"
+            autoComplete="current-password"
+            error={errors.password}
+          />
+          {errors.form ? (
+            <p
+              className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
+              role="alert"
+            >
+              {errors.form}
+            </p>
+          ) : null}
+          <button
+            type="submit"
+            disabled={pending}
+            className="group mt-2 flex w-full items-center justify-center gap-3 rounded-xl bg-[#0b2f28] px-5 py-4 text-sm font-bold text-white shadow-[0_18px_35px_-20px_rgba(11,47,40,.8)] transition hover:-translate-y-0.5 hover:bg-[#075f49] disabled:cursor-wait disabled:opacity-60 disabled:hover:translate-y-0"
+          >
+            {pending ? copy.signingIn : copy.signInSecurely}
+            {!pending ? (
+              <span className="transition-transform group-hover:translate-x-1" aria-hidden="true">
+                →
+              </span>
+            ) : null}
+          </button>
+        </form>
       ) : null}
-      <button
-        type="submit"
-        disabled={pending}
-        className="group mt-2 flex w-full items-center justify-center gap-3 rounded-xl bg-[#0b2f28] px-5 py-4 text-sm font-bold text-white shadow-[0_18px_35px_-20px_rgba(11,47,40,.8)] transition hover:-translate-y-0.5 hover:bg-[#075f49] disabled:cursor-wait disabled:opacity-60 disabled:hover:translate-y-0"
-      >
-        {pending ? copy.signingIn : copy.signInSecurely}
-        {!pending ? (
-          <span className="transition-transform group-hover:translate-x-1" aria-hidden="true">
-            →
-          </span>
-        ) : null}
-      </button>
-    </form>
+      <GoogleSignIn onSelectionStateChange={setGoogleSelecting} />
+    </div>
   );
 }
 

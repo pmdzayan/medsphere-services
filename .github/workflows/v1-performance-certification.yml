@@ -1,4 +1,4 @@
-name: MedSphere V1 Performance & Reliability Certification
+name: AIM V1 Performance & Reliability Certification
 
 # Certifies that the accepted V1 runtime chain (Frontend BFF -> auth-service
 # -> PostgreSQL -> Redis) stays stable under controlled, genuinely

@@ -53,7 +53,7 @@ describe('AuthService', () => {
   beforeEach(() => {
     usersRepository = {
       findLoginIdentity: jest.fn(),
-      findGoogleLoginIdentity: jest.fn(),
+      findGlobalGoogleIdentityBySubject: jest.fn(),
       createPendingGoogleRegistration: jest.fn(),
       findGlobalIdentityByEmail: jest.fn(),
       findActiveMembershipsForUser: jest.fn(),
@@ -261,13 +261,25 @@ describe('AuthService', () => {
     expect(sessionRepository.createSession).not.toHaveBeenCalled();
   });
 
-  it('creates the normal membership-bound session for a linked Google identity', async () => {
+  it('creates the normal membership-bound session for a linked Google identity with one active membership', async () => {
     googleIdentityVerifier.verify.mockResolvedValue({
       subject: 'google-subject-123',
       email: loginDto.email,
       emailVerified: true,
     });
-    usersRepository.findGoogleLoginIdentity.mockResolvedValue(loginIdentity);
+    usersRepository.findGlobalGoogleIdentityBySubject.mockResolvedValue({
+      id: userId,
+      email: loginDto.email,
+    });
+    usersRepository.findActiveMembershipsForUser.mockResolvedValue([
+      {
+        membershipId,
+        tenantId,
+        organizationName: 'Central Pharmacy',
+        organizationType: 'PHARMACY',
+      },
+    ]);
+    usersRepository.findLoginIdentityByMembershipId.mockResolvedValue(loginIdentity);
     tokenService.issueRefreshCredential.mockReturnValue({
       value: 'google-refresh',
       hash: 'c'.repeat(64),
@@ -279,12 +291,15 @@ describe('AuthService', () => {
       tokenId,
     });
 
-    const result = await service.googleLogin(loginDto.tenantSlug, 'google-id-token', metadata);
+    const result = await service.googleLogin('google-id-token', metadata);
 
     expect(googleIdentityVerifier.verify).toHaveBeenCalledWith('google-id-token');
-    expect(usersRepository.findGoogleLoginIdentity).toHaveBeenCalledWith(
-      loginDto.tenantSlug,
+    expect(usersRepository.findGlobalGoogleIdentityBySubject).toHaveBeenCalledWith(
       'google-subject-123',
+    );
+    expect(usersRepository.findLoginIdentityByMembershipId).toHaveBeenCalledWith(
+      userId,
+      membershipId,
     );
     expect(sessionRepository.createSession).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -294,6 +309,9 @@ describe('AuthService', () => {
         metadata,
       }),
     );
+    if ('requiresOrganizationSelection' in result) {
+      throw new Error('Expected a membership-bound Google session');
+    }
     expect(result.accessToken).toBe('google-access');
     expect(result.context).toEqual({
       membershipId,
@@ -310,11 +328,11 @@ describe('AuthService', () => {
       email: loginDto.email,
       emailVerified: true,
     });
-    usersRepository.findGoogleLoginIdentity.mockResolvedValue(null);
+    usersRepository.findGlobalGoogleIdentityBySubject.mockResolvedValue(null);
 
-    await expect(
-      service.googleLogin(loginDto.tenantSlug, 'google-id-token', metadata),
-    ).rejects.toThrow(new UnauthorizedException('Invalid credentials'));
+    await expect(service.googleLogin('google-id-token', metadata)).rejects.toThrow(
+      new UnauthorizedException('Invalid credentials'),
+    );
 
     expect(sessionRepository.createSession).not.toHaveBeenCalled();
   });
@@ -325,12 +343,146 @@ describe('AuthService', () => {
       email: 'attacker@example.com',
       emailVerified: true,
     });
-    usersRepository.findGoogleLoginIdentity.mockResolvedValue(loginIdentity);
+    usersRepository.findGlobalGoogleIdentityBySubject.mockResolvedValue({
+      id: userId,
+      email: loginDto.email,
+    });
+
+    await expect(service.googleLogin('google-id-token', metadata)).rejects.toThrow(
+      new UnauthorizedException('Invalid credentials'),
+    );
+
+    expect(usersRepository.findActiveMembershipsForUser).not.toHaveBeenCalled();
+    expect(sessionRepository.createSession).not.toHaveBeenCalled();
+  });
+
+  it("returns only the verified Google user's active organization choices when multiple exist", async () => {
+    googleIdentityVerifier.verify.mockResolvedValue({
+      subject: 'google-subject-123',
+      email: loginDto.email,
+      emailVerified: true,
+    });
+    usersRepository.findGlobalGoogleIdentityBySubject.mockResolvedValue({
+      id: userId,
+      email: loginDto.email,
+    });
+    usersRepository.findActiveMembershipsForUser.mockResolvedValue([
+      {
+        membershipId,
+        tenantId,
+        organizationName: 'Central Pharmacy',
+        organizationType: 'PHARMACY',
+      },
+      {
+        membershipId: 'membership-2',
+        tenantId: 'tenant-2',
+        organizationName: 'Riverside Hospital',
+        organizationType: 'HOSPITAL',
+      },
+    ]);
+
+    await expect(service.googleLogin('google-id-token', metadata)).resolves.toEqual({
+      requiresOrganizationSelection: true,
+      organizations: [
+        {
+          membershipId,
+          organizationName: 'Central Pharmacy',
+          organizationType: 'PHARMACY',
+        },
+        {
+          membershipId: 'membership-2',
+          organizationName: 'Riverside Hospital',
+          organizationType: 'HOSPITAL',
+        },
+      ],
+    });
+    expect(sessionRepository.createSession).not.toHaveBeenCalled();
+  });
+
+  it('uses the accepted generic denial when a verified Google user has zero active memberships', async () => {
+    googleIdentityVerifier.verify.mockResolvedValue({
+      subject: 'google-subject-123',
+      email: loginDto.email,
+      emailVerified: true,
+    });
+    usersRepository.findGlobalGoogleIdentityBySubject.mockResolvedValue({
+      id: userId,
+      email: loginDto.email,
+    });
+    usersRepository.findActiveMembershipsForUser.mockResolvedValue([]);
+
+    await expect(service.googleLogin('google-id-token', metadata)).rejects.toThrow(
+      new UnauthorizedException('Invalid credentials'),
+    );
+    expect(sessionRepository.createSession).not.toHaveBeenCalled();
+  });
+
+  it('verifies Google again before allowing organization selection', async () => {
+    googleIdentityVerifier.verify.mockRejectedValue(
+      new UnauthorizedException('Invalid Google identity'),
+    );
 
     await expect(
-      service.googleLogin(loginDto.tenantSlug, 'google-id-token', metadata),
-    ).rejects.toThrow(new UnauthorizedException('Invalid credentials'));
+      service.selectGoogleOrganizationLogin(
+        { idToken: 'invalid-google-token', membershipId },
+        metadata,
+      ),
+    ).rejects.toThrow(UnauthorizedException);
+    expect(usersRepository.findGlobalGoogleIdentityBySubject).not.toHaveBeenCalled();
+    expect(usersRepository.findLoginIdentityByMembershipId).not.toHaveBeenCalled();
+    expect(sessionRepository.createSession).not.toHaveBeenCalled();
+  });
 
+  it('issues a Google session only for a membership belonging to the re-verified identity', async () => {
+    googleIdentityVerifier.verify.mockResolvedValue({
+      subject: 'google-subject-123',
+      email: loginDto.email,
+      emailVerified: true,
+    });
+    usersRepository.findGlobalGoogleIdentityBySubject.mockResolvedValue({
+      id: userId,
+      email: loginDto.email,
+    });
+    usersRepository.findLoginIdentityByMembershipId.mockResolvedValue(loginIdentity);
+    tokenService.issueRefreshCredential.mockReturnValue({
+      value: 'google-refresh',
+      hash: 'c'.repeat(64),
+      sessionId,
+    });
+    tokenService.issueAccessToken.mockReturnValue({
+      value: 'google-access',
+      expiresIn: 900,
+      tokenId,
+    });
+
+    const result = await service.selectGoogleOrganizationLogin(
+      { idToken: 'google-id-token', membershipId },
+      metadata,
+    );
+
+    expect(usersRepository.findLoginIdentityByMembershipId).toHaveBeenCalledWith(
+      userId,
+      membershipId,
+    );
+    expect(result.context.membershipId).toBe(membershipId);
+    expect(sessionRepository.createSession).toHaveBeenCalled();
+  });
+
+  it('denies selecting a membership belonging to another user', async () => {
+    googleIdentityVerifier.verify.mockResolvedValue({
+      subject: 'google-subject-123',
+      email: loginDto.email,
+      emailVerified: true,
+    });
+    usersRepository.findGlobalGoogleIdentityBySubject.mockResolvedValue({
+      id: userId,
+      email: loginDto.email,
+    });
+    usersRepository.findLoginIdentityByMembershipId.mockResolvedValue(null);
+
+    await expect(
+      service.selectGoogleOrganizationLogin({ idToken: 'google-id-token', membershipId }, metadata),
+    ).rejects.toThrow(new UnauthorizedException('Invalid credentials'));
     expect(sessionRepository.createSession).not.toHaveBeenCalled();
   });
 

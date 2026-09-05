@@ -1,4 +1,4 @@
-name: MedSphere V1 Core Runtime Regression
+name: AIM V1 Core Runtime Regression
 
 # Single authoritative certification of the merged V1 core runtime chain
 # (Frontend -> Backend -> PostgreSQL -> Redis), covering, in order:

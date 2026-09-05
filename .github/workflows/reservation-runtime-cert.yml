@@ -1,4 +1,4 @@
-name: MedSphere Reservations Runtime Certification
+name: AIM Reservations Runtime Certification
 
 on:
   workflow_dispatch: {}

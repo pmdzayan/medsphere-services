@@ -29,4 +29,4 @@ Replace public tenant-slug onboarding with organization-type selection and crypt
 
 ## Status
 
-Implementation complete locally; acceptance remains pending exact-head CI and merge.
+Accepted and merged in commit `87f79e3` (#126).

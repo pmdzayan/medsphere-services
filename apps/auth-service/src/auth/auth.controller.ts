@@ -19,6 +19,7 @@ import { IdentifyLoginDto } from './dto/identify-login.dto';
 import { SelectOrganizationLoginDto } from './dto/select-organization-login.dto';
 import { OrganizationSelectionRequiredDto } from './dto/organization-selection-required.dto';
 import { GoogleLoginDto } from './dto/google-login.dto';
+import { SelectGoogleOrganizationLoginDto } from './dto/select-google-organization-login.dto';
 import { GoogleRegisterDto } from './dto/google-register.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { LockSessionDto } from './dto/lock-session.dto';
@@ -137,14 +138,37 @@ export class AuthController {
   })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Create a membership-bound session with Google' })
+  @ApiOkResponse({
+    schema: {
+      oneOf: [
+        { $ref: getSchemaPath(LoginResponseDto) },
+        { $ref: getSchemaPath(OrganizationSelectionRequiredDto) },
+      ],
+    },
+  })
+  @ApiUnauthorizedResponse({ description: 'Invalid Google identity' })
+  @ApiExtraModels(LoginResponseDto, OrganizationSelectionRequiredDto)
+  google(@Body() googleLoginDto: GoogleLoginDto, @Req() request: MetadataHttpRequest) {
+    return this.authService.googleLogin(googleLoginDto.idToken, extractRequestMetadata(request));
+  }
+
+  @Post('google/select-organization')
+  @PublicEndpoint()
+  @Throttle({
+    ip: { limit: 10, ttl: 60_000 },
+    account: { limit: 10, ttl: 60_000 },
+  })
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Complete Google login for a membership owned by the re-verified identity',
+  })
   @ApiOkResponse({ type: LoginResponseDto })
   @ApiUnauthorizedResponse({ description: 'Invalid Google identity' })
-  google(@Body() googleLoginDto: GoogleLoginDto, @Req() request: MetadataHttpRequest) {
-    return this.authService.googleLogin(
-      googleLoginDto.tenantSlug,
-      googleLoginDto.idToken,
-      extractRequestMetadata(request),
-    );
+  selectGoogleOrganization(
+    @Body() dto: SelectGoogleOrganizationLoginDto,
+    @Req() request: MetadataHttpRequest,
+  ) {
+    return this.authService.selectGoogleOrganizationLogin(dto, extractRequestMetadata(request));
   }
 
   @Post('refresh')

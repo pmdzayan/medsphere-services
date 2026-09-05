@@ -2,8 +2,11 @@ import { ORGANIZATION_TYPES, type OrganizationType } from './organization-types'
 import { isKnownLanguageCode, type KnownLanguageCode } from './settings-contract';
 
 export interface GoogleLoginRequest {
-  tenantSlug: string;
   idToken: string;
+}
+
+export interface SelectGoogleOrganizationLoginRequest extends GoogleLoginRequest {
+  membershipId: string;
 }
 
 export interface GoogleRegisterRequest {
@@ -176,7 +179,6 @@ export function validateGoogleRegisterRequest(
 
 export function normalizeGoogleLoginRequest(input: GoogleLoginRequest): GoogleLoginRequest {
   return {
-    tenantSlug: normalizeTenantSlug(input.tenantSlug),
     idToken: input.idToken.trim(),
   };
 }
@@ -186,12 +188,7 @@ export function isGoogleLoginRequest(value: unknown): value is GoogleLoginReques
     return false;
   }
 
-  const candidate = value as Record<string, unknown>;
-  return (
-    Object.keys(candidate).sort().join(',') === 'idToken,tenantSlug' &&
-    typeof candidate.tenantSlug === 'string' &&
-    typeof candidate.idToken === 'string'
-  );
+  return hasExactStringKeys(value, ['idToken']);
 }
 
 export function validateGoogleLoginRequest(
@@ -199,15 +196,17 @@ export function validateGoogleLoginRequest(
 ): Partial<Record<keyof GoogleLoginRequest, string>> {
   const errors: Partial<Record<keyof GoogleLoginRequest, string>> = {};
 
-  if (input.tenantSlug.length < 1 || input.tenantSlug.length > 100) {
-    errors.tenantSlug = 'Use the organization slug provided by your administrator.';
-  }
-
   if (input.idToken.length < 1 || input.idToken.length > 10000) {
     errors.idToken = 'Invalid Google sign-in credential.';
   }
 
   return errors;
+}
+
+export function isSelectGoogleOrganizationLoginRequest(
+  value: unknown,
+): value is SelectGoogleOrganizationLoginRequest {
+  return hasExactStringKeys(value, ['idToken', 'membershipId']);
 }
 
 export function normalizeLoginRequest(input: LoginRequest): LoginRequest {
@@ -255,11 +254,28 @@ export function isSelectOrganizationLoginRequest(
 export function isOrganizationSelectionRequired(
   value: unknown,
 ): value is OrganizationSelectionRequired {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+  if (!hasExactKeys(value, ['organizations', 'requiresOrganizationSelection'])) {
     return false;
   }
   const candidate = value as Record<string, unknown>;
-  return candidate.requiresOrganizationSelection === true && Array.isArray(candidate.organizations);
+  return (
+    candidate.requiresOrganizationSelection === true &&
+    Array.isArray(candidate.organizations) &&
+    candidate.organizations.length > 0 &&
+    candidate.organizations.every(
+      (organization) =>
+        hasExactStringKeys(organization, [
+          'membershipId',
+          'organizationName',
+          'organizationType',
+        ]) &&
+        isUuidV4(organization.membershipId) &&
+        organization.organizationName.length > 0 &&
+        organization.organizationName.length <= 200 &&
+        organization.organizationType.length > 0 &&
+        organization.organizationType.length <= 50,
+    )
+  );
 }
 
 export function isLoginResponse(value: unknown): value is LoginResponse {
@@ -467,6 +483,10 @@ function hasExactKeys(value: unknown, expectedKeys: readonly string[]): value is
     actualKeys.length === expectedKeys.length &&
     actualKeys.every((key, index) => key === expectedKeys[index])
   );
+}
+
+function isUuidV4(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }
 
 /* -------------------------------------------------------------------------- */

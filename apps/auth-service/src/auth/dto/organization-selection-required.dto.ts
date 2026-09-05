@@ -15,7 +15,7 @@ export class OrganizationChoiceDto {
  * Returned by the identify-login step instead of a LoginResponseDto when
  * the person's individual identity resolves to more than one active
  * membership. Contains only organization display information the
- * now-password-verified caller is already authorized to know about
+ * now-verified caller is already authorized to know about
  * their own memberships -- never a general organization search/listing.
  */
 export class OrganizationSelectionRequiredDto {
