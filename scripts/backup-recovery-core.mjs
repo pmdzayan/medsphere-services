@@ -17,14 +17,7 @@
 // under apps/ or packages/ may depend on them.
 
 import { createHash } from 'node:crypto';
-import {
-  appendFileSync,
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  statSync,
-  writeFileSync,
-} from 'node:fs';
+import { appendFileSync, existsSync, mkdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname } from 'node:path';
 
 // ---------------------------------------------------------------------------
@@ -89,21 +82,24 @@ export const PRODUCTION_HOST_MARKERS = [
   '.goog',
 ];
 
-export function isProductionConnection(conn, explicitProductionUrlRaw) {
+// ---------------------------------------------------------------------------
+// CONTRACT: the second argument MUST already be a successfully parsed
+// connection object (or null/undefined) from parseConnectionUrl(). This is
+// deliberate: an unparsable AIM_PRODUCTION_DATABASE_URL must fail closed in
+// the caller BEFORE any database/tool operation, and this helper must never
+// see a raw string it could silently fail to classify. The caller parses the
+// explicit production URL explicitly and refuses to continue on parse error.
+// ---------------------------------------------------------------------------
+
+export function isProductionConnection(conn, explicitProduction) {
   const reasons = [];
-  if (explicitProductionUrlRaw) {
-    try {
-      const explicit = parseConnectionUrl(explicitProductionUrlRaw);
-      if (
-        explicit.host === conn.host &&
-        explicit.port === conn.port &&
-        explicit.database === conn.database
-      ) {
-        reasons.push('matches AIM_PRODUCTION_DATABASE_URL');
-      }
-    } catch {
-      // An unparsable AIM_PRODUCTION_DATABASE_URL must fail closed at the
-      // call site; here we only ignore it for classification purposes.
+  if (explicitProduction) {
+    if (
+      explicitProduction.host === conn.host &&
+      explicitProduction.port === conn.port &&
+      explicitProduction.database === conn.database
+    ) {
+      reasons.push('matches AIM_PRODUCTION_DATABASE_URL');
     }
   }
   const host = conn.host.toLowerCase();
@@ -385,13 +381,22 @@ export const REQUIRED_FK_MINIMA = {
 // Status records (bounded, secret-free operational evidence).
 // ---------------------------------------------------------------------------
 
-export function buildStatusRecord({ program, kind, ok, detail, backupFile, timestamp } = {}) {
+export function buildStatusRecord({
+  program,
+  kind,
+  ok,
+  detail,
+  backupFile,
+  timestamp,
+  operationId,
+} = {}) {
   return {
     program,
     kind,
     ok: Boolean(ok),
     timestamp: timestamp ?? Math.floor(Date.now() / 1000),
     ...(backupFile ? { backupFile } : {}),
+    ...(operationId ? { operationId } : {}),
     ...(detail ? { detail } : {}),
   };
 }
@@ -456,11 +461,22 @@ export function computeBackupMetrics(records, nowSeconds, warnAfterSeconds, crit
 
   const restoresSorted = [...restores].sort((a, b) => (a.timestamp ?? 0) - (b.timestamp ?? 0));
   const latestRestore = restoresSorted[restoresSorted.length - 1];
-  const verifiesSorted = [...verifies].sort((a, b) => (a.timestamp ?? 0) - (b.timestamp ?? 0));
-  const latestVerify = verifiesSorted[verifiesSorted.length - 1];
-  const restoreVerified = Boolean(
-    latestRestore && latestRestore.ok && latestVerify != null && latestVerify.ok,
-  );
+
+  // Restore/verification correlation: a verification record is ONLY
+  // meaningful when it belongs to the SAME restore operation (same
+  // operationId). We deliberately fail closed: if the newest restore has no
+  // matching successful verification record, the metric is 0 -- an older
+  // successful verify never satisfies a newer restore, and uncorrelated
+  // legacy records are never treated as verification.
+  let restoreVerified = 0;
+  if (latestRestore && latestRestore.ok && latestRestore.operationId) {
+    const matchingVerify = verifies.find(
+      (verify) => verify.operationId === latestRestore.operationId && verify.ok,
+    );
+    if (matchingVerify) {
+      restoreVerified = 1;
+    }
+  }
 
   return {
     status: lastBackup ? (lastBackup.ok ? 1 : 0) : 0,

@@ -32,6 +32,7 @@
 //   AIM_RESTORE_KEEP_ON_FAILURE=1   -- keep the target for debugging
 
 import { execFileSync } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import {
   appendStatusRecord,
@@ -63,6 +64,10 @@ function main() {
   const expectedMigrationsRaw = process.env.AIM_RESTORE_EXPECTED_MIGRATIONS;
   const expectedCountsFile = process.env.AIM_RESTORE_EXPECTED_COUNTS;
   let createdTargetThisRun = false;
+  // One correlation identifier per restore operation, shared by the restore
+  // and verification status records so backup observability can never pair a
+  // verification record with a different restore operation.
+  const operationId = randomUUID();
 
   function fail(message) {
     throw new Error(message);
@@ -116,6 +121,24 @@ function main() {
     }
   }
 
+  // Parse AIM_PRODUCTION_DATABASE_URL explicitly at configuration time. If it
+  // is present and cannot be parsed, fail closed IMMEDIATELY -- before any
+  // database inspection, create/drop, or pg_restore -- with a bounded,
+  // secret-free error. We never silently fall back to host-marker
+  // classification, and the raw value is never logged.
+  let explicitProduction = null;
+  if (explicitProductionUrlRaw && explicitProductionUrlRaw.trim()) {
+    try {
+      explicitProduction = parseConnectionUrl(explicitProductionUrlRaw);
+    } catch {
+      fail(
+        'AIM_PRODUCTION_DATABASE_URL is present but could not be parsed; refusing to ' +
+          'continue before any database operation. Fix the configuration and retry. ' +
+          'The misconfigured value is never logged.',
+      );
+    }
+  }
+
   function pgEnv() {
     return { ...process.env, PGPASSWORD: target.password };
   }
@@ -150,7 +173,7 @@ function main() {
   // ---------------------------------------------------------------------------
   // Preflight 1: production guard (fail closed, no override).
   // ---------------------------------------------------------------------------
-  const productionCheck = isProductionConnection(target, explicitProductionUrlRaw);
+  const productionCheck = isProductionConnection(target, explicitProduction);
   if (productionCheck.isProduction) {
     fail(
       `Restore target ${targetSummary} is classified as a production database (${productionCheck.reasons.join('; ')}). ${PROG} never restores into production.`,
@@ -349,6 +372,7 @@ function main() {
       program: PROG,
       kind: 'restore',
       ok: true,
+      operationId,
       detail: `restored into ${targetSummary}`,
       backupFile: backupFile.split(/[\\/]/).pop(),
     }),
@@ -359,6 +383,7 @@ function main() {
       program: PROG,
       kind: 'verify',
       ok: verification.passed,
+      operationId,
       detail: verification.passed
         ? `${verification.checks.length} integrity checks passed`
         : `${verification.checks.filter((c) => !c.ok).length} integrity checks failed`,

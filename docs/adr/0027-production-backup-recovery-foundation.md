@@ -59,8 +59,12 @@ The restore utility has no `--force-production` option. Restore targets are
 classified as production when they match an explicit
 `AIM_PRODUCTION_DATABASE_URL` or a conservative managed-host marker
 (RDS/Azure/Cloud SQL suffixes), and these guards cannot be overridden.
-Restoring over the source database is rejected. Production promotion remains
-an explicit controlled operator action outside the basic restore utility.
+`AIM_PRODUCTION_DATABASE_URL` is parsed explicitly at configuration time: if
+it is present but malformed, the restore fails closed before any database
+operation (no silent fallback to host-marker classification, no secret
+leakage). Restoring over the source database is rejected. Production
+promotion remains an explicit controlled operator action outside the basic
+restore utility.
 
 ### 4. Integrity verification is required, not optional
 
@@ -91,9 +95,11 @@ The repository's existing metrics/alerting architecture is extended, not
 replaced: a node/textfile-collector command renders
 `medsphere_backup_status`, `medsphere_backup_last_success_age_seconds`,
 `medsphere_backup_stale{severity=...}`, and
-`medsphere_backup_restore_verified`, and the accepted alert-rules file gains
-backup failure/staleness alerts. Metrics never contain passwords, URLs,
-backup bytes, or patient data.
+`medsphere_backup_restore_verified` (correlated to the same restore operation
+via a shared `operationId`, so a verification record never satisfies a
+different restore), and the accepted alert-rules file gains backup
+failure/staleness alerts. Metrics never contain passwords, URLs, backup
+bytes, or patient data.
 
 ### 8. Retention policy is canonical
 

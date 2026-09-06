@@ -80,7 +80,8 @@ test('safeConnectionSummary never includes the user name or password', () => {
 
 test('isProductionConnection flags an explicit production URL match', () => {
   const conn = parseConnectionUrl('postgresql://u:p@prod.example.com:5432/aim_prod');
-  const result = isProductionConnection(conn, 'postgresql://u2:p3@prod.example.com:5432/aim_prod');
+  const explicit = parseConnectionUrl('postgresql://u2:p3@prod.example.com:5432/aim_prod');
+  const result = isProductionConnection(conn, explicit);
   assert.equal(result.isProduction, true);
   assert.ok(result.reasons.some((r) => r.includes('AIM_PRODUCTION_DATABASE_URL')));
 });
@@ -158,7 +159,7 @@ function scriptedMock(plan) {
 function healthyPlan() {
   const plan = [[/SELECT 1;/, '1']];
   plan.push([/LEFT JOIN "TenantMembership" m\s*ON a\."actorMembershipId" = m\."id"/, '0']);
-  for (const [child, , parent] of [
+  for (const [, , parent] of [
     ['TenantMembership', 'tenantId', 'Tenant'],
     ['TenantMembership', 'userId', 'User'],
     ['UserPrivacy', 'userId', 'User'],
@@ -343,6 +344,55 @@ test('restore CLI rejects an explicit production target with no override', () =>
   assert.match(String(result.stderr), /classified as a production database/);
 });
 
+test('restore CLI fails closed on a malformed AIM_PRODUCTION_DATABASE_URL before any tool runs', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'medsphere-br-spec-'));
+  const corrupt = join(dir, 'corrupt.dump');
+  writeFileSync(corrupt, 'not a pg_dump archive at all');
+  const result = runCli('aim-restore.mjs', {
+    AIM_BACKUP_FILE: corrupt,
+    RESTORE_DATABASE_URL: 'postgresql://u:SUPERSECRET_TEST_PW@127.0.0.1:1/db',
+    AIM_PRODUCTION_DATABASE_URL: 'postgresql://u:PRODSECRET_PW@host:notaport/db',
+    AIM_RESTORE_KEEP_ON_FAILURE: '1',
+  });
+  assert.notEqual(result.status, 0);
+  const output = `${result.stdout}\n${result.stderr}`;
+  assert.match(output, /AIM_PRODUCTION_DATABASE_URL/);
+  assert.match(output, /could not be parsed/i);
+  // No database/tool operation proceeded: the corrupt archive is never even
+  // inspected, so the pg_restore-readability error must NOT appear.
+  assert.doesNotMatch(output, /not readable by pg_restore/);
+  assert.doesNotMatch(output, /backup file/);
+  // Secrets / malformed values never print.
+  assert.ok(!output.includes('SUPERSECRET_TEST_PW'), 'target password leaked into output');
+  assert.ok(!output.includes('PRODSECRET_PW'), 'production password leaked into output');
+  assert.ok(
+    !output.includes('postgresql://u:PRODSECRET_PW@host:notaport/db'),
+    'raw production URL leaked into output',
+  );
+  rmSync(dir, { recursive: true, force: true });
+});
+
+test('restore CLI fails closed on a malformed AIM_PRODUCTION_DATABASE_URL even when the target is non-production', () => {
+  // A valid ordinary target must still be refused when the production-URL
+  // override is present but unparsable: never silently fall back to host
+  // marker classification.
+  const dir = mkdtempSync(join(tmpdir(), 'medsphere-br-spec-'));
+  const corrupt = join(dir, 'corrupt.dump');
+  writeFileSync(corrupt, 'not a pg_dump archive at all');
+  const result = runCli('aim-restore.mjs', {
+    AIM_BACKUP_FILE: corrupt,
+    RESTORE_DATABASE_URL: 'postgresql://u:p@localhost:5432/aim_dev',
+    AIM_PRODUCTION_DATABASE_URL: 'not-a-valid-url',
+    AIM_RESTORE_KEEP_ON_FAILURE: '1',
+  });
+  assert.notEqual(result.status, 0);
+  const output = `${result.stdout}\n${result.stderr}`;
+  assert.match(output, /AIM_PRODUCTION_DATABASE_URL/);
+  assert.doesNotMatch(output, /not-readable|not readable by pg_restore/);
+  assert.ok(!output.includes('not-a-valid-url\n'), 'raw production URL leaked into output');
+  rmSync(dir, { recursive: true, force: true });
+});
+
 test('restore CLI rejects managed-host production endpoints', () => {
   const result = runCli('aim-restore.mjs', {
     AIM_BACKUP_FILE: 'whatever.dump',
@@ -403,8 +453,20 @@ test('computeBackupMetrics tracks success, failure, staleness, and restore verif
       timestamp: 2000,
       backupFile: 'b.dump',
     }),
-    buildStatusRecord({ program: 'aim-restore', kind: 'restore', ok: true, timestamp: 3000 }),
-    buildStatusRecord({ program: 'aim-restore', kind: 'verify', ok: true, timestamp: 3001 }),
+    buildStatusRecord({
+      program: 'aim-restore',
+      kind: 'restore',
+      ok: true,
+      timestamp: 3000,
+      operationId: 'op-restore-1',
+    }),
+    buildStatusRecord({
+      program: 'aim-restore',
+      kind: 'verify',
+      ok: true,
+      timestamp: 3001,
+      operationId: 'op-restore-1',
+    }),
   ];
   const metrics = computeBackupMetrics(records, 50000, 3600, 7200);
   assert.equal(metrics.status, 0); // latest backup attempt failed
@@ -415,6 +477,157 @@ test('computeBackupMetrics tracks success, failure, staleness, and restore verif
   assert.equal(metrics.attemptsSuccess, 1);
   assert.equal(metrics.attemptsFailure, 1);
   assert.equal(metrics.restoreVerified, 1);
+});
+
+// ---------------------------------------------------------------------------
+// Restore/verification correlation (fail closed on mismatched operationId).
+// ---------------------------------------------------------------------------
+
+test('computeBackupMetrics: matching restore+verify success => restoreVerified 1', () => {
+  const records = [
+    buildStatusRecord({
+      program: 'aim-restore',
+      kind: 'restore',
+      ok: true,
+      timestamp: 100,
+      operationId: 'op-1',
+    }),
+    buildStatusRecord({
+      program: 'aim-restore',
+      kind: 'verify',
+      ok: true,
+      timestamp: 101,
+      operationId: 'op-1',
+    }),
+  ];
+  assert.equal(computeBackupMetrics(records, 1000, 3600, 7200).restoreVerified, 1);
+});
+
+test('computeBackupMetrics: matching restore + verify failure => restoreVerified 0', () => {
+  const records = [
+    buildStatusRecord({
+      program: 'aim-restore',
+      kind: 'restore',
+      ok: true,
+      timestamp: 100,
+      operationId: 'op-1',
+    }),
+    buildStatusRecord({
+      program: 'aim-restore',
+      kind: 'verify',
+      ok: false,
+      timestamp: 101,
+      operationId: 'op-1',
+    }),
+  ];
+  assert.equal(computeBackupMetrics(records, 1000, 3600, 7200).restoreVerified, 0);
+});
+
+test('computeBackupMetrics: new successful restore with NO new verify => restoreVerified 0', () => {
+  // Old restore+verify succeeded; a newer restore (new operationId) has no
+  // matching verification record. The old verify must NOT satisfy it.
+  const records = [
+    buildStatusRecord({
+      program: 'aim-restore',
+      kind: 'restore',
+      ok: true,
+      timestamp: 100,
+      operationId: 'op-1',
+    }),
+    buildStatusRecord({
+      program: 'aim-restore',
+      kind: 'verify',
+      ok: true,
+      timestamp: 101,
+      operationId: 'op-1',
+    }),
+    buildStatusRecord({
+      program: 'aim-restore',
+      kind: 'restore',
+      ok: true,
+      timestamp: 200,
+      operationId: 'op-2',
+    }),
+  ];
+  assert.equal(computeBackupMetrics(records, 1000, 3600, 7200).restoreVerified, 0);
+});
+
+test('computeBackupMetrics: older successful verify never satisfies a newer restore', () => {
+  // An older verify for op-old must never count toward a newer restore op-new.
+  const records = [
+    buildStatusRecord({
+      program: 'aim-restore',
+      kind: 'restore',
+      ok: true,
+      timestamp: 100,
+      operationId: 'op-old',
+    }),
+    buildStatusRecord({
+      program: 'aim-restore',
+      kind: 'verify',
+      ok: true,
+      timestamp: 101,
+      operationId: 'op-old',
+    }),
+    buildStatusRecord({
+      program: 'aim-restore',
+      kind: 'restore',
+      ok: true,
+      timestamp: 200,
+      operationId: 'op-new',
+    }),
+    buildStatusRecord({
+      program: 'aim-restore',
+      kind: 'verify',
+      ok: true,
+      timestamp: 201,
+      operationId: 'op-other',
+    }),
+  ];
+  assert.equal(computeBackupMetrics(records, 1000, 3600, 7200).restoreVerified, 0);
+});
+
+test('computeBackupMetrics: newer successful correlated pair returns to 1', () => {
+  const records = [
+    buildStatusRecord({
+      program: 'aim-restore',
+      kind: 'restore',
+      ok: true,
+      timestamp: 100,
+      operationId: 'op-1',
+    }),
+    buildStatusRecord({
+      program: 'aim-restore',
+      kind: 'verify',
+      ok: true,
+      timestamp: 101,
+      operationId: 'op-1',
+    }),
+    buildStatusRecord({
+      program: 'aim-restore',
+      kind: 'restore',
+      ok: true,
+      timestamp: 200,
+      operationId: 'op-2',
+    }),
+    buildStatusRecord({
+      program: 'aim-restore',
+      kind: 'verify',
+      ok: true,
+      timestamp: 201,
+      operationId: 'op-2',
+    }),
+  ];
+  assert.equal(computeBackupMetrics(records, 1000, 3600, 7200).restoreVerified, 1);
+});
+
+test('computeBackupMetrics: legacy uncorrelated records are treated conservatively as 0', () => {
+  // Records without operationId cannot be correlated; never invent one.
+  const records = [
+    buildStatusRecord({ program: 'aim-restore', kind: 'restore', ok: true, timestamp: 100 }),
+    buildStatusRecord({ program: 'aim-restore', kind: 'verify', ok: true, timestamp: 101 }),
+  ];
+  assert.equal(computeBackupMetrics(records, 1000, 3600, 7200).restoreVerified, 0);
 });
 
 test('formatBackupMetrics emits bounded text with zero sensitive fields', () => {

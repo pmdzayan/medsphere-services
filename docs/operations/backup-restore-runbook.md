@@ -157,6 +157,9 @@ FAIL`/`PASS` verdict.
 
 The restore tool refuses to run if:
 
+- `AIM_PRODUCTION_DATABASE_URL` is set but **cannot be parsed** (fail closed
+  before any database/tool operation; the misconfigured value is never
+  logged);
 - the target matches `AIM_PRODUCTION_DATABASE_URL`;
 - the target host matches a conservative managed-production marker
   (`.rds.amazonaws.com`, `.postgres.database.azure.com`, `.azure.com`,

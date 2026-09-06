@@ -222,11 +222,14 @@ script on an interval):
   success exceeds the 28 h / 72 h thresholds (the thresholds themselves are
   exported as `medsphere_backup_staleness_warning_seconds` /
   `medsphere_backup_staleness_critical_seconds` for dashboards).
-- `medsphere_backup_restore_verified` — whether the latest restore + integrity
-  verification both passed (1) or not (0).
+- `medsphere_backup_restore_verified` — whether the latest restore + its
+  **correlated** integrity verification (same `operationId`) both passed (1)
+  or not (0). A verification record never satisfies a different restore
+  operation, so a newer restore without a matching successful verification
+  reports 0 (fail closed).
 
 The status records backing these metrics come from the backup/restore CLIs
-(`AIM_BACKUP_STATUS_FILE` JSONL) — bounded `{program, kind, ok, timestamp}`
+(`AIM_BACKUP_STATUS_FILE` JSONL) — bounded `{program, kind, ok, timestamp, operationId?}`
 records. No metric or record ever contains a password, a connection URL, a
 token, backup bytes, or patient data.
 
