@@ -26,7 +26,15 @@ const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const sourceMigrations = join(packageRoot, 'prisma', 'migrations');
 const targetMigration = '20260830190000_aim_consumer_brand';
 const targetMigrationSqlPath = join(sourceMigrations, targetMigration, 'migration.sql');
-const pnpmCommand = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm';
+const pnpmCommand = process.platform === 'win32' ? process.env.ComSpec || 'cmd.exe' : 'pnpm';
+
+function prismaProcessArgs(args) {
+  if (process.platform === 'win32') {
+    return ['/d', '/c', 'pnpm.cmd', 'exec', 'prisma', ...args];
+  }
+
+  return ['exec', 'prisma', ...args];
+}
 
 if (!existsSync(targetMigrationSqlPath)) {
   throw new Error(`Required migration is missing: ${targetMigration}`);
@@ -60,7 +68,7 @@ function sanitize(output) {
 }
 
 function runPrisma(args, scopedDatabaseUrl, options = {}) {
-  const result = spawnSync(pnpmCommand, ['exec', 'prisma', ...args], {
+  const result = spawnSync(pnpmCommand, prismaProcessArgs(args), {
     cwd: packageRoot,
     encoding: 'utf8',
     env: {

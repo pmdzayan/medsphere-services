@@ -224,6 +224,40 @@ enum ConsentStatus {
   WITHDRAWN
 }
 
+/// Task 0021: platform-account lifecycle. Platform authority is granted ONLY
+/// through a PlatformAccount + live PlatformRoleAssignment -- never through
+/// tenant membership (TENANT AUTHORITY != PLATFORM AUTHORITY).
+enum PlatformAccountStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+/// Task 0021: invitation lifecycle. Invitations are single-use bearer proofs
+/// stored only as an HMAC digest; plaintext secrets are never persisted.
+enum PlatformInvitationStatus {
+  PENDING
+  ACCEPTED
+  REVOKED
+  EXPIRED
+}
+
+/// Task 0021: dedicated platform-session lifecycle. Distinct from the
+/// tenant-scoped UserSession so a platform administrator's platform session
+/// can never be confused with (or grant) a tenant membership.
+enum PlatformSessionStatus {
+  ACTIVE
+  ROTATED
+  EXPIRED
+  REVOKED
+  COMPROMISED
+}
+
+enum PlatformRefreshCredentialStatus {
+  ACTIVE
+  USED
+  REVOKED
+}
+
 model Tenant {
   id String @id @default(uuid()) @db.Uuid
 
@@ -342,16 +376,22 @@ model User {
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
-  memberships            TenantMembership[]
-  sessions               UserSession[]
-  platformAuditEvents    AuditEvent[]                 @relation("AuditEventPlatformActor")
-  actorAuditEvents       AuditEvent[]                 @relation("AuditEventActorUser")
-  privacy                UserPrivacy?
-  medicineReservations   MedicineReservation[]
-  verificationAttempts   AccountVerificationAttempt[]
-  externalAuthIdentities ExternalAuthIdentity[]
-  phoneOtpChallenges     PhoneOtpChallenge[]
-  consentRecords         ConsentRecord[]
+  memberships                 TenantMembership[]
+  sessions                    UserSession[]
+  platformAuditEvents         AuditEvent[]                 @relation("AuditEventPlatformActor")
+  actorAuditEvents            AuditEvent[]                 @relation("AuditEventActorUser")
+  privacy                     UserPrivacy?
+  medicineReservations        MedicineReservation[]
+  verificationAttempts        AccountVerificationAttempt[]
+  externalAuthIdentities      ExternalAuthIdentity[]
+  phoneOtpChallenges          PhoneOtpChallenge[]
+  consentRecords              ConsentRecord[]
+  platformAccount             PlatformAccount?             @relation("PlatformAccountUser")
+  platformSessions            PlatformSession[]            @relation("PlatformSessionUser")
+  createdPlatformAssignments  PlatformRoleAssignment[]     @relation("PlatformAssignmentCreatedBy")
+  createdPlatformInvitations  PlatformInvitation[]         @relation("PlatformInvitationCreatedBy")
+  acceptedPlatformInvitations PlatformInvitation[]         @relation("PlatformInvitationAccepted")
+  revokedPlatformInvitations  PlatformInvitation[]         @relation("PlatformInvitationRevokedBy")
 }
 
 model ExternalAuthIdentity {
@@ -560,7 +600,8 @@ model Permission {
   description String   @db.VarChar(240)
   createdAt   DateTime @default(now())
 
-  rolePermissions RolePermission[]
+  rolePermissions         RolePermission[]
+  platformRolePermissions PlatformRolePermission[]
 }
 
 model MembershipRole {
@@ -700,6 +741,242 @@ model UserSessionRefreshCredential {
 
   @@index([sessionId, status])
   @@index([sessionId, issuedAt])
+  @@index([status, issuedAt])
+}
+
+/// Task 0021: platform administration foundation.
+///
+/// A global AIM user MAY optionally have exactly one platform account.
+/// Platform authority is derived only from this account + live role
+/// assignments -- a tenant membership NEVER grants platform privileges and a
+/// platform role NEVER grants tenant/clinical authority.
+///
+/// `userId` is `@unique`, proving "one platform account per global user".
+model PlatformAccount {
+  id String @id @default(uuid()) @db.Uuid
+
+  userId String @unique @db.Uuid
+  user   User   @relation("PlatformAccountUser", fields: [userId], references: [id], onDelete: Restrict)
+
+  status PlatformAccountStatus @default(ACTIVE)
+
+  version Int @default(1)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  roleAssignments PlatformRoleAssignment[]
+  sessions        PlatformSession[]        @relation("PlatformAccountSessions")
+
+  @@index([status])
+  @@index([userId, status])
+}
+
+/// Task 0021: GLOBAL platform role. It has NO tenantId, is never a tenant
+/// `Role`, and is seeded only by migration. Platform roles are immutable at
+/// runtime (a database trigger rejects UPDATE/DELETE) so the protected owner
+/// role can never be renamed, deleted, or silently replaced by an API call.
+model PlatformRole {
+  id   String @id @default(uuid()) @db.Uuid
+  key  String @unique @db.VarChar(64)
+  name String @db.VarChar(64)
+
+  description String? @db.VarChar(240)
+  /// CLT-owned roles (PLATFORM_OWNER, PLATFORM_ADMIN) can never be renamed,
+  /// deleted, or have their permissions edited through HTTP APIs.
+  isProtected Boolean @default(false)
+
+  version Int @default(1)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  rolePermissions PlatformRolePermission[]
+  roleAssignments PlatformRoleAssignment[]
+  invitations     PlatformInvitation[]
+}
+
+/// Task 0021: platform role -> permission binding. Structurally separate from
+/// the tenant `RolePermission` table (no tenantId, separate binding source),
+/// so a tenant permission can never become platform authority merely because
+/// both exist in the shared permission catalogue.
+model PlatformRolePermission {
+  id String @id @default(uuid()) @db.Uuid
+
+  roleId       String @db.Uuid
+  permissionId String @db.Uuid
+
+  role       PlatformRole @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission   @relation(fields: [permissionId], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now())
+
+  @@unique([roleId, permissionId])
+  @@index([roleId])
+  @@index([permissionId])
+}
+
+/// Task 0021: live server-side platform role assignment binding the global
+/// platform account to a global platform role. There is NO tenantId and NO
+/// membershipId anywhere on this row -- a platform-role assignment can
+/// never reference a tenant membership by construction.
+///
+/// `grantedRoleKey` is the denormalized copy of the granted PlatformRole.key,
+/// validated by a database trigger at write time so the partial unique index
+/// below can prove "at most one PLATFORM_OWNER assignment" in pure SQL.
+model PlatformRoleAssignment {
+  id String @id @default(uuid()) @db.Uuid
+
+  platformAccountId String @db.Uuid
+  roleId            String @db.Uuid
+  grantedRoleKey    String @db.VarChar(64)
+
+  platformAccount PlatformAccount @relation(fields: [platformAccountId], references: [id], onDelete: Cascade)
+  role            PlatformRole    @relation(fields: [roleId], references: [id], onDelete: Restrict)
+
+  /// The platform user who ordered this assignment. NULL only for the
+  /// operator-invoked one-time initial-owner bootstrap.
+  createdByPlatformUserId String? @db.Uuid
+  createdByPlatformUser   User?   @relation("PlatformAssignmentCreatedBy", fields: [createdByPlatformUserId], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now())
+
+  @@unique([platformAccountId, roleId])
+  @@index([roleId])
+  @@index([platformAccountId])
+}
+
+/// Task 0021: invitation-only platform access. The plaintext invitation
+/// secret is NEVER stored -- only the HMAC-SHA256 digest (`invitationHash`).
+/// Invitations are single-use, expiring, revocable, bounded, and validated by
+/// a cryptographic identity bound to the same normalized e-mail address.
+model PlatformInvitation {
+  id String @id @default(uuid()) @db.Uuid
+
+  /// Normalized (trimmed, lower-cased) target global-identity e-mail.
+  targetEmail String @db.Citext
+
+  roleId String       @db.Uuid
+  role   PlatformRole @relation(fields: [roleId], references: [id], onDelete: Restrict)
+
+  /// HMAC-SHA256 hex digest of the invitation secret. Globally unique.
+  invitationHash String @unique @db.VarChar(64)
+
+  status PlatformInvitationStatus @default(PENDING)
+
+  expiresAt DateTime
+
+  acceptedAt       DateTime?
+  acceptedByUserId String?   @db.Uuid
+  acceptedByUser   User?     @relation("PlatformInvitationAccepted", fields: [acceptedByUserId], references: [id], onDelete: Restrict)
+
+  revokedAt               DateTime?
+  revokedByPlatformUserId String?   @db.Uuid
+  revokedByPlatformUser   User?     @relation("PlatformInvitationRevokedBy", fields: [revokedByPlatformUserId], references: [id], onDelete: Restrict)
+
+  createdByPlatformUserId String @db.Uuid
+  createdByPlatformUser   User   @relation("PlatformInvitationCreatedBy", fields: [createdByPlatformUserId], references: [id], onDelete: Restrict)
+
+  version Int @default(1)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([status, expiresAt])
+  @@index([targetEmail, status])
+  @@index([createdByPlatformUserId, createdAt])
+  @@index([roleId])
+}
+
+/// Task 0021: dedicated, tenant-less platform session. Distinct from the
+/// tenant-scoped `UserSession` (which keeps its invariants unchanged). A
+/// platform session belongs to the exact global user + platform account
+/// (proved by the FK to PlatformAccount.userId) and carries no tenant or
+/// membership context at all.
+model PlatformSession {
+  id String @id @default(uuid()) @db.Uuid
+
+  userId String @db.Uuid
+  user   User   @relation("PlatformSessionUser", fields: [userId], references: [id], onDelete: Cascade, map: "PlatformSession_userId_fkey")
+
+  /// Session family for replay/compromise chain revocation, mirroring the
+  /// accepted tenant-session architecture.
+  familyId         String @db.Uuid
+  refreshTokenHash String @unique @db.VarChar(64)
+
+  ipAddress  String? @db.Inet
+  userAgent  String? @db.VarChar(512)
+  deviceName String? @db.VarChar(120)
+
+  expiresAt         DateTime
+  absoluteExpiresAt DateTime
+  lastUsedAt        DateTime @default(now())
+
+  status PlatformSessionStatus @default(ACTIVE)
+
+  /// Mirrors Task 0014 workstation hardening: locked platform sessions fail
+  /// closed and pre-lock platform access tokens are invalidated via
+  /// securityVersion.
+  lockedAt              DateTime?
+  lockReason            String?   @db.VarChar(120)
+  unlockedAt            DateTime?
+  unlockMethod          String?   @db.VarChar(40)
+  securityVersion       Int       @default(1)
+  recentAuthenticatedAt DateTime?
+
+  replacedById String?          @unique @db.Uuid
+  replacedBy   PlatformSession? @relation("PlatformSessionRotation", fields: [replacedById], references: [id], onDelete: SetNull)
+  replaces     PlatformSession? @relation("PlatformSessionRotation")
+
+  version Int @default(1)
+
+  revokedAt        DateTime?
+  revocationReason String?   @db.VarChar(120)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  refreshCredentials PlatformSessionRefreshCredential[]
+
+  platformAccount PlatformAccount @relation("PlatformAccountSessions", fields: [userId], references: [userId], onDelete: Cascade, map: "PlatformSession_platformAccount_userId_fkey")
+
+  @@index([userId, status])
+  @@index([familyId, status])
+  @@index([status, expiresAt])
+  @@index([status, absoluteExpiresAt])
+  @@index([familyId, createdAt])
+  @@index([status, lockedAt])
+}
+
+/// Task 0021: single-use platform refresh credentials. Same hashing, rotation
+/// and replay semantics as the accepted tenant architecture, namespaced by the
+/// dedicated PlatformSession -- a tenant refresh credential can never be used
+/// for a platform session and vice versa.
+model PlatformSessionRefreshCredential {
+  id                String          @id @default(uuid()) @db.Uuid
+  platformSessionId String          @db.Uuid
+  platformSession   PlatformSession @relation(fields: [platformSessionId], references: [id], onDelete: Cascade)
+
+  hash   String                          @unique @db.VarChar(64)
+  status PlatformRefreshCredentialStatus @default(ACTIVE)
+
+  issuedAt  DateTime  @default(now())
+  usedAt    DateTime?
+  revokedAt DateTime?
+
+  replacedById String?                           @unique @db.Uuid
+  replacedBy   PlatformSessionRefreshCredential? @relation("PlatformCredentialRotation", fields: [replacedById], references: [id], onDelete: SetNull)
+  replaces     PlatformSessionRefreshCredential? @relation("PlatformCredentialRotation")
+
+  rotationSequence Int @default(1)
+
+  createdAt DateTime @default(now())
+
+  @@index([platformSessionId, status])
+  @@index([platformSessionId, issuedAt])
   @@index([status, issuedAt])
 }
 

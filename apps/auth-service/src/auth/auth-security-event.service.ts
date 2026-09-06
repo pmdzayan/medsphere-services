@@ -14,7 +14,9 @@ export type AuthenticationSecurityEvent =
   | 'session-reauthenticated'
   | 'session-reauthentication-failed'
   | 'logout-locked'
-  | 'switch-user';
+  | 'switch-user'
+  | 'platform-login'
+  | 'platform-session-revocation';
 
 export interface AuthenticationSecurityEventContext {
   readonly outcome: 'success' | 'denied';
@@ -29,7 +31,9 @@ export interface AuthenticationSecurityEventContext {
     | 'registration-processed'
     | 'session-locked'
     | 'invalid-unlock-credential'
-    | 'invalid-reauthentication-credential';
+    | 'invalid-reauthentication-credential'
+    | 'platform-login-processed'
+    | 'platform-sessions-revoked';
 }
 
 /**

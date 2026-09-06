@@ -20,7 +20,15 @@ const baselineMigrations = [
   '20260720120000_trusted_authentication_tenant_context',
 ];
 const s04Migration = '20260725120000_tenant_safe_authorization_durable_audit';
-const pnpmCommand = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm';
+const pnpmCommand = process.platform === 'win32' ? process.env.ComSpec || 'cmd.exe' : 'pnpm';
+
+function prismaProcessArgs(args) {
+  if (process.platform === 'win32') {
+    return ['/d', '/c', 'pnpm.cmd', 'exec', 'prisma', ...args];
+  }
+
+  return ['exec', 'prisma', ...args];
+}
 
 for (const migrationName of [...baselineMigrations, s04Migration]) {
   if (!existsSync(join(sourceMigrations, migrationName, 'migration.sql'))) {
@@ -46,7 +54,7 @@ function sanitize(output) {
 }
 
 function runPrisma(args, scopedDatabaseUrl, options = {}) {
-  const result = spawnSync(pnpmCommand, ['exec', 'prisma', ...args], {
+  const result = spawnSync(pnpmCommand, prismaProcessArgs(args), {
     cwd: packageRoot,
     encoding: 'utf8',
     env: {

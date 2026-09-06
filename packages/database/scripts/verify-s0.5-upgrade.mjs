@@ -33,7 +33,15 @@ const upgradeMigrations = [
   '20260810200000_one_way_manual_batch_quarantine',
   '20260814120000_staff_reservation_creation',
 ];
-const pnpmCommand = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm';
+const pnpmCommand = process.platform === 'win32' ? process.env.ComSpec || 'cmd.exe' : 'pnpm';
+
+function prismaProcessArgs(args) {
+  if (process.platform === 'win32') {
+    return ['/d', '/c', 'pnpm.cmd', 'exec', 'prisma', ...args];
+  }
+
+  return ['exec', 'prisma', ...args];
+}
 
 for (const migrationName of [...baselineMigrations, ...upgradeMigrations]) {
   if (!existsSync(join(sourceMigrations, migrationName, 'migration.sql'))) {
@@ -59,7 +67,7 @@ function sanitize(output) {
 }
 
 function runPrisma(args, scopedDatabaseUrl, options = {}) {
-  const result = spawnSync(pnpmCommand, ['exec', 'prisma', ...args], {
+  const result = spawnSync(pnpmCommand, prismaProcessArgs(args), {
     cwd: packageRoot,
     encoding: 'utf8',
     env: {
@@ -280,6 +288,8 @@ INSERT INTO "InventoryHistory" (
 `;
 
 const legacySessionHistory = `
+SET TIME ZONE 'UTC';
+
 INSERT INTO "UserSession" (
   "id", "membershipId", "familyId", "refreshTokenHash", "expiresAt",
   "absoluteExpiresAt", "lastUsedAt", "status", "replacedById", "revokedAt",
