@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { Prisma } from '@medsphere/database';
 import { PrismaService } from '../prisma/prisma.service';
@@ -29,13 +29,30 @@ export class PlatformSessionRepository {
   async createPlatformSession(data: {
     id: string;
     userId: string;
+    platformAccountId: string;
     familyId: string;
     refreshTokenHash: string;
     expiresAt: Date;
     absoluteExpiresAt: Date;
     metadata: RequestMetadata;
-  }): Promise<void> {
-    await withSerializableRetry(this.prisma.client, async (transaction) => {
+  }): Promise<boolean> {
+    return withSerializableRetry(this.prisma.client, async (transaction) => {
+      const activeAccess = await transaction.platformAccount.findFirst({
+        where: {
+          id: data.platformAccountId,
+          userId: data.userId,
+          status: 'ACTIVE',
+          deletedAt: null,
+          user: { status: 'ACTIVE', deletedAt: null },
+          roleAssignments: { some: { role: { deletedAt: null } } },
+        },
+        select: { id: true },
+      });
+
+      if (!activeAccess) {
+        return false;
+      }
+
       await transaction.platformSession.create({
         data: {
           id: data.id,
@@ -70,6 +87,8 @@ export class PlatformSessionRepository {
         resourceId: data.id,
         request: data.metadata,
       });
+
+      return true;
     });
   }
 
@@ -517,10 +536,20 @@ export class PlatformSessionRepository {
    * explicit "revoke platform sessions" admin action.
    */
   async revokeAllPlatformSessionsForUserId(
+    actor: PlatformAuthenticatedIdentity,
     userId: string,
     reason: string = 'platform-access-revoked',
-  ): Promise<number> {
+    metadata: RequestMetadata = {},
+  ): Promise<{ platformAccountId: string; revokedSessionCount: number }> {
     return withSerializableRetry(this.prisma.client, async (transaction) => {
+      const target = await transaction.platformAccount.findFirst({
+        where: { userId, deletedAt: null },
+        select: { id: true },
+      });
+      if (!target) {
+        throw new NotFoundException('Platform account not found');
+      }
+
       const now = new Date();
       const active = await transaction.platformSession.findMany({
         where: { userId, status: 'ACTIVE' },
@@ -541,7 +570,21 @@ export class PlatformSessionRepository {
         where: { userId, status: 'ACTIVE' },
         data: { status: 'REVOKED', revokedAt: now, revocationReason: reason },
       });
-      return revoked.count;
+
+      await this.auditWriter.appendPlatformUser(transaction, {
+        platformActorUserId: actor.userId,
+        eventType: 'platform.session.revoked',
+        outcome: 'SUCCEEDED',
+        resourceType: 'platform-account',
+        resourceId: target.id,
+        metadata: { revokedSessionCount: revoked.count },
+        request: metadata,
+      });
+
+      return {
+        platformAccountId: target.id,
+        revokedSessionCount: revoked.count,
+      };
     });
   }
 }

@@ -121,6 +121,7 @@ describeInfra('Task 0021 platform administration foundation (real PostgreSQL)', 
     await sessions.createPlatformSession({
       id: sessionId,
       userId: ownerUserId,
+      platformAccountId: ownerAccountId,
       familyId: randomUUID(),
       refreshTokenHash: refresh.hash,
       expiresAt: new Date(Date.now() + 3600_000),
@@ -173,6 +174,27 @@ describeInfra('Task 0021 platform administration foundation (real PostgreSQL)', 
       randomUUID(),
     );
     expect(stillValid).toBeNull();
+  });
+
+  it('refuses to create a new platform session while the platform account is suspended', async () => {
+    const sessionId = randomUUID();
+    const refresh = platformTokens.issuePlatformRefreshCredential(sessionId);
+
+    const created = await sessions.createPlatformSession({
+      id: sessionId,
+      userId: ownerUserId,
+      platformAccountId: ownerAccountId,
+      familyId: randomUUID(),
+      refreshTokenHash: refresh.hash,
+      expiresAt: new Date(Date.now() + 3600_000),
+      absoluteExpiresAt: new Date(Date.now() + 86_400_000),
+      metadata: {},
+    });
+
+    expect(created).toBe(false);
+    await expect(
+      prisma.client.platformSession.findUnique({ where: { id: sessionId } }),
+    ).resolves.toBeNull();
   });
 
   it('creates an invitation whose plaintext is NEVER persisted (digest only)', async () => {
@@ -276,6 +298,100 @@ describeInfra('Task 0021 platform administration foundation (real PostgreSQL)', 
       where: { id: created.invitationId },
     });
     expect(row.status).toBe('ACCEPTED');
+
+    const assignment = await prisma.client.platformRoleAssignment.findFirstOrThrow({
+      where: {
+        platformAccount: { userId: acceptedUserId },
+        grantedRoleKey: PLATFORM_ADMIN_ROLE_KEY,
+      },
+      select: { id: true, createdByPlatformUserId: true },
+    });
+    expect(assignment.createdByPlatformUserId).toBe(acceptedUserId);
+
+    const assignmentAudit = await prisma.client.auditEvent.findFirstOrThrow({
+      where: {
+        eventType: 'platform.role.assigned',
+        resourceType: 'platform-role-assignment',
+        resourceId: assignment.id,
+      },
+      orderBy: { occurredAt: 'desc' },
+    });
+    expect(assignmentAudit.platformActorUserId).toBe(acceptedUserId);
+  });
+
+  it('explicit platform-session revocation is durably attributed to the exact platform actor', async () => {
+    const targetUserId = randomUUID();
+    const targetAccountId = randomUUID();
+    const targetSessionId = randomUUID();
+    const targetRefresh = platformTokens.issuePlatformRefreshCredential(targetSessionId);
+    const adminRole = await prisma.client.platformRole.findFirstOrThrow({
+      where: { key: PLATFORM_ADMIN_ROLE_KEY },
+      select: { id: true },
+    });
+
+    await prisma.client.user.create({
+      data: {
+        id: targetUserId,
+        email: `revoke-target-${targetUserId}@medsphere.test`,
+        firstName: 'Revoke',
+        lastName: 'Target',
+      },
+    });
+    await prisma.client.platformAccount.create({
+      data: { id: targetAccountId, userId: targetUserId, status: 'ACTIVE' },
+    });
+    await prisma.client.platformRoleAssignment.create({
+      data: {
+        id: randomUUID(),
+        platformAccountId: targetAccountId,
+        roleId: adminRole.id,
+        grantedRoleKey: PLATFORM_ADMIN_ROLE_KEY,
+        createdByPlatformUserId: ownerUserId,
+      },
+    });
+
+    await expect(
+      sessions.createPlatformSession({
+        id: targetSessionId,
+        userId: targetUserId,
+        platformAccountId: targetAccountId,
+        familyId: randomUUID(),
+        refreshTokenHash: targetRefresh.hash,
+        expiresAt: new Date(Date.now() + 3600_000),
+        absoluteExpiresAt: new Date(Date.now() + 86_400_000),
+        metadata: {},
+      }),
+    ).resolves.toBe(true);
+
+    const result = await sessions.revokeAllPlatformSessionsForUserId(
+      {
+        userId: ownerUserId,
+        platformAccountId: ownerAccountId,
+        platformSessionId: randomUUID(),
+        securityVersion: 1,
+        tokenId: randomUUID(),
+      },
+      targetUserId,
+      'platform-sessions-explicitly-revoked',
+      {},
+    );
+
+    expect(result).toEqual({
+      platformAccountId: targetAccountId,
+      revokedSessionCount: 1,
+    });
+
+    const audit = await prisma.client.auditEvent.findFirstOrThrow({
+      where: {
+        eventType: 'platform.session.revoked',
+        resourceType: 'platform-account',
+        resourceId: targetAccountId,
+      },
+      orderBy: { occurredAt: 'desc' },
+    });
+    expect(audit.actorType).toBe('PLATFORM_USER');
+    expect(audit.platformActorUserId).toBe(ownerUserId);
+    expect(audit.metadata).toMatchObject({ revokedSessionCount: 1 });
   });
 
   it('deterministic bounded admin pagination with no duplicate/omitted rows', async () => {

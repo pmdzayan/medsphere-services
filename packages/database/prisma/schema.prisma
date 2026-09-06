@@ -825,7 +825,7 @@ model PlatformRolePermission {
 ///
 /// `grantedRoleKey` is the denormalized copy of the granted PlatformRole.key,
 /// validated by a database trigger at write time so the partial unique index
-/// below can prove "at most one active PLATFORM_OWNER" in pure SQL.
+/// below can prove "at most one PLATFORM_OWNER assignment" in pure SQL.
 model PlatformRoleAssignment {
   id String @id @default(uuid()) @db.Uuid
 

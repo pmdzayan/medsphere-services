@@ -305,10 +305,6 @@ export class PlatformController {
     @Param('userId', uuid) userId: string,
     @Req() request: MetadataHttpRequest,
   ) {
-    const revokedSessionCount = await this.auth.revokeSessionsForUser(
-      userId,
-      extractRequestMetadata(request),
-    );
-    return this.admins.mapRevokeSessionsResult(userId, revokedSessionCount);
+    return this.auth.revokeSessionsForUser(identity, userId, extractRequestMetadata(request));
   }
 }

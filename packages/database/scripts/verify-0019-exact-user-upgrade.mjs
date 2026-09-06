@@ -23,7 +23,15 @@ const databaseUrl = new URL(databaseUrlValue);
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const sourceMigrations = join(packageRoot, 'prisma', 'migrations');
 const upgradeMigration = '20260903000000_exact_user_audit_accountability';
-const pnpmCommand = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm';
+const pnpmCommand = process.platform === 'win32' ? process.env.ComSpec || 'cmd.exe' : 'pnpm';
+
+function prismaProcessArgs(args) {
+  if (process.platform === 'win32') {
+    return ['/d', '/c', 'pnpm.cmd', 'exec', 'prisma', ...args];
+  }
+
+  return ['exec', 'prisma', ...args];
+}
 
 if (!existsSync(join(sourceMigrations, upgradeMigration, 'migration.sql'))) {
   throw new Error(`Required migration is missing: ${upgradeMigration}`);
@@ -47,7 +55,7 @@ function sanitize(output) {
 }
 
 function runPrisma(args, scopedDatabaseUrl, options = {}) {
-  const result = spawnSync(pnpmCommand, ['exec', 'prisma', ...args], {
+  const result = spawnSync(pnpmCommand, prismaProcessArgs(args), {
     cwd: packageRoot,
     encoding: 'utf8',
     env: {

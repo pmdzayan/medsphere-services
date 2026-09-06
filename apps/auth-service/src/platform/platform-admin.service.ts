@@ -227,6 +227,8 @@ export class PlatformAdminService {
           data: { id: randomUUID(), userId, status: 'ACTIVE' },
           select: { id: true, status: true },
         });
+      } else if (account.status !== 'ACTIVE') {
+        throw new ConflictException('Platform account is not active');
       }
 
       const assignment = await transaction.platformRoleAssignment.create({
@@ -256,9 +258,5 @@ export class PlatformAdminService {
         assignmentId: assignment.id,
       };
     });
-  }
-
-  mapRevokeSessionsResult(userId: string, revokedSessionCount: number) {
-    return { platformAccountId: userId, revokedSessionCount };
   }
 }

@@ -4,6 +4,7 @@ import {
   existsSync,
   mkdtempSync,
   mkdirSync,
+  readFileSync,
   readdirSync,
   rmSync,
   writeFileSync,
@@ -23,10 +24,21 @@ const databaseUrl = new URL(databaseUrlValue);
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const sourceMigrations = join(packageRoot, 'prisma', 'migrations');
 const upgradeMigration = '20260905000000_platform_administration_foundation';
-const pnpmCommand = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm';
+const auditCorrectionMigration = '20260906090000_platform_audit_event_allowlist_correction';
+const pnpmCommand = process.platform === 'win32' ? process.env.ComSpec || 'cmd.exe' : 'pnpm';
 
-if (!existsSync(join(sourceMigrations, upgradeMigration, 'migration.sql'))) {
-  throw new Error(`Required migration is missing: ${upgradeMigration}`);
+function prismaProcessArgs(args) {
+  if (process.platform === 'win32') {
+    return ['/d', '/c', 'pnpm.cmd', 'exec', 'prisma', ...args];
+  }
+
+  return ['exec', 'prisma', ...args];
+}
+
+for (const requiredMigration of [upgradeMigration, auditCorrectionMigration]) {
+  if (!existsSync(join(sourceMigrations, requiredMigration, 'migration.sql'))) {
+    throw new Error(`Required migration is missing: ${requiredMigration}`);
+  }
 }
 
 function databaseName(label) {
@@ -47,10 +59,10 @@ function sanitize(output) {
 }
 
 function runPrisma(args, scopedDatabaseUrl, options = {}) {
-  const result = spawnSync(pnpmCommand, ['exec', 'prisma', ...args], {
+  const result = spawnSync(pnpmCommand, prismaProcessArgs(args), {
     cwd: packageRoot,
     encoding: 'utf8',
-    shell: process.platform === 'win32', // .cmd shim needs a shell on Windows
+    shell: false,
     env: { ...process.env, DATABASE_URL: scopedDatabaseUrl, FORCE_COLOR: '0', NO_COLOR: '1' },
     input: options.input,
     maxBuffer: 10 * 1024 * 1024,
@@ -98,13 +110,48 @@ function createMigrationProject() {
     .map((entry) => entry.name)
     .sort();
   for (const migrationName of migrationNames) {
-    if (migrationName === upgradeMigration) continue;
+    if (migrationName === upgradeMigration || migrationName === auditCorrectionMigration) {
+      continue;
+    }
     cpSync(join(sourceMigrations, migrationName), join(migrationsRoot, migrationName), {
       recursive: true,
     });
   }
 
   return { projectRoot, schemaFile };
+}
+
+function copyMigration(projectRoot, migrationName) {
+  cpSync(join(sourceMigrations, migrationName), join(projectRoot, 'migrations', migrationName), {
+    recursive: true,
+  });
+}
+
+function copyLegacyBrokenPlatformMigration(projectRoot) {
+  const destination = join(projectRoot, 'migrations', upgradeMigration);
+
+  cpSync(join(sourceMigrations, upgradeMigration), destination, {
+    recursive: true,
+  });
+
+  const migrationFile = join(destination, 'migration.sql');
+  const sql = readFileSync(migrationFile, 'utf8');
+  const marker = '-- 13. Extend the immutable audit-event allowlist';
+  const markerIndex = sql.indexOf(marker);
+
+  if (markerIndex === -1) {
+    throw new Error('Task 0021 audit allowlist marker is missing from the platform migration');
+  }
+
+  // Reproduce the effective state of the originally-applied migration:
+  // all platform tables/invariants exist, but its misplaced audit allowlist
+  // DDL never became part of the live AuditEvent CHECK constraint.
+  writeFileSync(
+    migrationFile,
+    `${sql.slice(0, markerIndex).trimEnd()}
+`,
+    'utf8',
+  );
 }
 
 function createDatabase(schemaFile, name) {
@@ -126,11 +173,10 @@ function verifyScenario({ label, seedSql, assertionSql, expectFailureSql = null 
     if (seedSql) {
       executeSql(project.schemaFile, scopedDatabaseUrl, seedSql);
     }
-    cpSync(
-      join(sourceMigrations, upgradeMigration),
-      join(project.projectRoot, 'migrations', upgradeMigration),
-      { recursive: true },
-    );
+    copyMigration(project.projectRoot, upgradeMigration);
+    runPrisma(['migrate', 'deploy', '--schema', project.schemaFile], scopedDatabaseUrl);
+
+    copyMigration(project.projectRoot, auditCorrectionMigration);
     runPrisma(['migrate', 'deploy', '--schema', project.schemaFile], scopedDatabaseUrl);
 
     if (assertionSql) {
@@ -256,3 +302,129 @@ verifyScenario({
     FROM u, "PlatformRole" pr WHERE pr."key" = 'PLATFORM_OWNER';
   `,
 });
+
+// ---------------------------------------------------------------------------
+// Scenario 3: reproduce an environment that already applied the early Task
+// 0021 migration while its platform audit-event allowlist was not live.
+// The append-only correction must converge that database without a reset.
+// ---------------------------------------------------------------------------
+function verifyAuditAllowlistCorrectionScenario() {
+  const label = 'already-applied-0021-audit-allowlist-repair';
+  const name = databaseName(label);
+  const scopedDatabaseUrl = databaseUrlForName(name);
+  const project = createMigrationProject();
+
+  try {
+    createDatabase(project.schemaFile, name);
+
+    // Deploy only the authoritative pre-0021 history.
+    runPrisma(['migrate', 'deploy', '--schema', project.schemaFile], scopedDatabaseUrl);
+
+    // Reproduce an environment that already applied the early 0021
+    // migration while its platform audit allowlist was not live.
+    copyLegacyBrokenPlatformMigration(project.projectRoot);
+
+    runPrisma(['migrate', 'deploy', '--schema', project.schemaFile], scopedDatabaseUrl);
+
+    // Fail closed unless the legacy state has the AuditEvent constraint
+    // and does NOT yet allow the Task 0021 platform event.
+    executeSql(
+      project.schemaFile,
+      scopedDatabaseUrl,
+      `
+        CREATE TEMP TABLE "_Task0021LegacyAuditAssertion" (
+          "ok" boolean NOT NULL CHECK ("ok")
+        );
+
+        INSERT INTO "_Task0021LegacyAuditAssertion" ("ok")
+        VALUES (
+          COALESCE(
+            (
+              SELECT
+                position(
+                  'platform.owner.bootstrap'
+                  in pg_get_constraintdef(c.oid)
+                ) = 0
+              FROM pg_constraint c
+              JOIN pg_class t ON t.oid = c.conrelid
+              WHERE t.relname = 'AuditEvent'
+                AND c.conname = 'AuditEvent_event_type_check'
+              LIMIT 1
+            ),
+            false
+          )
+        );
+      `,
+    );
+
+    // Apply only the append-only correction.
+    copyMigration(project.projectRoot, auditCorrectionMigration);
+
+    runPrisma(['migrate', 'deploy', '--schema', project.schemaFile], scopedDatabaseUrl);
+
+    // Fail closed unless the repaired constraint contains the approved
+    // platform event catalogue and still rejects an invented event.
+    executeSql(
+      project.schemaFile,
+      scopedDatabaseUrl,
+      `
+        CREATE TEMP TABLE "_Task0021RepairedAuditAssertion" (
+          "ok" boolean NOT NULL CHECK ("ok")
+        );
+
+        INSERT INTO "_Task0021RepairedAuditAssertion" ("ok")
+        VALUES (
+          COALESCE(
+            (
+              SELECT
+                position(
+                  'platform.authentication.session.created'
+                  in pg_get_constraintdef(c.oid)
+                ) > 0
+                AND position(
+                  'platform.invitation.created'
+                  in pg_get_constraintdef(c.oid)
+                ) > 0
+                AND position(
+                  'platform.role.assigned'
+                  in pg_get_constraintdef(c.oid)
+                ) > 0
+                AND position(
+                  'platform.admin.suspended'
+                  in pg_get_constraintdef(c.oid)
+                ) > 0
+                AND position(
+                  'platform.session.revoked'
+                  in pg_get_constraintdef(c.oid)
+                ) > 0
+                AND position(
+                  'platform.owner.bootstrap'
+                  in pg_get_constraintdef(c.oid)
+                ) > 0
+                AND position(
+                  'platform.fabricated.event'
+                  in pg_get_constraintdef(c.oid)
+                ) = 0
+              FROM pg_constraint c
+              JOIN pg_class t ON t.oid = c.conrelid
+              WHERE t.relname = 'AuditEvent'
+                AND c.conname = 'AuditEvent_event_type_check'
+              LIMIT 1
+            ),
+            false
+          )
+        );
+      `,
+    );
+
+    process.stdout.write(`Task 0021 upgrade scenario passed: ${label}\n`);
+  } finally {
+    try {
+      dropDatabase(project.schemaFile, name);
+    } finally {
+      rmSync(project.projectRoot, { recursive: true, force: true });
+    }
+  }
+}
+
+verifyAuditAllowlistCorrectionScenario();

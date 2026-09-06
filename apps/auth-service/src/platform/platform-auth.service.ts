@@ -136,15 +136,21 @@ export class PlatformAuthService {
       now.getTime() + this.authConfig.value.refreshAbsoluteTtlSeconds * 1000,
     );
 
-    await this.sessions.createPlatformSession({
+    const sessionCreated = await this.sessions.createPlatformSession({
       id: sessionId,
       userId,
+      platformAccountId,
       familyId,
       refreshTokenHash: refresh.hash,
       expiresAt: idleExpiry,
       absoluteExpiresAt: absoluteExpiry,
       metadata,
     });
+
+    if (!sessionCreated) {
+      this.recordInvalidPlatformLogin();
+      throw new UnauthorizedException(INVALID_PLATFORM_LOGIN_MESSAGE);
+    }
 
     const identity: PlatformAccessTokenIdentity = {
       userId,
@@ -281,16 +287,22 @@ export class PlatformAuthService {
     );
   }
 
-  async revokeSessionsForUser(userId: string, _metadata: RequestMetadata = {}): Promise<number> {
-    const revokedSessionCount = await this.sessions.revokeAllPlatformSessionsForUserId(
+  async revokeSessionsForUser(
+    actor: PlatformAuthenticatedIdentity,
+    userId: string,
+    metadata: RequestMetadata = {},
+  ): Promise<{ platformAccountId: string; revokedSessionCount: number }> {
+    const result = await this.sessions.revokeAllPlatformSessionsForUserId(
+      actor,
       userId,
       'platform-sessions-explicitly-revoked',
+      metadata,
     );
     this.securityEvents.record('platform-session-revocation', {
       outcome: 'success',
       reason: 'platform-sessions-revoked',
     });
-    return revokedSessionCount;
+    return result;
   }
   private recordInvalidPlatformLogin(): void {
     this.securityEvents.record('platform-login', {

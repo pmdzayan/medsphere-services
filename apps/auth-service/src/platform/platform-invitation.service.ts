@@ -508,14 +508,15 @@ export class PlatformInvitationService {
       throw new NotFoundException('Platform role does not exist');
     }
 
-    await transaction.platformRoleAssignment.create({
+    const assignment = await transaction.platformRoleAssignment.create({
       data: {
         id: randomUUID(),
         platformAccountId: account.id,
         roleId: role.id,
         grantedRoleKey: roleKey,
-        createdByPlatformUserId: null, // invitation acceptance is not a management action
+        createdByPlatformUserId: userId,
       },
+      select: { id: true },
     });
 
     await this.auditWriter.appendPlatformUser(transaction, {
@@ -533,7 +534,7 @@ export class PlatformInvitationService {
       eventType: 'platform.role.assigned',
       outcome: 'SUCCEEDED',
       resourceType: 'platform-role-assignment',
-      resourceId: role.id,
+      resourceId: assignment.id,
       metadata: { targetPlatformUserId: userId, roleKey },
       request,
     });

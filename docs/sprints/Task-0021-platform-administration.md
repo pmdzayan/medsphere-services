@@ -78,6 +78,7 @@ Platform actor identity is derived **only** after:
 2. the user is ACTIVE/non-deleted;
 3. the current `PlatformAccount` access is ACTIVE;
 4. the current platform role/permission state is re-evaluated **live**;
+5. the `PlatformSession` is live and not revoked/expired/locked.
 
 ## Platform data model
 
@@ -92,8 +93,8 @@ Append-only migration `20260905000000_platform_administration_foundation` adds:
   separate from tenant `RolePermission`.
 - `PlatformRoleAssignment` — live account→role grants. No `tenantId` /
   `membershipId` anywhere; `grantedRoleKey` is DB-trigger-validated against
-  the referenced role; partial unique index proves **at most one active
-  PLATFORM_OWNER** in pure SQL.
+  the referenced role; partial unique index proves **at most one
+  PLATFORM_OWNER assignment** in pure SQL.
 - `PlatformInvitation` — invitation-only access; plaintext proof is never
   stored (only HMAC-SHA256 digest), single-use, expiring, revocable, bounded.
 - `PlatformSession` + `PlatformSessionRefreshCredential` — dedicated
@@ -156,7 +157,7 @@ one-time initial owner:
 - never hard-codes an e-mail/user id in application source (the operator
   supplies the target id).
 
-This bootstrap mechanism is **not** a general admin-creation shortcut. 5. the `PlatformSession` is live and not revoked/expired/locked.
+This bootstrap mechanism is **not** a general admin-creation shortcut.
 
 The browser can never supply `platformUserId`, `userId`, `tenantId`,
 `membershipId`, role, permission, organization, territory, or any owner/admin
