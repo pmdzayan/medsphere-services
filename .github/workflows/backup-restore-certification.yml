@@ -61,6 +61,9 @@ jobs:
       - name: Verify database migration and drift
         run: pnpm db:verify
 
+      - name: Run focused backup/recovery unit tests
+        run: pnpm test:backup-recovery
+
       - name: Run backup/restore certification
         run: node scripts/backup-restore-certification.mjs | tee /tmp/backup-restore-cert.log
 
@@ -68,6 +71,16 @@ jobs:
         run: |
           if ! grep -Fq 'BACKUP RESTORE CERTIFICATION: PASS' /tmp/backup-restore-cert.log; then
             echo 'Backup/restore certification did not report an explicit PASS verdict.'
+            exit 1
+          fi
+
+      - name: Run deterministic recovery validation (populate -> backup -> restore -> verify -> migrate forward)
+        run: node scripts/db-recovery-validation.mjs | tee /tmp/db-recovery-validation.log
+
+      - name: Confirm explicit recovery-validation PASS verdict
+        run: |
+          if ! grep -Fq 'DB RECOVERY VALIDATION: PASS' /tmp/db-recovery-validation.log; then
+            echo 'Deterministic recovery validation did not report an explicit PASS verdict.'
             exit 1
           fi
 

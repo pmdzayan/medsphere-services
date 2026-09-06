@@ -9,3 +9,10 @@ node-compile-cache/
 .env.local
 *.log
 .DS_Store
+# AIM backup/recovery artifacts (Task 0022): PostgreSQL dump archives and
+# local backup/status directories must never be committed.
+*.dump
+*.dump.gz
+*.backup
+.aim-backups/
+.aim-backup-status/

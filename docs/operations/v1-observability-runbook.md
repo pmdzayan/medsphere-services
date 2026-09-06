@@ -202,6 +202,45 @@ For a metrics-flagged incident (an alert fired, not a single user report):
 5. for an exporter-health alert, remember this reflects telemetry pipeline health only -- it does not by itself indicate a business-impacting outage;
 6. do not add tenant IDs, phone numbers, OTPs, or other sensitive values to any incident notes derived from this data -- none of it is present in the source metrics.
 
+## Backup and recovery observability (Task 0022)
+
+Operators determine backup/recovery health from the following provider-neutral
+metrics, emitted by `scripts/aim-backup-status.mjs` as Prometheus text
+(typically scraped via a Prometheus node/textfile collector that runs the
+script on an interval):
+
+- `medsphere_backup_status` — whether the most recent backup attempt
+  succeeded (1) or failed (0). Operators know immediately whether the latest
+  backup failed.
+- `medsphere_backup_last_success_timestamp_seconds` — when the most recent
+  successful backup was taken (0 when none).
+- `medsphere_backup_last_success_age_seconds` — seconds since the most recent
+  successful backup; operators compute backup age from this directly.
+- `medsphere_backup_attempts_total{outcome="success"|"failure"}` — cumulative
+  success/failure counts.
+- `medsphere_backup_stale{severity="warning"|"critical"}` — whether the last
+  success exceeds the 28 h / 72 h thresholds (the thresholds themselves are
+  exported as `medsphere_backup_staleness_warning_seconds` /
+  `medsphere_backup_staleness_critical_seconds` for dashboards).
+- `medsphere_backup_restore_verified` — whether the latest restore + its
+  **correlated** integrity verification (same `operationId`) both passed (1)
+  or not (0). A verification record never satisfies a different restore
+  operation, so a newer restore without a matching successful verification
+  reports 0 (fail closed).
+
+The status records backing these metrics come from the backup/restore CLIs
+(`AIM_BACKUP_STATUS_FILE` JSONL) — bounded `{program, kind, ok, timestamp, operationId?}`
+records. No metric or record ever contains a password, a connection URL, a
+token, backup bytes, or patient data.
+
+Alert rules live in `docs/operations/v1-alert-rules.prometheus.yml`, in the
+`medsphere-v1-backup-recovery` group (backup failed, backup stale at warning
+and critical thresholds, and restore-verification failed).
+
+Retention and incident procedures for these conditions are in
+`docs/operations/backup-retention-policy.md` and
+`docs/operations/backup-restore-runbook.md`.
+
 ## What still requires production deployment/vendor activation
 
 This foundation does **not** claim centralized production monitoring is operational. The following remain external, deployment-only steps:

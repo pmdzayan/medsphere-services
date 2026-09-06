@@ -31,13 +31,21 @@ import { createHash } from 'node:crypto';
 import { mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const REPO_ROOT = new URL('..', import.meta.url).pathname;
+// Windows-safe repository root: fileURLToPath yields a drive-letter path
+// (C:\...) that is a valid cwd for child processes, unlike URL.pathname
+// (/C:\...) which fails with ENOENT on Windows.
+const REPO_ROOT = fileURLToPath(new URL('..', import.meta.url));
 
 const REQUIRED_TABLES = [
   'Tenant',
   'User',
   'TenantMembership',
+  'UserPrivacy',
+  'ConsentRecord',
+  'UserSession',
+  'UserSessionRefreshCredential',
   'Provider',
   'Product',
   'Inventory',
@@ -193,7 +201,14 @@ try {
 }
 
 try {
-  execFileSync('pnpm', ['--filter', '@medsphere/database', 'run', 'prisma:deploy'], {
+  // Windows-safe pnpm invocation (pnpm on PATH is pnpm.cmd; the same pattern
+  // accepted in packages/database/scripts/verify-*.mjs).
+  const pnpmCommand = process.platform === 'win32' ? process.env.ComSpec || 'cmd.exe' : 'pnpm';
+  const pnpmArgs =
+    process.platform === 'win32'
+      ? ['/d', '/c', 'pnpm.cmd', '--filter', '@medsphere/database', 'run', 'prisma:deploy']
+      : ['--filter', '@medsphere/database', 'run', 'prisma:deploy'];
+  execFileSync(pnpmCommand, pnpmArgs, {
     cwd: REPO_ROOT,
     env: { ...process.env, DATABASE_URL: sourceUrlRaw },
     stdio: 'inherit',
@@ -227,6 +242,11 @@ const ids = {
   batch: '00000000-0000-4000-a000-000000000009',
   reservation: '00000000-0000-4000-a000-00000000000a',
   auditEvent: '00000000-0000-4000-a000-00000000000b',
+  privacy: '00000000-0000-4000-a000-00000000000c',
+  consentGranted: '00000000-0000-4000-a000-00000000000d',
+  consentWithdrawn: '00000000-0000-4000-a000-00000000000e',
+  session: '00000000-0000-4000-a000-0000000000f1',
+  refreshCredential: '00000000-0000-4000-a000-0000000000f2',
 };
 
 function seed() {
@@ -312,8 +332,45 @@ function seed() {
 
   psql(
     source.database,
-    `INSERT INTO "AuditEvent" (id, scope, "actorType", outcome, "tenantId", "eventType", "occurredAt", metadata)
-     VALUES ('${ids.auditEvent}', 'TENANT', 'SYSTEM', 'SUCCEEDED', '${ids.tenant}', 'authentication.account.activated', now(), '{}'::jsonb)
+    `INSERT INTO "AuditEvent" (id, scope, "actorType", outcome, "tenantId", "actorMembershipId", "actorUserId", "platformActorUserId", "eventType", "resourceType", "resourceId", "requestId", "ipAddress", "userAgent", metadata, "occurredAt")
+     VALUES ('${ids.auditEvent}', 'TENANT', 'TENANT_USER', 'SUCCEEDED', '${ids.tenant}', '${ids.membership}', '${ids.user}', NULL, 'authentication.account.activated', 'User', '${ids.user}', 'req-dr-cert-001', '127.0.0.1', 'dr-cert-agent', '{"evidence":"backup-restore-cert-task0022"}'::jsonb, now())
+     ON CONFLICT (id) DO NOTHING;`,
+  );
+
+  // Task 0013 privacy state -- recovery must preserve, not reset.
+  psql(
+    source.database,
+    `INSERT INTO "UserPrivacy" (id, "userId", "sharePhone", "shareEmail", "allowInAppChat", "privatePickup", "hideSensitiveNotifications", "preferredLanguage", "wantsReservationNotifications", "wantsOperationalAlerts", version, "createdAt", "updatedAt")
+     VALUES ('${ids.privacy}', '${ids.user}', false, true, true, false, true, 'en', true, false, 3, now(), now())
+     ON CONFLICT (id) DO NOTHING;`,
+  );
+
+  // Task 0013 append-only consent log: one GRANTED + one WITHDRAWN event.
+  psql(
+    source.database,
+    `INSERT INTO "ConsentRecord" (id, "userId", category, status, version, source, "createdAt")
+     VALUES ('${ids.consentGranted}', '${ids.user}', 'NOTIFICATIONS_RESERVATIONS', 'GRANTED', 2, 'settings_privacy_page', now())
+     ON CONFLICT (id) DO NOTHING;`,
+  );
+  psql(
+    source.database,
+    `INSERT INTO "ConsentRecord" (id, "userId", category, status, version, source, "createdAt")
+     VALUES ('${ids.consentWithdrawn}', '${ids.user}', 'LOCATION_USE', 'WITHDRAWN', 1, 'settings_privacy_page', now())
+     ON CONFLICT (id) DO NOTHING;`,
+  );
+
+  // Task 0014 durable session state -- recovery must preserve active
+  // sessions and refresh-credential rotation.
+  psql(
+    source.database,
+    `INSERT INTO "UserSession" (id, "userId", "tenantId", "membershipId", "familyId", "refreshTokenHash", "ipAddress", "userAgent", "deviceName", "expiresAt", "absoluteExpiresAt", "lastUsedAt", status, "securityVersion", "recentAuthenticatedAt", version, "createdAt", "updatedAt")
+     VALUES ('${ids.session}', '${ids.user}', '${ids.tenant}', '${ids.membership}', '00000000-0000-4000-a000-0000000000e1', '${'a'.repeat(64)}', '127.0.0.1', 'dr-cert-agent', 'dr-cert-device', now() + interval '7 days', now() + interval '30 days', now(), 'ACTIVE', 1, now(), 1, now(), now())
+     ON CONFLICT (id) DO NOTHING;`,
+  );
+  psql(
+    source.database,
+    `INSERT INTO "UserSessionRefreshCredential" (id, "sessionId", hash, status, "rotationSequence", "issuedAt", "createdAt")
+     VALUES ('${ids.refreshCredential}', '${ids.session}', '${'b'.repeat(64)}', 'ACTIVE', 1, now(), now())
      ON CONFLICT (id) DO NOTHING;`,
   );
 }
@@ -533,6 +590,58 @@ for (const table of REQUIRED_TABLES) {
     record(`restored data: ${table}`, false, error.message);
   }
 }
+
+// ---------------------------------------------------------------------
+// Step 10b: verify durable-state preservation (Task 0013 privacy/consent,
+// Task 0014 sessions, Task 0019 exact-user audit evidence).
+// ---------------------------------------------------------------------
+console.log('\n== Verifying durable-state preservation ==');
+
+function verifyPreservation(label, query, expected) {
+  try {
+    const actual = psql(restoreDbName, query);
+    if (actual === expected) {
+      record(`preserved: ${label}`, true);
+    } else {
+      certificationPassed = false;
+      record(`preserved: ${label}`, false, `expected [${expected}] got [${actual}]`);
+    }
+  } catch (error) {
+    certificationPassed = false;
+    record(`preserved: ${label}`, false, error.message);
+  }
+}
+
+verifyPreservation(
+  'TENANT_USER audit exact-user attribution (actorMembershipId, actorUserId, tenantId)',
+  `SELECT ("actorMembershipId" IS NOT NULL AND "actorUserId" = '${ids.user}' AND "tenantId" = '${ids.tenant}' AND "platformActorUserId" IS NULL)::text FROM "AuditEvent" WHERE id = '${ids.auditEvent}';`,
+  'true',
+);
+verifyPreservation(
+  'audit evidence event type / metadata / requestId unchanged',
+  `SELECT ("eventType" = 'authentication.account.activated' AND metadata->>'evidence' = 'backup-restore-cert-task0022' AND "requestId" = 'req-dr-cert-001')::text FROM "AuditEvent" WHERE id = '${ids.auditEvent}';`,
+  'true',
+);
+verifyPreservation(
+  'withdrawn consent record remains WITHDRAWN (never regenerated)',
+  `SELECT count(*) FROM "ConsentRecord" WHERE id = '${ids.consentWithdrawn}' AND status = 'WITHDRAWN' AND category = 'LOCATION_USE';`,
+  '1',
+);
+verifyPreservation(
+  'consent log is not regenerated or expanded',
+  `SELECT count(*) FROM "ConsentRecord" WHERE id NOT IN ('${ids.consentGranted}', '${ids.consentWithdrawn}');`,
+  '0',
+);
+verifyPreservation(
+  'privacy preference values unchanged',
+  `SELECT ("sharePhone" = false AND "shareEmail" = true AND "wantsReservationNotifications" = true AND version = 3)::text FROM "UserPrivacy" WHERE id = '${ids.privacy}';`,
+  'true',
+);
+verifyPreservation(
+  'active session preserved with its refresh credential hash',
+  `SELECT (s.status = 'ACTIVE' AND c.status = 'ACTIVE' AND c."rotationSequence" = 1 AND s."refreshTokenHash" = '${'a'.repeat(64)}')::text FROM "UserSession" s JOIN "UserSessionRefreshCredential" c ON c."sessionId" = s.id WHERE s.id = '${ids.session}';`,
+  'true',
+);
 
 // ---------------------------------------------------------------------
 // Step 11-12: cleanup and final verdict. Cleanup runs regardless of
