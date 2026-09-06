@@ -146,3 +146,41 @@ groups:
         annotations:
           summary: 'Metrics exporter/collector appears unhealthy'
           description: 'More than 5 consecutive telemetry export failures in 15 minutes. This reflects telemetry pipeline health only, not necessarily a business-impacting outage.'
+
+  - name: medsphere-v1-backup-recovery
+    rules:
+      - alert: MedSphereBackupFailed
+        expr: medsphere_backup_status == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: 'Latest AIM database backup failed'
+          description: 'The most recent logical backup attempt failed (medsphere_backup_status=0). Restore capability for the latest data is at risk until a successful backup is taken.'
+
+      - alert: MedSphereBackupStaleWarning
+        expr: medsphere_backup_stale{severity="warning"} == 1
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: 'Latest successful AIM database backup is stale (warning)'
+          description: 'No successful AIM database backup in over 28 hours. Take a backup and investigate why the scheduled backup stopped.'
+
+      - alert: MedSphereBackupStaleCritical
+        expr: medsphere_backup_stale{severity="critical"} == 1
+        for: 15m
+        labels:
+          severity: critical
+        annotations:
+          summary: 'Latest successful AIM database backup is stale (critical)'
+          description: 'No successful AIM database backup in over 72 hours. RPO exposure now exceeds the documented V1 target (24h). Take an immediate backup and follow the runbook incident response.'
+
+      - alert: MedSphereRestoreVerificationFailed
+        expr: medsphere_backup_restore_verified == 0
+        for: 1h
+        labels:
+          severity: critical
+        annotations:
+          summary: 'Latest restore/verification cycle did not pass'
+          description: 'The most recent restore verification did not reach PASS (medsphere_backup_restore_verified=0). A backup that cannot be verified is treated as a backup failure for retention purposes, per the runbook.'

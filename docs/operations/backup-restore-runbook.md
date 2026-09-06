@@ -1,12 +1,14 @@
-# PostgreSQL Backup, Restore & Disaster-Recovery Runbook
+# AIM PostgreSQL Backup, Restore, and Recovery Runbook (Authoritative)
 
-This runbook covers the mechanics of creating a PostgreSQL backup for
-AIM, verifying it, and restoring it into a clean database, plus how
-to run the automated certification that proves the round trip preserves
-schema and data. It is deliberately scoped to **portability and restore
-correctness** -- it does not select a production backup storage vendor,
-retention schedule, or RPO/RTO target. See "What this runbook does not
-cover" at the end.
+**Status:** Proposed foundation (Task 0022) — implementation and local
+validation complete; CTO review pending. This document is the authoritative
+operations reference for the repository-owned tooling; it does not imply
+production activation or CTO acceptance.
+
+This is the **single authoritative** backup/restore/recovery runbook. It is
+the operational companion to `docs/operations/backup-retention-policy.md`
+(canonical retention values) and
+`docs/adr/0027-production-backup-recovery-foundation.md` (architecture).
 
 ## What this proves
 
@@ -14,161 +16,313 @@ cover" at the end.
 PostgreSQL running AIM schema/data
         |
         v
-verified backup (pg_dump, custom format, SHA-256 hashed)
+verified logical backup (pg_dump / scripts/aim-backup.mjs, custom format, SHA-256)
         |
         v
-clean, separate database (never the source database)
+clean, separate, non-production database (never the source database)
         |
         v
-restore (pg_restore)
+restore (pg_restore / scripts/aim-restore.mjs)
         |
         v
-schema + data integrity verification (row counts + canonical content hashes)
+integrity verification (scripts/aim-restore-verify.mjs) —
+connects, required tables, PKs, unique indexes, FK counts, orphan rows,
+migration history, expected row counts
         |
         v
-PASS / FAIL certification
+PASS / FAIL verdict + bounded Prometheus status metrics
 ```
 
-## Automated certification
+## Objectives (RPO / RTO)
 
-The certification script is `scripts/backup-restore-certification.mjs`. A
-dedicated workflow, `.github/workflows/backup-restore-certification.yml`,
-runs it on every pull request targeting `feature/database-architecture`
-and on manual dispatch.
+### RPO — maximum acceptable data-loss window
 
-### Running it locally
+- **Policy target:** **24 hours** (one daily logical backup).
+- This is the engineering target, not a measured or contractual value. It is
+  covered by the canonical retention policy in
+  `docs/operations/backup-retention-policy.md`.
+- Provider snapshots / point-in-time recovery are NOT yet activated; until
+  then the RPO floor is the last successful logical backup, and the backup
+  staleness alerts (28 h warning / 72 h critical) exist precisely so the
+  actual exposure does not silently exceed the target unnoticed.
 
-```bash
-export DATABASE_URL='postgresql://medsphere_dev:CHANGE_ME@localhost:5432/medsphere_dev?schema=public'
-node scripts/backup-restore-certification.mjs
+### RTO — target time to restore useful service
+
+- **Policy target:** **4 hours** for an isolated logical restore of the
+  current schema from a verified backup, including integrity verification
+  and migration status confirmation.
+- This is a **V1 engineering target, not a measured exercise result**. No
+  recovery exercise has yet measured a production RTO; treat any prior
+  "RTO: X PASS" statement as unsupported unless it cites a performed
+  recovery exercise.
+- Measured local restore time itself is recorded in
+  `docs/operations/task0022-backup-recovery-validation.md` as supplementary
+  evidence; elapsed wall-clock time on developer hardware is not a
+  production RTO certification.
+
+### Known limitations
+
+- Exact PostgreSQL 16 validation requires CI or another PostgreSQL 16
+  environment; local PostgreSQL 18 evidence is supplementary (see
+  `docs/operations/task0022-backup-recovery-validation.md`).
+- Managed-database snapshots, PITR/WAL archival, multi-region failover, and
+  production promotion procedures are deliberately out of scope for the
+  repository-owned tooling and remain deployment/activation work.
+
+## Backup
+
+### Tooling
+
+Repository-owned command (Windows-safe, no shell interpolation, PGPASSWORD
+only):
+
+```
+$env:DATABASE_URL = 'postgresql://user:password@host:5432/db?schema=public'
+$env:AIM_BACKUP_DIR = 'C:\backups\aim'
+node scripts/aim-backup.mjs
 ```
 
-Requirements:
+Required variables: `DATABASE_URL`, `AIM_BACKUP_DIR`.
+Optional: `AIM_BACKUP_FILENAME`, `AIM_BACKUP_OVERWRITE=1`,
+`AIM_BACKUP_STATUS_FILE`.
 
-- PostgreSQL 16 client tools on `PATH`: `psql`, `pg_dump`, `pg_restore`,
-  `createdb`, `dropdb` (matching the V1 database baseline -- see
-  `compose/docker-compose.services.yml` for the accepted server image).
-- The `DATABASE_URL` user must be able to create and drop databases on
-  the target server (true for local development and CI's synthetic
-  `medsphere_ci` role; never point this at a production credential).
-- `pnpm install` already run in the repository (the script shells out to
-  the repository's own accepted `pnpm --filter @medsphere/database run
-prisma:deploy` command to ensure migrations are current before
-  seeding).
+The command:
 
-### What it does, step by step
+1. validates configuration and output location;
+2. runs `pg_dump --format=custom --no-owner --no-privileges`;
+3. fails on errors and removes any partial file;
+4. verifies the archive is readable with `pg_restore --list`;
+5. emits bounded output (host:port/database only, no password, no backup
+   content) plus a SHA-256 of the archive; and
+6. returns non-zero on failure and prints an explicit `AIM BACKUP:
+FAIL`/`PASS` verdict.
 
-1. Confirms the source database is reachable and applies/verifies current
-   migrations (idempotent -- safe even if already applied).
-2. Seeds deterministic synthetic data covering `Tenant`, `User`,
-   `TenantMembership`, `Provider`, `Product`, `Inventory`, `Batch`,
-   `MedicineReservation`, and `AuditEvent` -- the same accepted
-   direct-SQL bootstrap pattern already used by
-   `scripts/task5-smoke-test.mjs` for rows no accepted API can create.
-   All values are synthetic; no real names, contact details, or
-   healthcare data.
-3. Records pre-backup evidence: a row count and a canonical SHA-256 hash
-   of every row (ordered by primary key) for each of those tables.
-4. Creates a backup with `pg_dump --format=custom --no-owner
---no-privileges` and computes its SHA-256 hash.
-5. Creates a **new, separate** database on the same server (never the
-   source database; drops any stale one from a prior interrupted run
-   first, so the target is provably clean).
-6. Restores the backup into that clean database with `pg_restore
---no-owner --no-privileges`.
-7. Verifies every required table exists in the restored database and
-   that the applied-migration count matches the source exactly.
-8. Re-computes the same row-count + canonical-hash evidence against the
-   restored database and compares it to the pre-backup evidence,
-   table by table.
-9. Deletes the temporary backup file and drops the temporary restore
-   database (unless `BACKUP_CERT_KEEP_ARTIFACTS=1` is set, for local
-   debugging only).
-10. Prints an explicit final verdict line: `BACKUP RESTORE CERTIFICATION:
-PASS` or `BACKUP RESTORE CERTIFICATION: FAIL`, and exits non-zero on
-    any failure.
+### Schedule / frequency
 
-### What counts as PASS
+- One logical backup per day in production (canonical schedule).
+- One weekly and one monthly copy per the retention policy.
+- Automated restore verification (Section "Automated restore verification")
+  runs on a schedule (CI pull requests + an operations-scheduled job when
+  deployment is activated).
 
-Every one of the following must hold:
+### Where it is stored (conceptually)
 
-- the backup file was created and is non-empty
-- the clean restore database was created and is distinct from the source
-- `pg_restore` completed
-- every required table exists in the restored database
-- the restored applied-migration count matches the source
-- for every required table, the restored row count and canonical content
-  hash exactly match the pre-backup evidence
+- Locally into `AIM_BACKUP_DIR` first, then copied to operations-controlled
+  encrypted storage. Never Git, never public web directories, never
+  application assets, never GitHub repository artifacts as long-term
+  production storage.
+- A backup may be deleted from the local location only after the encrypted
+  copy is verified (size + SHA-256).
 
-### What counts as FAIL
+### Retention and encryption
 
-Any of: the source database is unreachable, migrations cannot be
-applied, seeding fails, `pg_dump` fails or produces an empty/unreadable
-file, the restore database cannot be created, `pg_restore` fails, a
-required table is missing after restore, the migration count differs, or
-any table's restored row count or content hash differs from the
-pre-backup evidence. The script never downgrades a failure to a warning
-and always prints the explicit `FAIL` verdict line before a non-zero
-exit.
+- Retention numbers live in exactly one place:
+  `docs/operations/backup-retention-policy.md`.
+- Backups are treated as sensitive healthcare/business data: encrypted in
+  transit (TLS/SSH to the storage destination) and encrypted at rest
+  (provider-managed encryption at minimum).
 
-## Manual backup and restore (outside the certification script)
+### Credentials / permissions
 
-Manual commands, for reference -- always confirm you are pointed at the
-intended database before running any of these, and never against a
-production connection string without separate, explicit authorization.
+- The backup role has least privilege: `CONNECT`, `SELECT` on the
+  application schema, and read access to system catalogs required by
+  `pg_dump`. It does not have `SUPERUSER`, `CREATEDB`, or write access to
+  application data.
+- Credentials are supplied via environment variables / the accepted
+  secret-management mechanism. Only configuration **names** are documented
+  (e.g. `AIM_BACKUP_DATABASE_URL`); never real values.
+- The password is passed to PostgreSQL tools via `PGPASSWORD`, never in the
+  command line, so it cannot appear in a process listing or logs.
 
-**Create a backup:**
+### How success is verified
 
-```bash
-pg_dump -h <host> -p <port> -U <user> -d <database> \
-  --format=custom --no-owner --no-privileges \
-  --file backup.dump
+- The backup command emits `AIM BACKUP: PASS` and a SHA-256.
+- The status exporter (`scripts/aim-backup-status.mjs`) renders
+  `medsphere_backup_status` / last-success age; stale/failed backups trip the
+  alert rules.
+
+## Restore
+
+### Prerequisites
+
+- A verified custom-format backup archive.
+- A **separate, isolated, disposable target database** on a server you are
+  authorized to create databases on. The target must NOT be production.
+- Optionally `DATABASE_URL` (source reference) so the restore can read the
+  expected migration count automatically, and
+  `AIM_RESTORE_EXPECTED_MIGRATIONS` / `AIM_RESTORE_EXPECTED_COUNTS` for
+  stronger assertions.
+
+### Isolated-target requirement (fail closed)
+
+The restore tool refuses to run if:
+
+- the target matches `AIM_PRODUCTION_DATABASE_URL`;
+- the target host matches a conservative managed-production marker
+  (`.rds.amazonaws.com`, `.postgres.database.azure.com`, `.azure.com`,
+  `.cloudsql.google.com`, `.clustercfg.`, ...);
+- the target is identical to the source database;
+- the backup archive is missing, empty, or unreadable;
+- the target already contains AIM schema objects (an existing database with
+  the Prisma migration table or any required AIM table);
+- the target already exists at all (even empty) unless the operator
+  explicitly sets `AIM_RESTORE_DROP_EXISTING=1`.
+
+There is **no `--force-production` option**. Production promotion is an
+explicit controlled operator action outside this utility.
+
+### Command / process
+
+```
+$env:AIM_BACKUP_FILE = 'C:\backups\aim\aim-backup-<timestamp>.dump'
+$env:RESTORE_DATABASE_URL = 'postgresql://user:password@host:5432/aim_t0022_restore'
+$env:DATABASE_URL = 'postgresql://user:password@host:5432/medsphere_dev'   # source ref (optional)
+node scripts/aim-restore.mjs
 ```
 
-**Verify a backup file (sanity check, does not touch any database):**
+Step-by-step:
 
-```bash
-pg_restore --list backup.dump > /dev/null && echo "backup file is readable"
-sha256sum backup.dump
-```
+1. validates configuration (required `AIM_BACKUP_FILE`,
+   `RESTORE_DATABASE_URL`);
+2. production guard + source==target guard;
+3. verifies the archive is readable;
+4. reads expected migration count (from source or explicit env);
+5. prepares the isolated target (create, or drop-empty when explicitly
+   allowed);
+6. restores with `pg_restore --no-owner --no-privileges`;
+7. runs the full integrity verification battery;
+8. prints `RESTORE INTEGRITY VERIFICATION: PASS`/`FAIL` and a final
+   `AIM RESTORE: PASS`/`FAIL` verdict.
 
-**Restore into a clean database:**
+### Verification
 
-```bash
-createdb -h <host> -p <port> -U <user> <clean_database_name>
-pg_restore -h <host> -p <port> -U <user> -d <clean_database_name> \
-  --no-owner --no-privileges \
-  backup.dump
-```
+The integrity verifier (`scripts/aim-restore-verify.mjs`, reusable
+standalone):
 
-Never run `pg_restore` against the original source database -- restoring
-over a live database is not a valid restore test and risks real data
-loss. Always restore into a separate, newly created database.
+- database connection succeeds;
+- every required table exists (Tenant, User, TenantMembership, UserPrivacy,
+  ConsentRecord, UserSession, UserSessionRefreshCredential, Provider,
+  Product, Inventory, Batch, MedicineReservation, AuditEvent);
+- every required table still has a primary key;
+- required unique indexes still exist (Tenant.slug, User.email,
+  UserSession.refreshTokenHash, UserSessionRefreshCredential.hash);
+- FK counts meet per-table minima;
+- zero orphan rows across representative relationships, including the Task
+  0019 composite `AuditEvent(actorMembershipId, actorUserId, tenantId)`
+  attribution FK;
+- migration history count matches the source (when asserted);
+- expected row counts match (when an expected-counts file is supplied).
 
-## Operator safety rules
+`pg_restore` exiting 0 is not sufficient.
 
-- Never point any command in this runbook at a production
-  `DATABASE_URL`. This certification is for synthetic, non-production
-  databases only.
-- Never commit a backup file (`*.dump`) to the repository.
-- Never log or paste a complete `DATABASE_URL` (it contains a password);
-  share only host/port/database name when reporting an issue.
-- The certification script uses `PGPASSWORD` via the environment, never
-  as a command-line argument, so the password never appears in a process
-  listing.
-- Always let the script's own cleanup step run (or run the manual
-  `dropdb`/temp-file cleanup yourself) -- do not leave restore-target
-  databases or backup files lying around on a shared host.
+### Rollback / abort behavior
 
-## What this runbook does not cover
+- Any failure before target creation exits non-zero without touching
+  anything.
+- A failure after the target was created by this run drops the target again
+  (disposable isolated target; set `AIM_RESTORE_KEEP_ON_FAILURE=1` to keep
+  it for debugging).
+- Restore never overwrites an existing AIM database automatically; a target
+  that already has AIM objects must be dropped by an operator manually after
+  they confirm it is disposable.
 
-Production backup retention schedule, RPO/RTO targets, and storage
-vendor/location selection (e.g. object storage, offsite replication) are
-explicitly **separate, not-yet-defined launch-operations work** and are
-out of scope here, per the V1 launch-readiness gap already tracked in
-`PROJECT_STATUS.md` and `README.md`. This runbook only certifies that a
-backup taken from an AIM PostgreSQL database can be restored into a
-clean database, that the required representative tables exist with matching
-row counts and canonical content hashes, and that applied migration-history
-count matches the source -- restore _correctness_ for this certification
-scope, not a production retention or recovery-time commitment.
+### Migration-forward process (Scenario B)
+
+When restoring an older schema backup and advancing to the current schema:
+
+1. restore the backup into the isolated target (as above);
+2. run the repository's accepted forward migration command against the
+   target: `pnpm --filter @medsphere/database run prisma:verify` (deploy +
+   status + drift);
+3. confirm `prisma migrate deploy` advances the target and the drift check
+   reports no difference;
+4. re-run the restore integrity verification (expected row counts must still
+   match; migration count will now be the current total).
+
+## Incident response
+
+### Backup failed
+
+1. Confirm the failure is real (non-zero exit, `AIM BACKUP: FAIL`,
+   status metric `medsphere_backup_status 0`).
+2. Check the bounded log for host/port/database and the exact `pg_dump`
+   error; never paste the connection URL or password.
+3. Correct the cause (connectivity, credentials/secret rotation, disk
+   space, permissions) and retry.
+4. If the retry fails, do not silently accept a missing backup; escalate to
+   the on-call operator and record the incident. A failed backup does not
+   extend the retention clock.
+
+### Backup became stale
+
+1. The backup-staleness warning alert (older than 28 h) or the
+   backup-staleness critical alert (older than 72 h) fires.
+2. Determine the last successful backup timestamp
+   (`medsphere_backup_last_success_timestamp_seconds`).
+3. Take an immediate new backup.
+4. If backups keep failing, treat as the "backup failed" incident; if the
+   backup succeeds but records look wrong, inspect the status file
+   (`AIM_BACKUP_STATUS_FILE`) for malformed/duplicate records.
+
+### Restore verification failed
+
+1. A failed restore or failed integrity verification is a **backup failure**
+   for retention purposes.
+2. Preserve the backup archive; do not delete it while diagnosing.
+3. Determine which check failed (connection, schema, constraints, orphans,
+   migration count, row counts).
+4. Confirm the target was genuinely clean and the backup archive was
+   created with matching client/server-version tooling where material.
+5. Re-run verification against a fresh isolated target before rewriting or
+   discarding the archive.
+6. If the archive is provably bad, treat the source of that backup as
+   unrecoverable and verify the next older archive (that is exactly why the
+   retention policy keeps 30 daily + 12 weekly + 12 monthly archives).
+
+## Automated restore verification
+
+A backup must periodically prove it is restorable. Repository-owned
+mechanisms:
+
+- **CI (always available):** `.github/workflows/backup-restore-certification.yml`
+  runs, on every PR to `feature/database-architecture` and on manual
+  dispatch, against a real PostgreSQL 16 service container:
+  `pnpm test:backup-recovery` (focused unit tests) →
+  `node scripts/backup-restore-certification.mjs` →
+  `node scripts/db-recovery-validation.mjs` (populate → backup → restore →
+  verify → migrate-forward), each requiring an explicit PASS verdict.
+- **Operations (when deployment is activated):** schedule the same
+  `db-recovery-validation` command in an isolated database to periodically
+  restore the latest production backup and verify it. This job never runs a
+  destructive restore against production.
+- **Local:** `DATABASE_URL=... node scripts/db-recovery-validation.mjs` (see
+  the validation evidence document).
+
+## Security rules
+
+- Backups are sensitive healthcare/business data; encrypt in transit and at
+  rest; restrict access to authorized operators.
+- Restore targets are never production; there is no override flag.
+- No credentials committed to Git; secrets come from environment
+  variables/secret management; document configuration names only.
+- No production connection URLs printed into normal logs; no patient records
+  or backup content dumped into console logs.
+- No secret values in documentation; no credentials embedded in scripts.
+
+## Redis
+
+Redis is **not** the authoritative disaster-recovery datastore. Its
+accepted role in AIM V1 is reconstructable/ephemeral operational state
+(rate-limit counters and similar). PostgreSQL is the durable datastore and
+is the recovery path this runbook implements. See
+`docs/operations/task0022-backup-recovery-validation.md` for the audit
+detail.
+
+## Related documents
+
+- `docs/operations/backup-retention-policy.md` — canonical retention values
+- `docs/adr/0027-production-backup-recovery-foundation.md` — architecture
+- `docs/operations/v1-observability-runbook.md` — metrics/alerting
+- `docs/operations/v1-alert-rules.prometheus.yml` — backup alerts
+- `docs/operations/task0022-backup-recovery-validation.md` — local evidence
+- `PROJECT_RULES.md`, `README.md` — governance and launch-gate context
