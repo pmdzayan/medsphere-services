@@ -1,0 +1,22 @@
+# Docker build context exclusion rules
+# Prevent secrets, environment files, git state, build artifacts, and test logs from entering the build context
+
+.env
+.env.*
+!.env.example
+.git
+.gitignore
+.dockerignore
+node_modules
+dist
+coverage
+.turbo
+.next
+*.log
+*.pem
+*.key
+scratch
+.gemini
+.idea
+.vscode
+tmp

@@ -1,10 +1,13 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { configureHttpSecurityHeaders, GlobalExceptionFilter } from '@medsphere/common';
+import { assertScaffoldRuntimeNotProduction } from '@medsphere/config';
 import { createValidationPipe } from '@medsphere/validation';
 import { createServiceLogger } from '@medsphere/logger';
 
 async function bootstrap(): Promise<void> {
+  assertScaffoldRuntimeNotProduction('notification-service');
+
   const logger = createServiceLogger('notification-service');
   const app = await NestFactory.create(AppModule, { bufferLogs: true });
 
