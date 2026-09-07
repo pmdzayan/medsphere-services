@@ -27,6 +27,7 @@
     "dev:check": "node scripts/dev-check.js",
     "test": "pnpm test:architecture && turbo run test --concurrency=1",
     "test:architecture": "node --test scripts/architecture-boundary-check.spec.js scripts/brand-audit.spec.js scripts/browser-permission-boundary-check.spec.js scripts/backup-recovery.spec.mjs && node scripts/architecture-boundary-check.js && node scripts/brand-audit.js && node scripts/browser-permission-boundary-check.mjs && node scripts/i18n-hardcoded-ui-audit.mjs",
+    "test:production-runtime": "pnpm exec turbo run clean --filter=@medsphere/auth-service... && pnpm exec turbo run build --filter=@medsphere/auth-service... && node --test scripts/production-runtime-certification.spec.mjs && node scripts/production-runtime-certification.mjs",
     "audit:brand": "node scripts/brand-audit.js",
     "test:cov": "turbo run test:cov --concurrency=1",
     "lint": "turbo run lint",
