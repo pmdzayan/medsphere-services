@@ -1,12 +1,12 @@
 # AIM — All In Medico Project Status
 
-**Status date:** 2026-08-15
+**Status date:** 2026-09-08
 
-**Accepted source commit:** `95949887b6ace793f0c33156a2dceec0c4ff1916`
+**Current authoritative HEAD:** `0aa5dc1f0cfba618467dd957ea1afdf386aa7c71`
 
-**Accepted stabilization baseline:** `4ea55a17e188410ddee45fa3ea6c016e22d6617a`
+**Current authoritative tree:** `d7fe5420705ac9da47e8d189340e5d5624800e97`
 
-**Current sprint:** Post-Audit Stabilization Batch 1 — 4/5 tasks formally
+**Historical sprint record:** Post-Audit Stabilization Batch 1 — 4/5 tasks formally
 accepted (Task 1: release/coverage hardening, PR #70; Task 2: authorization/
 tenant-isolation coverage, PR #72; Task 3: last-tenant-administrator
 concurrency, PR #79; Task 4: audit integrity hardening, PR #81). Task 5
@@ -21,7 +21,44 @@ and does not authorize real healthcare data.
 
 **Release state:** Not approved for production or real healthcare data
 
-**Full-roadmap engineering estimate:** 40% complete / 60% remaining
+**Roadmap completion:** No current numeric completion percentage is asserted. The expanded AIM roadmap still contains substantial healthcare-domain, shared-platform, production-certification, and India-launch work; see `PRODUCT_ROADMAP.md`.
+
+## Current accepted implementation state
+
+### Task 0023 — Production Runtime, Secrets & Deployment Safety Foundation
+
+**Status:** Accepted and merged in PR #142.
+
+- starting/base: `6bd5aee560f72aac6482384b320a7bb0e14d6657`
+- accepted source: `efeee75c8b37e5c5eab3c7bc29aff2d8a09308e9`
+- merge/current authoritative SHA: `0aa5dc1f0cfba618467dd957ea1afdf386aa7c71`
+- accepted tree: `d7fe5420705ac9da47e8d189340e5d5624800e97`
+- GitHub production-runtime certification run: `34135844389`
+- ADR-0028: Accepted
+
+**Accepted boundary:** Repository-owned fail-closed production runtime
+configuration, secret isolation, component capability classification, and
+deployment-safety foundation. `auth-service` is the accepted production-capable
+backend runtime; prototype-blocked and health-only scaffold classifications
+remain enforced.
+
+**Production boundary:** Task 0023 acceptance does not mean AIM is deployed to
+production. Real production infrastructure, real secrets, DNS/TLS, real
+production PostgreSQL/Redis, external-provider activation, real healthcare data,
+and final production-release approval are not claimed.
+
+### Task 0022 — Backup, Restore & Recovery Operations Foundation
+
+**Status:** Accepted and merged in PR #141.
+
+- accepted source: `dc1402f02fec075ff3cd3f0643a53583a5feea2b`
+- merge commit: `6bd5aee560f72aac6482384b320a7bb0e14d6657`
+- ADR-0027 remains Proposed unless separately accepted
+
+**Accepted boundary:** Repository-owned logical PostgreSQL
+backup/restore/recovery operations foundation. Provider-specific snapshots,
+PITR activation, production backup-storage activation, measured production RTO
+exercise, and production deployment are not claimed.
 
 ## Most recent accepted sprint
 
@@ -267,8 +304,13 @@ V1 gap matrix, and
 5. Hospital, doctor, laboratory, patient, and clinical journeys do not have
    accepted end-to-end implementations. Medical-record exposure remains blocked
    before consent and privacy controls.
-6. Browser E2E, performance/load, penetration, backup/restore, disaster recovery,
-   observability, and operational-runbook evidence remain incomplete.
+6. Final browser E2E and penetration/security release review remain incomplete.
+   Accepted repository evidence now exists for performance/reliability,
+   observability, logical backup/restore/recovery operations, and production
+   runtime/deployment runbooks; real production collectors/alert destinations,
+   provider-specific snapshots/PITR, production backup storage, measured
+   production recovery exercises, and final production activation remain
+   incomplete.
 7. Production deployment is intentionally disabled.
 
 Supporting evidence is recorded in [the baseline audit](docs/audits/2026-07-20-cto-baseline.md)

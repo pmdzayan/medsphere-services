@@ -19,21 +19,47 @@ Other application scaffolds in the monorepo are not automatically accepted V1 pr
 
 ## Current engineering status
 
-**Status date:** 2026-08-21
+**Status date:** 2026-09-08
 
-The repository has advanced substantially beyond the older August 14 progress snapshot. Post-Audit Stabilization Batch 1 is complete, and Batch 2 Tasks 1–4 have been merged. Batch 2 Task 5 is the current runtime-verification and full V1 smoke-test candidate.
+**Authoritative branch:** `feature/database-architecture`
 
-Current planning estimate: **approximately 73% of the launch-targeted V1 engineering scope is complete, with approximately 27% remaining.** This is a working engineering estimate, not a regulatory, security-certification, or release-approval percentage. The estimate must continue to be revised from accepted repository evidence rather than file count or prototype screens.
+**Current authoritative HEAD:** `0aa5dc1f0cfba618467dd957ea1afdf386aa7c71`
 
-### Recently completed work
+**Current authoritative tree:** `d7fe5420705ac9da47e8d189340e5d5624800e97`
 
-- Post-Audit Stabilization Batch 1 — 5/5 accepted.
-- Frontend operational hardening and responsive inventory/reservation workflows.
-- Batch 2 Task 1 — stock-transfer authorization and cross-tenant coverage.
-- Batch 2 Task 2 — privacy-minimized public medicine search with safe staff-assisted reservation handoff.
-- Batch 2 Task 3 — provider-neutral SMTP/email notification activation while preserving delivery privacy boundaries.
-- Batch 2 Task 4 — reproducible supported V1 localhost bootstrap with PostgreSQL and Redis.
-- Batch 2 Task 5 — deterministic runtime and full V1 smoke verification is the active acceptance candidate. Normal exact-head PR quality gates have passed; dedicated live-smoke evidence remains part of its acceptance boundary.
+No current whole-roadmap completion percentage is asserted. AIM still has
+substantial healthcare-domain, shared-platform, production-certification, and
+India-launch work remaining; `PRODUCT_ROADMAP.md` remains the roadmap authority.
+
+### Recently accepted foundation work
+
+- Task 0022 — Production Backup, Restore & Recovery Operations Foundation:
+  accepted and merged in PR #141 from source
+  `dc1402f02fec075ff3cd3f0643a53583a5feea2b`, with merge commit
+  `6bd5aee560f72aac6482384b320a7bb0e14d6657`. Its accepted scope is the
+  repository-owned logical PostgreSQL backup/restore/recovery operations
+  foundation. It does not activate provider snapshots, PITR, production backup
+  storage, or production recovery operations. ADR-0027 remains Proposed unless
+  separately accepted.
+- Task 0023 — Production Runtime, Secrets & Deployment Safety Foundation:
+  accepted and merged in PR #142 from source
+  `efeee75c8b37e5c5eab3c7bc29aff2d8a09308e9`, producing the current
+  authoritative merge SHA
+  `0aa5dc1f0cfba618467dd957ea1afdf386aa7c71` and tree
+  `d7fe5420705ac9da47e8d189340e5d5624800e97`. Production-runtime
+  certification run `34135844389` completed successfully, and ADR-0028 is
+  Accepted.
+- Task 0023 establishes repository-owned fail-closed runtime configuration,
+  secret-isolation, component capability classification, and deployment-safety
+  foundations. `auth-service` is the accepted production-capable backend
+  runtime; prototype-blocked and health-only scaffold classifications remain
+  enforced.
+
+These accepted foundations do **not** mean AIM has been deployed to production.
+Real production infrastructure, real secrets, DNS/TLS, production
+PostgreSQL/Redis, external-provider activation, provider-specific backup/PITR,
+real healthcare data, and final production-release approval remain outside the
+accepted state.
 
 ## Product definition and engineering authority
 

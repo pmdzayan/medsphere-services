@@ -40,4 +40,4 @@ Every ADR includes decision, reason/context, alternatives, consequences, impleme
 | [ADR-025](0025-secure-organization-onboarding.md)                    | Secure organization onboarding                         | Accepted | 2026-08-29 |
 | [ADR-026](0026-platform-administration-security-boundary.md)         | Dedicated platform-administration security boundary    | Proposed | 2026-09-05 |
 | [ADR-027](0027-production-backup-recovery-foundation.md)             | Production backup/restore/recovery foundation          | Proposed | 2026-09-06 |
-| [ADR-028](0028-production-runtime-secrets-and-deployment-safety.md)  | Production runtime configuration and deployment safety | Proposed | 2026-09-07 |
+| [ADR-028](0028-production-runtime-secrets-and-deployment-safety.md)  | Production runtime configuration and deployment safety | Accepted | 2026-09-07 |
