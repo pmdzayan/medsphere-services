@@ -1,6 +1,6 @@
 # ADR-0028: Production Runtime Configuration, Secret Isolation, and Deployment Safety Foundation
 
-**Status:** Proposed
+**Status:** Accepted
 
 **Date:** 2026-09-07
 
@@ -23,7 +23,7 @@ AIM services require an explicit, repository-owned production configuration cont
    - **Frontend Client**: `web`
 3. **Secret Isolation Boundary**: Production secrets (`DATABASE_URL`, `REDIS_CLUSTER_URL`, `AUTH_JWT_PRIVATE_KEY_BASE64`, `AUTH_REFRESH_TOKEN_PEPPER`, `AUTH_OTP_PEPPER`, `ORG_JOIN_CODE_PEPPER`, `MSG91_AUTH_KEY`, `MEDSPHERE_NOTIFICATION_SMTP_URL`, `MEDSPHERE_OTLP_COLLECTOR_AUTH_HEADER`) remain strictly injected at runtime by external platforms. Secrets are forbidden in Docker layers, persistent Docker ARGs, `.env` files, git commits, `NEXT_PUBLIC_` frontend variables, logs, telemetry attributes, error messages, or CI artifacts. `.dockerignore` excludes all sensitive files from Docker context.
 4. **Forbidden Production Flags**: `ENABLE_SWAGGER`, `ENABLE_TEST_VERIFICATION_PROVIDER`, `ENABLE_UNACCEPTED_PROTOTYPE_SERVICES`, `ENABLE_PRISMA_QUERY_LOGGING`, `RUN_AUTH_INFRASTRUCTURE_TESTS` remain strictly forbidden in `NODE_ENV=production`.
-5. **Container Runtime Invariants**: Production containers enforce multi-stage pinned builds, distroless base images (`gcr.io/distroless/nodejs20-debian12:nonroot`), non-root execution (`USER nonroot:nonroot`), and Node-only liveness checks (`HEALTHCHECK CMD ["node", "healthcheck.js"]`).
+5. **Container Runtime Invariants**: Production containers enforce multi-stage pinned builds, distroless base images (`gcr.io/distroless/nodejs22-debian13:nonroot`), non-root execution (`USER nonroot:nonroot`), and Node-only liveness checks (`HEALTHCHECK CMD ["node", "healthcheck.js"]`).
 6. **Release Identity Contract**: Bounded, non-secret build identity (`APP_VERSION`, full 40-character hexadecimal `RELEASE_SHA`, and existing `NODE_ENV`) is standardized and validated without exposing sensitive data.
 7. **Deployment Sequence**: Safe deployment follows an immutable order of operations: approved release SHA verification -> immutable container build -> external secret injection -> config validation -> Task 0022 backup pre-flight verification -> append-only database migration -> health/readiness check -> smoke verification -> rollback boundary.
 

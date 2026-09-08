@@ -1,8 +1,20 @@
 # AIM — All In Medico AI Handoff
 
-**Last updated:** 2026-08-20
+**Last updated:** 2026-09-08
 
-**Current sprint:** Post-Audit Stabilization Batch 1 — 4/5 tasks formally
+**Authoritative branch:** `feature/database-architecture`
+
+**Authoritative HEAD:** `0aa5dc1f0cfba618467dd957ea1afdf386aa7c71`
+
+**Authoritative tree:** `d7fe5420705ac9da47e8d189340e5d5624800e97`
+
+**Most recently accepted implementation task:** Task 0023, PR #142
+
+**Production release:** NOT authorized
+
+**Real healthcare data:** NOT authorized
+
+**Historical sprint record:** Post-Audit Stabilization Batch 1 — 4/5 tasks formally
 accepted. Task 1 (release/coverage hardening, PR #70), Task 2 (authorization/
 tenant-isolation coverage, PR #72), Task 3 (last-tenant-administrator
 concurrency, PR #79), and Task 4 (audit integrity hardening, PR #81) are
@@ -17,12 +29,51 @@ cross-task architecture/security/privacy review, and remaining coverage
 gaps recorded as future work. If Task 5 is accepted, Batch 1 becomes 5/5
 complete; that has not yet occurred.
 
-**Next feature work:** none currently authorized while Task 5 is pending.
+**Next implementation work:** must be separately scoped by the CTO from the live authoritative branch. Do not infer the next task from historical sprint status.
 This is not production approval and does not authorize real healthcare
 data. The next batch of work is not yet scoped by this document. The G3.25
 reservation-recipient-resolution boundary remains accepted (see
 `PROJECT_STATUS.md` and
 `docs/sprints/G3.25-reservation-recipient-resolution-boundary.md`).
+
+## Current accepted implementation boundary
+
+### Task 0023 — Production Runtime, Secrets & Deployment Safety Foundation
+
+Task 0023 is accepted and merged in PR #142.
+
+- starting/base: `6bd5aee560f72aac6482384b320a7bb0e14d6657`
+- accepted source: `efeee75c8b37e5c5eab3c7bc29aff2d8a09308e9`
+- merge/current authoritative SHA: `0aa5dc1f0cfba618467dd957ea1afdf386aa7c71`
+- accepted tree: `d7fe5420705ac9da47e8d189340e5d5624800e97`
+- production-runtime certification run: `34135844389`
+- ADR-0028: Accepted
+
+Task 0023 establishes the accepted production-runtime/configuration,
+secret-isolation, component-classification, and deployment-safety foundation.
+
+It does **not** authorize production deployment, real secrets, real production
+PostgreSQL/Redis, DNS/TLS, external-provider activation, real healthcare data,
+or final production-release approval.
+
+### Task 0022 — Backup, Restore & Recovery Operations Foundation
+
+Task 0022 is accepted and merged in PR #141.
+
+- accepted source: `dc1402f02fec075ff3cd3f0643a53583a5feea2b`
+- merge commit: `6bd5aee560f72aac6482384b320a7bb0e14d6657`
+
+Its accepted boundary is the repository-owned logical PostgreSQL
+backup/restore/recovery operations foundation. Provider snapshots, PITR,
+production backup storage, and measured production recovery activation remain
+outside that acceptance. ADR-0027 remains Proposed unless separately accepted.
+
+### Continuation rule
+
+Do not send the next implementation agent back to already accepted Tasks
+0022 or 0023. The next numbered implementation task must be separately scoped
+by the CTO from the live authoritative branch; Task 0024 itself is governance
+reconciliation only.
 
 ## Mandatory startup sequence
 

@@ -1,6 +1,10 @@
 # Task 0022 — Production Backup, Restore & Recovery Operations Foundation
 
-**Status:** Implementation candidate — locally validated, not yet accepted, not merged.
+**Status:** Accepted and merged in PR #141.
+
+**Accepted source:** `dc1402f02fec075ff3cd3f0643a53583a5feea2b`
+
+**Merge commit:** `6bd5aee560f72aac6482384b320a7bb0e14d6657`
 
 **Branch:** `cto/0022-production-backup-recovery`
 
@@ -131,7 +135,10 @@ provisional Task 0032+.
 
 ## Completion status
 
-`TASK 0022 — IMPLEMENTATION/VALIDATION COMPLETE LOCALLY — CTO REVIEW PENDING`
+`TASK 0022 — ACCEPTED AND MERGED`
 
-Not accepted and not merged until CTO review. No push / PR / merge / deploy
-without explicit CTO approval.
+Accepted and merged in PR #141. Acceptance covers the repository-owned logical
+PostgreSQL backup/restore/recovery operations foundation only. It does not
+activate provider snapshots, PITR, production backup storage, production
+deployment, or real healthcare data. ADR-0027 remains Proposed unless separately
+accepted.

@@ -1,7 +1,7 @@
 # Task 0023 — Production Runtime, Secrets & Deployment Safety Foundation
 
 **Sprint:** Task 0023
-**Status:** Local Candidate Ready for CTO Publication Review
+**Status:** Accepted and merged in PR #142; accepted source `efeee75c8b37e5c5eab3c7bc29aff2d8a09308e9`; merge/current authoritative SHA `0aa5dc1f0cfba618467dd957ea1afdf386aa7c71`; tree `d7fe5420705ac9da47e8d189340e5d5624800e97`; starting/base `6bd5aee560f72aac6482384b320a7bb0e14d6657`; certification run `34135844389`.
 **Date:** 2026-09-07
 
 ## Objective
@@ -22,7 +22,7 @@ Establish a repository-owned, fail-closed production runtime configuration contr
 
 3. **Container & Build Isolation**:
    - Created `.dockerignore` excluding `.env*`, `.git`, `node_modules`, `coverage`, private keys, and test artifacts from Docker build contexts.
-   - Certified Dockerfile invariants: multi-stage build, distroless base image (`gcr.io/distroless/nodejs20-debian12:nonroot`), non-root execution (`USER nonroot:nonroot`), and Node-only liveness check (`HEALTHCHECK CMD ["node", "healthcheck.js"]`).
+   - Certified Dockerfile invariants: multi-stage build, distroless base image (`gcr.io/distroless/nodejs22-debian13:nonroot`), non-root execution (`USER nonroot:nonroot`), and Node-only liveness check (`HEALTHCHECK CMD ["node", "healthcheck.js"]`).
 
 4. **Testing & Certification**:
    - Created `scripts/production-runtime-certification.spec.mjs` (Node `--test`) for focused Task 0023 behavioral invariants A-K plus explicit no-secret-output sentinel evidence N.
@@ -38,4 +38,4 @@ Establish a repository-owned, fail-closed production runtime configuration contr
 
 ## Verification Status
 
-The complete final local validation matrix passed after all CTO corrections, including clean-generated-artifact architecture validation, self-contained Task 0023 certification, full auth-service regression, web regression, lint, full monorepo build, actual Next.js build-time public-secret fail-closed proof with no secret-value leakage, production dependency audit, formatting, and brand audit. Published-head GitHub CI remains pending. This remains a local candidate and is not a production-readiness or deployment approval.
+The complete final local validation matrix passed after all CTO corrections, including clean-generated-artifact architecture validation, self-contained Task 0023 certification, full auth-service regression, web regression, lint, full monorepo build, actual Next.js build-time public-secret fail-closed proof with no secret-value leakage, production dependency audit, formatting, and brand audit. The accepted Task 0023 source completed the required GitHub certification before PR #142 was merged (production-runtime certification run `34135844389`). Task 0023 is accepted and merged. This acceptance is not a production deployment, production-release approval, or real-healthcare-data approval.
