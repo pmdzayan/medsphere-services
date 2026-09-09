@@ -1,10 +1,37 @@
 # AIM — All In Medico Project Status
 
-**Status date:** 2026-09-08
+**Status date:** 2026-09-09
 
-**Current authoritative HEAD:** `0aa5dc1f0cfba618467dd957ea1afdf386aa7c71`
+**Current authoritative HEAD:** `fb118eb18f791a7c2689ec99ce6d386dd62b196e`
 
-**Current authoritative tree:** `d7fe5420705ac9da47e8d189340e5d5624800e97`
+**Current authoritative tree:** `cf9f8ad886d7bb92897da06c265fea5666a3c51c`
+
+**Release state:** Not approved for production or real healthcare data
+
+**Accepted dependency-security hotfix:** PR #145 (`fb118eb18f791a7c2689ec99ce6d386dd62b196e`)
+
+## Current candidate implementation state
+
+### Task 0025 — Medicine Availability Trust & Inventory Freshness Foundation
+
+**Status:** CANDIDATE awaiting CTO review. Not merged, not accepted.
+
+- base SHA: `fb118eb18f791a7c2689ec99ce6d386dd62b196e`
+- candidate branch: `cto/0025-medicine-availability-trust-freshness`
+- ADR-029: Proposed
+
+**Candidate boundary:** Canonical availability-trust foundation — closed
+evidence-source catalogue, append-only physical-stock observation evidence,
+V1 freshness policy, monotonic evidence ordering, canonical trust evaluator,
+atomic evidence recording for new-batch receipt only in Task 0025, and an
+internal trust read service. Generic adjustments, transfers, damaged-stock
+write-offs, and metadata/configuration mutations do not refresh freshness. Batch remains the only
+quantity authority; no new public/patient endpoint.
+
+**Not implemented in this candidate:** Live Availability Request, pharmacist
+confirmation actions, patient medicine-search redesign, demand analytics, POS
+vendor integration, delivery, payments, appointments, family/dependents,
+medical timeline, AI.
 
 **Historical sprint record:** Post-Audit Stabilization Batch 1 — 4/5 tasks formally
 accepted (Task 1: release/coverage hardening, PR #70; Task 2: authorization/
@@ -18,8 +45,6 @@ task in this batch; all are coverage-only, evidenced by PostgreSQL/
 Redis-backed integration tests. If Task 5 is accepted, this batch becomes
 5/5 complete; that is not yet the case. This is not production approval
 and does not authorize real healthcare data.
-
-**Release state:** Not approved for production or real healthcare data
 
 **Roadmap completion:** No current numeric completion percentage is asserted. The expanded AIM roadmap still contains substantial healthcare-domain, shared-platform, production-certification, and India-launch work; see `PRODUCT_ROADMAP.md`.
 

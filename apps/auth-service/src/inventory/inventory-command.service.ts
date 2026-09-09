@@ -13,6 +13,7 @@ import {
 } from '@medsphere/database';
 import { AuditWriter } from '../audit/audit-writer.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { AvailabilityEvidenceService } from './availability-evidence.service';
 import { assertTrustedProviderAccess } from './inventory-access';
 import type {
   AdjustBatchCommand,
@@ -31,6 +32,7 @@ export class InventoryCommandService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditWriter,
+    private readonly evidence: AvailabilityEvidenceService,
   ) {}
 
   async configureInventory(
@@ -235,6 +237,12 @@ export class InventoryCommandService {
 
           const batchId = randomUUID();
           const movementId = randomUUID();
+          const [{ occurredAt }] = await transaction.$queryRaw<Array<{ occurredAt: Date }>>(
+            Prisma.sql`SELECT CURRENT_TIMESTAMP AS "occurredAt"`,
+          );
+          if (!(occurredAt instanceof Date) || Number.isNaN(occurredAt.getTime())) {
+            throw new Error('Database timestamp was not returned');
+          }
           await transaction.batch.create({
             data: {
               id: batchId,
@@ -273,8 +281,24 @@ export class InventoryCommandService {
               commandHash,
               actorType: 'TENANT_USER',
               actorMembershipId: command.actor.membershipId,
+              occurredAt,
             },
             select: { id: true },
+          });
+          // A new batch receipt starts from zero and objectively establishes
+          // the batch's physical on-hand quantity. Record that observation in
+          // the same transaction as Batch + StockMovement.
+          await this.evidence.recordObservation(transaction, {
+            tenantId: command.actor.tenantId,
+            inventoryId: inventory.id,
+            batchId,
+            providerId: command.providerId,
+            productId: command.productId,
+            source: 'AIM_MANAGED_INVENTORY',
+            observedOnHandQuantity: command.quantity,
+            occurredAt,
+            movementId,
+            idempotencyKey: command.idempotencyKey,
           });
           await this.audit.appendTenantUser(transaction, {
             tenantId: command.actor.tenantId,

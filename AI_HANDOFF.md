@@ -1,18 +1,47 @@
 # AIM — All In Medico AI Handoff
 
-**Last updated:** 2026-09-08
+**Last updated:** 2026-09-09
 
 **Authoritative branch:** `feature/database-architecture`
 
-**Authoritative HEAD:** `0aa5dc1f0cfba618467dd957ea1afdf386aa7c71`
+**Authoritative HEAD:** `fb118eb18f791a7c2689ec99ce6d386dd62b196e`
 
-**Authoritative tree:** `d7fe5420705ac9da47e8d189340e5d5624800e97`
+**Authoritative tree:** `cf9f8ad886d7bb92897da06c265fea5666a3c51c`
 
 **Most recently accepted implementation task:** Task 0023, PR #142
+
+**Accepted dependency-security hotfix:** PR #145 (`fb118eb18f791a7c2689ec99ce6d386dd62b196e`)
 
 **Production release:** NOT authorized
 
 **Real healthcare data:** NOT authorized
+
+## Current candidate implementation boundary
+
+### Task 0025 — Medicine Availability Trust & Inventory Freshness Foundation
+
+**Status:** CANDIDATE awaiting CTO review on branch
+`cto/0025-medicine-availability-trust-freshness` (base
+`fb118eb18f791a7c2689ec99ce6d386dd62b196e`).
+
+- ADR-029: Proposed
+- Candidate sprint record: `docs/sprints/Task-0025-medicine-availability-trust-freshness.md`
+
+**Candidate boundary:** Canonical availability-trust foundation — closed
+evidence-source catalogue, append-only physical-stock observation evidence,
+V1 freshness policy, monotonic evidence ordering, canonical trust evaluator,
+atomic evidence recording for new-batch receipt only in Task 0025, and an
+internal trust read service. Batch remains the only quantity authority; no new
+public/patient endpoint.
+
+**Not implemented in this candidate:** Live Availability Request, pharmacist
+confirmation actions, patient medicine-search redesign, demand analytics, POS
+vendor integration, delivery, payments, appointments, family/dependents,
+medical timeline, AI. Do not begin the intended next scoped task (Live
+Availability Request & Pharmacist Confirmation) before Task 0025 is accepted
+by the CTO.
+
+## Previous accepted implementation boundary
 
 **Historical sprint record:** Post-Audit Stabilization Batch 1 — 4/5 tasks formally
 accepted. Task 1 (release/coverage hardening, PR #70), Task 2 (authorization/
