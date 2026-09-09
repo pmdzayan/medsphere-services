@@ -22,6 +22,7 @@ function createHarness() {
       updateMany: jest.fn(),
     },
     auditEvent: { create: jest.fn() },
+    $queryRaw: jest.fn().mockResolvedValue([{ occurredAt: new Date('2026-09-09T00:00:00.000Z') }]),
   };
   const client = {
     ...transaction,
@@ -30,8 +31,13 @@ function createHarness() {
     ),
   };
   const audit = { appendTenantUser: jest.fn() };
-  const service = new InventoryCommandService({ client } as never, audit as never);
-  return { audit, client, service, transaction };
+  const evidence = { recordObservation: jest.fn().mockResolvedValue(true) };
+  const service = new InventoryCommandService(
+    { client } as never,
+    audit as never,
+    evidence as never,
+  );
+  return { audit, client, service, transaction, evidence };
 }
 
 const actor = { tenantId: 'tenant-1', membershipId: 'membership-1', userId: 'user-1' };

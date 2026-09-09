@@ -3,6 +3,7 @@ import { AuditWriter } from '../audit/audit-writer.service';
 import { AuthenticatedIdentity } from '../auth/auth.types';
 import { isInfrastructureTestEnabled, requireEnv } from '../auth/testing/infrastructure-test-gate';
 import { PrismaService } from '../prisma/prisma.service';
+import { AvailabilityEvidenceService } from './availability-evidence.service';
 import { InventoryCommandService } from './inventory-command.service';
 
 const describeInventoryInfrastructure = isInfrastructureTestEnabled() ? describe : describe.skip;
@@ -13,7 +14,11 @@ if (isInfrastructureTestEnabled()) {
 
 describeInventoryInfrastructure('G3.2 PostgreSQL inventory command integrity', () => {
   const prisma = new PrismaService();
-  const service = new InventoryCommandService(prisma, new AuditWriter());
+  const service = new InventoryCommandService(
+    prisma,
+    new AuditWriter(),
+    new AvailabilityEvidenceService(),
+  );
   const tenantId = randomUUID();
   const userId = randomUUID();
   const unassignedUserId = randomUUID();

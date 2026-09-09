@@ -16,6 +16,9 @@ import { ReservationRepository } from './reservation.repository';
 import { ReservationService } from './reservation.service';
 import { ReservationCreationService } from './reservation-creation.service';
 import { InventoryEventWriter } from './inventory-event-writer';
+import { AvailabilityEvidenceService } from './availability-evidence.service';
+import { AvailabilityTrustEvaluator } from './availability-trust.evaluator';
+import { AvailabilityTrustService } from './availability-trust.service';
 import { PublicMedicineSearchController } from './public-medicine-search.controller';
 import { PublicMedicineSearchService } from './public-medicine-search.service';
 import { PublicNearbyMedicineSearchService } from './public-nearby-medicine-search.service';
@@ -31,6 +34,9 @@ import { PublicNearbyMedicineSearchController } from './public-nearby-medicine-s
   providers: [
     InventoryRepository,
     InventoryEventWriter,
+    AvailabilityEvidenceService,
+    AvailabilityTrustEvaluator,
+    AvailabilityTrustService,
     InventoryService,
     InventoryCommandService,
     InventoryTransferService,
@@ -45,6 +51,6 @@ import { PublicNearbyMedicineSearchController } from './public-nearby-medicine-s
     PublicMedicineSearchService,
     PublicNearbyMedicineSearchService,
   ],
-  exports: [InventoryService],
+  exports: [InventoryService, AvailabilityTrustService],
 })
 export class InventoryModule {}

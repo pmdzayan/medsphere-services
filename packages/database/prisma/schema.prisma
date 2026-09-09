@@ -138,6 +138,21 @@ enum StockMovementType {
   DAMAGED
 }
 
+/// Task 0025: closed catalogue of accepted BATCH-BOUND physical-stock evidence
+/// sources. Every value is persisted in `BatchStockObservation`, which is
+/// strictly batch-bound (requires an AIM `Batch` id via composite FKs).
+/// `MANUAL_PHYSICAL_COUNT` and `POS_SYNC` are valid only when the external
+/// observation has been normalized to a real AIM batch. `PHARMACIST_CONFIRMATION`
+/// is deliberately NOT in this catalogue: a pharmacist confirmation for Live
+/// Availability Request is temporary provider/product evidence and must not
+/// require an AIM batch; it is reserved for a future provider/product-level
+/// evidence model combined by the canonical trust layer.
+enum AvailabilityEvidenceSource {
+  AIM_MANAGED_INVENTORY
+  MANUAL_PHYSICAL_COUNT
+  POS_SYNC
+}
+
 enum MedicineReservationStatus {
   PENDING
   CONFIRMED
@@ -306,6 +321,7 @@ model Tenant {
   notificationDeliveryAttempts   NotificationDeliveryAttempt[]
   phoneOtpChallenges             PhoneOtpChallenge[]
   organizationJoinCodes          OrganizationJoinCode[]
+  batchStockObservations         BatchStockObservation[]
 
   @@index([slug])
 }
@@ -1033,9 +1049,9 @@ model Provider {
   isVerified Boolean @default(false)
   isActive   Boolean @default(true)
 
-  inventory                     Inventory[]
-  batches                       Batch[]
-  stockMovements                StockMovement[]
+  inventory                      Inventory[]
+  batches                        Batch[]
+  stockMovements                 StockMovement[]
   medicineReservations          MedicineReservation[]
   reservationItems              MedicineReservationItem[]
   reservationAllocations        MedicineReservationAllocation[]
@@ -1044,6 +1060,7 @@ model Provider {
   destinationInventoryTransfers InventoryTransfer[]             @relation("InventoryTransferDestinationProvider")
   batchExpiryRecords            BatchExpiryRecord[]
   batchQuarantineRecords        BatchQuarantineRecord[]
+  batchStockObservations        BatchStockObservation[]
 
   version Int @default(1)
 
@@ -1081,6 +1098,7 @@ model Product {
   inventoryTransfers     InventoryTransfer[]
   batchExpiryRecords     BatchExpiryRecord[]
   batchQuarantineRecords BatchQuarantineRecord[]
+  batchStockObservations BatchStockObservation[]
 
   version Int @default(1)
 
@@ -1126,6 +1144,7 @@ model Inventory {
   destinationTransfers   InventoryTransfer[]             @relation("InventoryTransferDestinationInventory")
   batchExpiryRecords     BatchExpiryRecord[]
   batchQuarantineRecords BatchQuarantineRecord[]
+  batchStockObservations BatchStockObservation[]
 
   @@unique([id, tenantId])
   @@unique([id, tenantId, providerId, productId])
@@ -1189,6 +1208,7 @@ model Batch {
   destinationTransfers   InventoryTransfer[]             @relation("InventoryTransferDestinationBatch")
   expiryRecord           BatchExpiryRecord?
   quarantineRecord       BatchQuarantineRecord?
+  stockObservations      BatchStockObservation[]
 
   @@unique([tenantId, providerId, productId, batchNumber])
   @@unique([id, tenantId, inventoryId, providerId, productId])
@@ -1302,6 +1322,7 @@ model StockMovement {
 
   sourceTransfers      InventoryTransfer[] @relation("InventoryTransferSourceMovement")
   destinationTransfers InventoryTransfer[] @relation("InventoryTransferDestinationMovement")
+  stockObservations    BatchStockObservation[] @relation("BatchStockObservationMovement")
 
   @@unique([tenantId, idempotencyKey])
   @@unique([id, tenantId, inventoryId, batchId, providerId, productId])
@@ -1309,6 +1330,68 @@ model StockMovement {
   @@index([tenantId, batchId, occurredAt(sort: Desc), id(sort: Desc)])
   @@index([tenantId, providerId, productId, occurredAt(sort: Desc)])
   @@index([actorMembershipId, occurredAt(sort: Desc)])
+}
+
+/// Task 0025: append-only physical-stock observation evidence. One row records
+/// one qualifying event where a trusted inventory command objectively established
+/// the physical quantity of a batch (batch receipt, physical stock adjustment,
+/// completed transfer endpoint, damaged-stock write-off). Future evidence sources
+/// (manual physical counts, POS synchronization, live pharmacist confirmation)
+/// append rows through the same table without redesigning the freshness/trust model.
+///
+/// `occurredAt` is the observation's own occurrence timestamp. For AIM-managed
+/// commands it is derived from the same database transaction clock that stamps the
+/// driving StockMovement. Current evidence for a batch is always the row with the
+/// newest `occurredAt`; older or equal evidence arriving later is ignored, so delayed
+/// or out-of-order writes can never overwrite newer evidence. Idempotent retries of
+/// the driving command deterministically reuse the same observation key, making
+/// duplicates no-ops.
+///
+/// `observedOnHandQuantity` is the newly established physical quantity at the time
+/// of the observation. It is bound to the accepted Batch quantity authority (the row
+/// is written atomically with the command that mutated Batch) and never introduces a
+/// second quantity authority. Reservation-held quantity continues reducing the
+/// trusted available quantity exclusively through the accepted reservation model.
+model BatchStockObservation {
+  id String @id @default(uuid()) @db.Uuid
+
+  tenantId String @db.Uuid
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict, map: "BatchStockObservation_tenantId_fkey")
+
+  inventoryId String    @db.Uuid
+  inventory   Inventory @relation(fields: [inventoryId, tenantId, providerId, productId], references: [id, tenantId, providerId, productId], onDelete: Restrict, map: "BatchStockObservation_inventory_scope_fkey")
+
+  batchId String @db.Uuid
+  batch   Batch  @relation(fields: [batchId, tenantId, inventoryId, providerId, productId], references: [id, tenantId, inventoryId, providerId, productId], onDelete: Restrict, map: "BatchStockObservation_batch_scope_fkey")
+
+  providerId String   @db.Uuid
+  provider   Provider @relation(fields: [providerId, tenantId], references: [id, tenantId], onDelete: Restrict, map: "BatchStockObservation_provider_scope_fkey")
+
+  productId String  @db.Uuid
+  product   Product @relation(fields: [productId], references: [id], onDelete: Restrict, map: "BatchStockObservation_productId_fkey")
+
+  source AvailabilityEvidenceSource
+  observedOnHandQuantity Int
+  occurredAt DateTime
+
+  /// Provenance back-reference to the accepted StockMovement that drove this
+  /// observation. Null for future sources that produce no movement (e.g. manual
+  /// physical count or POS sync).
+  movementId String?        @db.Uuid
+  movement   StockMovement? @relation("BatchStockObservationMovement", fields: [movementId, tenantId, inventoryId, batchId, providerId, productId], references: [id, tenantId, inventoryId, batchId, providerId, productId], onDelete: Restrict, map: "BatchStockObservation_movement_scope_fkey")
+
+  /// Deterministic command anchor: the same command retried against the same
+  /// batch reproduces the same key, making a re-insertion a no-op. Matches the
+  /// repository-wide idempotency-key convention (VARCHAR(120)).
+  idempotencyKey String @db.VarChar(120)
+
+  createdAt DateTime @default(now())
+
+  @@unique([tenantId, idempotencyKey], map: "BatchStockObservation_tenantId_idempotencyKey_key")
+  @@unique([batchId, occurredAt, source], map: "BatchStockObservation_batchId_occurredAt_source_key")
+  @@index([batchId, occurredAt(sort: Desc), id(sort: Desc)], map: "BatchStockObservation_batch_occurredAt_idx")
+  @@index([tenantId, providerId, productId, occurredAt(sort: Desc), id(sort: Desc)], map: "BatchStockObservation_tenant_provider_product_occurredAt_idx")
+  @@index([tenantId, inventoryId, occurredAt(sort: Desc), id(sort: Desc)], map: "BatchStockObservation_tenant_inventory_occurredAt_idx")
 }
 
 model InventoryTransfer {
