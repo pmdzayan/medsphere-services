@@ -67,6 +67,13 @@ import { InventoryExpiryQueryDto } from './dto/inventory-expiry-query.dto';
 import { InventoryExpiryWorklistResponseDto } from './dto/inventory-expiry-response.dto';
 import { InventoryQuarantineEvidenceQueryDto } from './dto/inventory-quarantine-evidence-query.dto';
 import { InventoryQuarantineEvidenceResponseDto } from './dto/inventory-quarantine-evidence-response.dto';
+import {
+  AvailabilityRequestQueueQueryDto,
+  AvailabilityRequestQueueResponseDto,
+  AvailabilityResponseResultDto,
+  RespondAvailabilityRequestDto,
+} from './dto/availability-request-response.dto';
+import { AvailabilityRequestService } from './availability-request.service';
 
 @Controller('inventory')
 @ApiTags('Inventory')
@@ -83,6 +90,7 @@ export class InventoryController {
     private readonly inventoryDamage: InventoryDamageService,
     private readonly inventoryQuarantine: InventoryQuarantineService,
     private readonly reservationCreation: ReservationCreationService,
+    private readonly availabilityRequests: AvailabilityRequestService,
   ) {}
 
   @Post('providers/:providerId/reservations')
@@ -273,6 +281,45 @@ export class InventoryController {
     @Query() query: InventoryQuarantineEvidenceQueryDto,
   ) {
     return this.inventoryService.listQuarantineEvidence(identity, providerId, query);
+  }
+
+  @Get('providers/:providerId/availability-requests')
+  @Header('Cache-Control', 'private, no-store')
+  @RequirePermissions(PERMISSIONS.inventoryAvailabilityRequestsRead)
+  @ApiOperation({ summary: 'List live availability requests for an assigned provider' })
+  @ApiOkResponse({ type: AvailabilityRequestQueueResponseDto })
+  @ApiNotFoundResponse({ description: 'Provider availability requests not found' })
+  listAvailabilityRequests(
+    @CurrentIdentity() identity: AuthenticatedIdentity,
+    @Param('providerId', new ParseUUIDPipe({ version: '4' })) providerId: string,
+    @Query() query: AvailabilityRequestQueueQueryDto,
+  ) {
+    return this.availabilityRequests.listProviderQueue(identity, providerId, query);
+  }
+
+  @Post('providers/:providerId/availability-requests/:requestId/responses')
+  @HttpCode(HttpStatus.OK)
+  @RequirePermissions(PERMISSIONS.inventoryAvailabilityRequestsManage)
+  @ApiOperation({ summary: 'Respond to a live availability request for an assigned provider' })
+  @ApiOkResponse({ type: AvailabilityResponseResultDto })
+  @ApiNotFoundResponse({ description: 'Availability request not found' })
+  @ApiConflictResponse({
+    description: 'Expired, already responded, version, or idempotency conflict',
+  })
+  respondToAvailabilityRequest(
+    @CurrentIdentity() identity: AuthenticatedIdentity,
+    @Param('providerId', new ParseUUIDPipe({ version: '4' })) providerId: string,
+    @Param('requestId', new ParseUUIDPipe({ version: '4' })) requestId: string,
+    @Body() dto: RespondAvailabilityRequestDto,
+    @Req() request: MetadataHttpRequest,
+  ) {
+    return this.availabilityRequests.respond(identity, providerId, requestId, {
+      outcome: dto.outcome,
+      idempotencyKey: dto.idempotencyKey,
+      expectedVersion: dto.expectedVersion,
+      retryAfterMinutes: dto.retryAfterMinutes,
+      request: extractRequestMetadata(request),
+    });
   }
 
   @Put('providers/:providerId/products/:productId')

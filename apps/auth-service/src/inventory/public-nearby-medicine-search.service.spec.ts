@@ -2,12 +2,14 @@ import {
   calculateDistanceKm,
   PublicNearbyMedicineSearchService,
 } from './public-nearby-medicine-search.service';
+import type { PublicAvailabilityResolution } from './availability-request.types';
 
 function inventoryListing(overrides: Record<string, unknown> = {}) {
   return {
     providerId: '11111111-1111-4111-8111-111111111111',
     productId: '22222222-2222-4222-8222-222222222222',
     provider: {
+      tenantId: '00000000-0000-4000-8000-000000000001',
       businessName: 'Test Pharmacy',
       city: 'Bengaluru',
       state: 'Karnataka',
@@ -26,27 +28,44 @@ function inventoryListing(overrides: Record<string, unknown> = {}) {
   };
 }
 
+function resolution(
+  availabilityState: PublicAvailabilityResolution['availabilityState'],
+): PublicAvailabilityResolution {
+  return {
+    requestId: null,
+    requestStatus: 'NONE',
+    requestedAt: null,
+    expiresAt: null,
+    respondedAt: null,
+    availabilityState,
+    confirmationSource: null,
+    confirmedAt: null,
+    retryAfterAt: null,
+  };
+}
+
 function createHarness() {
   const inventoryFindMany = jest.fn();
-  const batchGroupBy = jest.fn();
+  const resolveProviderProducts = jest.fn();
 
   const prisma = {
     client: {
       inventory: {
         findMany: inventoryFindMany,
       },
-      batch: {
-        groupBy: batchGroupBy,
-      },
     },
   };
 
-  const service = new PublicNearbyMedicineSearchService(prisma as never);
+  const reconciliation = {
+    resolveProviderProducts,
+  };
+
+  const service = new PublicNearbyMedicineSearchService(prisma as never, reconciliation as never);
 
   return {
     service,
     inventoryFindMany,
-    batchGroupBy,
+    resolveProviderProducts,
   };
 }
 
@@ -56,11 +75,12 @@ describe('PublicNearbyMedicineSearchService', () => {
   });
 
   it('excludes providers outside the requested radius', async () => {
-    const { service, inventoryFindMany, batchGroupBy } = createHarness();
+    const { service, inventoryFindMany, resolveProviderProducts } = createHarness();
 
     inventoryFindMany.mockResolvedValue([
       inventoryListing({
         provider: {
+          tenantId: '00000000-0000-4000-8000-000000000001',
           businessName: 'Far Pharmacy',
           city: 'Chennai',
           state: 'Tamil Nadu',
@@ -80,16 +100,17 @@ describe('PublicNearbyMedicineSearchService', () => {
     });
 
     expect(result.data).toEqual([]);
-    expect(batchGroupBy).not.toHaveBeenCalled();
+    expect(resolveProviderProducts).not.toHaveBeenCalled();
   });
 
   it('orders providers by distance before pagination', async () => {
-    const { service, inventoryFindMany, batchGroupBy } = createHarness();
+    const { service, inventoryFindMany, resolveProviderProducts } = createHarness();
 
     inventoryFindMany.mockResolvedValue([
       inventoryListing({
         providerId: '33333333-3333-4333-8333-333333333333',
         provider: {
+          tenantId: '00000000-0000-4000-8000-000000000002',
           businessName: 'Farther Pharmacy',
           city: 'Bengaluru',
           state: 'Karnataka',
@@ -100,6 +121,7 @@ describe('PublicNearbyMedicineSearchService', () => {
       inventoryListing({
         providerId: '44444444-4444-4444-8444-444444444444',
         provider: {
+          tenantId: '00000000-0000-4000-8000-000000000003',
           businessName: 'Closer Pharmacy',
           city: 'Bengaluru',
           state: 'Karnataka',
@@ -109,7 +131,9 @@ describe('PublicNearbyMedicineSearchService', () => {
       }),
     ]);
 
-    batchGroupBy.mockResolvedValue([]);
+    resolveProviderProducts.mockResolvedValue(
+      new Map([['22222222-2222-4222-8222-222222222222', resolution('UNKNOWN')]]),
+    );
 
     const result = await service.search({
       q: 'paracetamol',
@@ -127,20 +151,13 @@ describe('PublicNearbyMedicineSearchService', () => {
     expect(result.data[0]!.distanceKm).toBeLessThan(result.data[1]!.distanceKm);
   });
 
-  it('reports stock only when active eligible batch quantity remains after holds', async () => {
-    const { service, inventoryFindMany, batchGroupBy } = createHarness();
+  it('reports AVAILABLE only from the canonical trust resolution', async () => {
+    const { service, inventoryFindMany, resolveProviderProducts } = createHarness();
 
     inventoryFindMany.mockResolvedValue([inventoryListing()]);
-    batchGroupBy.mockResolvedValue([
-      {
-        providerId: '11111111-1111-4111-8111-111111111111',
-        productId: '22222222-2222-4222-8222-222222222222',
-        _sum: {
-          onHandQuantity: 8,
-          heldQuantity: 3,
-        },
-      },
-    ]);
+    resolveProviderProducts.mockResolvedValue(
+      new Map([['22222222-2222-4222-8222-222222222222', resolution('AVAILABLE')]]),
+    );
 
     const result = await service.search({
       q: 'paracetamol',
@@ -152,23 +169,22 @@ describe('PublicNearbyMedicineSearchService', () => {
     });
 
     expect(result.data).toHaveLength(1);
-    expect(result.data[0]!.availability).toBe('IN_STOCK');
+    expect(result.data[0]!.availability).toBe('AVAILABLE');
   });
 
-  it('reports out of stock when held quantity consumes all on-hand stock', async () => {
-    const { service, inventoryFindMany, batchGroupBy } = createHarness();
+  it('never presents UNKNOWN/confirmation-required evidence as confidently available', async () => {
+    const { service, inventoryFindMany, resolveProviderProducts } = createHarness();
 
-    inventoryFindMany.mockResolvedValue([inventoryListing()]);
-    batchGroupBy.mockResolvedValue([
-      {
-        providerId: '11111111-1111-4111-8111-111111111111',
-        productId: '22222222-2222-4222-8222-222222222222',
-        _sum: {
-          onHandQuantity: 5,
-          heldQuantity: 5,
-        },
-      },
+    inventoryFindMany.mockResolvedValue([
+      inventoryListing({ productId: '22222222-2222-4222-8222-222222222222' }),
+      inventoryListing({ productId: '77777777-7777-4777-8777-777777777777' }),
     ]);
+    resolveProviderProducts.mockResolvedValue(
+      new Map([
+        ['22222222-2222-4222-8222-222222222222', resolution('CONFIRMATION_REQUIRED')],
+        ['77777777-7777-4777-8777-777777777777', resolution('UNKNOWN')],
+      ]),
+    );
 
     const result = await service.search({
       q: 'paracetamol',
@@ -179,14 +195,19 @@ describe('PublicNearbyMedicineSearchService', () => {
       offset: 0,
     });
 
-    expect(result.data[0]!.availability).toBe('OUT_OF_STOCK');
+    expect(result.data.map((row) => row.availability).sort()).toEqual([
+      'CONFIRMATION_REQUIRED',
+      'UNKNOWN',
+    ]);
   });
 
-  it('queries only active verified providers and eligible stock', async () => {
-    const { service, inventoryFindMany, batchGroupBy } = createHarness();
+  it('queries only active verified providers scoped to their tenants', async () => {
+    const { service, inventoryFindMany, resolveProviderProducts } = createHarness();
 
     inventoryFindMany.mockResolvedValue([inventoryListing()]);
-    batchGroupBy.mockResolvedValue([]);
+    resolveProviderProducts.mockResolvedValue(
+      new Map([['22222222-2222-4222-8222-222222222222', resolution('UNKNOWN')]]),
+    );
 
     await service.search({
       q: 'paracetamol',
@@ -216,19 +237,10 @@ describe('PublicNearbyMedicineSearchService', () => {
         }),
       }),
     );
-
-    expect(batchGroupBy).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({
-          status: 'ACTIVE',
-          expiryDate: { gt: expect.any(Date) },
-          provider: {
-            isActive: true,
-            isVerified: true,
-            deletedAt: null,
-          },
-        }),
-      }),
+    expect(resolveProviderProducts).toHaveBeenCalledWith(
+      '00000000-0000-4000-8000-000000000001',
+      '11111111-1111-4111-8111-111111111111',
+      ['22222222-2222-4222-8222-222222222222'],
     );
   });
 });

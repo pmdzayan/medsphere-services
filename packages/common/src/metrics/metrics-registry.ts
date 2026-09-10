@@ -220,6 +220,22 @@ export class MetricsRegistry {
     'medsphere_otp_dispatch_total',
     'Total OTP provider dispatch attempts by outcome',
   );
+  readonly availabilityRequestOutcomeTotal = new Counter(
+    'medsphere_availability_request_outcome_total',
+    'Total live availability request creations by outcome (created, deduplicated, reused, current_evidence)',
+  );
+  readonly availabilityResponseTotal = new Counter(
+    'medsphere_availability_response_total',
+    'Total pharmacist availability responses by outcome (AVAILABLE, UNAVAILABLE, CHECK_LATER, replayed)',
+  );
+  readonly availabilityRequestToResponseMs = new Histogram(
+    'medsphere_availability_request_to_response_ms',
+    'Request-to-response latency for responded live availability requests in milliseconds',
+  );
+  readonly availabilityExpirationTotal = new Counter(
+    'medsphere_availability_expiration_total',
+    'Total live availability request expirations',
+  );
   readonly exporterFailuresTotal = new Counter(
     'medsphere_metrics_exporter_failures_total',
     'Total telemetry exporter failures',
@@ -232,12 +248,16 @@ export class MetricsRegistry {
     this.reservationOutcomeTotal,
     this.notificationDeliveryTotal,
     this.otpDispatchTotal,
+    this.availabilityRequestOutcomeTotal,
+    this.availabilityResponseTotal,
+    this.availabilityExpirationTotal,
     this.exporterFailuresTotal,
   ];
 
   private readonly histograms: Histogram[] = [
     this.httpRequestDurationMs,
     this.dependencyCheckDurationMs,
+    this.availabilityRequestToResponseMs,
   ];
 
   /**

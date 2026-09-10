@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { LiveAvailabilityReconciliationService } from './live-availability-reconciliation.service';
 import type { PublicMedicineSearchQueryDto } from './dto/public-medicine-search-query.dto';
 import type {
   PublicMedicineSearchResponseDto,
@@ -14,18 +15,20 @@ import type {
  * for this task and is future work. This mirrors the existing convention
  * that every accepted inventory route is scoped to one assigned provider.
  *
- * Exposes only fields a patient needs to decide whether to reserve --
- * never inventoryId, batchId, cost/purchase price, SKU, exact quantities,
- * staff/membership identifiers, or any other internal operational field.
- * Availability is coarse (IN_STOCK / OUT_OF_STOCK) rather than an exact
- * count, and is derived from the same eligibility criteria
- * ReservationCreationService itself uses (ACTIVE, non-expired batches,
- * visible inventory, active product) so a result shown as IN_STOCK can
- * genuinely be reserved -- no fabricated or looser criteria.
+ * Task 0026: availability now comes from the canonical trust/live
+ * reconciliation layer (Task 0025 batch evidence + provider/product live
+ * pharmacist confirmation) instead of a raw on-hand>0 test, so stale or
+ * unknown evidence is never presented as confidently available. Result
+ * availability is one of AVAILABLE / UNAVAILABLE / CONFIRMATION_REQUIRED /
+ * UNKNOWN plus optional minimized live-evidence fields; the exact quantity,
+ * batch, inventory, staff, and audit identifiers are never exposed.
  */
 @Injectable()
 export class PublicMedicineSearchService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly reconciliation: LiveAvailabilityReconciliationService,
+  ) {}
 
   async search(
     providerId: string,
@@ -33,15 +36,15 @@ export class PublicMedicineSearchService {
   ): Promise<PublicMedicineSearchResponseDto> {
     const provider = await this.prisma.client.provider.findFirst({
       where: { id: providerId, isActive: true, isVerified: true, deletedAt: null },
-      select: { businessName: true, city: true, state: true },
+      select: { tenantId: true, businessName: true, city: true, state: true },
     });
     // Fail closed without distinguishing "does not exist" from "not
     // eligible for public search" -- both look identical to the caller,
     // preventing enumeration of inactive/unverified providers.
     if (!provider) throw new NotFoundException('Provider not found');
+    const tenantId = provider.tenantId;
 
     const term = query.q.trim();
-    const now = new Date();
 
     const listings = await this.prisma.client.inventory.findMany({
       where: {
@@ -82,41 +85,36 @@ export class PublicMedicineSearchService {
     }
 
     const productIds = listings.map((listing) => listing.productId);
-    const availableBatches = await this.prisma.client.batch.groupBy({
-      by: ['productId'],
-      where: {
-        providerId,
-        productId: { in: productIds },
-        status: 'ACTIVE',
-        expiryDate: { gt: now },
-        deletedAt: null,
-        inventory: { isVisible: true, deletedAt: null },
-        product: { isActive: true, deletedAt: null },
-      },
-      _sum: { onHandQuantity: true, heldQuantity: true },
-    });
-    const availableByProduct = new Map<string, number>();
-    for (const row of availableBatches) {
-      const onHand = row._sum.onHandQuantity ?? 0;
-      const held = row._sum.heldQuantity ?? 0;
-      availableByProduct.set(row.productId, Math.max(0, onHand - held));
-    }
-
-    const data: PublicMedicineSearchResultDto[] = listings.map((listing) => ({
-      productId: listing.productId,
+    const resolutions = await this.reconciliation.resolveProviderProducts(
+      tenantId,
       providerId,
-      providerName: provider.businessName,
-      providerCity: provider.city,
-      providerState: provider.state,
-      name: listing.product.name,
-      genericName: listing.product.genericName,
-      brand: listing.product.brand,
-      strength: listing.product.strength,
-      dosageForm: listing.product.dosageForm,
-      requiresPrescription: listing.product.requiresPrescription,
-      availability:
-        (availableByProduct.get(listing.productId) ?? 0) > 0 ? 'IN_STOCK' : 'OUT_OF_STOCK',
-    }));
+      productIds,
+    );
+
+    const data: PublicMedicineSearchResultDto[] = listings.map((listing) => {
+      const resolution = resolutions.get(listing.productId);
+      return {
+        productId: listing.productId,
+        providerId,
+        providerName: provider.businessName,
+        providerCity: provider.city,
+        providerState: provider.state,
+        name: listing.product.name,
+        genericName: listing.product.genericName,
+        brand: listing.product.brand,
+        strength: listing.product.strength,
+        dosageForm: listing.product.dosageForm,
+        requiresPrescription: listing.product.requiresPrescription,
+        availability: resolution?.availabilityState ?? 'UNKNOWN',
+        confirmationSource: resolution?.confirmationSource ?? null,
+        confirmedAt: resolution?.confirmedAt ?? null,
+        requestId: resolution?.requestId ?? null,
+        requestStatus: resolution?.requestStatus ?? 'NONE',
+        requestedAt: resolution?.requestedAt ?? null,
+        expiresAt: resolution?.expiresAt ?? null,
+        retryAfterAt: resolution?.retryAfterAt ?? null,
+      } as PublicMedicineSearchResultDto;
+    });
 
     return { data, limit: query.limit, offset: query.offset };
   }
