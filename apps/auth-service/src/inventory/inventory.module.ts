@@ -19,10 +19,14 @@ import { InventoryEventWriter } from './inventory-event-writer';
 import { AvailabilityEvidenceService } from './availability-evidence.service';
 import { AvailabilityTrustEvaluator } from './availability-trust.evaluator';
 import { AvailabilityTrustService } from './availability-trust.service';
+import { AvailabilityRequestService } from './availability-request.service';
+import { AvailabilityRequestExpiryService } from './availability-request-expiry.service';
+import { LiveAvailabilityReconciliationService } from './live-availability-reconciliation.service';
 import { PublicMedicineSearchController } from './public-medicine-search.controller';
 import { PublicMedicineSearchService } from './public-medicine-search.service';
 import { PublicNearbyMedicineSearchService } from './public-nearby-medicine-search.service';
 import { PublicNearbyMedicineSearchController } from './public-nearby-medicine-search.controller';
+import { PublicLiveAvailabilityController } from './public-live-availability.controller';
 
 @Module({
   imports: [PrismaModule, AuthorizationModule, AuditPersistenceModule],
@@ -30,6 +34,7 @@ import { PublicNearbyMedicineSearchController } from './public-nearby-medicine-s
     InventoryController,
     PublicMedicineSearchController,
     PublicNearbyMedicineSearchController,
+    PublicLiveAvailabilityController,
   ],
   providers: [
     InventoryRepository,
@@ -37,6 +42,9 @@ import { PublicNearbyMedicineSearchController } from './public-nearby-medicine-s
     AvailabilityEvidenceService,
     AvailabilityTrustEvaluator,
     AvailabilityTrustService,
+    AvailabilityRequestService,
+    AvailabilityRequestExpiryService,
+    LiveAvailabilityReconciliationService,
     InventoryService,
     InventoryCommandService,
     InventoryTransferService,

@@ -153,6 +153,34 @@ enum AvailabilityEvidenceSource {
   POS_SYNC
 }
 
+/// Task 0026: lifecycle of a provider/product live availability request.
+/// The public V1 workflow is simply "please confirm whether this provider
+/// currently has this product available" -- it carries no patient medical
+/// data, contact information, or free-form patient text.
+enum AvailabilityRequestStatus {
+  PENDING
+  RESPONDED
+  EXPIRED
+}
+
+/// Task 0026: the closed set of temporary provider/product availability
+/// outcomes an authorized pharmacist/staff member can confirm. CHECK_LATER is
+/// available to a patient-facing surface only as "confirmation required" with
+/// a bounded retryAfterAt; it never claims current availability.
+enum PharmacistConfirmationOutcome {
+  AVAILABLE
+  UNAVAILABLE
+  CHECK_LATER
+}
+
+/// Task 0026: closed catalogue of provider/product-level live evidence
+/// sources. PHARMACIST_CONFIRMATION is the only Task 0026 source and is never
+/// written to the batch-bound `BatchStockObservation` table (Task 0025
+/// deliberately reserved it for this separate model).
+enum ProviderProductAvailabilityEvidenceSource {
+  PHARMACIST_CONFIRMATION
+}
+
 enum MedicineReservationStatus {
   PENDING
   CONFIRMED
@@ -297,31 +325,33 @@ model Tenant {
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
-  memberships                    TenantMembership[]
-  sessions                       UserSession[]
-  membershipProviderAccess       MembershipProviderAccess[]
-  roles                          Role[]
-  auditEvents                    AuditEvent[]
-  providerVerifications          ProviderVerification[]
-  providers                      Provider[]
-  inventory                      Inventory[]
-  batches                        Batch[]
-  stockMovements                 StockMovement[]
-  inventoryConfigurationCommands InventoryConfigurationCommand[]
-  medicineReservations           MedicineReservation[]
-  reservationItems               MedicineReservationItem[]
-  reservationAllocations         MedicineReservationAllocation[]
-  reservationCommands            MedicineReservationCommand[]
-  inventoryTransfers             InventoryTransfer[]
-  batchExpiryRecords             BatchExpiryRecord[]
-  batchQuarantineRecords         BatchQuarantineRecord[]
-  outboxEvents                   OutboxEvent[]
-  eventInboxReceipts             EventInboxReceipt[]
-  notificationDeliveries         NotificationDelivery[]
-  notificationDeliveryAttempts   NotificationDeliveryAttempt[]
-  phoneOtpChallenges             PhoneOtpChallenge[]
-  organizationJoinCodes          OrganizationJoinCode[]
-  batchStockObservations         BatchStockObservation[]
+  memberships                         TenantMembership[]
+  sessions                            UserSession[]
+  membershipProviderAccess            MembershipProviderAccess[]
+  roles                               Role[]
+  auditEvents                         AuditEvent[]
+  providerVerifications               ProviderVerification[]
+  providers                           Provider[]
+  inventory                           Inventory[]
+  batches                             Batch[]
+  stockMovements                      StockMovement[]
+  inventoryConfigurationCommands      InventoryConfigurationCommand[]
+  medicineReservations                MedicineReservation[]
+  reservationItems                    MedicineReservationItem[]
+  reservationAllocations              MedicineReservationAllocation[]
+  reservationCommands                 MedicineReservationCommand[]
+  inventoryTransfers                  InventoryTransfer[]
+  batchExpiryRecords                  BatchExpiryRecord[]
+  batchQuarantineRecords              BatchQuarantineRecord[]
+  outboxEvents                        OutboxEvent[]
+  eventInboxReceipts                  EventInboxReceipt[]
+  notificationDeliveries              NotificationDelivery[]
+  notificationDeliveryAttempts        NotificationDeliveryAttempt[]
+  phoneOtpChallenges                  PhoneOtpChallenge[]
+  organizationJoinCodes               OrganizationJoinCode[]
+  batchStockObservations              BatchStockObservation[]
+  availabilityRequests                AvailabilityRequest[]
+  providerProductAvailabilityEvidence ProviderProductAvailabilityEvidence[]
 
   @@index([slug])
 }
@@ -392,22 +422,23 @@ model User {
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
-  memberships                 TenantMembership[]
-  sessions                    UserSession[]
-  platformAuditEvents         AuditEvent[]                 @relation("AuditEventPlatformActor")
-  actorAuditEvents            AuditEvent[]                 @relation("AuditEventActorUser")
-  privacy                     UserPrivacy?
-  medicineReservations        MedicineReservation[]
-  verificationAttempts        AccountVerificationAttempt[]
-  externalAuthIdentities      ExternalAuthIdentity[]
-  phoneOtpChallenges          PhoneOtpChallenge[]
-  consentRecords              ConsentRecord[]
-  platformAccount             PlatformAccount?             @relation("PlatformAccountUser")
-  platformSessions            PlatformSession[]            @relation("PlatformSessionUser")
-  createdPlatformAssignments  PlatformRoleAssignment[]     @relation("PlatformAssignmentCreatedBy")
-  createdPlatformInvitations  PlatformInvitation[]         @relation("PlatformInvitationCreatedBy")
-  acceptedPlatformInvitations PlatformInvitation[]         @relation("PlatformInvitationAccepted")
-  revokedPlatformInvitations  PlatformInvitation[]         @relation("PlatformInvitationRevokedBy")
+  memberships                  TenantMembership[]
+  sessions                     UserSession[]
+  platformAuditEvents          AuditEvent[]                          @relation("AuditEventPlatformActor")
+  actorAuditEvents             AuditEvent[]                          @relation("AuditEventActorUser")
+  privacy                      UserPrivacy?
+  medicineReservations         MedicineReservation[]
+  verificationAttempts         AccountVerificationAttempt[]
+  externalAuthIdentities       ExternalAuthIdentity[]
+  phoneOtpChallenges           PhoneOtpChallenge[]
+  consentRecords               ConsentRecord[]
+  platformAccount              PlatformAccount?                      @relation("PlatformAccountUser")
+  platformSessions             PlatformSession[]                     @relation("PlatformSessionUser")
+  createdPlatformAssignments   PlatformRoleAssignment[]              @relation("PlatformAssignmentCreatedBy")
+  createdPlatformInvitations   PlatformInvitation[]                  @relation("PlatformInvitationCreatedBy")
+  acceptedPlatformInvitations  PlatformInvitation[]                  @relation("PlatformInvitationAccepted")
+  revokedPlatformInvitations   PlatformInvitation[]                  @relation("PlatformInvitationRevokedBy")
+  availabilityResponseEvidence ProviderProductAvailabilityEvidence[]
 }
 
 model ExternalAuthIdentity {
@@ -513,7 +544,8 @@ model TenantMembership {
   providerAccess               MembershipProviderAccess[]
   batchQuarantineRecords       BatchQuarantineRecord[]
   outboxEvents                 OutboxEvent[]
-  createdOrganizationJoinCodes OrganizationJoinCode[]     @relation("OrganizationJoinCodeCreatedBy")
+  createdOrganizationJoinCodes OrganizationJoinCode[]                @relation("OrganizationJoinCodeCreatedBy")
+  availabilityResponseEvidence ProviderProductAvailabilityEvidence[]
 
   @@unique([tenantId, userId])
   @@unique([id, tenantId])
@@ -1049,18 +1081,20 @@ model Provider {
   isVerified Boolean @default(false)
   isActive   Boolean @default(true)
 
-  inventory                      Inventory[]
-  batches                        Batch[]
-  stockMovements                 StockMovement[]
-  medicineReservations          MedicineReservation[]
-  reservationItems              MedicineReservationItem[]
-  reservationAllocations        MedicineReservationAllocation[]
-  membershipAccesses            MembershipProviderAccess[]
-  sourceInventoryTransfers      InventoryTransfer[]             @relation("InventoryTransferSourceProvider")
-  destinationInventoryTransfers InventoryTransfer[]             @relation("InventoryTransferDestinationProvider")
-  batchExpiryRecords            BatchExpiryRecord[]
-  batchQuarantineRecords        BatchQuarantineRecord[]
-  batchStockObservations        BatchStockObservation[]
+  inventory                           Inventory[]
+  batches                             Batch[]
+  stockMovements                      StockMovement[]
+  medicineReservations                MedicineReservation[]
+  reservationItems                    MedicineReservationItem[]
+  reservationAllocations              MedicineReservationAllocation[]
+  membershipAccesses                  MembershipProviderAccess[]
+  sourceInventoryTransfers            InventoryTransfer[]                   @relation("InventoryTransferSourceProvider")
+  destinationInventoryTransfers       InventoryTransfer[]                   @relation("InventoryTransferDestinationProvider")
+  batchExpiryRecords                  BatchExpiryRecord[]
+  batchQuarantineRecords              BatchQuarantineRecord[]
+  batchStockObservations              BatchStockObservation[]
+  availabilityRequests                AvailabilityRequest[]
+  providerProductAvailabilityEvidence ProviderProductAvailabilityEvidence[]
 
   version Int @default(1)
 
@@ -1089,16 +1123,18 @@ model Product {
   barcode              String?
   requiresPrescription Boolean         @default(false)
 
-  isActive               Boolean                         @default(true)
-  inventory              Inventory[]
-  batches                Batch[]
-  stockMovements         StockMovement[]
-  reservationItems       MedicineReservationItem[]
-  reservationAllocations MedicineReservationAllocation[]
-  inventoryTransfers     InventoryTransfer[]
-  batchExpiryRecords     BatchExpiryRecord[]
-  batchQuarantineRecords BatchQuarantineRecord[]
-  batchStockObservations BatchStockObservation[]
+  isActive                            Boolean                               @default(true)
+  inventory                           Inventory[]
+  batches                             Batch[]
+  stockMovements                      StockMovement[]
+  reservationItems                    MedicineReservationItem[]
+  reservationAllocations              MedicineReservationAllocation[]
+  inventoryTransfers                  InventoryTransfer[]
+  batchExpiryRecords                  BatchExpiryRecord[]
+  batchQuarantineRecords              BatchQuarantineRecord[]
+  batchStockObservations              BatchStockObservation[]
+  availabilityRequests                AvailabilityRequest[]
+  providerProductAvailabilityEvidence ProviderProductAvailabilityEvidence[]
 
   version Int @default(1)
 
@@ -1320,8 +1356,8 @@ model StockMovement {
   occurredAt DateTime @default(now())
   createdAt  DateTime @default(now())
 
-  sourceTransfers      InventoryTransfer[] @relation("InventoryTransferSourceMovement")
-  destinationTransfers InventoryTransfer[] @relation("InventoryTransferDestinationMovement")
+  sourceTransfers      InventoryTransfer[]     @relation("InventoryTransferSourceMovement")
+  destinationTransfers InventoryTransfer[]     @relation("InventoryTransferDestinationMovement")
   stockObservations    BatchStockObservation[] @relation("BatchStockObservationMovement")
 
   @@unique([tenantId, idempotencyKey])
@@ -1370,9 +1406,9 @@ model BatchStockObservation {
   productId String  @db.Uuid
   product   Product @relation(fields: [productId], references: [id], onDelete: Restrict, map: "BatchStockObservation_productId_fkey")
 
-  source AvailabilityEvidenceSource
+  source                 AvailabilityEvidenceSource
   observedOnHandQuantity Int
-  occurredAt DateTime
+  occurredAt             DateTime
 
   /// Provenance back-reference to the accepted StockMovement that drove this
   /// observation. Null for future sources that produce no movement (e.g. manual
@@ -1392,6 +1428,124 @@ model BatchStockObservation {
   @@index([batchId, occurredAt(sort: Desc), id(sort: Desc)], map: "BatchStockObservation_batch_occurredAt_idx")
   @@index([tenantId, providerId, productId, occurredAt(sort: Desc), id(sort: Desc)], map: "BatchStockObservation_tenant_provider_product_occurredAt_idx")
   @@index([tenantId, inventoryId, occurredAt(sort: Desc), id(sort: Desc)], map: "BatchStockObservation_tenant_inventory_occurredAt_idx")
+}
+
+/// Task 0026: provider/product live availability request.
+///
+/// A request is exactly one server-derived tenant + one verified/active
+/// provider + one active product and carries NO patient medical data (no
+/// patient name, contact info, prescription, diagnosis, symptoms, health
+/// condition, or free-form patient text). It is simply "please confirm
+/// whether this provider currently has this product available".
+///
+/// `activeDedupKey` is a deterministic derived key (`providerId:productId`)
+/// that is set while a request is PENDING and cleared (NULL) once it is
+/// RESPONDED or EXPIRED. Its unique constraint gives the database the
+/// authority to guarantee at most one effective PENDING request per
+/// tenant/provider/product, so concurrent public request creation converges
+/// on one request instead of producing operational spam. Prisma cannot
+/// express partial unique indexes, so this nullable-unique derived column is
+/// the schema-visible form of the same invariant.
+model AvailabilityRequest {
+  id String @id @default(uuid()) @db.Uuid
+
+  tenantId String @db.Uuid
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict, map: "AvailabilityRequest_tenantId_fkey")
+
+  providerId String   @db.Uuid
+  provider   Provider @relation(fields: [providerId, tenantId], references: [id, tenantId], onDelete: Restrict, map: "AvailabilityRequest_provider_scope_fkey")
+
+  productId String  @db.Uuid
+  product   Product @relation(fields: [productId], references: [id], onDelete: Restrict, map: "AvailabilityRequest_productId_fkey")
+
+  status AvailabilityRequestStatus @default(PENDING)
+
+  /// Derived `providerId:productId` while PENDING, NULL once resolved. See the
+  /// model doc for the concurrency/deduplication invariant this provides.
+  activeDedupKey String? @unique @db.VarChar(80)
+
+  requestedAt DateTime
+  expiresAt   DateTime
+  respondedAt DateTime?
+
+  /// Optimistic-concurrency version: incremented on every transition so a
+  /// stale concurrent responder can never win twice.
+  version Int @default(1)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  confirmationEvidence ProviderProductAvailabilityEvidence[]
+
+  @@unique([id, tenantId], map: "AvailabilityRequest_id_tenantId_key")
+  @@unique([id, tenantId, providerId, productId], map: "AvailabilityRequest_id_tenant_provider_product_key")
+  @@index([tenantId, providerId, productId, status], map: "AvailabilityRequest_tenant_provider_product_status_idx")
+  @@index([tenantId, providerId, status, requestedAt, id], map: "AvailabilityRequest_tenant_provider_status_requested_idx")
+  @@index([tenantId, status, expiresAt], map: "AvailabilityRequest_tenant_status_expiresAt_idx")
+}
+
+/// Task 0026: append-only provider/product-level temporary evidence.
+///
+/// A pharmacist answering one availability request appends one row here. The
+/// row is provider/product-scoped (NOT batch-scoped), is never a Batch
+/// quantity, never changes Batch on-hand/held quantities, and never creates a
+/// StockMovement. Evidence is immutable: a correction appends newer evidence
+/// rather than rewriting history (enforced by a database trigger).
+///
+/// Validity is bounded and server-derived: AVAILABLE/UNAVAILABLE rows carry a
+/// `validUntil` (default 30 minutes); CHECK_LATER rows carry a bounded
+/// `retryAfterAt` and never claim current availability. Expired evidence must
+/// never continue to produce a current confirmation.
+model ProviderProductAvailabilityEvidence {
+  id String @id @default(uuid()) @db.Uuid
+
+  tenantId String @db.Uuid
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict, map: "ProviderProductAvailabilityEvidence_tenantId_fkey")
+
+  providerId String   @db.Uuid
+  provider   Provider @relation(fields: [providerId, tenantId], references: [id, tenantId], onDelete: Restrict, map: "ProviderProductAvailabilityEvidence_provider_scope_fkey")
+
+  productId String  @db.Uuid
+  product   Product @relation(fields: [productId], references: [id], onDelete: Restrict, map: "ProviderProductAvailabilityEvidence_productId_fkey")
+
+  availabilityRequestId String              @db.Uuid
+  availabilityRequest   AvailabilityRequest @relation(fields: [availabilityRequestId, tenantId, providerId, productId], references: [id, tenantId, providerId, productId], onDelete: Restrict, map: "ProviderProductAvailabilityEvidence_request_scope_fkey")
+
+  source  ProviderProductAvailabilityEvidenceSource
+  outcome PharmacistConfirmationOutcome
+
+  /// Server/database time of the confirmation, never client-supplied.
+  confirmedAt DateTime
+
+  /// AVAILABLE/UNAVAILABLE only: moment this live confirmation stops counting
+  /// as current. Server-derived from the accepted bounded policy.
+  validUntil DateTime?
+
+  /// CHECK_LATER only: bounded retry time after which the patient may ask
+  /// again. Server-derived from the accepted bounded retryAfterMinutes input.
+  retryAfterAt DateTime?
+
+  /// Task 0019 exact-user accountability: responder identity is always
+  /// derived from the authenticated session/membership chain, never from the
+  /// request body.
+  responderMembershipId String           @db.Uuid
+  responderMembership   TenantMembership @relation(fields: [responderMembershipId, responderUserId, tenantId], references: [id, userId, tenantId], onDelete: Restrict, map: "ProviderProductAvailabilityEvidence_responder_scope_fkey")
+  responderUserId       String           @db.Uuid
+  responderUser         User             @relation(fields: [responderUserId], references: [id], onDelete: Restrict, map: "ProviderProductAvailabilityEvidence_responderUserId_fkey")
+
+  /// Deterministic replay anchor: the same response retried with the same key
+  /// and content is a safe no-op; reuse with different content conflicts.
+  idempotencyKey String @db.VarChar(120)
+  commandHash    String @db.VarChar(64)
+
+  createdAt DateTime @default(now())
+
+  @@unique([tenantId, idempotencyKey], map: "ProviderProductAvailabilityEvidence_tenantId_idempotencyKey_key")
+  @@index([tenantId, providerId, productId, createdAt(sort: Desc), id(sort: Desc)], map: "ProviderProductEvidence_tenant_provider_product_created_idx")
+  @@index([availabilityRequestId], map: "ProviderProductEvidence_requestId_idx")
+  @@index([tenantId, validUntil, createdAt], map: "ProviderProductEvidence_tenant_validUntil_idx")
+  @@index([tenantId, retryAfterAt, createdAt], map: "ProviderProductEvidence_tenant_retryAfter_idx")
+  @@index([responderMembershipId, createdAt(sort: Desc)], map: "ProviderProductEvidence_responder_created_idx")
 }
 
 model InventoryTransfer {

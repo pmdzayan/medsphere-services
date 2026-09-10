@@ -110,7 +110,12 @@ function createMigrationProject() {
     .map((entry) => entry.name)
     .sort();
   for (const migrationName of migrationNames) {
-    if (migrationName === upgradeMigration || migrationName === auditCorrectionMigration) {
+    // This temporary project must model the migration history that existed
+    // immediately before Task 0021. Copying later migrations here makes the
+    // legacy-repair scenario depend on future tasks and can pre-apply a later
+    // AuditEvent allowlist before the deliberately broken 0021 migration is
+    // introduced.
+    if (migrationName >= upgradeMigration) {
       continue;
     }
     cpSync(join(sourceMigrations, migrationName), join(migrationsRoot, migrationName), {

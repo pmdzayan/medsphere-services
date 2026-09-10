@@ -1,5 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { LiveAvailabilityReconciliationService } from './live-availability-reconciliation.service';
+import type { PublicAvailabilityResolution } from './availability-request.types';
 import type { PublicNearbyMedicineSearchQueryDto } from './dto/public-nearby-medicine-search-query.dto';
 import type {
   PublicNearbyMedicineSearchResponseDto,
@@ -30,13 +32,15 @@ export function calculateDistanceKm(
 
 @Injectable()
 export class PublicNearbyMedicineSearchService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly reconciliation: LiveAvailabilityReconciliationService,
+  ) {}
 
   async search(
     query: PublicNearbyMedicineSearchQueryDto,
   ): Promise<PublicNearbyMedicineSearchResponseDto> {
     const term = query.q.trim();
-    const now = new Date();
 
     // Coarse database-side bounding box first; exact Haversine distance below
     // remains the authoritative radius check.
@@ -81,6 +85,7 @@ export class PublicNearbyMedicineSearchService {
         productId: true,
         provider: {
           select: {
+            tenantId: true,
             businessName: true,
             city: true,
             state: true,
@@ -124,64 +129,63 @@ export class PublicNearbyMedicineSearchService {
       };
     }
 
+    // Task 0026: availability per (provider, product) comes from the canonical
+    // trust/live reconciliation so stale or unknown evidence is never shown as
+    // confidently available. Group the paged rows by provider and resolve each
+    // provider's products in one scoped batch read.
     const paged = nearbyListings.slice(query.offset, query.offset + query.limit);
-
-    const availabilityRows = await this.prisma.client.batch.groupBy({
-      by: ['providerId', 'productId'],
-      where: {
-        OR: paged.map(({ listing }) => ({
-          providerId: listing.providerId,
-          productId: listing.productId,
-        })),
-        status: 'ACTIVE',
-        expiryDate: { gt: now },
-        deletedAt: null,
-        inventory: {
-          isVisible: true,
-          deletedAt: null,
-        },
-        product: {
-          isActive: true,
-          deletedAt: null,
-        },
-        provider: {
-          isActive: true,
-          isVerified: true,
-          deletedAt: null,
-        },
-      },
-      _sum: {
-        onHandQuantity: true,
-        heldQuantity: true,
-      },
-    });
-
-    const availability = new Map<string, number>();
-
-    for (const row of availabilityRows) {
-      const onHand = row._sum.onHandQuantity ?? 0;
-      const held = row._sum.heldQuantity ?? 0;
-      availability.set(`${row.providerId}:${row.productId}`, Math.max(0, onHand - held));
+    const byProvider = new Map<
+      string,
+      Array<{ listing: (typeof listings)[number]; distanceKm: number }>
+    >();
+    for (const { listing, distanceKm } of paged) {
+      const list = byProvider.get(listing.providerId) ?? [];
+      list.push({ listing, distanceKm });
+      byProvider.set(listing.providerId, list);
     }
 
-    const data: PublicNearbyMedicineSearchResultDto[] = paged.map(({ listing, distanceKm }) => ({
-      productId: listing.productId,
-      providerId: listing.providerId,
-      providerName: listing.provider.businessName,
-      providerCity: listing.provider.city,
-      providerState: listing.provider.state,
-      distanceKm: Math.round(distanceKm * 10) / 10,
-      name: listing.product.name,
-      genericName: listing.product.genericName,
-      brand: listing.product.brand,
-      strength: listing.product.strength,
-      dosageForm: listing.product.dosageForm,
-      requiresPrescription: listing.product.requiresPrescription,
-      availability:
-        (availability.get(`${listing.providerId}:${listing.productId}`) ?? 0) > 0
-          ? 'IN_STOCK'
-          : 'OUT_OF_STOCK',
-    }));
+    const resolutionByKey = new Map<string, PublicAvailabilityResolution>();
+    for (const [providerKey, rows] of byProvider) {
+      const tenantId = rows[0].listing.provider.tenantId;
+      const products = [...new Set(rows.map(({ listing }) => listing.productId))];
+      const resolutions = await this.reconciliation.resolveProviderProducts(
+        tenantId,
+        providerKey,
+        products,
+      );
+      for (const row of rows) {
+        const resolution = resolutions.get(row.listing.productId);
+        if (resolution) {
+          resolutionByKey.set(`${providerKey}:${row.listing.productId}`, resolution);
+        }
+      }
+    }
+
+    const data: PublicNearbyMedicineSearchResultDto[] = paged.map(({ listing, distanceKm }) => {
+      const resolution = resolutionByKey.get(`${listing.providerId}:${listing.productId}`);
+      return {
+        productId: listing.productId,
+        providerId: listing.providerId,
+        providerName: listing.provider.businessName,
+        providerCity: listing.provider.city,
+        providerState: listing.provider.state,
+        distanceKm: Math.round(distanceKm * 10) / 10,
+        name: listing.product.name,
+        genericName: listing.product.genericName,
+        brand: listing.product.brand,
+        strength: listing.product.strength,
+        dosageForm: listing.product.dosageForm,
+        requiresPrescription: listing.product.requiresPrescription,
+        availability: resolution?.availabilityState ?? 'UNKNOWN',
+        confirmationSource: resolution?.confirmationSource ?? null,
+        confirmedAt: resolution?.confirmedAt ?? null,
+        requestId: resolution?.requestId ?? null,
+        requestStatus: resolution?.requestStatus ?? 'NONE',
+        requestedAt: resolution?.requestedAt ?? null,
+        expiresAt: resolution?.expiresAt ?? null,
+        retryAfterAt: resolution?.retryAfterAt ?? null,
+      } as PublicNearbyMedicineSearchResultDto;
+    });
 
     return {
       data,

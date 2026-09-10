@@ -14,13 +14,16 @@ export const INVENTORY_DOMAIN_EVENT_TYPES = [
   'inventory.batch.quarantined',
   'inventory.stock.damaged',
   'inventory.stock.transferred',
+  'inventory.availability.request.created',
+  'inventory.availability.request.responded',
 ] as const;
 
 export type InventoryDomainEventType = (typeof INVENTORY_DOMAIN_EVENT_TYPES)[number];
 
 interface InventoryDomainEventInput {
   readonly eventType: InventoryDomainEventType;
-  readonly aggregateType: 'MedicineReservation' | 'Batch' | 'InventoryTransfer';
+  readonly aggregateType:
+    'MedicineReservation' | 'Batch' | 'InventoryTransfer' | 'AvailabilityRequest';
   readonly aggregateId: string;
   readonly occurredAt: Date;
   readonly payload: Prisma.InputJsonObject;
@@ -53,7 +56,11 @@ export class InventoryEventWriter {
   appendTenantSystem(
     database: OutboxDatabase,
     tenantId: string,
-    service: 'reservation-expiry-worker' | 'batch-expiry-worker' | 'inventory-quarantine-service',
+    service:
+      | 'reservation-expiry-worker'
+      | 'batch-expiry-worker'
+      | 'inventory-quarantine-service'
+      | 'public-live-availability',
     input: InventoryDomainEventInput,
   ): Promise<void> {
     return appendOutboxEvent(database, {

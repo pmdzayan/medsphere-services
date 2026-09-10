@@ -20,7 +20,14 @@ const searchResponse = {
       strength: '500 mg',
       dosageForm: 'TABLET',
       requiresPrescription: false,
-      availability: 'IN_STOCK',
+      availability: 'AVAILABLE',
+      confirmationSource: null,
+      confirmedAt: null,
+      requestId: null,
+      requestStatus: 'NONE',
+      requestedAt: null,
+      expiresAt: null,
+      retryAfterAt: null,
     },
   ],
   limit: 20,
@@ -72,8 +79,30 @@ describe('public medicine search BFF boundary', () => {
     expect(response.status).toBe(404);
   });
 
-  it('rejects an invalid upstream response shape', async () => {
+  it('rejects invalid, legacy, and over-broad upstream response shapes', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ unexpected: true })));
+    expect((await GET(request('q=paracetamol'), context)).status).toBe(502);
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        Response.json({
+          ...searchResponse,
+          data: [{ ...searchResponse.data[0], availability: 'IN_STOCK' }],
+        }),
+      ),
+    );
+    expect((await GET(request('q=paracetamol'), context)).status).toBe(502);
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        Response.json({
+          ...searchResponse,
+          data: [{ ...searchResponse.data[0], tenantId: providerId }],
+        }),
+      ),
+    );
     expect((await GET(request('q=paracetamol'), context)).status).toBe(502);
   });
 });

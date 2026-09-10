@@ -2,30 +2,36 @@ import { randomUUID } from 'node:crypto';
 import { NotFoundException } from '@nestjs/common';
 import { isInfrastructureTestEnabled, requireEnv } from '../auth/testing/infrastructure-test-gate';
 import { PrismaService } from '../prisma/prisma.service';
+import { AvailabilityTrustEvaluator } from './availability-trust.evaluator';
+import { LiveAvailabilityReconciliationService } from './live-availability-reconciliation.service';
 import { PublicMedicineSearchService } from './public-medicine-search.service';
 
 const infra = isInfrastructureTestEnabled() ? describe : describe.skip;
 if (isInfrastructureTestEnabled()) requireEnv('DATABASE_URL');
 
 /**
- * Batch 2 Task 2 -- patient-safe medicine search.
+ * Batch 2 Task 2 + Task 0026 -- patient-safe medicine search.
  *
  * Proves the response shape never leaks internal fields, availability is
- * genuinely derived from the same eligibility criteria
- * ReservationCreationService uses (not fabricated or looser), hidden
- * listings and inactive/unverified providers are concealed identically
- * (fail-closed, no distinguishing existence), and expired/quarantined
- * stock does not count as available.
+ * genuinely derived from the accepted Task 0025 batch evidence freshness (not
+ * fabricated or looser), hidden listings and inactive/unverified providers are
+ * concealed identically (fail-closed, no distinguishing existence), and
+ * stale/unknown evidence is never presented as confidently available.
  */
-infra('Batch 2 Task 2 public medicine search', () => {
+infra('Batch 2 Task 2 + Task 0026 public medicine search', () => {
   const prisma = new PrismaService();
-  const service = new PublicMedicineSearchService(prisma);
-
   const tenantId = randomUUID();
   const providerId = randomUUID();
   const hiddenProductId = randomUUID();
   const inStockProductId = randomUUID();
   const outOfStockProductId = randomUUID();
+  const inStockListingId = randomUUID();
+  const inStockBatchId = randomUUID();
+
+  const service = new PublicMedicineSearchService(
+    prisma,
+    new LiveAvailabilityReconciliationService(prisma, new AvailabilityTrustEvaluator()),
+  );
 
   beforeAll(async () => {
     await prisma.client.tenant.create({
@@ -99,7 +105,7 @@ infra('Batch 2 Task 2 public medicine search', () => {
           isVisible: false,
         },
         {
-          id: randomUUID(),
+          id: inStockListingId,
           tenantId,
           providerId,
           productId: inStockProductId,
@@ -124,13 +130,9 @@ infra('Batch 2 Task 2 public medicine search', () => {
     });
     await prisma.client.batch.create({
       data: {
-        id: randomUUID(),
+        id: inStockBatchId,
         tenantId,
-        inventoryId: (
-          await prisma.client.inventory.findFirstOrThrow({
-            where: { providerId, productId: inStockProductId },
-          })
-        ).id,
+        inventoryId: inStockListingId,
         providerId,
         productId: inStockProductId,
         batchNumber: `BATCH2-T2-${randomUUID()}`,
@@ -142,6 +144,23 @@ infra('Batch 2 Task 2 public medicine search', () => {
         sellingPrice: '25.00',
       },
     });
+    // Task 0025: a fresh AIM-managed observation is what makes stock
+    // trustworthy. With fresh evidence the in-stock product is AVAILABLE;
+    // without any observation the same batch would be UNKNOWN (never
+    // confidently available).
+    await prisma.client.batchStockObservation.create({
+      data: {
+        tenantId,
+        inventoryId: inStockListingId,
+        batchId: inStockBatchId,
+        providerId,
+        productId: inStockProductId,
+        source: 'AIM_MANAGED_INVENTORY',
+        observedOnHandQuantity: 20,
+        occurredAt: new Date(Date.now() - 60_000),
+        idempotencyKey: `b2t2-obs-${randomUUID()}`,
+      },
+    });
     // Out-of-stock product has an inventory listing but zero available
     // batches -- proving availability is computed from real batch data,
     // not merely from the existence of an inventory listing.
@@ -149,7 +168,7 @@ infra('Batch 2 Task 2 public medicine search', () => {
 
   afterAll(async () => prisma.client.$disconnect());
 
-  it('returns only privacy-safe fields and correct coarse availability', async () => {
+  it('returns only privacy-safe fields and trust-derived availability', async () => {
     const result = await service.search(providerId, { q: 'Batch2-T2', limit: 20, offset: 0 });
 
     expect(result.data).toHaveLength(2);
@@ -166,11 +185,15 @@ infra('Batch 2 Task 2 public medicine search', () => {
       strength: '500 mg',
       dosageForm: 'TABLET',
       requiresPrescription: false,
-      availability: 'IN_STOCK',
+      availability: 'AVAILABLE',
+      confirmationSource: null,
+      requestStatus: 'NONE',
     });
 
+    // The out-of-stock product has an inventory listing but zero batches, so
+    // the canonical evaluator yields UNKNOWN (never confidently available).
     const amoxicillin = result.data.find((item) => item.productId === outOfStockProductId);
-    expect(amoxicillin?.availability).toBe('OUT_OF_STOCK');
+    expect(amoxicillin?.availability).toBe('UNKNOWN');
 
     // Never present anywhere in the response: internal IDs, cost, staff
     // or owner identity, contact details.

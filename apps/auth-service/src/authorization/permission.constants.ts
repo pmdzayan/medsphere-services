@@ -21,6 +21,8 @@ export const PERMISSIONS = {
   inventoryReservationsRead: 'inventory.reservations.read',
   inventoryReservationsCreate: 'inventory.reservations.create',
   inventoryReservationsManage: 'inventory.reservations.manage',
+  inventoryAvailabilityRequestsRead: 'inventory.availability-requests.read',
+  inventoryAvailabilityRequestsManage: 'inventory.availability-requests.manage',
 } as const;
 
 export const PERMISSION_KEYS = Object.values(PERMISSIONS);

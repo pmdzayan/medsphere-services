@@ -922,7 +922,10 @@ async function main() {
     publicResult &&
     publicResult.name === 'Task5 Smoke Paracetamol' &&
     publicResult.providerId === providerAId &&
-    publicResult.availability === 'IN_STOCK' &&
+    publicResult.availability === 'AVAILABLE' &&
+    publicResult.confirmationSource === null &&
+    publicResult.requestId === null &&
+    publicResult.requestStatus === 'NONE' &&
     !('inventoryId' in publicResult) &&
     !('purchasePrice' in publicResult) &&
     !('sellingPrice' in publicResult) &&
