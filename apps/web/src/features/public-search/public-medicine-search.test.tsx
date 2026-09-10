@@ -68,7 +68,14 @@ const inStockResult: PublicMedicineSearchResult = {
   strength: '500 mg',
   dosageForm: 'TABLET',
   requiresPrescription: false,
-  availability: 'IN_STOCK',
+  availability: 'AVAILABLE',
+  confirmationSource: null,
+  confirmedAt: null,
+  requestId: null,
+  requestStatus: 'NONE',
+  requestedAt: null,
+  expiresAt: null,
+  retryAfterAt: null,
 };
 
 beforeEach(() => {
@@ -115,7 +122,7 @@ describe('PublicMedicineSearch', () => {
       data: [
         {
           ...inStockResult,
-          availability: 'OUT_OF_STOCK',
+          availability: 'UNAVAILABLE',
           requiresPrescription: true,
         },
       ],
@@ -129,6 +136,26 @@ describe('PublicMedicineSearch', () => {
     expect(await screen.findByText('Out of stock')).toBeVisible();
     expect(screen.getByText('Prescription required')).toBeVisible();
   });
+
+  it.each([
+    ['CONFIRMATION_REQUIRED', 'Confirm with pharmacy'],
+    ['UNKNOWN', 'Availability unknown'],
+  ] as const)(
+    'renders Task 0026 availability state %s without claiming stock',
+    async (availability, label) => {
+      vi.mocked(searchPublicMedicine).mockResolvedValue({
+        data: [{ ...inStockResult, availability }],
+        limit: 20,
+        offset: 0,
+      });
+      renderSearch();
+
+      fillAndSubmit('paracetamol');
+
+      expect(await screen.findByText(label)).toBeVisible();
+      expect(screen.queryByText('In stock')).not.toBeInTheDocument();
+    },
+  );
 
   it('shows an empty state with no fabricated results', async () => {
     vi.mocked(searchPublicMedicine).mockResolvedValue({ data: [], limit: 20, offset: 0 });

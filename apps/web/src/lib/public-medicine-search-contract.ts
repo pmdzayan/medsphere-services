@@ -1,4 +1,7 @@
-export type PublicAvailabilityState = 'IN_STOCK' | 'OUT_OF_STOCK';
+export type PublicAvailabilityState =
+  'AVAILABLE' | 'UNAVAILABLE' | 'CONFIRMATION_REQUIRED' | 'UNKNOWN';
+
+export type PublicAvailabilityRequestStatus = 'NONE' | 'PENDING' | 'RESPONDED' | 'EXPIRED';
 
 export interface PublicMedicineSearchResult {
   readonly productId: string;
@@ -13,6 +16,13 @@ export interface PublicMedicineSearchResult {
   readonly dosageForm: string;
   readonly requiresPrescription: boolean;
   readonly availability: PublicAvailabilityState;
+  readonly confirmationSource: 'PHARMACY_CONFIRMED' | null;
+  readonly confirmedAt: string | null;
+  readonly requestId: string | null;
+  readonly requestStatus: PublicAvailabilityRequestStatus;
+  readonly requestedAt: string | null;
+  readonly expiresAt: string | null;
+  readonly retryAfterAt: string | null;
 }
 
 export interface PublicMedicineSearchResponse {
@@ -23,12 +33,55 @@ export interface PublicMedicineSearchResponse {
 
 const uuidV4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 
+const publicResultKeys = [
+  'productId',
+  'providerId',
+  'providerName',
+  'providerCity',
+  'providerState',
+  'name',
+  'genericName',
+  'brand',
+  'strength',
+  'dosageForm',
+  'requiresPrescription',
+  'availability',
+  'confirmationSource',
+  'confirmedAt',
+  'requestId',
+  'requestStatus',
+  'requestedAt',
+  'expiresAt',
+  'retryAfterAt',
+] as const;
+
 function isCanonicalUuid(value: unknown): value is string {
   return typeof value === 'string' && uuidV4.test(value);
 }
 
-function isPublicMedicineSearchResult(value: unknown): value is PublicMedicineSearchResult {
-  if (typeof value !== 'object' || value === null) return false;
+function hasExactKeys(
+  value: unknown,
+  expected: readonly string[],
+): value is Record<string, unknown> {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
+  const actual = Object.keys(value).sort();
+  const sortedExpected = [...expected].sort();
+  return (
+    actual.length === sortedExpected.length &&
+    actual.every((key, index) => key === sortedExpected[index])
+  );
+}
+
+function isNullableIsoDateTime(value: unknown): value is string | null {
+  if (value === null) return true;
+  if (typeof value !== 'string') return false;
+  const parsed = new Date(value);
+  return !Number.isNaN(parsed.getTime()) && parsed.toISOString() === value;
+}
+
+function hasPublicMedicineSearchFields(
+  value: Record<string, unknown>,
+): value is Record<string, unknown> & PublicMedicineSearchResult {
   const result = value as Partial<PublicMedicineSearchResult>;
   return (
     isCanonicalUuid(result.productId) &&
@@ -42,15 +95,28 @@ function isPublicMedicineSearchResult(value: unknown): value is PublicMedicineSe
     typeof result.strength === 'string' &&
     typeof result.dosageForm === 'string' &&
     typeof result.requiresPrescription === 'boolean' &&
-    (result.availability === 'IN_STOCK' || result.availability === 'OUT_OF_STOCK')
+    ['AVAILABLE', 'UNAVAILABLE', 'CONFIRMATION_REQUIRED', 'UNKNOWN'].includes(
+      String(result.availability),
+    ) &&
+    (result.confirmationSource === null || result.confirmationSource === 'PHARMACY_CONFIRMED') &&
+    isNullableIsoDateTime(result.confirmedAt) &&
+    (result.requestId === null || isCanonicalUuid(result.requestId)) &&
+    ['NONE', 'PENDING', 'RESPONDED', 'EXPIRED'].includes(String(result.requestStatus)) &&
+    isNullableIsoDateTime(result.requestedAt) &&
+    isNullableIsoDateTime(result.expiresAt) &&
+    isNullableIsoDateTime(result.retryAfterAt)
   );
+}
+
+function isPublicMedicineSearchResult(value: unknown): value is PublicMedicineSearchResult {
+  return hasExactKeys(value, publicResultKeys) && hasPublicMedicineSearchFields(value);
 }
 
 export function isPublicMedicineSearchResponse(
   value: unknown,
 ): value is PublicMedicineSearchResponse {
-  if (typeof value !== 'object' || value === null) return false;
-  const page = value as Partial<PublicMedicineSearchResponse>;
+  if (!hasExactKeys(value, ['data', 'limit', 'offset'])) return false;
+  const page = value as unknown as Partial<PublicMedicineSearchResponse>;
   return (
     Array.isArray(page.data) &&
     page.data.every(isPublicMedicineSearchResult) &&
@@ -82,12 +148,10 @@ export interface PublicNearbyMedicineSearchRequest {
 function isPublicNearbyMedicineSearchResult(
   value: unknown,
 ): value is PublicNearbyMedicineSearchResult {
-  if (!isPublicMedicineSearchResult(value)) return false;
+  if (!hasExactKeys(value, [...publicResultKeys, 'distanceKm'])) return false;
+  if (!hasPublicMedicineSearchFields(value)) return false;
 
-  const result = value as PublicMedicineSearchResult & {
-    distanceKm?: unknown;
-  };
-
+  const result = value as unknown as PublicNearbyMedicineSearchResult;
   return (
     typeof result.distanceKm === 'number' &&
     Number.isFinite(result.distanceKm) &&
@@ -98,8 +162,8 @@ function isPublicNearbyMedicineSearchResult(
 export function isPublicNearbyMedicineSearchResponse(
   value: unknown,
 ): value is PublicNearbyMedicineSearchResponse {
-  if (typeof value !== 'object' || value === null) return false;
-  const page = value as Partial<PublicNearbyMedicineSearchResponse>;
+  if (!hasExactKeys(value, ['data', 'limit', 'offset', 'radiusKm'])) return false;
+  const page = value as unknown as Partial<PublicNearbyMedicineSearchResponse>;
 
   return (
     Array.isArray(page.data) &&

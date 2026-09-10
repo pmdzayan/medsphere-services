@@ -181,8 +181,22 @@ export function PublicMedicineSearch({ providerId }: { providerId: string }) {
                     </div>
 
                     <div className="flex shrink-0 flex-col items-end gap-2">
-                      <Badge tone={result.availability === 'IN_STOCK' ? 'emerald' : 'slate'}>
-                        {result.availability === 'IN_STOCK' ? copy.inStock : copy.outOfStock}
+                      <Badge
+                        tone={
+                          result.availability === 'AVAILABLE'
+                            ? 'emerald'
+                            : result.availability === 'CONFIRMATION_REQUIRED'
+                              ? 'amber'
+                              : 'slate'
+                        }
+                      >
+                        {result.availability === 'AVAILABLE'
+                          ? copy.inStock
+                          : result.availability === 'UNAVAILABLE'
+                            ? copy.outOfStock
+                            : result.availability === 'CONFIRMATION_REQUIRED'
+                              ? t('publicSearch.confirmationRequired')
+                              : t('publicSearch.availabilityUnknown')}
                       </Badge>
 
                       {result.requiresPrescription ? (

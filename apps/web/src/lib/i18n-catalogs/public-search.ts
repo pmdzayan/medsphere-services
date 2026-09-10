@@ -7,6 +7,8 @@ export const publicSearchEnglishMessages = {
   'publicSearch.findingNearby': 'Finding nearby pharmacies…',
   'publicSearch.findNearMe': 'Find near me',
   'publicSearch.distanceAway': '{distance} away',
+  'publicSearch.confirmationRequired': 'Confirm with pharmacy',
+  'publicSearch.availabilityUnknown': 'Availability unknown',
 } as const;
 
 export type PublicSearchTranslationKey = keyof typeof publicSearchEnglishMessages;
@@ -20,6 +22,8 @@ export const publicSearchTamilMessages: Record<PublicSearchTranslationKey, strin
   'publicSearch.findingNearby': 'அருகிலுள்ள மருந்தகங்கள் கண்டறியப்படுகின்றன…',
   'publicSearch.findNearMe': 'எனக்கு அருகில் தேடு',
   'publicSearch.distanceAway': '{distance} தொலைவில்',
+  'publicSearch.confirmationRequired': 'மருந்தகத்துடன் உறுதிப்படுத்தவும்',
+  'publicSearch.availabilityUnknown': 'கிடைப்புத் தகவல் தெரியவில்லை',
 };
 
 export const publicSearchUrduMessages: Record<PublicSearchTranslationKey, string> = {
@@ -31,4 +35,6 @@ export const publicSearchUrduMessages: Record<PublicSearchTranslationKey, string
   'publicSearch.findingNearby': 'قریبی فارمیسیاں تلاش ہو رہی ہیں…',
   'publicSearch.findNearMe': 'میرے قریب تلاش کریں',
   'publicSearch.distanceAway': '{distance} دور',
+  'publicSearch.confirmationRequired': 'فارمیسی سے تصدیق کریں',
+  'publicSearch.availabilityUnknown': 'دستیابی معلوم نہیں',
 };
