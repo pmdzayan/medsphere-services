@@ -63,6 +63,7 @@ export const AUDIT_EVENT_TYPES = [
   'inventory.reservation.cancelled',
   'inventory.reservation.expired',
   'inventory.availability-request.responded',
+  'inventory.availability-request.preference.configured',
 ] as const;
 
 export type AuditEventType = (typeof AUDIT_EVENT_TYPES)[number];
@@ -151,6 +152,12 @@ export const AUDIT_METADATA_KEYS = {
   'inventory.reservation.cancelled': ['previousStatus', 'version', 'totalQuantity', 'cause'],
   'inventory.reservation.expired': ['previousStatus', 'version', 'totalQuantity', 'cause'],
   'inventory.availability-request.responded': ['outcome'],
+  'inventory.availability-request.preference.configured': [
+    'liveRequestsEnabled',
+    'timezone',
+    'quietHoursStartMinute',
+    'quietHoursEndMinute',
+  ],
 } as const satisfies Record<AuditEventType, readonly string[]>;
 
 const AUDIT_EVENT_TYPE_SET = new Set<string>(AUDIT_EVENT_TYPES);

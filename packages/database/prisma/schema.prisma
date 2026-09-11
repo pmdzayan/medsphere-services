@@ -325,33 +325,34 @@ model Tenant {
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
-  memberships                         TenantMembership[]
-  sessions                            UserSession[]
-  membershipProviderAccess            MembershipProviderAccess[]
-  roles                               Role[]
-  auditEvents                         AuditEvent[]
-  providerVerifications               ProviderVerification[]
-  providers                           Provider[]
-  inventory                           Inventory[]
-  batches                             Batch[]
-  stockMovements                      StockMovement[]
-  inventoryConfigurationCommands      InventoryConfigurationCommand[]
-  medicineReservations                MedicineReservation[]
-  reservationItems                    MedicineReservationItem[]
-  reservationAllocations              MedicineReservationAllocation[]
-  reservationCommands                 MedicineReservationCommand[]
-  inventoryTransfers                  InventoryTransfer[]
-  batchExpiryRecords                  BatchExpiryRecord[]
-  batchQuarantineRecords              BatchQuarantineRecord[]
-  outboxEvents                        OutboxEvent[]
-  eventInboxReceipts                  EventInboxReceipt[]
-  notificationDeliveries              NotificationDelivery[]
-  notificationDeliveryAttempts        NotificationDeliveryAttempt[]
-  phoneOtpChallenges                  PhoneOtpChallenge[]
-  organizationJoinCodes               OrganizationJoinCode[]
-  batchStockObservations              BatchStockObservation[]
-  availabilityRequests                AvailabilityRequest[]
-  providerProductAvailabilityEvidence ProviderProductAvailabilityEvidence[]
+  memberships                            TenantMembership[]
+  sessions                               UserSession[]
+  membershipProviderAccess               MembershipProviderAccess[]
+  roles                                  Role[]
+  auditEvents                            AuditEvent[]
+  providerVerifications                  ProviderVerification[]
+  providers                              Provider[]
+  inventory                              Inventory[]
+  batches                                Batch[]
+  stockMovements                         StockMovement[]
+  inventoryConfigurationCommands         InventoryConfigurationCommand[]
+  medicineReservations                   MedicineReservation[]
+  reservationItems                       MedicineReservationItem[]
+  reservationAllocations                 MedicineReservationAllocation[]
+  reservationCommands                    MedicineReservationCommand[]
+  inventoryTransfers                     InventoryTransfer[]
+  batchExpiryRecords                     BatchExpiryRecord[]
+  batchQuarantineRecords                 BatchQuarantineRecord[]
+  outboxEvents                           OutboxEvent[]
+  eventInboxReceipts                     EventInboxReceipt[]
+  notificationDeliveries                 NotificationDelivery[]
+  notificationDeliveryAttempts           NotificationDeliveryAttempt[]
+  phoneOtpChallenges                     PhoneOtpChallenge[]
+  organizationJoinCodes                  OrganizationJoinCode[]
+  batchStockObservations                 BatchStockObservation[]
+  availabilityRequests                   AvailabilityRequest[]
+  providerProductAvailabilityEvidence    ProviderProductAvailabilityEvidence[]
+  pharmacyAvailabilityRequestPreferences PharmacyAvailabilityRequestPreference[]
 
   @@index([slug])
 }
@@ -1088,13 +1089,14 @@ model Provider {
   reservationItems                    MedicineReservationItem[]
   reservationAllocations              MedicineReservationAllocation[]
   membershipAccesses                  MembershipProviderAccess[]
-  sourceInventoryTransfers            InventoryTransfer[]                   @relation("InventoryTransferSourceProvider")
-  destinationInventoryTransfers       InventoryTransfer[]                   @relation("InventoryTransferDestinationProvider")
+  sourceInventoryTransfers            InventoryTransfer[]                    @relation("InventoryTransferSourceProvider")
+  destinationInventoryTransfers       InventoryTransfer[]                    @relation("InventoryTransferDestinationProvider")
   batchExpiryRecords                  BatchExpiryRecord[]
   batchQuarantineRecords              BatchQuarantineRecord[]
   batchStockObservations              BatchStockObservation[]
   availabilityRequests                AvailabilityRequest[]
   providerProductAvailabilityEvidence ProviderProductAvailabilityEvidence[]
+  availabilityRequestPreference       PharmacyAvailabilityRequestPreference?
 
   version Int @default(1)
 
@@ -1546,6 +1548,32 @@ model ProviderProductAvailabilityEvidence {
   @@index([tenantId, validUntil, createdAt], map: "ProviderProductEvidence_tenant_validUntil_idx")
   @@index([tenantId, retryAfterAt, createdAt], map: "ProviderProductEvidence_tenant_retryAfter_idx")
   @@index([responderMembershipId, createdAt(sort: Desc)], map: "ProviderProductEvidence_responder_created_idx")
+}
+
+/// Task 0027: pharmacy-controlled live-availability request preferences.
+///
+/// Live requests are opt-in. A newly created preference row defaults to
+/// disabled, and the application treats a missing row as disabled as well.
+/// Timezone is server-persisted pharmacy configuration used only to evaluate
+/// quiet hours; it is never supplied by the public requester.
+model PharmacyAvailabilityRequestPreference {
+  providerId String @id @db.Uuid
+  tenantId   String @db.Uuid
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Restrict, map: "PharmacyAvailabilityRequestPreference_tenantId_fkey")
+  provider Provider @relation(fields: [providerId, tenantId], references: [id, tenantId], onDelete: Restrict, map: "PharmacyAvailabilityRequestPreference_provider_scope_fkey")
+
+  liveRequestsEnabled Boolean @default(false)
+  timezone            String  @db.VarChar(64)
+
+  quietHoursStartMinute Int?
+  quietHoursEndMinute   Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([providerId, tenantId], map: "PharmacyAvailabilityRequestPreference_provider_tenant_key")
+  @@index([tenantId], map: "PharmacyAvailabilityRequestPreference_tenantId_idx")
 }
 
 model InventoryTransfer {

@@ -27,10 +27,12 @@ import {
   Prisma,
   SerializableRetryError,
   hasPrismaCode,
+  isSerializableConflict,
   withSerializableRetry,
   type AuditRequestContext,
 } from '@medsphere/database';
 import { appMetrics } from '@medsphere/common';
+import { evaluatePharmacyLiveRequestPreference } from '../availability-requests/pharmacy-live-request.policy';
 import { AuditWriter } from '../audit/audit-writer.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { assertTrustedProviderAccess } from './inventory-access';
@@ -59,6 +61,22 @@ const PUBLIC_NOT_FOUND = 'Provider or product not found.';
 const REQUEST_SERIALIZABLE_ATTEMPTS = 10;
 const MINUTE_MS = 60_000;
 const MAX_QUEUE_LIMIT = 50;
+
+/**
+ * Task 0027 conservative V1 safety ceiling.
+ *
+ * This is a protection limit, not a pharmacy throughput target.
+ */
+const MAX_CONCURRENT_PENDING_REQUESTS_PER_PROVIDER = 15;
+
+/**
+ * Task 0027 conservative V1 rolling-hour safety ceiling.
+ *
+ * Counts only durably-created AvailabilityRequest rows. Existing PENDING
+ * reuse and suppressed or rolled-back creation attempts consume no
+ * additional hourly capacity.
+ */
+const MAX_CREATED_REQUESTS_PER_PROVIDER_PER_HOUR = 20;
 
 export interface CreateAvailabilityRequestOutcome {
   readonly requestId: string | null;
@@ -211,6 +229,94 @@ export class AvailabilityRequestService {
             data: { status: 'EXPIRED', activeDedupKey: null, version: { increment: 1 } },
           });
 
+          // Task 0027: serialize every NEW provider-scoped admission decision.
+          //
+          // Existing same-product PENDING reuse intentionally happens before
+          // this lock. Once a new request is required, the same provider lock
+          // orders mutable preference configuration, pharmacy-wide capacity
+          // checks, rolling-hour admission, and request creation.
+          await transaction.$queryRaw<Array<{ locked: number }>>`
+            SELECT 1::int AS "locked"
+            FROM pg_advisory_xact_lock(
+              hashtext(${tenantId}::text),
+              hashtext(${providerId}::text)
+            )
+          `;
+
+          // The advisory lock serializes provider operations, while this row lock
+          // makes concurrent preference mutation visible to PostgreSQL's
+          // SERIALIZABLE conflict detection. If configuration changed after this
+          // transaction took its snapshot, the transaction is retried rather
+          // than admitting a request against stale preference state.
+          await transaction.$queryRaw<Array<{ providerId: string }>>`
+            SELECT "providerId"
+            FROM "PharmacyAvailabilityRequestPreference"
+            WHERE "providerId" = ${providerId}::uuid
+              AND "tenantId" = ${tenantId}::uuid
+            FOR UPDATE
+          `;
+
+          const preference = await transaction.pharmacyAvailabilityRequestPreference.findUnique({
+            where: { providerId },
+            select: {
+              liveRequestsEnabled: true,
+              timezone: true,
+              quietHoursStartMinute: true,
+              quietHoursEndMinute: true,
+            },
+          });
+
+          const admission = evaluatePharmacyLiveRequestPreference(preference, now);
+          if (!admission.allowed) {
+            return {
+              requestId: null,
+              created: false,
+              reused: false,
+            };
+          }
+
+          const activeCountForProvider = await transaction.availabilityRequest.count({
+            where: {
+              tenantId,
+              providerId,
+              status: 'PENDING',
+              expiresAt: { gt: now },
+            },
+          });
+
+          if (activeCountForProvider >= MAX_CONCURRENT_PENDING_REQUESTS_PER_PROVIDER) {
+            return {
+              requestId: null,
+              created: false,
+              reused: false,
+            };
+          }
+
+          // Task 0027: the same provider advisory lock also serializes this
+          // rolling-hour count-and-create decision across different products.
+          //
+          // Count every request that actually committed in the previous hour,
+          // regardless of whether it has since been responded to or expired.
+          // An existing PENDING request was already returned above and therefore
+          // consumes no second hourly slot.
+          const hourlyWindowStart = new Date(now.getTime() - 60 * MINUTE_MS);
+
+          const createdDuringRollingHour = await transaction.availabilityRequest.count({
+            where: {
+              tenantId,
+              providerId,
+              requestedAt: { gt: hourlyWindowStart },
+            },
+          });
+
+          if (createdDuringRollingHour >= MAX_CREATED_REQUESTS_PER_PROVIDER_PER_HOUR) {
+            return {
+              requestId: null,
+              created: false,
+              reused: false,
+            };
+          }
+
           const requestId = randomUUID();
           const requestedAt = now;
           const expiresAt = new Date(now.getTime() + requestPolicy.requestLifetimeMs);
@@ -299,7 +405,7 @@ export class AvailabilityRequestService {
         }
       }
 
-      if (hasPrismaCode(error, 'P2034')) {
+      if (isSerializableConflict(error)) {
         throw new ConflictException('Concurrent availability request creation detected');
       }
 

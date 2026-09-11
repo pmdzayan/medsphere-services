@@ -29,6 +29,28 @@ export function hasPrismaCode(error: unknown, code: string): boolean {
   );
 }
 
+function hasPrismaMetaCode(error: unknown, code: string): boolean {
+  if (typeof error !== 'object' || error === null || !('meta' in error)) {
+    return false;
+  }
+
+  const meta = (error as { meta?: unknown }).meta;
+
+  return (
+    typeof meta === 'object' &&
+    meta !== null &&
+    'code' in meta &&
+    (meta as { code?: unknown }).code === code
+  );
+}
+
+export function isSerializableConflict(error: unknown): boolean {
+  return (
+    hasPrismaCode(error, 'P2034') ||
+    (hasPrismaCode(error, 'P2010') && hasPrismaMetaCode(error, '40001'))
+  );
+}
+
 async function waitBeforeSerializableRetry(attempt: number): Promise<void> {
   const exponentialDelay = Math.min(
     BASE_SERIALIZABLE_BACKOFF_MS * 2 ** (attempt - 1),
@@ -55,7 +77,7 @@ export async function withSerializableRetry<T>(
     try {
       return await client.$transaction(operation, { isolationLevel: 'Serializable' });
     } catch (error) {
-      if (!hasPrismaCode(error, 'P2034') || attempt === maximumAttempts) {
+      if (!isSerializableConflict(error) || attempt === maximumAttempts) {
         throw error;
       }
 
