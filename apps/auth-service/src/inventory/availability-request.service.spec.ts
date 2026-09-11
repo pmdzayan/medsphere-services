@@ -51,6 +51,22 @@ function publicPrerequisites() {
   };
 }
 
+const ENABLED_LIVE_REQUEST_PREFERENCE = {
+  liveRequestsEnabled: true,
+  timezone: 'UTC',
+  quietHoursStartMinute: null,
+  quietHoursEndMinute: null,
+} as const;
+
+function enabledPreferenceRepository() {
+  return {
+    pharmacyAvailabilityRequestPreference: {
+      findUnique: jest.fn().mockResolvedValue(ENABLED_LIVE_REQUEST_PREFERENCE),
+    },
+    $queryRaw: jest.fn().mockResolvedValue([{ pg_advisory_xact_lock: null }]),
+  };
+}
+
 beforeEach(() => {
   jest.clearAllMocks();
   accessMock.mockResolvedValue(undefined);
@@ -60,8 +76,10 @@ describe('AvailabilityRequestService - Task 0026 CTO coverage correction', () =>
   it('creates a minimal PENDING request and reconciles only after the transaction commits', async () => {
     let inTransaction = false;
     const transaction = {
+      ...enabledPreferenceRepository(),
       availabilityRequest: {
         findFirst: jest.fn().mockResolvedValue(null),
+        count: jest.fn().mockResolvedValue(0),
         updateMany: jest.fn().mockResolvedValue({ count: 0 }),
         create: jest.fn().mockResolvedValue({ id: 'created' }),
       },
@@ -166,8 +184,10 @@ describe('AvailabilityRequestService - Task 0026 CTO coverage correction', () =>
   it('recovers a P2002 dedupe race only after rollback through the root Prisma client', async () => {
     const p2002 = Object.assign(new Error('unique constraint'), { code: 'P2002' });
     const transaction = {
+      ...enabledPreferenceRepository(),
       availabilityRequest: {
         findFirst: jest.fn().mockResolvedValueOnce(null),
+        count: jest.fn().mockResolvedValue(0),
         updateMany: jest.fn().mockResolvedValue({ count: 0 }),
         create: jest.fn().mockRejectedValue(p2002),
       },
@@ -219,10 +239,57 @@ describe('AvailabilityRequestService - Task 0026 CTO coverage correction', () =>
     expect(rootFindFirst).toHaveBeenCalledTimes(1);
   });
 
+  it('maps an exhausted raw PostgreSQL serialization conflict to the existing conflict contract', async () => {
+    const rawSerializationConflict = Object.assign(
+      new Error('could not serialize access due to concurrent update'),
+      {
+        code: 'P2010',
+        meta: {
+          code: '40001',
+          message: 'could not serialize access due to concurrent update',
+        },
+      },
+    );
+
+    const prerequisites = publicPrerequisites();
+
+    const client = {
+      ...prerequisites,
+      availabilityRequest: {
+        findFirst: jest.fn(),
+      },
+      $transaction: jest.fn().mockRejectedValue(rawSerializationConflict),
+    };
+
+    const reconciliation = {
+      findCurrentEvidence: jest.fn().mockResolvedValue(null),
+      isValidLiveState: jest.fn(),
+      resolveProviderProduct: jest.fn().mockResolvedValue(UNKNOWN_RESOLUTION),
+    };
+
+    const service = new AvailabilityRequestService(
+      { client } as never,
+      { appendTenantUser: jest.fn() } as never,
+      { appendTenantSystem: jest.fn(), appendTenantUser: jest.fn() } as never,
+      reconciliation as never,
+    );
+
+    await expect(
+      service.createPublicRequest('provider-a', 'product-a', {
+        now: NOW,
+        requestPolicy: REQUEST_POLICY,
+        freshnessPolicy: FRESHNESS_POLICY,
+      }),
+    ).rejects.toBeInstanceOf(ConflictException);
+
+    expect(client.$transaction).toHaveBeenCalledTimes(10);
+  });
   it('server-derives tenant from the eligible provider instead of accepting patient context', async () => {
     const transaction = {
+      ...enabledPreferenceRepository(),
       availabilityRequest: {
         findFirst: jest.fn().mockResolvedValue(null),
+        count: jest.fn().mockResolvedValue(0),
         updateMany: jest.fn().mockResolvedValue({ count: 0 }),
         create: jest.fn().mockResolvedValue({ id: 'created' }),
       },

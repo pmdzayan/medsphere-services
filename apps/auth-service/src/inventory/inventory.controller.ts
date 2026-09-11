@@ -74,6 +74,11 @@ import {
   RespondAvailabilityRequestDto,
 } from './dto/availability-request-response.dto';
 import { AvailabilityRequestService } from './availability-request.service';
+import { AvailabilityRequestPreferenceService } from './availability-request-preference.service';
+import {
+  AvailabilityRequestPreferenceResponseDto,
+  ConfigureAvailabilityRequestPreferenceDto,
+} from './dto/availability-request-preference.dto';
 
 @Controller('inventory')
 @ApiTags('Inventory')
@@ -91,6 +96,7 @@ export class InventoryController {
     private readonly inventoryQuarantine: InventoryQuarantineService,
     private readonly reservationCreation: ReservationCreationService,
     private readonly availabilityRequests: AvailabilityRequestService,
+    private readonly availabilityRequestPreferences: AvailabilityRequestPreferenceService,
   ) {}
 
   @Post('providers/:providerId/reservations')
@@ -295,6 +301,47 @@ export class InventoryController {
     @Query() query: AvailabilityRequestQueueQueryDto,
   ) {
     return this.availabilityRequests.listProviderQueue(identity, providerId, query);
+  }
+
+  @Get('providers/:providerId/availability-request-preference')
+  @Header('Cache-Control', 'private, no-store')
+  @RequirePermissions(PERMISSIONS.inventoryAvailabilityRequestsConfigure)
+  @ApiOperation({
+    summary: 'Read live availability request participation settings for an assigned pharmacy',
+  })
+  @ApiOkResponse({ type: AvailabilityRequestPreferenceResponseDto })
+  @ApiNotFoundResponse({ description: 'Assigned pharmacy provider not found' })
+  getAvailabilityRequestPreference(
+    @CurrentIdentity() identity: AuthenticatedIdentity,
+    @Param('providerId', new ParseUUIDPipe({ version: '4' })) providerId: string,
+  ) {
+    return this.availabilityRequestPreferences.get(identity, providerId);
+  }
+
+  @Put('providers/:providerId/availability-request-preference')
+  @HttpCode(HttpStatus.OK)
+  @Header('Cache-Control', 'private, no-store')
+  @RequirePermissions(PERMISSIONS.inventoryAvailabilityRequestsConfigure)
+  @ApiOperation({
+    summary: 'Configure live availability request participation for an assigned pharmacy',
+  })
+  @ApiOkResponse({ type: AvailabilityRequestPreferenceResponseDto })
+  @ApiNotFoundResponse({ description: 'Assigned pharmacy provider not found' })
+  configureAvailabilityRequestPreference(
+    @CurrentIdentity() identity: AuthenticatedIdentity,
+    @Param('providerId', new ParseUUIDPipe({ version: '4' })) providerId: string,
+    @Body() dto: ConfigureAvailabilityRequestPreferenceDto,
+    @Req() request: MetadataHttpRequest,
+  ) {
+    return this.availabilityRequestPreferences.configure({
+      actor: identity,
+      providerId,
+      liveRequestsEnabled: dto.liveRequestsEnabled,
+      timezone: dto.timezone,
+      quietHoursStartMinute: dto.quietHoursStartMinute ?? null,
+      quietHoursEndMinute: dto.quietHoursEndMinute ?? null,
+      request: extractRequestMetadata(request),
+    });
   }
 
   @Post('providers/:providerId/availability-requests/:requestId/responses')
