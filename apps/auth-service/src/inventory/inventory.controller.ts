@@ -75,6 +75,11 @@ import {
 } from './dto/availability-request-response.dto';
 import { AvailabilityRequestService } from './availability-request.service';
 import { AvailabilityRequestPreferenceService } from './availability-request-preference.service';
+import { AvailabilityRequestDemandAnalyticsService } from './availability-request-demand.service';
+import {
+  AvailabilityRequestDemandQueryDto,
+  AvailabilityRequestDemandResponseDto,
+} from './dto/availability-request-demand-query.dto';
 import {
   AvailabilityRequestPreferenceResponseDto,
   ConfigureAvailabilityRequestPreferenceDto,
@@ -97,6 +102,7 @@ export class InventoryController {
     private readonly reservationCreation: ReservationCreationService,
     private readonly availabilityRequests: AvailabilityRequestService,
     private readonly availabilityRequestPreferences: AvailabilityRequestPreferenceService,
+    private readonly availabilityRequestDemand: AvailabilityRequestDemandAnalyticsService,
   ) {}
 
   @Post('providers/:providerId/reservations')
@@ -301,6 +307,23 @@ export class InventoryController {
     @Query() query: AvailabilityRequestQueueQueryDto,
   ) {
     return this.availabilityRequests.listProviderQueue(identity, providerId, query);
+  }
+
+  @Get('providers/:providerId/availability-request-demand')
+  @Header('Cache-Control', 'private, no-store')
+  @RequirePermissions(PERMISSIONS.inventoryAvailabilityRequestsRead)
+  @ApiOperation({
+    summary:
+      'Read privacy-safe live availability request demand analytics for an assigned pharmacy',
+  })
+  @ApiOkResponse({ type: AvailabilityRequestDemandResponseDto })
+  @ApiNotFoundResponse({ description: 'Assigned pharmacy provider not found' })
+  readAvailabilityRequestDemand(
+    @CurrentIdentity() identity: AuthenticatedIdentity,
+    @Param('providerId', new ParseUUIDPipe({ version: '4' })) providerId: string,
+    @Query() query: AvailabilityRequestDemandQueryDto,
+  ) {
+    return this.availabilityRequestDemand.readDemand(identity, providerId, query);
   }
 
   @Get('providers/:providerId/availability-request-preference')

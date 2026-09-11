@@ -20,6 +20,7 @@ import { AvailabilityEvidenceService } from './availability-evidence.service';
 import { AvailabilityTrustEvaluator } from './availability-trust.evaluator';
 import { AvailabilityTrustService } from './availability-trust.service';
 import { AvailabilityRequestService } from './availability-request.service';
+import { AvailabilityRequestDemandAnalyticsService } from './availability-request-demand.service';
 import { AvailabilityRequestPreferenceService } from './availability-request-preference.service';
 import { AvailabilityRequestExpiryService } from './availability-request-expiry.service';
 import { LiveAvailabilityReconciliationService } from './live-availability-reconciliation.service';
@@ -44,6 +45,7 @@ import { PublicLiveAvailabilityController } from './public-live-availability.con
     AvailabilityTrustEvaluator,
     AvailabilityTrustService,
     AvailabilityRequestService,
+    AvailabilityRequestDemandAnalyticsService,
     AvailabilityRequestPreferenceService,
     AvailabilityRequestExpiryService,
     LiveAvailabilityReconciliationService,
