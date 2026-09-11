@@ -24,12 +24,10 @@ const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const sourceMigrations = join(packageRoot, 'prisma', 'migrations');
 
 const controlsMigration = '20260910120000_live_availability_request_controls';
-const preferenceAdminMigration =
-  '20260910130000_live_availability_request_preference_admin';
+const preferenceAdminMigration = '20260910130000_live_availability_request_preference_admin';
 const task0027Migrations = [controlsMigration, preferenceAdminMigration];
 
-const pnpmCommand =
-  process.platform === 'win32' ? process.env.ComSpec || 'cmd.exe' : 'pnpm';
+const pnpmCommand = process.platform === 'win32' ? process.env.ComSpec || 'cmd.exe' : 'pnpm';
 
 function prismaProcessArgs(args) {
   if (process.platform === 'win32') {
@@ -140,11 +138,9 @@ function createMigrationProject() {
 }
 
 function copyMigration(project, migrationName) {
-  cpSync(
-    join(sourceMigrations, migrationName),
-    join(project.migrationsRoot, migrationName),
-    { recursive: true },
-  );
+  cpSync(join(sourceMigrations, migrationName), join(project.migrationsRoot, migrationName), {
+    recursive: true,
+  });
 }
 
 function createDatabase(schemaFile, name) {
@@ -152,11 +148,7 @@ function createDatabase(schemaFile, name) {
 }
 
 function dropDatabase(schemaFile, name) {
-  executeSql(
-    schemaFile,
-    databaseUrl.toString(),
-    `DROP DATABASE IF EXISTS "${name}" WITH (FORCE);`,
-  );
+  executeSql(schemaFile, databaseUrl.toString(), `DROP DATABASE IF EXISTS "${name}" WITH (FORCE);`);
 }
 
 // Deterministic fixture UUIDs.
