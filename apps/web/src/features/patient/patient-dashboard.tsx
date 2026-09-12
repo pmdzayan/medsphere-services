@@ -133,20 +133,20 @@ export function PatientDashboard() {
         className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2"
         aria-label={t('patient.dashboard.title')}
       >
-        <Link href="/search" className="block">
+        <Link href="/patient/medicines" className="block">
           <Card className="h-full transition hover:border-emerald-600">
             <p className="text-sm font-bold text-[#173128]">
               {t('patient.dashboard.medicineSearch')}
             </p>
           </Card>
         </Link>
-        <Card>
-          <p className="text-sm font-bold text-[#173128]">{t('patient.dashboard.reservations')}</p>
-          <EmptyState
-            title={t('patient.dashboard.comingSoon')}
-            description={t('patient.dashboard.reservationsComingSoon')}
-          />
-        </Card>
+        <Link href="/patient/medicines#reservations" className="block">
+          <Card className="h-full transition hover:border-emerald-600">
+            <p className="text-sm font-bold text-[#173128]">
+              {t('patient.dashboard.reservations')}
+            </p>
+          </Card>
+        </Link>
         <Card>
           <p className="text-sm font-bold text-[#173128]">{t('patient.dashboard.appointments')}</p>
           <EmptyState

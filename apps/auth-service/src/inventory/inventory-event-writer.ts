@@ -60,7 +60,14 @@ export class InventoryEventWriter {
       | 'reservation-expiry-worker'
       | 'batch-expiry-worker'
       | 'inventory-quarantine-service'
-      | 'public-live-availability',
+      | 'public-live-availability'
+      // Task 0034: patient-created/cancelled reservation events are written
+      // with a SYSTEM actor because a patient has no ACTIVE membership inside
+      // the provider's tenant (OutboxEvent carries a single tenantId and the
+      // TENANT_USER composite FK binds membership+user+tenant). Exact-user
+      // accountability for patient actions lives in the AuditEvent trail via
+      // appendPlatformUser; the outbox payload stays patient-free.
+      | 'patient-reservations',
     input: InventoryDomainEventInput,
   ): Promise<void> {
     return appendOutboxEvent(database, {
