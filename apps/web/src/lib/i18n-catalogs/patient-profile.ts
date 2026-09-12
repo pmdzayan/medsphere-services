@@ -1,7 +1,3 @@
-/**
- * Candidate Task 0032 (pre-0031). See
- * docs/candidates/0032-patient-identity-profile-dashboard-pre0031.md
- */
 export const patientProfileEnglishMessages = {
   'patient.dashboard.title': 'Your health, simplified',
   'patient.dashboard.greeting': 'Welcome back, {name}',

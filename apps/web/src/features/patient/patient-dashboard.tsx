@@ -9,13 +9,10 @@ import type { PatientProfile } from '@/lib/patient-profile-contract';
 import { PatientProfileForm } from './patient-profile-form';
 
 /**
- * Candidate Task 0032 (pre-0031): a deliberately simple patient home.
- * Every section either uses real, already-accepted backend capability
- * (profile) or shows an honest "coming soon" state -- never synthetic
- * placeholder data presented as though it belongs to the logged-in
- * patient. See
- * docs/candidates/0032-patient-identity-profile-dashboard-pre0031.md
- * for exactly which sections are real vs. honest-placeholder, and why.
+ * A deliberately simple patient home. Every section either uses real,
+ * already-accepted backend capability (profile) or shows an honest
+ * "coming soon" state -- never synthetic placeholder data presented as
+ * though it belongs to the logged-in patient.
  */
 export function PatientDashboard() {
   const { t } = useLanguage();

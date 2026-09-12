@@ -6,7 +6,7 @@ import {
   noStoreJson,
   upstreamHeaders,
 } from '@/lib/auth-api';
-import { isPatientProfile } from '@/lib/patient-profile-contract';
+import { isPatientProfile, isUpdatePatientProfileRequest } from '@/lib/patient-profile-contract';
 import { ACCESS_COOKIE } from '@/lib/session-profile';
 
 /**
@@ -53,6 +53,9 @@ export async function PATCH(request: NextRequest): Promise<NextResponse> {
   try {
     body = await request.json();
   } catch {
+    return noStoreJson({ message: 'A valid profile update is required.' }, 400);
+  }
+  if (!isUpdatePatientProfileRequest(body)) {
     return noStoreJson({ message: 'A valid profile update is required.' }, 400);
   }
 

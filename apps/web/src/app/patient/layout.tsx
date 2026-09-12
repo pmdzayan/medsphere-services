@@ -24,5 +24,9 @@ export default async function PatientLayout({ children }: Readonly<{ children: R
     redirect('/login?reason=session');
   }
 
+  if (profile.context.organizationType !== 'NONE') {
+    redirect('/dashboard');
+  }
+
   return <div className="min-h-screen bg-[#f7f6f0]">{children}</div>;
 }

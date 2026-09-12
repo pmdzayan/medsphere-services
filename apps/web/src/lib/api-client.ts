@@ -482,10 +482,6 @@ export async function setRoleAssignment(
   });
 }
 
-/**
- * Candidate Task 0032 (pre-0031). See
- * docs/candidates/0032-patient-identity-profile-dashboard-pre0031.md
- */
 export async function getPatientProfile(): Promise<PatientProfile> {
   return requestJson<PatientProfile>('/api/patient/profile');
 }

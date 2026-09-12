@@ -1,8 +1,0 @@
-{
-  "name": "candidate-0032-test-harness",
-  "private": true,
-  "description": "Candidate Task 0032 (pre-0031): standalone, reproducible test harness for evidence that cannot execute inside this repository's Jest suite in this sandbox (real PostgreSQL integration; a direct-import audit-metadata regression bypassing an unrelated Prisma-client-generation limitation in the @medsphere/database barrel export). See README.md.",
-  "devDependencies": {
-    "pg": "^8.11.0"
-  }
-}

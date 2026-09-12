@@ -1,15 +1,6 @@
 import { IsBoolean, IsIn, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-
-/**
- * Mirrors the existing accepted supported-language list (see
- * apps/web/src/lib/i18n.ts localeOptions) -- kept as a small, explicit
- * constant here rather than importing across the frontend/backend
- * boundary. Documented in the candidate integration doc as a
- * reconciliation point if the canonical list moves to a shared
- * package.
- */
-export const SUPPORTED_LANGUAGE_CODES = ['en', 'ta', 'ur'] as const;
+import { ENABLED_UI_LANGUAGES } from '@medsphere/i18n';
 
 /**
  * Candidate Task 0032 (pre-0031): the smallest useful self-service
@@ -36,9 +27,11 @@ export class UpdatePatientProfileDto {
   @MaxLength(120)
   lastName?: string;
 
-  @ApiPropertyOptional({ enum: SUPPORTED_LANGUAGE_CODES })
+  @ApiPropertyOptional({ enum: ENABLED_UI_LANGUAGES })
   @IsOptional()
-  @IsIn(SUPPORTED_LANGUAGE_CODES)
+  @IsIn(ENABLED_UI_LANGUAGES as unknown as string[], {
+    message: `preferredLanguage must be one of: ${ENABLED_UI_LANGUAGES.join(', ')}`,
+  })
   preferredLanguage?: string;
 
   @ApiPropertyOptional()

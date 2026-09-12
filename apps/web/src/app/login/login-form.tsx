@@ -55,7 +55,9 @@ export function LoginForm() {
         setCredentials(request);
         return;
       }
-      router.replace('/dashboard');
+      router.replace(
+        result.context.organizationType === 'NONE' ? '/patient/dashboard' : '/dashboard',
+      );
       router.refresh();
     } catch {
       setErrors({ form: copy.errorGeneric });
@@ -69,8 +71,10 @@ export function LoginForm() {
     setPending(true);
     setErrors({});
     try {
-      await selectOrganizationLogin({ ...credentials, membershipId });
-      router.replace('/dashboard');
+      const result = await selectOrganizationLogin({ ...credentials, membershipId });
+      router.replace(
+        result.context.organizationType === 'NONE' ? '/patient/dashboard' : '/dashboard',
+      );
       router.refresh();
     } catch {
       setErrors({ form: copy.errorGeneric });
