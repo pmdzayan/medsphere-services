@@ -75,17 +75,16 @@ describe('PatientDashboard (candidate Task 0032)', () => {
     expect(screen.queryByText(/Dr\./)).not.toBeInTheDocument();
   });
 
-  it('the reservations card uses reservation-specific copy, not the appointments message (correction pass 1)', async () => {
+  it('the reservations card links into the Task 0034 medicines workspace (not a coming-soon placeholder)', async () => {
     vi.mocked(getPatientProfile).mockResolvedValue(profile);
     renderDashboard();
 
     await screen.findByText('Asha');
-    expect(screen.getByText('Your reservations')).toBeVisible();
-    expect(screen.getByText(/Your reservations will appear here once available/)).toBeVisible();
+    const reservationsLink = screen.getByRole('link', { name: 'Your reservations' });
+    expect(reservationsLink).toBeVisible();
+    expect(reservationsLink).toHaveAttribute('href', '/patient/medicines#reservations');
     // The reservations card must never show the appointments message.
-    const reservationsHeading = screen.getByText('Your reservations');
-    const reservationsCard = reservationsHeading.closest('div');
-    expect(reservationsCard?.textContent).not.toMatch(/Appointments will appear here/);
+    expect(reservationsLink).not.toHaveTextContent(/Appointments will appear here/);
   });
 
   it('shows a separate, accurately-labeled Appointments card', async () => {

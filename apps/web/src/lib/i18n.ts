@@ -46,6 +46,11 @@ import {
   permissionsTamilMessages,
   permissionsUrduMessages,
 } from './i18n-catalogs/permissions';
+import {
+  patientMedicinesEnglishMessages,
+  patientMedicinesTamilMessages,
+  patientMedicinesUrduMessages,
+} from './i18n-catalogs/patient-medicines';
 import { workstationSecurityLocaleMessages } from './i18n-catalogs/workstation-security';
 
 export const localeOptions = [
@@ -91,6 +96,7 @@ const englishMessages = {
   ...auditEnglishMessages,
   ...teamEnglishMessages,
   ...permissionsEnglishMessages,
+  ...patientMedicinesEnglishMessages,
   'language.label': 'Language',
   'meta.login.title': 'Sign in',
   'meta.register.title': 'Request access',
@@ -245,6 +251,7 @@ const tamilMessages: MessageOverrides = {
   ...auditTamilMessages,
   ...teamTamilMessages,
   ...permissionsTamilMessages,
+  ...patientMedicinesTamilMessages,
   'language.label': 'மொழி',
   'meta.login.title': 'உள்நுழைக',
   'meta.register.title': 'அணுகலைக் கோருங்கள்',
@@ -429,6 +436,7 @@ const urduMessages: MessageOverrides = {
   ...auditUrduMessages,
   ...teamUrduMessages,
   ...permissionsUrduMessages,
+  ...patientMedicinesUrduMessages,
   'language.label': 'زبان',
   'meta.login.title': 'سائن ان',
   'meta.register.title': 'رسائی کی درخواست',

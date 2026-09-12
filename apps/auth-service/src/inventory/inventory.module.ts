@@ -29,6 +29,10 @@ import { PublicMedicineSearchService } from './public-medicine-search.service';
 import { PublicNearbyMedicineSearchService } from './public-nearby-medicine-search.service';
 import { PublicNearbyMedicineSearchController } from './public-nearby-medicine-search.controller';
 import { PublicLiveAvailabilityController } from './public-live-availability.controller';
+import { PatientMedicineSearchController } from './patient-medicine-search.controller';
+import { PatientMedicineSearchService } from './patient-medicine-search.service';
+import { PatientReservationController } from './patient-reservation.controller';
+import { PatientReservationService } from './patient-reservation.service';
 
 @Module({
   imports: [PrismaModule, AuthorizationModule, AuditPersistenceModule],
@@ -37,6 +41,8 @@ import { PublicLiveAvailabilityController } from './public-live-availability.con
     PublicMedicineSearchController,
     PublicNearbyMedicineSearchController,
     PublicLiveAvailabilityController,
+    PatientMedicineSearchController,
+    PatientReservationController,
   ],
   providers: [
     InventoryRepository,
@@ -62,6 +68,8 @@ import { PublicLiveAvailabilityController } from './public-live-availability.con
     InventoryQuarantineService,
     PublicMedicineSearchService,
     PublicNearbyMedicineSearchService,
+    PatientMedicineSearchService,
+    PatientReservationService,
   ],
   exports: [InventoryService, AvailabilityTrustService],
 })

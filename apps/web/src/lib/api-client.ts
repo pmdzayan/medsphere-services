@@ -60,6 +60,22 @@ import {
   type ReservationTransitionResponse,
 } from './reservation-contract';
 import type { PatientProfile, UpdatePatientProfileRequest } from './patient-profile-contract';
+import {
+  toPatientMedicineSearchParams,
+  type PatientLiveAvailabilityRequestResponse,
+  type PatientMedicineSearchFilters,
+  type PatientMedicineSearchResponse,
+} from './patient-medicine-search-contract';
+import {
+  toPatientReservationSearchParams,
+  type CancelPatientReservationRequest,
+  type CancelPatientReservationResponse,
+  type CreatePatientReservationRequest,
+  type CreatePatientReservationResponse,
+  type PatientReservation,
+  type PatientReservationFilters,
+  type PatientReservationPage,
+} from './patient-reservation-contract';
 
 export class ApiError extends Error {
   constructor(
@@ -494,6 +510,80 @@ export async function updatePatientProfile(
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(request),
   });
+}
+
+export async function searchPatientMedicine(
+  filters: PatientMedicineSearchFilters,
+  signal?: AbortSignal,
+): Promise<PatientMedicineSearchResponse> {
+  const params = toPatientMedicineSearchParams(filters);
+  return requestJson<PatientMedicineSearchResponse>(
+    `/api/patient/medicine-discovery/search?${params.toString()}`,
+    { signal },
+  );
+}
+
+export async function listPatientReservations(
+  filters: PatientReservationFilters,
+  signal?: AbortSignal,
+): Promise<PatientReservationPage> {
+  const params = toPatientReservationSearchParams(filters);
+  return requestJson<PatientReservationPage>(
+    `/api/patient/medicine-reservations?${params.toString()}`,
+    {
+      signal,
+    },
+  );
+}
+
+export async function getPatientReservation(reservationId: string): Promise<PatientReservation> {
+  return requestJson<PatientReservation>(`/api/patient/medicine-reservations/${reservationId}`);
+}
+
+export async function createPatientReservation(
+  request: CreatePatientReservationRequest,
+): Promise<CreatePatientReservationResponse> {
+  return requestJson<CreatePatientReservationResponse>('/api/patient/medicine-reservations', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(request),
+  });
+}
+
+export async function cancelPatientReservation(
+  reservationId: string,
+  request: CancelPatientReservationRequest,
+): Promise<CancelPatientReservationResponse> {
+  return requestJson<CancelPatientReservationResponse>(
+    `/api/patient/medicine-reservations/${reservationId}/cancel`,
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(request),
+    },
+  );
+}
+
+export async function requestPatientLiveAvailability(
+  providerId: string,
+  productId: string,
+): Promise<PatientLiveAvailabilityRequestResponse> {
+  return requestJson<PatientLiveAvailabilityRequestResponse>(
+    `/api/public/medicine-discovery/providers/${providerId}/products/${productId}/availability-requests`,
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({}),
+    },
+  );
+}
+
+export async function getPatientLiveAvailabilityStatus(
+  requestId: string,
+): Promise<PatientLiveAvailabilityRequestResponse> {
+  return requestJson<PatientLiveAvailabilityRequestResponse>(
+    `/api/public/medicine-discovery/availability-requests/${requestId}`,
+  );
 }
 
 async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
