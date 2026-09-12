@@ -33,6 +33,19 @@ const singleMembershipSession: AuthenticatedSession = {
   },
 };
 
+const personalMembershipSession: AuthenticatedSession = {
+  ...singleMembershipSession,
+  user: {
+    ...singleMembershipSession.user,
+    email: 'patient@example.com',
+  },
+  context: {
+    membershipId: '11111111-1111-4111-8111-111111111111',
+    tenantId: '22222222-2222-4222-8222-222222222222',
+    tenantName: 'AIM Personal Accounts',
+    organizationType: 'NONE',
+  },
+};
 beforeEach(() => {
   vi.clearAllMocks();
   window.localStorage.clear();
@@ -96,6 +109,60 @@ describe('LoginForm interactions', () => {
     expect(selectOrganizationLogin).not.toHaveBeenCalled();
   });
 
+  it('routes a personal NONE membership directly to the patient dashboard', async () => {
+    vi.mocked(identifyLogin).mockResolvedValue(personalMembershipSession);
+
+    renderLoginForm();
+
+    fill('Work email', 'patient@example.com');
+    fill('Password', 'a-secure-password');
+    fireEvent.click(screen.getByRole('button', { name: 'Sign in securely' }));
+
+    await waitFor(() => expect(replace).toHaveBeenCalledWith('/patient/dashboard'));
+    expect(refresh).toHaveBeenCalled();
+    expect(selectOrganizationLogin).not.toHaveBeenCalled();
+  });
+
+  it('routes a selected personal NONE membership to the patient dashboard', async () => {
+    vi.mocked(identifyLogin).mockResolvedValue({
+      requiresOrganizationSelection: true,
+      organizations: [
+        {
+          membershipId: 'membership-hospital',
+          organizationName: 'Central Hospital',
+          organizationType: 'HOSPITAL',
+        },
+        {
+          membershipId: 'membership-personal',
+          organizationName: 'AIM Personal Accounts',
+          organizationType: 'NONE',
+        },
+      ],
+    });
+
+    vi.mocked(selectOrganizationLogin).mockResolvedValue(personalMembershipSession);
+
+    renderLoginForm();
+
+    fill('Work email', 'patient@example.com');
+    fill('Password', 'a-secure-password');
+    fireEvent.click(screen.getByRole('button', { name: 'Sign in securely' }));
+
+    expect(await screen.findByText('AIM Personal Accounts')).toBeVisible();
+
+    fireEvent.click(screen.getByText('AIM Personal Accounts'));
+
+    await waitFor(() =>
+      expect(selectOrganizationLogin).toHaveBeenCalledWith({
+        email: 'patient@example.com',
+        password: 'a-secure-password',
+        membershipId: 'membership-personal',
+      }),
+    );
+
+    expect(replace).toHaveBeenCalledWith('/patient/dashboard');
+    expect(refresh).toHaveBeenCalled();
+  });
   it('shows only bounded organization display info -- never a search -- when multiple memberships exist, then completes login on selection', async () => {
     vi.mocked(identifyLogin).mockResolvedValue({
       requiresOrganizationSelection: true,

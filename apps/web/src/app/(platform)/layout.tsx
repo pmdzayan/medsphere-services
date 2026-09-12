@@ -15,6 +15,10 @@ export default async function PlatformLayout({
     redirect('/login?reason=session');
   }
 
+  if (profile.context.organizationType === 'NONE') {
+    redirect('/patient/dashboard');
+  }
+
   const workstationState = await readServerWorkstationSessionState(refreshToken);
   if (!workstationState) {
     redirect('/login?reason=session');
