@@ -41,6 +41,7 @@ import {
   type InventoryExpiryWorklistPage,
   type ProviderAccess,
 } from './inventory-contract';
+import type { InventoryAnalyticsResponse } from './inventory-analytics-contract';
 import type {
   ConsentStatus,
   LanguageUpdateRequest,
@@ -338,6 +339,25 @@ export async function getProviderExpiryWorklist(
   const search = toInventoryExpirySearchParams(filters);
   return requestJson<InventoryExpiryWorklistPage>(
     `/api/inventory/expiry-worklist?${search.toString()}`,
+  );
+}
+
+/**
+ * Candidate Task 0038 (PROVISIONAL). See
+ * docs/candidates/0038-pharmacy-inventory-analytics-provisional.md
+ */
+export async function getInventoryAnalytics(
+  providerId: string,
+  nearExpiryHorizonDays: number | undefined,
+  signal?: AbortSignal,
+): Promise<InventoryAnalyticsResponse> {
+  const search = new URLSearchParams();
+  if (nearExpiryHorizonDays !== undefined) {
+    search.set('nearExpiryHorizonDays', String(nearExpiryHorizonDays));
+  }
+  return requestJson<InventoryAnalyticsResponse>(
+    `/api/inventory/providers/${encodeURIComponent(providerId)}/analytics?${search.toString()}`,
+    { signal },
   );
 }
 

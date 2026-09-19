@@ -33,6 +33,7 @@ import { PatientMedicineSearchController } from './patient-medicine-search.contr
 import { PatientMedicineSearchService } from './patient-medicine-search.service';
 import { PatientReservationController } from './patient-reservation.controller';
 import { PatientReservationService } from './patient-reservation.service';
+import { InventoryAnalyticsService } from './inventory-analytics.service';
 
 @Module({
   imports: [PrismaModule, AuthorizationModule, AuditPersistenceModule],
@@ -70,6 +71,7 @@ import { PatientReservationService } from './patient-reservation.service';
     PublicNearbyMedicineSearchService,
     PatientMedicineSearchService,
     PatientReservationService,
+    InventoryAnalyticsService,
   ],
   exports: [InventoryService, AvailabilityTrustService],
 })

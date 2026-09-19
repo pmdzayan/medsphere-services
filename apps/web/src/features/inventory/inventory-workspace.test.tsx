@@ -151,6 +151,14 @@ function renderWorkspace() {
 }
 
 describe('InventoryWorkspace live integration', () => {
+  it('links to the pharmacy analytics workspace', async () => {
+    renderWorkspace();
+    expect(screen.getByRole('link', { name: 'Pharmacy Analytics' })).toHaveAttribute(
+      'href',
+      '/inventory/analytics',
+    );
+  });
+
   it('renders live accepted fields and current-page metrics without preview claims', async () => {
     renderWorkspace();
     const scope = within(await findTable());
