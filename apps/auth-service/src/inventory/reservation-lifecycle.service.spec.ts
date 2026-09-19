@@ -6,6 +6,7 @@ function createHarness() {
     membershipProviderAccess: { findFirst: jest.fn() },
     medicineReservationCommand: { findUnique: jest.fn(), create: jest.fn() },
     medicineReservation: { findFirst: jest.fn(), updateMany: jest.fn() },
+    patientNotification: { create: jest.fn() },
     medicineReservationAllocation: { updateMany: jest.fn() },
     batch: { updateMany: jest.fn() },
     stockMovement: { create: jest.fn() },
@@ -143,6 +144,62 @@ describe('ReservationLifecycleService', () => {
       totalQuantity: 4,
       replayed: false,
     });
+    expect(harness.transaction.patientNotification.create).not.toHaveBeenCalled();
+  });
+
+  it('writes a single patient inbox entry in the successful READY transition transaction', async () => {
+    const harness = createHarness();
+    harness.transaction.membershipProviderAccess.findFirst.mockResolvedValue({ id: 'access-1' });
+    harness.transaction.medicineReservationCommand.findUnique.mockResolvedValue(null);
+    harness.transaction.medicineReservation.findFirst.mockResolvedValue({
+      id: 'reservation-1',
+      subjectUserId: 'personal-patient-1',
+      status: 'CONFIRMED',
+      version: 2,
+      expiresAt: new Date('2026-08-01T00:00:00.000Z'),
+      items: [{ quantity: 4 }],
+      allocations: [allocation],
+    });
+    harness.transaction.medicineReservation.updateMany.mockResolvedValue({ count: 1 });
+    harness.transaction.medicineReservationCommand.create.mockResolvedValue({ id: 'command-1' });
+
+    const command = {
+      actor,
+      providerId: 'provider-1',
+      reservationId: 'reservation-1',
+      transition: 'READY' as const,
+      expectedVersion: 2,
+      idempotencyKey: 'ready-1',
+    };
+    const result = await harness.service.transition(command);
+    expect(result).toMatchObject({ status: 'READY', version: 3, replayed: false });
+    expect(harness.transaction.patientNotification.create).toHaveBeenCalledTimes(1);
+    expect(harness.transaction.patientNotification.create).toHaveBeenCalledWith({
+      data: {
+        recipientUserId: 'personal-patient-1',
+        category: 'RESERVATION',
+        title: 'Reservation ready',
+        message: 'Your medicine reservation is ready for pickup.',
+        destinationType: 'RESERVATION',
+        destinationId: 'reservation-1',
+        sourceType: 'reservation-ready-v1',
+        sourceEventId: 'reservation-1',
+      },
+    });
+
+    harness.transaction.medicineReservationCommand.findUnique.mockResolvedValue({
+      reservationId: 'reservation-1',
+      commandHash:
+        harness.transaction.medicineReservationCommand.create.mock.calls[0][0].data.commandHash,
+      resultingStatus: 'READY',
+      resultingVersion: 3,
+      reservation: { allocations: [{ quantity: 4 }] },
+    });
+    await expect(harness.service.transition(command)).resolves.toMatchObject({
+      status: 'READY',
+      replayed: true,
+    });
+    expect(harness.transaction.patientNotification.create).toHaveBeenCalledTimes(1);
   });
 
   it('cancels an active reservation by releasing holds without changing on-hand stock', async () => {

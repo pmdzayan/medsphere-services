@@ -20,6 +20,7 @@ describeReservationInfrastructure('G3.3 PostgreSQL reservation lifecycle integri
   const tenantId = randomUUID();
   const userId = randomUUID();
   const unassignedUserId = randomUUID();
+  const personalPatientId = randomUUID();
   const membershipId = randomUUID();
   const unassignedMembershipId = randomUUID();
   const providerId = randomUUID();
@@ -59,6 +60,13 @@ describeReservationInfrastructure('G3.3 PostgreSQL reservation lifecycle integri
           passwordHash: 'integration-only-placeholder',
           firstName: 'Unassigned',
           lastName: 'Operator',
+        },
+        {
+          id: personalPatientId,
+          email: `${personalPatientId}@medsphere.test`,
+          passwordHash: 'integration-only-placeholder',
+          firstName: 'Personal',
+          lastName: 'Patient',
         },
       ],
     });
@@ -181,7 +189,45 @@ describeReservationInfrastructure('G3.3 PostgreSQL reservation lifecycle integri
     expect(['CONFIRMED', 'CANCELLED']).toContain(reservation.status);
   });
 
-  async function createReservation(status: 'PENDING' | 'READY') {
+  it('creates one inbox notification for a personal patient when staff marks a reservation ready', async () => {
+    const fixture = await createReservation('CONFIRMED', personalPatientId);
+    const idempotencyKey = `ready-${randomUUID()}`;
+    const command = {
+      actor: identity,
+      providerId,
+      reservationId: fixture.reservationId,
+      transition: 'READY' as const,
+      expectedVersion: 1,
+      idempotencyKey,
+    };
+
+    await expect(service.transition(command)).resolves.toMatchObject({
+      status: 'READY',
+      replayed: false,
+    });
+    await expect(service.transition(command)).resolves.toMatchObject({
+      status: 'READY',
+      replayed: true,
+    });
+
+    const notifications = await prisma.client.patientNotification.findMany({
+      where: { sourceType: 'reservation-ready-v1', sourceEventId: fixture.reservationId },
+    });
+    expect(notifications).toHaveLength(1);
+    expect(notifications[0]).toMatchObject({
+      recipientUserId: personalPatientId,
+      destinationType: 'RESERVATION',
+      destinationId: fixture.reservationId,
+    });
+    await expect(
+      prisma.client.tenantMembership.count({ where: { userId: personalPatientId } }),
+    ).resolves.toBe(0);
+  });
+
+  async function createReservation(
+    status: 'PENDING' | 'CONFIRMED' | 'READY',
+    subjectUserId = userId,
+  ) {
     const productId = randomUUID();
     const inventoryId = randomUUID();
     const batchId = randomUUID();
@@ -189,7 +235,8 @@ describeReservationInfrastructure('G3.3 PostgreSQL reservation lifecycle integri
     const itemId = randomUUID();
     const allocationId = randomUUID();
     const createdAt = new Date(Date.now() - 3 * 60 * 1000);
-    const confirmedAt = status === 'READY' ? new Date(createdAt.getTime() + 60 * 1000) : undefined;
+    const confirmedAt =
+      status !== 'PENDING' ? new Date(createdAt.getTime() + 60 * 1000) : undefined;
     const readyAt = status === 'READY' ? new Date(createdAt.getTime() + 2 * 60 * 1000) : undefined;
     await prisma.client.product.create({
       data: {
@@ -236,7 +283,7 @@ describeReservationInfrastructure('G3.3 PostgreSQL reservation lifecycle integri
         id: reservationId,
         tenantId,
         providerId,
-        subjectUserId: userId,
+        subjectUserId,
         status,
         createdAt,
         confirmedAt,

@@ -433,6 +433,7 @@ model User {
   externalAuthIdentities       ExternalAuthIdentity[]
   phoneOtpChallenges           PhoneOtpChallenge[]
   consentRecords               ConsentRecord[]
+  patientNotifications         PatientNotification[]
   platformAccount              PlatformAccount?                      @relation("PlatformAccountUser")
   platformSessions             PlatformSession[]                     @relation("PlatformSessionUser")
   createdPlatformAssignments   PlatformRoleAssignment[]              @relation("PlatformAssignmentCreatedBy")
@@ -616,6 +617,47 @@ model ConsentRecord {
   createdAt DateTime @default(now())
 
   @@index([userId, category, createdAt])
+}
+
+model PatientNotification {
+  id String @id @default(uuid()) @db.Uuid
+
+  recipientUserId String @db.Uuid
+  recipient       User   @relation(fields: [recipientUserId], references: [id], onDelete: Cascade)
+
+  category PatientNotificationCategory
+
+  title   String @db.VarChar(160)
+  message String @db.VarChar(500)
+
+  destinationType PatientNotificationDestinationType @default(NONE)
+  destinationId   String?                            @db.VarChar(120)
+
+  sourceType    String? @db.VarChar(80)
+  sourceEventId String? @db.VarChar(120)
+
+  readAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@unique([sourceType, sourceEventId])
+  @@index([recipientUserId, readAt, createdAt(sort: Desc), id(sort: Desc)])
+  @@index([recipientUserId, createdAt(sort: Desc), id(sort: Desc)])
+}
+
+enum PatientNotificationCategory {
+  ACCOUNT
+  SECURITY
+  RESERVATION
+  APPOINTMENT
+  SYSTEM
+}
+
+enum PatientNotificationDestinationType {
+  NONE
+  RESERVATION
+  APPOINTMENT
+  SETTINGS
 }
 
 model Role {
