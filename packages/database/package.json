@@ -17,6 +17,7 @@
     "prisma:studio": "prisma studio",
     "build": "pnpm prisma:generate && tsc",
     "lint": "eslint \"src/**/*.ts\"",
+    "test": "tsc -p tsconfig.spec.json --noEmit && jest",
     "clean": "rimraf dist tsconfig.tsbuildinfo"
   },
   "dependencies": {
@@ -24,8 +25,11 @@
     "@prisma/client": "^5.10.2"
   },
   "devDependencies": {
+    "@types/jest": "^30.0.0",
     "@types/node": "^20.11.24",
+    "jest": "^30.4.2",
     "prisma": "^5.10.2",
+    "ts-jest": "^29.4.11",
     "typescript": "^5.3.3"
   }
 }

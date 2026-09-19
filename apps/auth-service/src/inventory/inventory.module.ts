@@ -34,9 +34,10 @@ import { PatientMedicineSearchService } from './patient-medicine-search.service'
 import { PatientReservationController } from './patient-reservation.controller';
 import { PatientReservationService } from './patient-reservation.service';
 import { InventoryAnalyticsService } from './inventory-analytics.service';
+import { PharmacyVerificationModule } from '../pharmacy-verification/pharmacy-verification.module';
 
 @Module({
-  imports: [PrismaModule, AuthorizationModule, AuditPersistenceModule],
+  imports: [PrismaModule, AuthorizationModule, AuditPersistenceModule, PharmacyVerificationModule],
   controllers: [
     InventoryController,
     PublicMedicineSearchController,

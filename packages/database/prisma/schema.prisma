@@ -1119,11 +1119,38 @@ model PlatformSessionRefreshCredential {
   @@index([status, issuedAt])
 }
 
+/// CORRECTION (Task 0039, provisional reconciliation): the accepted
+/// model was tenant-scoped but did not unambiguously identify which
+/// concrete `Provider` it verifies. `providerId` closes that gap. It
+/// remains NULLABLE to preserve pre-Task-0039 historical rows without
+/// fabricating ownership -- a legacy row with `providerId = NULL` can
+/// never be `isCurrent = true` (enforced by a CHECK constraint in the
+/// migration SQL).
+///
+/// `isCurrent` means "the record currently AUTHORITATIVE for
+/// eligibility/state" -- NOT "the most recent submission". A PARTIAL
+/// unique index (WHERE "isCurrent" = true) guarantees at most one
+/// authoritative row per provider. This is DELIBERATELY SEPARATE from
+/// the open-submission concept: a valid APPROVED+current verification
+/// remains authoritative and isCurrent=true even while a renewal
+/// submission exists as a PENDING/UNDER_REVIEW row with isCurrent=false
+/// for the SAME provider -- the renewal only becomes authoritative once
+/// approved (which atomically demotes the old current row and promotes
+/// the renewal). A second, independent partial unique index (WHERE
+/// status IN ('PENDING','UNDER_REVIEW')) guarantees at most one OPEN
+/// submission per provider -- this is the ONLY thing that index
+/// constrains; it says nothing about which row (if any) is current.
+/// Prisma cannot express either partial index as an `@@unique`
+/// attribute, so both live in the migration SQL, exactly as the
+/// accepted Task 0027 candidate documents for its own dedupe index.
 model ProviderVerification {
   id String @id @default(uuid()) @db.Uuid
 
   tenantId String @db.Uuid
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+
+  providerId String?   @db.Uuid
+  provider   Provider? @relation(fields: [providerId, tenantId], references: [id, tenantId], onDelete: Restrict)
 
   providerType ProviderType
   status       VerificationStatus @default(PENDING)
@@ -1133,10 +1160,19 @@ model ProviderVerification {
   businessRegistrationNumber String
   governmentIdReference      String
 
+  /// Internal, platform-reviewer-only notes -- never returned to the
+  /// applicant. See `applicantMessage` for the safely applicant-visible
+  /// counterpart.
   verificationNotes String?
-  submittedAt       DateTime  @default(now())
-  verifiedAt        DateTime?
-  verifiedBy        String?   @db.Uuid
+  /// Safely applicant-visible decision/correction guidance. Never
+  /// contains platform-internal reasoning, reviewer identity, or
+  /// evidence details.
+  applicantMessage  String?   @db.VarChar(500)
+
+  submittedAt DateTime  @default(now())
+  verifiedAt  DateTime?
+  verifiedBy  String?   @db.Uuid
+  isCurrent   Boolean   @default(false)
 
   version Int @default(1)
 
@@ -1146,6 +1182,8 @@ model ProviderVerification {
 
   @@index([tenantId])
   @@index([status])
+  @@index([providerId])
+  @@index([providerId, isCurrent])
   @@index([providerType])
 }
 
@@ -1187,6 +1225,7 @@ model Provider {
   availabilityRequests                AvailabilityRequest[]
   providerProductAvailabilityEvidence ProviderProductAvailabilityEvidence[]
   availabilityRequestPreference       PharmacyAvailabilityRequestPreference?
+  verifications                       ProviderVerification[]
 
   version Int @default(1)
 

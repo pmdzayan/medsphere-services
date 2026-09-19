@@ -24,6 +24,8 @@ export const PERMISSIONS = {
   inventoryAvailabilityRequestsRead: 'inventory.availability-requests.read',
   inventoryAvailabilityRequestsManage: 'inventory.availability-requests.manage',
   inventoryAvailabilityRequestsConfigure: 'inventory.availability-requests.configure',
+  /** Task 0039 (PROVISIONAL): pharmacy onboarding/verification submission by tenant staff. */
+  providerOnboardingManage: 'provider.onboarding.manage',
 } as const;
 
 export const PERMISSION_KEYS = Object.values(PERMISSIONS);
