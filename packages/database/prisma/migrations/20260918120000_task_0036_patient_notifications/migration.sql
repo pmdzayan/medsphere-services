@@ -29,7 +29,7 @@ CREATE TABLE "PatientNotification" (
   "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT "PatientNotification_pkey" PRIMARY KEY ("id"),
   CONSTRAINT "PatientNotification_recipientUserId_fkey"
-    FOREIGN KEY ("recipientUserId") REFERENCES "User"("id") ON DELETE CASCADE
+    FOREIGN KEY ("recipientUserId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
 -- Idempotent ingestion, compound with sourceType (a bounded VARCHAR
