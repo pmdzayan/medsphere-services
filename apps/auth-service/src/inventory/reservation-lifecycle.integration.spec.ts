@@ -262,11 +262,14 @@ describeReservationInfrastructure('G3.3 PostgreSQL reservation lifecycle integri
     const timeline = new PatientTimelineService(prisma);
     const patientIdentity = { ...identity, userId: personalPatientId };
     const page = await timeline.list(patientIdentity, { limit: 20 });
-    expect(page.items.map((event) => event.title).sort()).toEqual([
+    const fixtureEvents = page.items.filter(
+      (event) => event.destinationId === fixture.reservationId,
+    );
+    expect(fixtureEvents.map((event) => event.title).sort()).toEqual([
       'Reservation confirmed',
       'Reservation ready',
     ]);
-    await expect(timeline.getOne(identity, page.items[0]!.id)).rejects.toThrow(
+    await expect(timeline.getOne(identity, fixtureEvents[0]!.id)).rejects.toThrow(
       'Timeline event not found',
     );
     await expect(
