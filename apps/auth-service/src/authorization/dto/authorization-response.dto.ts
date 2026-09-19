@@ -125,3 +125,37 @@ export class MembershipListResponseDto {
   @ApiProperty()
   offset!: number;
 }
+
+export class ProviderStaffMemberResponseDto {
+  @ApiProperty({ format: 'uuid' })
+  membershipId!: string;
+
+  @ApiProperty({ format: 'email' })
+  email!: string;
+
+  @ApiProperty()
+  firstName!: string;
+
+  @ApiProperty()
+  lastName!: string;
+
+  @ApiProperty({ enum: ['PENDING', 'ACTIVE', 'SUSPENDED', 'REVOKED'] })
+  status!: 'PENDING' | 'ACTIVE' | 'SUSPENDED' | 'REVOKED';
+
+  @ApiProperty({ type: [MembershipRoleSummaryDto] })
+  roles!: MembershipRoleSummaryDto[];
+}
+
+export class ProviderStaffListResponseDto {
+  @ApiProperty({ type: [ProviderStaffMemberResponseDto] })
+  data!: ProviderStaffMemberResponseDto[];
+
+  @ApiProperty()
+  total!: number;
+
+  @ApiProperty()
+  limit!: number;
+
+  @ApiProperty()
+  offset!: number;
+}
