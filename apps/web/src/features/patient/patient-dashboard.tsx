@@ -152,6 +152,11 @@ export function PatientDashboard() {
             <p className="text-sm font-bold text-[#173128]">{t('activityCenter.title')}</p>
           </Card>
         </Link>
+        <Link href="/patient/timeline" className="block">
+          <Card className="h-full transition hover:border-emerald-600">
+            <p className="text-sm font-bold text-[#173128]">{t('patientTimeline.title')}</p>
+          </Card>
+        </Link>
         <Card>
           <p className="text-sm font-bold text-[#173128]">{t('patient.dashboard.appointments')}</p>
           <EmptyState

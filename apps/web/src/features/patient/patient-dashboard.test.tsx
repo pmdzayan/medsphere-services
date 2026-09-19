@@ -98,6 +98,16 @@ describe('PatientDashboard (candidate Task 0032)', () => {
     );
   });
 
+  it('links the patient dashboard to the timeline', async () => {
+    vi.mocked(getPatientProfile).mockResolvedValue(profile);
+    renderDashboard();
+    await screen.findByText('Asha');
+    expect(screen.getByRole('link', { name: 'Medical timeline' })).toHaveAttribute(
+      'href',
+      '/patient/timeline',
+    );
+  });
+
   it('shows a separate, accurately-labeled Appointments card', async () => {
     vi.mocked(getPatientProfile).mockResolvedValue(profile);
     renderDashboard();

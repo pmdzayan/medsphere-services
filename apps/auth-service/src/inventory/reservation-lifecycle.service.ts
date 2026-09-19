@@ -14,6 +14,7 @@ import {
 import type { AuditMetadata } from '@medsphere/database';
 import { AuditWriter } from '../audit/audit-writer.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { writeReservationTimelineEvent } from '../patient-timeline/reservation-timeline-writer';
 import { assertTrustedProviderAccess } from './inventory-access';
 import { InventoryEventWriter } from './inventory-event-writer';
 import type {
@@ -172,6 +173,13 @@ export class ReservationLifecycleService {
             },
           });
         }
+        await writeReservationTimelineEvent(transaction, {
+          reservationId: reservation.id,
+          recipientUserId: reservation.subjectUserId,
+          status: rule.to,
+          version: resultingVersion,
+          occurredAt: now,
+        });
 
         await this.appendAudit(
           transaction,

@@ -7,6 +7,7 @@ function createHarness() {
     medicineReservationCommand: { findUnique: jest.fn(), create: jest.fn() },
     medicineReservation: { findFirst: jest.fn(), updateMany: jest.fn() },
     patientNotification: { create: jest.fn() },
+    patientTimelineEvent: { create: jest.fn() },
     medicineReservationAllocation: { updateMany: jest.fn() },
     batch: { updateMany: jest.fn() },
     stockMovement: { create: jest.fn() },
@@ -145,6 +146,12 @@ describe('ReservationLifecycleService', () => {
       replayed: false,
     });
     expect(harness.transaction.patientNotification.create).not.toHaveBeenCalled();
+    expect(harness.transaction.patientTimelineEvent.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        sourceEventId: 'reservation-1:4',
+        title: 'Reservation completed',
+      }),
+    });
   });
 
   it('writes a single patient inbox entry in the successful READY transition transaction', async () => {
@@ -200,6 +207,7 @@ describe('ReservationLifecycleService', () => {
       replayed: true,
     });
     expect(harness.transaction.patientNotification.create).toHaveBeenCalledTimes(1);
+    expect(harness.transaction.patientTimelineEvent.create).toHaveBeenCalledTimes(1);
   });
 
   it('cancels an active reservation by releasing holds without changing on-hand stock', async () => {

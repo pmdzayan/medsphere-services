@@ -13,6 +13,7 @@ import {
 } from '@medsphere/database';
 import { AuditWriter } from '../audit/audit-writer.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { writeReservationTimelineEvent } from '../patient-timeline/reservation-timeline-writer';
 import { assertTrustedProviderAccess } from './inventory-access';
 import { InventoryEventWriter } from './inventory-event-writer';
 import { InsufficientReservationStockError, planReservationFefo } from './reservation-fefo';
@@ -213,6 +214,14 @@ export class ReservationCreationService {
               });
             }
           }
+
+          await writeReservationTimelineEvent(transaction, {
+            reservationId,
+            recipientUserId: command.subjectUserId,
+            status: 'PENDING',
+            version: 1,
+            occurredAt,
+          });
 
           await this.audit.appendTenantUser(transaction, {
             tenantId: command.actor.tenantId,

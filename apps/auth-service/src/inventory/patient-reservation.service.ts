@@ -13,6 +13,7 @@ import {
 } from '@medsphere/database';
 import { AuditWriter } from '../audit/audit-writer.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { writeReservationTimelineEvent } from '../patient-timeline/reservation-timeline-writer';
 import { InventoryEventWriter } from './inventory-event-writer';
 import { assertPersonalAccountContext } from './patient-context';
 import { InsufficientReservationStockError, planReservationFefo } from './reservation-fefo';
@@ -242,6 +243,14 @@ export class PatientReservationService {
             }
           }
 
+          await writeReservationTimelineEvent(transaction, {
+            reservationId,
+            recipientUserId: command.identity.userId,
+            status: 'PENDING',
+            version: 1,
+            occurredAt,
+          });
+
           await this.audit.appendPlatformUser(transaction, {
             platformActorUserId: command.identity.userId,
             eventType: 'inventory.reservation.created',
@@ -458,6 +467,14 @@ export class PatientReservationService {
         if (updated.count !== 1) {
           throw new SerializableRetryError('Concurrent reservation cancellation detected');
         }
+
+        await writeReservationTimelineEvent(transaction, {
+          reservationId: reservation.id,
+          recipientUserId: command.identity.userId,
+          status: 'CANCELLED',
+          version: resultingVersion,
+          occurredAt,
+        });
 
         await transaction.medicineReservationCommand.create({
           data: {

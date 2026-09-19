@@ -37,6 +37,7 @@ function createHarness() {
     medicineReservationItem: { create: jest.fn() },
     medicineReservationAllocation: { create: jest.fn() },
     medicineReservationCommand: { findUnique: jest.fn(), create: jest.fn() },
+    patientTimelineEvent: { create: jest.fn() },
     $queryRaw: jest.fn().mockResolvedValue([{ occurredAt: new Date('2026-09-12T12:00:00.000Z') }]),
   };
   const client = {

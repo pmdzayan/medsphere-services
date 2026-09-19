@@ -5,6 +5,7 @@ import { isInfrastructureTestEnabled, requireEnv } from '../auth/testing/infrast
 import { PrismaService } from '../prisma/prisma.service';
 import { ReservationLifecycleService } from './reservation-lifecycle.service';
 import { InventoryEventWriter } from './inventory-event-writer';
+import { PatientTimelineService } from '../patient-timeline/patient-timeline.service';
 
 const describeReservationInfrastructure = isInfrastructureTestEnabled() ? describe : describe.skip;
 
@@ -219,6 +220,58 @@ describeReservationInfrastructure('G3.3 PostgreSQL reservation lifecycle integri
       destinationType: 'RESERVATION',
       destinationId: fixture.reservationId,
     });
+    await expect(
+      prisma.client.tenantMembership.count({ where: { userId: personalPatientId } }),
+    ).resolves.toBe(0);
+  });
+
+  it('projects successive reservation changes for a personal patient without tenant membership', async () => {
+    const fixture = await createReservation('PENDING', personalPatientId);
+    const confirmed = await service.transition({
+      actor: identity,
+      providerId,
+      reservationId: fixture.reservationId,
+      transition: 'CONFIRM',
+      expectedVersion: 1,
+      idempotencyKey: `confirm-${randomUUID()}`,
+    });
+    const readyCommand = {
+      actor: identity,
+      providerId,
+      reservationId: fixture.reservationId,
+      transition: 'READY' as const,
+      expectedVersion: confirmed.version,
+      idempotencyKey: `ready-${randomUUID()}`,
+    };
+    await service.transition(readyCommand);
+    await expect(service.transition(readyCommand)).resolves.toMatchObject({ replayed: true });
+
+    const events = await prisma.client.patientTimelineEvent.findMany({
+      where: {
+        sourceType: 'medicine-reservation-status-v1',
+        sourceEventId: { startsWith: `${fixture.reservationId}:` },
+      },
+      orderBy: { sourceEventId: 'asc' },
+    });
+    expect(events.map((event) => event.sourceEventId)).toEqual([
+      `${fixture.reservationId}:2`,
+      `${fixture.reservationId}:3`,
+    ]);
+    expect(events.every((event) => event.recipientUserId === personalPatientId)).toBe(true);
+
+    const timeline = new PatientTimelineService(prisma);
+    const patientIdentity = { ...identity, userId: personalPatientId };
+    const page = await timeline.list(patientIdentity, { limit: 20 });
+    const fixtureEvents = page.items.filter(
+      (event) => event.destinationId === fixture.reservationId,
+    );
+    expect(fixtureEvents.map((event) => event.title).sort()).toEqual([
+      'Reservation confirmed',
+      'Reservation ready',
+    ]);
+    await expect(timeline.getOne(identity, fixtureEvents[0]!.id)).rejects.toThrow(
+      'Timeline event not found',
+    );
     await expect(
       prisma.client.tenantMembership.count({ where: { userId: personalPatientId } }),
     ).resolves.toBe(0);

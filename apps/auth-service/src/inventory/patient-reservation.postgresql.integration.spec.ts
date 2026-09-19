@@ -181,6 +181,16 @@ infrastructure('Task 0034 PostgreSQL patient reservation integrity', () => {
       actorType: 'SYSTEM',
       systemService: 'patient-reservations',
     });
+    await expect(
+      prisma.client.patientTimelineEvent.findMany({
+        where: {
+          sourceType: 'medicine-reservation-status-v1',
+          sourceEventId: `${winner.reservationId}:1`,
+        },
+      }),
+    ).resolves.toMatchObject([
+      { recipientUserId: expectedWinnerUserId, title: 'Reservation created' },
+    ]);
   });
 
   it('allocates FEFO across batches and replays create without duplicating holds', async () => {
@@ -283,6 +293,17 @@ infrastructure('Task 0034 PostgreSQL patient reservation integrity', () => {
     expect(audits).toHaveLength(1);
     expect(audits[0]?.platformActorUserId).toBe(firstUserId);
     expect(events).toHaveLength(1);
+    const timelineEvents = await prisma.client.patientTimelineEvent.findMany({
+      where: {
+        sourceType: 'medicine-reservation-status-v1',
+        sourceEventId: { startsWith: `${created.reservationId}:` },
+      },
+      orderBy: { sourceEventId: 'asc' },
+    });
+    expect(timelineEvents.map((event) => event.title)).toEqual([
+      'Reservation created',
+      'Reservation cancelled',
+    ]);
   });
 
   it('fails closed when a provider is paired with stock from another provider tenant', async () => {

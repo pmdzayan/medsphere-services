@@ -5,6 +5,7 @@ function createHarness() {
   const transaction = {
     membershipProviderAccess: { findFirst: jest.fn() },
     medicineReservation: { findUnique: jest.fn(), create: jest.fn() },
+    patientTimelineEvent: { create: jest.fn() },
     medicineReservationItem: { create: jest.fn() },
     medicineReservationAllocation: { create: jest.fn() },
     user: { findFirst: jest.fn() },
@@ -88,6 +89,15 @@ describe('ReservationCreationService', () => {
     harness.transaction.medicineReservationAllocation.create.mockResolvedValue({ id: 'hold-1' });
 
     const result = await harness.service.create(command);
+
+    expect(harness.transaction.patientTimelineEvent.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        recipientUserId: command.subjectUserId,
+        sourceType: 'medicine-reservation-status-v1',
+        sourceEventId: `${result.reservationId}:1`,
+        title: 'Reservation created',
+      }),
+    });
 
     expect(harness.client.$transaction).toHaveBeenCalledWith(expect.any(Function), {
       isolationLevel: 'Serializable',

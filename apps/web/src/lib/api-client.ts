@@ -60,6 +60,7 @@ import {
   type ReservationTransitionResponse,
 } from './reservation-contract';
 import type { PatientProfile, UpdatePatientProfileRequest } from './patient-profile-contract';
+import type { ListPatientTimelineResponse } from './patient-timeline-contract';
 import {
   toPatientMedicineSearchParams,
   type PatientLiveAvailabilityRequestResponse,
@@ -532,6 +533,17 @@ export async function markAllNotificationsRead(): Promise<MarkAllReadResponse> {
 
 export async function getPatientProfile(): Promise<PatientProfile> {
   return requestJson<PatientProfile>('/api/patient/profile');
+}
+
+export async function listPatientTimeline(
+  cursor: string | undefined,
+  signal?: AbortSignal,
+): Promise<ListPatientTimelineResponse> {
+  const search = new URLSearchParams();
+  if (cursor) search.set('cursor', cursor);
+  return requestJson<ListPatientTimelineResponse>(`/api/patient/timeline?${search.toString()}`, {
+    signal,
+  });
 }
 
 export async function updatePatientProfile(
