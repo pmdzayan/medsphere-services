@@ -434,6 +434,7 @@ model User {
   phoneOtpChallenges           PhoneOtpChallenge[]
   consentRecords               ConsentRecord[]
   patientNotifications         PatientNotification[]
+  patientTimelineEvents        PatientTimelineEvent[]
   platformAccount              PlatformAccount?                      @relation("PlatformAccountUser")
   platformSessions             PlatformSession[]                     @relation("PlatformSessionUser")
   createdPlatformAssignments   PlatformRoleAssignment[]              @relation("PlatformAssignmentCreatedBy")
@@ -637,7 +638,6 @@ model PatientNotification {
   sourceEventId String? @db.VarChar(120)
 
   readAt DateTime?
-
   createdAt DateTime @default(now())
 
   @@unique([sourceType, sourceEventId])
@@ -654,6 +654,54 @@ enum PatientNotificationCategory {
 }
 
 enum PatientNotificationDestinationType {
+  NONE
+  RESERVATION
+  APPOINTMENT
+  SETTINGS
+}
+
+/// Patient-facing history projection. Domain tables remain authoritative;
+/// this row stores bounded presentation text and an opaque source identity.
+model PatientTimelineEvent {
+  id String @id @default(uuid()) @db.Uuid
+
+  /// Server-verified identity scopes every read; the recipient is immutable.
+  recipientUserId String @db.Uuid
+  recipient       User   @relation(fields: [recipientUserId], references: [id], onDelete: Cascade)
+
+  /// Server-controlled source namespace and event ID enable idempotent writes.
+  sourceType    String @db.VarChar(80)
+  sourceEventId String @db.VarChar(120)
+
+  /// Patient-facing category, currently RESERVATION_STATUS_CHANGED.
+  eventType String @db.VarChar(80)
+
+  /// Bounded, pre-composed presentation text -- MUST be treated as
+  /// potentially sensitive health information, not as inherently
+  /// non-sensitive. It is minimized (a short title/summary only) and
+  /// must never contain unrestricted raw clinical payloads, full
+  /// diagnostic documents, prescriptions, or verbatim provider notes.
+  title   String @db.VarChar(160)
+  summary String @db.VarChar(500)
+
+  destinationType PatientTimelineDestinationType @default(NONE)
+  /// A bounded internal identifier only -- never a URL, never
+  /// interpreted as one. See safe-destination.ts on the frontend for
+  /// the fixed, explicit route mapper this pairs with.
+  destinationId String? @db.VarChar(120)
+
+  /// When the underlying healthcare/domain event happened -- the
+  /// primary sort key. Deliberately distinct from createdAt (when this
+  /// projection row was stored). Patients cannot choose this value;
+  /// it is always server/producer-supplied.
+  occurredAt DateTime
+  createdAt  DateTime @default(now())
+
+  @@unique([sourceType, sourceEventId])
+  @@index([recipientUserId, occurredAt(sort: Desc), id(sort: Desc)])
+}
+
+enum PatientTimelineDestinationType {
   NONE
   RESERVATION
   APPOINTMENT

@@ -40,6 +40,11 @@ import {
   patientNotificationsUrduMessages,
 } from './i18n-catalogs/patient-notifications';
 import {
+  patientTimelineEnglishMessages,
+  patientTimelineTamilMessages,
+  patientTimelineUrduMessages,
+} from './i18n-catalogs/patient-timeline';
+import {
   reservationsEnglishMessages,
   reservationsTamilMessages,
   reservationsUrduMessages,
@@ -98,6 +103,7 @@ const englishMessages = {
   ...inventoryEnglishMessages,
   ...patientProfileEnglishMessages,
   ...patientNotificationsEnglishMessages,
+  ...patientTimelineEnglishMessages,
   ...reservationsEnglishMessages,
   ...auditEnglishMessages,
   ...teamEnglishMessages,
@@ -254,6 +260,7 @@ const tamilMessages: MessageOverrides = {
   ...inventoryTamilMessages,
   ...patientProfileTamilMessages,
   ...patientNotificationsTamilMessages,
+  ...patientTimelineTamilMessages,
   ...reservationsTamilMessages,
   ...auditTamilMessages,
   ...teamTamilMessages,
@@ -440,6 +447,7 @@ const urduMessages: MessageOverrides = {
   ...inventoryUrduMessages,
   ...patientProfileUrduMessages,
   ...patientNotificationsUrduMessages,
+  ...patientTimelineUrduMessages,
   ...reservationsUrduMessages,
   ...auditUrduMessages,
   ...teamUrduMessages,
