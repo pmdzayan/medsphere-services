@@ -67,6 +67,9 @@ import { InventoryExpiryQueryDto } from './dto/inventory-expiry-query.dto';
 import { InventoryExpiryWorklistResponseDto } from './dto/inventory-expiry-response.dto';
 import { InventoryQuarantineEvidenceQueryDto } from './dto/inventory-quarantine-evidence-query.dto';
 import { InventoryQuarantineEvidenceResponseDto } from './dto/inventory-quarantine-evidence-response.dto';
+import { InventoryAnalyticsService } from './inventory-analytics.service';
+import { InventoryAnalyticsQueryDto } from './dto/inventory-analytics-query.dto';
+import { InventoryAnalyticsResponseDto } from './dto/inventory-analytics-response.dto';
 import {
   AvailabilityRequestQueueQueryDto,
   AvailabilityRequestQueueResponseDto,
@@ -103,6 +106,7 @@ export class InventoryController {
     private readonly availabilityRequests: AvailabilityRequestService,
     private readonly availabilityRequestPreferences: AvailabilityRequestPreferenceService,
     private readonly availabilityRequestDemand: AvailabilityRequestDemandAnalyticsService,
+    private readonly inventoryAnalytics: InventoryAnalyticsService,
   ) {}
 
   @Post('providers/:providerId/reservations')
@@ -460,6 +464,20 @@ export class InventoryController {
       ...dto,
       request: extractRequestMetadata(request),
     });
+  }
+
+  @Get('providers/:providerId/analytics')
+  @Header('Cache-Control', 'private, no-store')
+  @RequirePermissions(PERMISSIONS.inventoryStockRead)
+  @ApiOperation({ summary: 'Bounded operational analytics snapshot for an assigned provider' })
+  @ApiOkResponse({ type: InventoryAnalyticsResponseDto })
+  @ApiNotFoundResponse({ description: 'Provider analytics not found' })
+  getAnalytics(
+    @CurrentIdentity() identity: AuthenticatedIdentity,
+    @Param('providerId', new ParseUUIDPipe({ version: '4' })) providerId: string,
+    @Query() query: InventoryAnalyticsQueryDto,
+  ) {
+    return this.inventoryAnalytics.getAnalytics(identity, providerId, query);
   }
 }
 

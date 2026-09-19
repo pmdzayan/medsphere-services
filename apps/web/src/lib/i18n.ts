@@ -30,6 +30,11 @@ import {
   inventoryUrduMessages,
 } from './i18n-catalogs/inventory';
 import {
+  inventoryAnalyticsEnglishMessages,
+  inventoryAnalyticsTamilMessages,
+  inventoryAnalyticsUrduMessages,
+} from './i18n-catalogs/inventory-analytics';
+import {
   patientProfileEnglishMessages,
   patientProfileTamilMessages,
   patientProfileUrduMessages,
@@ -101,6 +106,7 @@ const englishMessages = {
   ...publicSearchEnglishMessages,
   ...settingsEnglishMessages,
   ...inventoryEnglishMessages,
+  ...inventoryAnalyticsEnglishMessages,
   ...patientProfileEnglishMessages,
   ...patientNotificationsEnglishMessages,
   ...patientTimelineEnglishMessages,
@@ -258,6 +264,7 @@ const tamilMessages: MessageOverrides = {
   ...publicSearchTamilMessages,
   ...settingsTamilMessages,
   ...inventoryTamilMessages,
+  ...inventoryAnalyticsTamilMessages,
   ...patientProfileTamilMessages,
   ...patientNotificationsTamilMessages,
   ...patientTimelineTamilMessages,
@@ -445,6 +452,7 @@ const urduMessages: MessageOverrides = {
   ...publicSearchUrduMessages,
   ...settingsUrduMessages,
   ...inventoryUrduMessages,
+  ...inventoryAnalyticsUrduMessages,
   ...patientProfileUrduMessages,
   ...patientNotificationsUrduMessages,
   ...patientTimelineUrduMessages,

@@ -58,6 +58,7 @@ describe('InventoryController availability-request-demand - Task 0028', () => {
       {} as never,
       {} as never,
       { readDemand } as never,
+      {} as never,
     );
 
     const query = { days: 7, limit: 25 };
