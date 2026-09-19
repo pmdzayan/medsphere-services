@@ -12,6 +12,8 @@ export const AUTHORIZATION_PERMISSIONS = {
   permissionsRead: 'authorization.permissions.read',
   assignmentsRead: 'authorization.assignments.read',
   assignmentsManage: 'authorization.assignments.manage',
+  providerAccessRead: 'authorization.provider-access.read',
+  providerAccessManage: 'authorization.provider-access.manage',
   membershipsManage: 'authorization.memberships.manage',
   auditEventsRead: 'audit.events.read',
 } as const;

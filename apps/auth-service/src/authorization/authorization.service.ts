@@ -19,6 +19,7 @@ import {
   AssignmentResponseDto,
   EffectivePermissionsResponseDto,
   MembershipListResponseDto,
+  ProviderStaffListResponseDto,
   ProviderAccessResponseDto,
   RoleListResponseDto,
   RoleResponseDto,
@@ -422,6 +423,42 @@ export class AuthorizationService {
       providerType: assignment.provider.providerType,
       isActive: assignment.provider.isActive,
     }));
+  }
+
+  async listProviderMembers(
+    identity: AuthenticatedIdentity,
+    providerId: string,
+    query: AuthorizationListQueryDto,
+  ): Promise<ProviderStaffListResponseDto> {
+    const provider = await this.repository.findProvider(
+      this.repository.transactionClient,
+      identity.tenantId,
+      providerId,
+      true,
+    );
+    if (!provider || provider.providerType !== 'PHARMACY') {
+      throw new NotFoundException('Active pharmacy not found');
+    }
+
+    const result = await this.repository.listProviderMembers(
+      identity.tenantId,
+      providerId,
+      query.limit,
+      query.offset,
+    );
+    return {
+      data: result.data.map((membership) => ({
+        membershipId: membership.id,
+        email: membership.user.email,
+        firstName: membership.user.firstName,
+        lastName: membership.user.lastName,
+        status: membership.status,
+        roles: membership.roleAssignments.map(({ role }) => role),
+      })),
+      total: result.total,
+      limit: query.limit,
+      offset: query.offset,
+    };
   }
 
   async addProviderAccess(

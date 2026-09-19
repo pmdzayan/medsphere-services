@@ -1,5 +1,10 @@
 import { randomUUID } from 'node:crypto';
-import { ConflictException, ForbiddenException, PreconditionFailedException } from '@nestjs/common';
+import {
+  ConflictException,
+  ForbiddenException,
+  NotFoundException,
+  PreconditionFailedException,
+} from '@nestjs/common';
 import { Prisma } from '@medsphere/database';
 import { AuthenticatedIdentity } from '../auth/auth.types';
 import { AuditWriter } from '../audit/audit-writer.service';
@@ -45,6 +50,7 @@ describe('AuthorizationService', () => {
       removeAssignment: jest.fn(),
       findProvider: jest.fn(),
       listProviderAccess: jest.fn(),
+      listProviderMembers: jest.fn(),
       findProviderAccess: jest.fn(),
       createProviderAccess: jest.fn(),
       removeProviderAccess: jest.fn(),
@@ -234,6 +240,78 @@ describe('AuthorizationService', () => {
         resourceId: `${membershipId}:${providerId}`,
       }),
     );
+  });
+
+  it('lists only bounded members assigned to the requested pharmacy', async () => {
+    const providerId = randomUUID();
+    const roleId = randomUUID();
+    repository.findProvider.mockResolvedValue({
+      id: providerId,
+      businessName: 'Trusted Pharmacy',
+      providerType: 'PHARMACY',
+      isActive: true,
+    });
+    repository.listProviderMembers.mockResolvedValue({
+      data: [
+        {
+          id: identity.membershipId,
+          status: 'ACTIVE',
+          user: { email: 'pharmacist@example.test', firstName: 'Asha', lastName: 'Rao' },
+          roleAssignments: [{ role: { id: roleId, name: 'PHARMACIST' } }],
+        },
+      ],
+      total: 1,
+    } as never);
+
+    await expect(
+      service.listProviderMembers(identity, providerId, { limit: 25, offset: 0 }),
+    ).resolves.toEqual({
+      data: [
+        {
+          membershipId: identity.membershipId,
+          email: 'pharmacist@example.test',
+          firstName: 'Asha',
+          lastName: 'Rao',
+          status: 'ACTIVE',
+          roles: [{ id: roleId, name: 'PHARMACIST' }],
+        },
+      ],
+      total: 1,
+      limit: 25,
+      offset: 0,
+    });
+    expect(repository.listProviderMembers).toHaveBeenCalledWith(
+      identity.tenantId,
+      providerId,
+      25,
+      0,
+    );
+  });
+
+  it('does not expose staff for a hospital or a provider outside the tenant', async () => {
+    const providerId = randomUUID();
+    repository.findProvider
+      .mockResolvedValueOnce({
+        id: providerId,
+        businessName: 'Trusted Hospital',
+        providerType: 'HOSPITAL',
+        isActive: true,
+      })
+      .mockResolvedValueOnce(null);
+
+    await expect(
+      service.listProviderMembers(identity, providerId, { limit: 50, offset: 0 }),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    await expect(
+      service.listProviderMembers(identity, providerId, { limit: 50, offset: 0 }),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(repository.findProvider).toHaveBeenLastCalledWith(
+      repository.transactionClient,
+      identity.tenantId,
+      providerId,
+      true,
+    );
+    expect(repository.listProviderMembers).not.toHaveBeenCalled();
   });
 
   it('removes provider access and its audit evidence atomically', async () => {

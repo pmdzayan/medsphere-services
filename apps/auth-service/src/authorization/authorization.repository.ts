@@ -345,6 +345,39 @@ export class AuthorizationRepository {
     });
   }
 
+  async listProviderMembers(tenantId: string, providerId: string, limit: number, offset: number) {
+    const where = {
+      tenantId,
+      providerId,
+      membership: { deletedAt: null },
+      provider: { deletedAt: null },
+    };
+    const [assignments, total] = await Promise.all([
+      this.prisma.client.membershipProviderAccess.findMany({
+        where,
+        select: {
+          membership: {
+            select: {
+              id: true,
+              status: true,
+              user: { select: { email: true, firstName: true, lastName: true } },
+              roleAssignments: {
+                where: { role: { deletedAt: null } },
+                select: { role: { select: { id: true, name: true } } },
+                orderBy: { role: { name: 'asc' } },
+              },
+            },
+          },
+        },
+        orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+        take: limit,
+        skip: offset,
+      }),
+      this.prisma.client.membershipProviderAccess.count({ where }),
+    ]);
+    return { data: assignments.map(({ membership }) => membership), total };
+  }
+
   async findProviderAccess(
     database: AuthorizationDatabase,
     tenantId: string,

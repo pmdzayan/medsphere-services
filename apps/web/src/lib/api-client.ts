@@ -13,6 +13,7 @@ import type {
   VerifyPhoneOtpResponse,
 } from './auth-contract';
 import { toAuditSearchParams, type AuditEventFilters, type AuditEventPage } from './audit-contract';
+import type { PharmacyStaffCatalogue } from './pharmacy-staff-contract';
 import type {
   PublicMedicineSearchResponse,
   PublicNearbyMedicineSearchRequest,
@@ -647,6 +648,36 @@ export async function getPatientLiveAvailabilityStatus(
 ): Promise<PatientLiveAvailabilityRequestResponse> {
   return requestJson<PatientLiveAvailabilityRequestResponse>(
     `/api/public/medicine-discovery/availability-requests/${requestId}`,
+  );
+}
+
+export async function getPharmacyStaff(
+  providerId: string,
+  offset = 0,
+): Promise<PharmacyStaffCatalogue> {
+  return requestJson<PharmacyStaffCatalogue>(
+    `/api/pharmacy/providers/${encodeURIComponent(providerId)}/staff?limit=50&offset=${offset}`,
+  );
+}
+
+export async function assignPharmacyStaff(providerId: string, membershipId: string): Promise<void> {
+  await requestJson<{ assigned: true }>(
+    `/api/pharmacy/providers/${encodeURIComponent(providerId)}/staff`,
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ membershipId }),
+    },
+  );
+}
+
+export async function revokePharmacyStaffAccess(
+  providerId: string,
+  membershipId: string,
+): Promise<void> {
+  await requestJson<{ revoked: true }>(
+    `/api/pharmacy/providers/${encodeURIComponent(providerId)}/staff/members/${encodeURIComponent(membershipId)}`,
+    { method: 'DELETE' },
   );
 }
 

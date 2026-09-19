@@ -38,6 +38,7 @@ import {
   RoleListResponseDto,
   RoleResponseDto,
   ProviderAccessResponseDto,
+  ProviderStaffListResponseDto,
 } from './dto/authorization-response.dto';
 import { CreateRoleDto } from './dto/create-role.dto';
 import { UpdateRoleDto } from './dto/update-role.dto';
@@ -212,6 +213,18 @@ export class AuthorizationController {
     @Param('membershipId', uuid) membershipId: string,
   ) {
     return this.authorizationService.listProviderAccess(identity, membershipId);
+  }
+
+  @Get('providers/:providerId/memberships')
+  @RequirePermissions(PERMISSIONS.providerAccessRead)
+  @ApiOperation({ summary: 'List bounded staff assignments for one pharmacy' })
+  @ApiOkResponse({ type: ProviderStaffListResponseDto })
+  listProviderMembers(
+    @CurrentIdentity() identity: AuthenticatedIdentity,
+    @Param('providerId', uuid) providerId: string,
+    @Query() query: AuthorizationListQueryDto,
+  ) {
+    return this.authorizationService.listProviderMembers(identity, providerId, query);
   }
 
   @Put('memberships/:membershipId/provider-access/:providerId')

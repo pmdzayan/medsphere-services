@@ -25,6 +25,7 @@ const primaryNavigation: NavigationItem[] = [
 
 const organizationNavigation: NavigationItem[] = [
   { labelKey: 'shell.teamAccess', href: '/team', icon: 'team' },
+  { labelKey: 'pharmacyStaff.title', href: '/pharmacy-staff', icon: 'team' },
   { labelKey: 'shell.auditTrail', href: '/audit', icon: 'audit' },
   { labelKey: 'shell.settings', href: '/settings', icon: 'settings' },
 ];
