@@ -103,6 +103,7 @@ function buildHarness(options: {
     { appendTenantUser: jest.fn() } as never,
     events as never,
     reconciliation as never,
+    { evaluate: jest.fn().mockResolvedValue({ eligible: true }) } as never,
   );
 
   return {

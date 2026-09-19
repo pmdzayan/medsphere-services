@@ -38,6 +38,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { assertTrustedProviderAccess } from './inventory-access';
 import { InventoryEventWriter } from './inventory-event-writer';
 import { LiveAvailabilityReconciliationService } from './live-availability-reconciliation.service';
+import { PharmacyVerificationEligibilityEvaluator } from '../pharmacy-verification/pharmacy-verification-eligibility.evaluator';
 import {
   acceptedRetryAfterMinutes,
   isPendingRequestExpired,
@@ -118,6 +119,7 @@ export class AvailabilityRequestService {
     private readonly audit: AuditWriter,
     private readonly events: InventoryEventWriter,
     private readonly reconciliation: LiveAvailabilityReconciliationService,
+    private readonly pharmacyEligibility: PharmacyVerificationEligibilityEvaluator,
   ) {}
 
   async createPublicRequest(
@@ -132,11 +134,14 @@ export class AvailabilityRequestService {
 
     // -- Server-side eligibility -----------------------------------------
     const provider = await this.prisma.client.provider.findFirst({
-      where: { id: providerId, isActive: true, isVerified: true, deletedAt: null },
+      where: { id: providerId, isActive: true, deletedAt: null },
       select: { id: true, tenantId: true },
     });
     if (!provider) throw new NotFoundException(PUBLIC_NOT_FOUND);
     const tenantId = provider.tenantId;
+
+    const eligibility = await this.pharmacyEligibility.evaluate({ tenantId, providerId, now });
+    if (!eligibility.eligible) throw new NotFoundException(PUBLIC_NOT_FOUND);
 
     const product = await this.prisma.client.product.findFirst({
       where: { id: productId, isActive: true, deletedAt: null },
@@ -151,7 +156,12 @@ export class AvailabilityRequestService {
         productId,
         isVisible: true,
         deletedAt: null,
-        provider: { isActive: true, isVerified: true, deletedAt: null },
+        // `isVerified` intentionally omitted here (Task 0039) -- this
+        // (tenantId, providerId) pair was already confirmed eligible by
+        // the central evaluator above, which checks authoritative
+        // current-verification state and runtime license expiry, not
+        // merely the possibly-stale `isVerified` projection.
+        provider: { isActive: true, deletedAt: null },
         product: { isActive: true, deletedAt: null },
       },
       select: { id: true },
@@ -465,10 +475,17 @@ export class AvailabilityRequestService {
     if (!request) throw new NotFoundException(PUBLIC_NOT_FOUND);
 
     const provider = await this.prisma.client.provider.findFirst({
-      where: { id: request.providerId, isActive: true, isVerified: true, deletedAt: null },
+      where: { id: request.providerId, isActive: true, deletedAt: null },
       select: { id: true },
     });
     if (!provider) return unresolvedPublicState();
+
+    const eligibility = await this.pharmacyEligibility.evaluate({
+      tenantId: request.tenantId,
+      providerId: request.providerId,
+      now,
+    });
+    if (!eligibility.eligible) return unresolvedPublicState();
 
     return this.reconciliation.resolveProviderProduct(
       request.tenantId,

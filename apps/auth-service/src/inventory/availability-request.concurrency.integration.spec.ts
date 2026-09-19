@@ -28,6 +28,7 @@ infrastructure('Task 0026 response-vs-expiry real PostgreSQL concurrency', () =>
     new AuditWriter(),
     new InventoryEventWriter(),
     {} as never,
+    {} as never,
   );
   const expiry = new AvailabilityRequestExpiryService(prisma);
 

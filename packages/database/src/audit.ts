@@ -68,6 +68,14 @@ export const AUDIT_EVENT_TYPES = [
   'inventory.reservation.expired',
   'inventory.availability-request.responded',
   'inventory.availability-request.preference.configured',
+  // Task 0039 (PROVISIONAL): pharmacy onboarding & verification closure.
+  'pharmacy.verification.submitted',
+  'pharmacy.verification.resubmitted',
+  'pharmacy.verification.review-started',
+  'pharmacy.verification.approved',
+  'pharmacy.verification.rejected',
+  'pharmacy.verification.suspended',
+  'pharmacy.verification.expired',
 ] as const;
 
 export type AuditEventType = (typeof AUDIT_EVENT_TYPES)[number];
@@ -163,6 +171,17 @@ export const AUDIT_METADATA_KEYS = {
     'quietHoursStartMinute',
     'quietHoursEndMinute',
   ],
+  // Task 0039 (PROVISIONAL): no document/evidence content, license
+  // numbers, government references, or reviewer notes are ever
+  // included -- only bounded structural identifiers and status
+  // transitions.
+  'pharmacy.verification.submitted': ['verificationId', 'providerId'],
+  'pharmacy.verification.resubmitted': ['verificationId', 'providerId', 'previousVerificationId'],
+  'pharmacy.verification.review-started': ['verificationId', 'providerId', 'previousStatus'],
+  'pharmacy.verification.approved': ['verificationId', 'providerId', 'previousStatus'],
+  'pharmacy.verification.rejected': ['verificationId', 'providerId', 'previousStatus'],
+  'pharmacy.verification.suspended': ['verificationId', 'providerId', 'previousStatus'],
+  'pharmacy.verification.expired': ['verificationId', 'providerId', 'previousStatus'],
 } as const satisfies Record<AuditEventType, readonly string[]>;
 
 const AUDIT_EVENT_TYPE_SET = new Set<string>(AUDIT_EVENT_TYPES);

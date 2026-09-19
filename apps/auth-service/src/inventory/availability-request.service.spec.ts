@@ -113,6 +113,7 @@ describe('AvailabilityRequestService - Task 0026 CTO coverage correction', () =>
       audit as never,
       events as never,
       reconciliation as never,
+      { evaluate: jest.fn().mockResolvedValue({ eligible: true }) } as never,
     );
 
     const result = await service.createPublicRequest('provider-a', 'product-a', {
@@ -164,6 +165,7 @@ describe('AvailabilityRequestService - Task 0026 CTO coverage correction', () =>
       { appendTenantUser: jest.fn() } as never,
       { appendTenantSystem: jest.fn(), appendTenantUser: jest.fn() } as never,
       reconciliation as never,
+      { evaluate: jest.fn().mockResolvedValue({ eligible: true }) } as never,
     );
 
     const result = await service.createPublicRequest('provider-a', 'product-a', {
@@ -221,6 +223,7 @@ describe('AvailabilityRequestService - Task 0026 CTO coverage correction', () =>
       { appendTenantUser: jest.fn() } as never,
       { appendTenantSystem: jest.fn(), appendTenantUser: jest.fn() } as never,
       reconciliation as never,
+      { evaluate: jest.fn().mockResolvedValue({ eligible: true }) } as never,
     );
 
     const result = await service.createPublicRequest('provider-a', 'product-a', {
@@ -272,6 +275,7 @@ describe('AvailabilityRequestService - Task 0026 CTO coverage correction', () =>
       { appendTenantUser: jest.fn() } as never,
       { appendTenantSystem: jest.fn(), appendTenantUser: jest.fn() } as never,
       reconciliation as never,
+      { evaluate: jest.fn().mockResolvedValue({ eligible: true }) } as never,
     );
 
     await expect(
@@ -316,6 +320,7 @@ describe('AvailabilityRequestService - Task 0026 CTO coverage correction', () =>
       { appendTenantUser: jest.fn() } as never,
       { appendTenantSystem: jest.fn(), appendTenantUser: jest.fn() } as never,
       reconciliation as never,
+      { evaluate: jest.fn().mockResolvedValue({ eligible: true }) } as never,
     );
 
     await service.createPublicRequest('provider-a', 'product-a', {
@@ -399,6 +404,7 @@ describe('AvailabilityRequestService - Task 0026 CTO coverage correction', () =>
         { client } as never,
         audit as never,
         events as never,
+        {} as never,
         {} as never,
       );
 
@@ -498,6 +504,7 @@ describe('AvailabilityRequestService - Task 0026 CTO coverage correction', () =>
       { appendTenantUser: jest.fn() } as never,
       { appendTenantUser: jest.fn(), appendTenantSystem: jest.fn() } as never,
       {} as never,
+      {} as never,
     );
     const input = {
       outcome: 'AVAILABLE' as const,
@@ -567,6 +574,7 @@ describe('AvailabilityRequestService - Task 0026 CTO coverage correction', () =>
       { appendTenantUser: jest.fn() } as never,
       { appendTenantUser: jest.fn(), appendTenantSystem: jest.fn() } as never,
       {} as never,
+      {} as never,
     );
 
     await service.respond(
@@ -619,6 +627,7 @@ describe('AvailabilityRequestService - Task 0026 CTO coverage correction', () =>
       { appendTenantUser: jest.fn() } as never,
       { appendTenantUser: jest.fn(), appendTenantSystem: jest.fn() } as never,
       {} as never,
+      {} as never,
     );
 
     await expect(
@@ -649,6 +658,7 @@ describe('AvailabilityRequestService - Task 0026 CTO coverage correction', () =>
       { client } as never,
       { appendTenantUser: jest.fn() } as never,
       { appendTenantUser: jest.fn(), appendTenantSystem: jest.fn() } as never,
+      {} as never,
       {} as never,
     );
 

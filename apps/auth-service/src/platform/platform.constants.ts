@@ -11,6 +11,8 @@
 export const PLATFORM_PERMISSIONS = {
   administrationRead: 'platform.administration.read',
   administrationManage: 'platform.administration.manage',
+  /** Task 0039 (PROVISIONAL): pharmacy onboarding verification review. */
+  providerVerificationsReview: 'platform.provider-verifications.review',
 } as const;
 
 export const PLATFORM_PERMISSION_KEYS = Object.values(PLATFORM_PERMISSIONS);
