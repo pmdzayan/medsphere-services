@@ -87,6 +87,17 @@ describe('PatientDashboard (candidate Task 0032)', () => {
     expect(reservationsLink).not.toHaveTextContent(/Appointments will appear here/);
   });
 
+  it('links to the patient activity center from the dashboard', async () => {
+    vi.mocked(getPatientProfile).mockResolvedValue(profile);
+    renderDashboard();
+
+    await screen.findByText('Asha');
+    expect(screen.getByRole('link', { name: 'Activity' })).toHaveAttribute(
+      'href',
+      '/patient/activity',
+    );
+  });
+
   it('shows a separate, accurately-labeled Appointments card', async () => {
     vi.mocked(getPatientProfile).mockResolvedValue(profile);
     renderDashboard();

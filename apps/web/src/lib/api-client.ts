@@ -76,6 +76,11 @@ import {
   type PatientReservationFilters,
   type PatientReservationPage,
 } from './patient-reservation-contract';
+import type {
+  ListPatientNotificationsResponse,
+  MarkAllReadResponse,
+  PatientNotification,
+} from './patient-notification-contract';
 
 export class ApiError extends Error {
   constructor(
@@ -495,6 +500,33 @@ export async function setRoleAssignment(
 ): Promise<void> {
   await requestJson<void>(`/api/authorization/memberships/${membershipId}/roles/${roleId}`, {
     method: assigned ? 'PUT' : 'DELETE',
+  });
+}
+
+export async function listPatientNotifications(
+  cursor: string | undefined,
+  unreadOnly: boolean | undefined,
+  signal?: AbortSignal,
+): Promise<ListPatientNotificationsResponse> {
+  const search = new URLSearchParams();
+  if (cursor) search.set('cursor', cursor);
+  if (unreadOnly !== undefined) search.set('unreadOnly', String(unreadOnly));
+  return requestJson<ListPatientNotificationsResponse>(
+    `/api/patient/notifications?${search.toString()}`,
+    { signal },
+  );
+}
+
+export async function markNotificationRead(notificationId: string): Promise<PatientNotification> {
+  return requestJson<PatientNotification>(
+    `/api/patient/notifications/${encodeURIComponent(notificationId)}/read`,
+    { method: 'PATCH' },
+  );
+}
+
+export async function markAllNotificationsRead(): Promise<MarkAllReadResponse> {
+  return requestJson<MarkAllReadResponse>('/api/patient/notifications/read-all', {
+    method: 'POST',
   });
 }
 

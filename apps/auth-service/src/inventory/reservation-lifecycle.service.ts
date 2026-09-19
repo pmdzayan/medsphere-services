@@ -68,6 +68,7 @@ export class ReservationLifecycleService {
           },
           select: {
             id: true,
+            subjectUserId: true,
             status: true,
             version: true,
             expiresAt: true,
@@ -155,6 +156,21 @@ export class ReservationLifecycleService {
         });
         if (updated.count !== 1) {
           throw new SerializableRetryError('Concurrent reservation transition detected');
+        }
+
+        if (rule.to === 'READY') {
+          await transaction.patientNotification.create({
+            data: {
+              recipientUserId: reservation.subjectUserId,
+              category: 'RESERVATION',
+              title: 'Reservation ready',
+              message: 'Your medicine reservation is ready for pickup.',
+              destinationType: 'RESERVATION',
+              destinationId: reservation.id,
+              sourceType: 'reservation-ready-v1',
+              sourceEventId: reservation.id,
+            },
+          });
         }
 
         await this.appendAudit(

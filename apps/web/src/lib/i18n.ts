@@ -35,6 +35,11 @@ import {
   patientProfileUrduMessages,
 } from './i18n-catalogs/patient-profile';
 import {
+  patientNotificationsEnglishMessages,
+  patientNotificationsTamilMessages,
+  patientNotificationsUrduMessages,
+} from './i18n-catalogs/patient-notifications';
+import {
   reservationsEnglishMessages,
   reservationsTamilMessages,
   reservationsUrduMessages,
@@ -92,6 +97,7 @@ const englishMessages = {
   ...settingsEnglishMessages,
   ...inventoryEnglishMessages,
   ...patientProfileEnglishMessages,
+  ...patientNotificationsEnglishMessages,
   ...reservationsEnglishMessages,
   ...auditEnglishMessages,
   ...teamEnglishMessages,
@@ -247,6 +253,7 @@ const tamilMessages: MessageOverrides = {
   ...settingsTamilMessages,
   ...inventoryTamilMessages,
   ...patientProfileTamilMessages,
+  ...patientNotificationsTamilMessages,
   ...reservationsTamilMessages,
   ...auditTamilMessages,
   ...teamTamilMessages,
@@ -432,6 +439,7 @@ const urduMessages: MessageOverrides = {
   ...settingsUrduMessages,
   ...inventoryUrduMessages,
   ...patientProfileUrduMessages,
+  ...patientNotificationsUrduMessages,
   ...reservationsUrduMessages,
   ...auditUrduMessages,
   ...teamUrduMessages,

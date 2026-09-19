@@ -16,6 +16,7 @@ import { VerificationModule } from './verification/verification.module';
 import { ConsentModule } from './consent/consent.module';
 import { PlatformModule } from './platform/platform.module';
 import { PatientProfileModule } from './patient-profile/patient-profile.module';
+import { PatientNotificationModule } from './patient-notifications/patient-notification.module';
 import { AuthReadinessService } from './health/auth-readiness.service';
 
 @Module({
@@ -40,6 +41,7 @@ import { AuthReadinessService } from './health/auth-readiness.service';
     ConsentModule,
     PlatformModule,
     PatientProfileModule,
+    PatientNotificationModule,
     MetricsModule,
   ],
   providers: [
