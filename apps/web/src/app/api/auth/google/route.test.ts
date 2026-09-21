@@ -25,7 +25,11 @@ describe('Google login session boundary', () => {
 
     const broad = await POST(createRequest({ ...validRequest, password: 'short' }));
     const legacy = await POST(
-      createRequest({ ...validRequest, tenantSlug: 'central-pharmacy', tenantId: 'client-controlled' }),
+      createRequest({
+        ...validRequest,
+        tenantSlug: 'central-pharmacy',
+        tenantId: 'client-controlled',
+      }),
     );
 
     expect(broad.status).toBe(400);
