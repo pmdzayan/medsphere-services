@@ -29,7 +29,9 @@ export function checkPwaCachePolicy(source = fs.readFileSync(serviceWorkerPath, 
 
   for (const pattern of forbiddenPatterns) {
     if (pattern.test(source)) {
-      failures.push(`Service worker appears to cache protected/dynamic healthcare content: ${pattern}`);
+      failures.push(
+        `Service worker appears to cache protected/dynamic healthcare content: ${pattern}`,
+      );
     }
   }
 
