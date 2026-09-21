@@ -13,10 +13,7 @@ const config = fs.readFileSync(
 
 describe('AIM OpenTelemetry Collector boundary', () => {
   it('pins the collector image rather than using latest', () => {
-    assert.match(
-      compose,
-      /otel\/opentelemetry-collector-contrib:0\.161\.0/,
-    );
+    assert.match(compose, /otel\/opentelemetry-collector-contrib:0\.161\.0/);
     assert.doesNotMatch(compose, /otel\/opentelemetry-collector-contrib:latest/);
   });
 
