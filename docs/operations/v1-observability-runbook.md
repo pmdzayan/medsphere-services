@@ -241,6 +241,40 @@ Retention and incident procedures for these conditions are in
 `docs/operations/backup-retention-policy.md` and
 `docs/operations/backup-restore-runbook.md`.
 
+## OpenTelemetry Collector reference deployment
+
+AIM now includes a **pinned, separately operated collector reference** in
+`compose/docker-compose.services.yml` using
+`otel/opentelemetry-collector-contrib:0.161.0`. The version is pinned to the
+September 2026 stable collector release rather than `latest`.
+
+The collector reads only AIM's existing privacy-bounded `GET /metrics`
+endpoint from `auth-service:3000`. It does **not** receive request bodies,
+cookies, authorization headers, patient searches, medicine names, tenant IDs,
+user IDs, phone numbers, or email addresses. The application's existing
+low-cardinality metric-label allowlist remains the source-of-truth privacy
+boundary.
+
+The reference collector:
+
+- applies a memory limiter before batching;
+- batches metrics before export;
+- exposes a Prometheus-compatible collector endpoint on host
+  `127.0.0.1:9464` only;
+- exposes collector health on host `127.0.0.1:13133` only;
+- emits only sampled/basic debug exporter output;
+- runs outside AIM's business-request path, so collector failure cannot alter
+  authentication, inventory, reservations, or patient workflows.
+
+Start it together with the accepted service compose stack after the external AIM
+networks exist. Operators may query `http://127.0.0.1:13133/` for collector
+health and `http://127.0.0.1:9464/metrics` for collector-exported metrics in a
+local or secured operator environment.
+
+This is **reference/local operational wiring**, not evidence that a production
+monitoring backend, retention policy, on-call route, or customer-facing SLA is
+live.
+
 ## What still requires production deployment/vendor activation
 
 This foundation does **not** claim centralized production monitoring is operational. The following remain external, deployment-only steps:
