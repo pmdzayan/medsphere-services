@@ -6,7 +6,9 @@ function isLocalDevelopmentHost(hostname: string): boolean {
   return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]';
 }
 
-export function canRegisterAimServiceWorker(location: Pick<Location, 'protocol' | 'hostname'>): boolean {
+export function canRegisterAimServiceWorker(
+  location: Pick<Location, 'protocol' | 'hostname'>,
+): boolean {
   return location.protocol === 'https:' || isLocalDevelopmentHost(location.hostname);
 }
 
