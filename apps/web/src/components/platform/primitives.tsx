@@ -71,9 +71,9 @@ type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger';
 
 const buttonVariants: Record<ButtonVariant, string> = {
   primary:
-    'bg-emerald-800 text-white shadow-[0_18px_35px_-20px_rgba(11,47,40,.8)] hover:bg-emerald-700 hover:-translate-y-0.5',
+    'organization-theme-interactive bg-[var(--org-primary)] text-[var(--org-on-primary)] shadow-[0_18px_35px_-20px_var(--org-glow)] hover:bg-[var(--org-primary-hover)] hover:-translate-y-0.5',
   secondary:
-    'border border-canvas-400 bg-white text-ink-900 hover:border-emerald-600/40 hover:bg-canvas-100',
+    'organization-theme-interactive border border-canvas-400 bg-white text-ink-900 hover:bg-canvas-100',
   ghost: 'text-ink-800 hover:bg-canvas-200',
   danger: 'bg-rose-700 text-white shadow-[0_18px_35px_-20px_rgba(159,18,57,.7)] hover:bg-rose-600',
 };
@@ -134,7 +134,7 @@ export function Input({
         id={id}
         aria-invalid={Boolean(error)}
         aria-describedby={describedBy}
-        className="w-full rounded-xl border border-ink-900/[.11] bg-canvas-50 px-4 py-3.5 text-sm text-ink-900 shadow-[0_1px_0_rgba(255,255,255,.8)_inset] transition placeholder:text-canvas-500 hover:border-ink-900/25 focus:border-emerald-600 focus:bg-white"
+        className="organization-theme-focus w-full rounded-xl border border-ink-900/[.11] bg-canvas-50 px-4 py-3.5 text-sm text-ink-900 shadow-[0_1px_0_rgba(255,255,255,.8)_inset] transition placeholder:text-canvas-500 hover:border-ink-900/25 focus:bg-white"
       />
       {error ? (
         <span id={`${id}-error`} className="mt-2 block text-xs text-rose-700" role="alert">
