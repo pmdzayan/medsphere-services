@@ -261,13 +261,29 @@ describe('AuthService', () => {
     expect(sessionRepository.createSession).not.toHaveBeenCalled();
   });
 
-  it('creates the normal membership-bound session for a linked Google identity', async () => {
+  it('creates a membership-bound session for a linked Google identity with one active membership', async () => {
     googleIdentityVerifier.verify.mockResolvedValue({
       subject: 'google-subject-123',
       email: loginDto.email,
       emailVerified: true,
     });
-    usersRepository.findGoogleLoginIdentity.mockResolvedValue(loginIdentity);
+    usersRepository.findGlobalIdentityByEmail.mockResolvedValue({
+      id: userId,
+      email: loginDto.email,
+      passwordHash: null,
+      firstName: 'Test',
+      lastName: 'User',
+    });
+    (prisma.client.externalAuthIdentity.findFirst as jest.Mock).mockResolvedValue({ id: 'link-1' });
+    usersRepository.findActiveMembershipsForUser.mockResolvedValue([
+      {
+        membershipId,
+        tenantId,
+        organizationName: 'Central Pharmacy',
+        organizationType: 'PHARMACY',
+      },
+    ]);
+    usersRepository.findLoginIdentityByMembershipId.mockResolvedValue(loginIdentity);
     tokenService.issueRefreshCredential.mockReturnValue({
       value: 'google-refresh',
       hash: 'c'.repeat(64),
@@ -279,58 +295,142 @@ describe('AuthService', () => {
       tokenId,
     });
 
-    const result = await service.googleLogin(loginDto.tenantSlug, 'google-id-token', metadata);
+    const result = await service.googleLogin('google-id-token', metadata);
 
     expect(googleIdentityVerifier.verify).toHaveBeenCalledWith('google-id-token');
-    expect(usersRepository.findGoogleLoginIdentity).toHaveBeenCalledWith(
-      loginDto.tenantSlug,
-      'google-subject-123',
-    );
-    expect(sessionRepository.createSession).toHaveBeenCalledWith(
-      expect.objectContaining({
-        userId,
-        membershipId,
-        tenantId,
-        metadata,
-      }),
-    );
-    expect(result.accessToken).toBe('google-access');
-    expect(result.context).toEqual({
-      membershipId,
-      tenantId,
-      tenantName: 'Central Pharmacy',
-      organizationType: 'PHARMACY',
-    });
-    expect(result.user.preferredLanguage).toBe('ta');
+    expect(usersRepository.findActiveMembershipsForUser).toHaveBeenCalledWith(userId);
+    expect(usersRepository.findLoginIdentityByMembershipId).toHaveBeenCalledWith(userId, membershipId);
+    expect(sessionRepository.createSession).toHaveBeenCalled();
+    if ('requiresOrganizationSelection' in result) {
+      throw new Error('Expected a membership-bound Google session');
+    }
+    expect(result.context.membershipId).toBe(membershipId);
   });
 
-  it('rejects an unknown Google identity without creating a session', async () => {
+  it('returns only the verified Google identity active organization choices when multiple exist', async () => {
+    googleIdentityVerifier.verify.mockResolvedValue({
+      subject: 'google-subject-123',
+      email: loginDto.email,
+      emailVerified: true,
+    });
+    usersRepository.findGlobalIdentityByEmail.mockResolvedValue({
+      id: userId,
+      email: loginDto.email,
+      passwordHash: null,
+      firstName: 'Test',
+      lastName: 'User',
+    });
+    (prisma.client.externalAuthIdentity.findFirst as jest.Mock).mockResolvedValue({ id: 'link-1' });
+    usersRepository.findActiveMembershipsForUser.mockResolvedValue([
+      {
+        membershipId,
+        tenantId,
+        organizationName: 'Central Pharmacy',
+        organizationType: 'PHARMACY',
+      },
+      {
+        membershipId: '00000000-0000-4000-8000-000000000002',
+        tenantId: '00000000-0000-4000-8000-000000000003',
+        organizationName: 'Riverside Hospital',
+        organizationType: 'HOSPITAL',
+      },
+    ]);
+
+    await expect(service.googleLogin('google-id-token', metadata)).resolves.toEqual({
+      requiresOrganizationSelection: true,
+      organizations: [
+        {
+          membershipId,
+          organizationName: 'Central Pharmacy',
+          organizationType: 'PHARMACY',
+        },
+        {
+          membershipId: '00000000-0000-4000-8000-000000000002',
+          organizationName: 'Riverside Hospital',
+          organizationType: 'HOSPITAL',
+        },
+      ],
+    });
+    expect(sessionRepository.createSession).not.toHaveBeenCalled();
+  });
+
+  it('rejects a Google identity that is not linked to the verified AIM user', async () => {
     googleIdentityVerifier.verify.mockResolvedValue({
       subject: 'unknown-google-subject',
       email: loginDto.email,
       emailVerified: true,
     });
-    usersRepository.findGoogleLoginIdentity.mockResolvedValue(null);
+    usersRepository.findGlobalIdentityByEmail.mockResolvedValue({
+      id: userId,
+      email: loginDto.email,
+      passwordHash: null,
+      firstName: 'Test',
+      lastName: 'User',
+    });
+    (prisma.client.externalAuthIdentity.findFirst as jest.Mock).mockResolvedValue(null);
 
-    await expect(
-      service.googleLogin(loginDto.tenantSlug, 'google-id-token', metadata),
-    ).rejects.toThrow(new UnauthorizedException('Invalid credentials'));
-
+    await expect(service.googleLogin('google-id-token', metadata)).rejects.toThrow(
+      new UnauthorizedException('Invalid credentials'),
+    );
+    expect(usersRepository.findActiveMembershipsForUser).not.toHaveBeenCalled();
     expect(sessionRepository.createSession).not.toHaveBeenCalled();
   });
 
-  it('rejects a Google identity when the verified email does not match the linked user', async () => {
+  it('re-verifies Google before selecting an organization and scopes membership to that identity', async () => {
     googleIdentityVerifier.verify.mockResolvedValue({
       subject: 'google-subject-123',
-      email: 'attacker@example.com',
+      email: loginDto.email,
       emailVerified: true,
     });
-    usersRepository.findGoogleLoginIdentity.mockResolvedValue(loginIdentity);
+    usersRepository.findGlobalIdentityByEmail.mockResolvedValue({
+      id: userId,
+      email: loginDto.email,
+      passwordHash: null,
+      firstName: 'Test',
+      lastName: 'User',
+    });
+    (prisma.client.externalAuthIdentity.findFirst as jest.Mock).mockResolvedValue({ id: 'link-1' });
+    usersRepository.findLoginIdentityByMembershipId.mockResolvedValue(loginIdentity);
+    tokenService.issueRefreshCredential.mockReturnValue({
+      value: 'google-refresh',
+      hash: 'c'.repeat(64),
+      sessionId,
+    });
+    tokenService.issueAccessToken.mockReturnValue({
+      value: 'google-access',
+      expiresIn: 900,
+      tokenId,
+    });
+
+    const result = await service.selectGoogleOrganizationLogin(
+      { idToken: 'google-id-token', membershipId },
+      metadata,
+    );
+
+    expect(usersRepository.findLoginIdentityByMembershipId).toHaveBeenCalledWith(userId, membershipId);
+    expect(result.context.membershipId).toBe(membershipId);
+    expect(sessionRepository.createSession).toHaveBeenCalled();
+  });
+
+  it('denies selecting a membership that does not belong to the re-verified Google identity', async () => {
+    googleIdentityVerifier.verify.mockResolvedValue({
+      subject: 'google-subject-123',
+      email: loginDto.email,
+      emailVerified: true,
+    });
+    usersRepository.findGlobalIdentityByEmail.mockResolvedValue({
+      id: userId,
+      email: loginDto.email,
+      passwordHash: null,
+      firstName: 'Test',
+      lastName: 'User',
+    });
+    (prisma.client.externalAuthIdentity.findFirst as jest.Mock).mockResolvedValue({ id: 'link-1' });
+    usersRepository.findLoginIdentityByMembershipId.mockResolvedValue(null);
 
     await expect(
-      service.googleLogin(loginDto.tenantSlug, 'google-id-token', metadata),
+      service.selectGoogleOrganizationLogin({ idToken: 'google-id-token', membershipId }, metadata),
     ).rejects.toThrow(new UnauthorizedException('Invalid credentials'));
-
     expect(sessionRepository.createSession).not.toHaveBeenCalled();
   });
 
