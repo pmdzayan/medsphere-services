@@ -54,6 +54,7 @@ describe('AuthService', () => {
     usersRepository = {
       findLoginIdentity: jest.fn(),
       findGoogleLoginIdentity: jest.fn(),
+      findGlobalGoogleIdentityBySubject: jest.fn(),
       createPendingGoogleRegistration: jest.fn(),
       findGlobalIdentityByEmail: jest.fn(),
       findActiveMembershipsForUser: jest.fn(),
@@ -267,14 +268,10 @@ describe('AuthService', () => {
       email: loginDto.email,
       emailVerified: true,
     });
-    usersRepository.findGlobalIdentityByEmail.mockResolvedValue({
+    usersRepository.findGlobalGoogleIdentityBySubject.mockResolvedValue({
       id: userId,
       email: loginDto.email,
-      passwordHash: null,
-      firstName: 'Test',
-      lastName: 'User',
     });
-    (prisma.client.externalAuthIdentity.findFirst as jest.Mock).mockResolvedValue({ id: 'link-1' });
     usersRepository.findActiveMembershipsForUser.mockResolvedValue([
       {
         membershipId,
@@ -313,14 +310,10 @@ describe('AuthService', () => {
       email: loginDto.email,
       emailVerified: true,
     });
-    usersRepository.findGlobalIdentityByEmail.mockResolvedValue({
+    usersRepository.findGlobalGoogleIdentityBySubject.mockResolvedValue({
       id: userId,
       email: loginDto.email,
-      passwordHash: null,
-      firstName: 'Test',
-      lastName: 'User',
     });
-    (prisma.client.externalAuthIdentity.findFirst as jest.Mock).mockResolvedValue({ id: 'link-1' });
     usersRepository.findActiveMembershipsForUser.mockResolvedValue([
       {
         membershipId,
@@ -360,14 +353,7 @@ describe('AuthService', () => {
       email: loginDto.email,
       emailVerified: true,
     });
-    usersRepository.findGlobalIdentityByEmail.mockResolvedValue({
-      id: userId,
-      email: loginDto.email,
-      passwordHash: null,
-      firstName: 'Test',
-      lastName: 'User',
-    });
-    (prisma.client.externalAuthIdentity.findFirst as jest.Mock).mockResolvedValue(null);
+    usersRepository.findGlobalGoogleIdentityBySubject.mockResolvedValue(null);
 
     await expect(service.googleLogin('google-id-token', metadata)).rejects.toThrow(
       new UnauthorizedException('Invalid credentials'),
@@ -382,14 +368,10 @@ describe('AuthService', () => {
       email: loginDto.email,
       emailVerified: true,
     });
-    usersRepository.findGlobalIdentityByEmail.mockResolvedValue({
+    usersRepository.findGlobalGoogleIdentityBySubject.mockResolvedValue({
       id: userId,
       email: loginDto.email,
-      passwordHash: null,
-      firstName: 'Test',
-      lastName: 'User',
     });
-    (prisma.client.externalAuthIdentity.findFirst as jest.Mock).mockResolvedValue({ id: 'link-1' });
     usersRepository.findLoginIdentityByMembershipId.mockResolvedValue(loginIdentity);
     tokenService.issueRefreshCredential.mockReturnValue({
       value: 'google-refresh',
@@ -418,14 +400,10 @@ describe('AuthService', () => {
       email: loginDto.email,
       emailVerified: true,
     });
-    usersRepository.findGlobalIdentityByEmail.mockResolvedValue({
+    usersRepository.findGlobalGoogleIdentityBySubject.mockResolvedValue({
       id: userId,
       email: loginDto.email,
-      passwordHash: null,
-      firstName: 'Test',
-      lastName: 'User',
     });
-    (prisma.client.externalAuthIdentity.findFirst as jest.Mock).mockResolvedValue({ id: 'link-1' });
     usersRepository.findLoginIdentityByMembershipId.mockResolvedValue(null);
 
     await expect(
