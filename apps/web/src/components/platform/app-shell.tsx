@@ -252,7 +252,10 @@ export function AppShell({
     const busy = lockingWorkstation || unlockingWorkstation || switchingUser || lockedSigningOut;
 
     return (
-      <main\n        data-organization-theme={session.context.organizationType}\n        className="organization-theme-shell grid min-h-screen place-items-center px-5 py-10"\n      >
+      <main
+        data-organization-theme={session.context.organizationType}
+        className="organization-theme-shell grid min-h-screen place-items-center px-5 py-10"
+      >
         <section
           className="w-full max-w-md rounded-[2rem] border border-[#102c24]/10 bg-white p-6 shadow-[0_28px_80px_rgba(7,35,28,.12)] sm:p-8"
           aria-labelledby="workstation-lock-title"
@@ -349,7 +352,10 @@ export function AppShell({
   }
 
   return (
-    <div\n      data-organization-theme={session.context.organizationType}\n      className="organization-theme-shell min-h-screen"\n    >
+    <div
+      data-organization-theme={session.context.organizationType}
+      className="organization-theme-shell min-h-screen"
+    >
       <a
         href="#main-content"
         className="fixed left-4 top-3 z-[100] -translate-y-20 rounded-full bg-[#09251f] px-4 py-2 text-sm font-bold text-white transition focus:translate-y-0"
