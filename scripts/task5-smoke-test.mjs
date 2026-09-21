@@ -730,7 +730,15 @@ async function main() {
   assertProcessesAlive('dashboard browser runtime certification');
   const browserCert = spawnSync(
     'pnpm',
-    ['--filter', '@medsphere/web', 'exec', 'playwright', 'test', 'e2e/dashboard.spec.ts'],
+    [
+      '--filter',
+      '@medsphere/web',
+      'exec',
+      'playwright',
+      'test',
+      'e2e/dashboard.spec.ts',
+      'e2e/accessibility-smoke.spec.ts',
+    ],
     {
       env: {
         ...process.env,
@@ -743,7 +751,7 @@ async function main() {
     },
   );
   record(
-    'dashboard browser runtime certification (real login, real hydration, real provider-dependent read path)',
+    'dashboard + accessibility browser certification (real login, hydration, keyboard semantics, reduced motion, safe PWA)',
     browserCert.status === 0 ? 'WORKING' : 'BROKEN',
     `playwright exit code: ${browserCert.status}${browserCert.error ? `, spawn error: ${browserCert.error.message}` : ''}`,
     { phase: 'dashboard' },
