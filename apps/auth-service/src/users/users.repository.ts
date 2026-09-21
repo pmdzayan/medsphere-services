@@ -7,6 +7,31 @@ import { hasPrismaCode, withSerializableRetry } from '../prisma/transaction.util
 export class UsersRepository {
   constructor(private readonly prisma: PrismaService) {}
 
+  async findGlobalGoogleIdentityBySubject(
+    subject: string,
+  ): Promise<{ id: string; email: string } | null> {
+    const externalIdentity = await this.prisma.client.externalAuthIdentity.findFirst({
+      where: {
+        provider: 'GOOGLE',
+        subject,
+        user: {
+          status: 'ACTIVE',
+          deletedAt: null,
+        },
+      },
+      select: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+          },
+        },
+      },
+    });
+
+    return externalIdentity?.user ?? null;
+  }
+
   async findGoogleLoginIdentity(
     tenantSlug: string,
     subject: string,
