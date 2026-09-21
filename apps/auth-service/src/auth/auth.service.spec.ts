@@ -296,7 +296,10 @@ describe('AuthService', () => {
 
     expect(googleIdentityVerifier.verify).toHaveBeenCalledWith('google-id-token');
     expect(usersRepository.findActiveMembershipsForUser).toHaveBeenCalledWith(userId);
-    expect(usersRepository.findLoginIdentityByMembershipId).toHaveBeenCalledWith(userId, membershipId);
+    expect(usersRepository.findLoginIdentityByMembershipId).toHaveBeenCalledWith(
+      userId,
+      membershipId,
+    );
     expect(sessionRepository.createSession).toHaveBeenCalled();
     if ('requiresOrganizationSelection' in result) {
       throw new Error('Expected a membership-bound Google session');
@@ -389,7 +392,10 @@ describe('AuthService', () => {
       metadata,
     );
 
-    expect(usersRepository.findLoginIdentityByMembershipId).toHaveBeenCalledWith(userId, membershipId);
+    expect(usersRepository.findLoginIdentityByMembershipId).toHaveBeenCalledWith(
+      userId,
+      membershipId,
+    );
     expect(result.context.membershipId).toBe(membershipId);
     expect(sessionRepository.createSession).toHaveBeenCalled();
   });
