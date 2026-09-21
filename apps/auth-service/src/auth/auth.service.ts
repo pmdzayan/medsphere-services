@@ -270,12 +270,11 @@ export class AuthService {
 
   private async resolveVerifiedGoogleIdentity(idToken: string): Promise<{ id: string }> {
     const googleIdentity = await this.googleIdentityVerifier.verify(idToken);
-    const identity = await this.usersRepository.findGlobalIdentityByEmail(googleIdentity.email);
+    const identity = await this.usersRepository.findGlobalGoogleIdentityBySubject(
+      googleIdentity.subject,
+    );
 
-    if (
-      !identity ||
-      !(await this.hasLinkedGoogleSubject(identity.id, googleIdentity.subject))
-    ) {
+    if (!identity || identity.email.trim().toLowerCase() !== googleIdentity.email) {
       this.recordInvalidLogin();
       throw new UnauthorizedException(INVALID_CREDENTIALS_MESSAGE);
     }
