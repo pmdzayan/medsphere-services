@@ -41,7 +41,9 @@ for (const route of PUBLIC_ROUTES) {
           : '';
         const id = control.id;
         const explicitLabel = id
-          ? document.querySelector<HTMLLabelElement>(`label[for="${CSS.escape(id)}"]`)?.textContent?.trim()
+          ? document
+              .querySelector<HTMLLabelElement>(`label[for="${CSS.escape(id)}"]`)
+              ?.textContent?.trim()
           : '';
         const wrappingLabel = control.closest('label')?.textContent?.trim();
         const ownText = control.textContent?.trim();
@@ -89,7 +91,9 @@ test('keyboard focus remains visible on the login journey', async ({ page }) => 
   expect(focus?.outlineWidth).not.toBe('0px');
 });
 
-test('reduced-motion preference collapses startup and organization theme animation', async ({ page }) => {
+test('reduced-motion preference collapses startup and organization theme animation', async ({
+  page,
+}) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('/login');
 
@@ -99,7 +103,9 @@ test('reduced-motion preference collapses startup and organization theme animati
   expect(startupDuration).toBeLessThanOrEqual(0.001);
 });
 
-test('PWA runtime registers the static-only AIM service worker on localhost', async ({ page }) => {
+test('PWA runtime registers the static-only AIM service worker on localhost', async ({
+  page,
+}) => {
   await page.goto('/');
 
   const registered = await page.evaluate(async () => {
