@@ -1,0 +1,49 @@
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+
+receivers:
+  prometheus:
+    config:
+      scrape_configs:
+        - job_name: aim-auth-service
+          scrape_interval: 15s
+          metrics_path: /metrics
+          static_configs:
+            - targets:
+                - auth-service:3000
+
+processors:
+  memory_limiter:
+    check_interval: 5s
+    limit_mib: 192
+    spike_limit_mib: 48
+  batch:
+    timeout: 5s
+    send_batch_size: 1024
+
+exporters:
+  prometheus:
+    endpoint: 0.0.0.0:9464
+    namespace: aim
+  debug:
+    verbosity: basic
+    sampling_initial: 2
+    sampling_thereafter: 500
+
+service:
+  extensions:
+    - health_check
+  telemetry:
+    logs:
+      level: warn
+  pipelines:
+    metrics:
+      receivers:
+        - prometheus
+      processors:
+        - memory_limiter
+        - batch
+      exporters:
+        - prometheus
+        - debug
