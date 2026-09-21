@@ -11,9 +11,7 @@ const CACHE_NAME = `${CACHE_PREFIX}v1`;
 const PUBLIC_SHELL_ASSETS = new Set(['/manifest.webmanifest', '/icon.svg']);
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll([...PUBLIC_SHELL_ASSETS])),
-  );
+  event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll([...PUBLIC_SHELL_ASSETS])));
 });
 
 self.addEventListener('activate', (event) => {
