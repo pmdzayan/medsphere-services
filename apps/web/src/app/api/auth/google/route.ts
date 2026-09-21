@@ -1,9 +1,10 @@
 import { NextResponse, type NextRequest } from 'next/server';
 
-import type { LoginResponse } from '@/lib/auth-contract';
+import type { LoginResponse, OrganizationSelectionRequired } from '@/lib/auth-contract';
 import {
   isGoogleLoginRequest,
   isLoginResponse,
+  isOrganizationSelectionRequired,
   normalizeGoogleLoginRequest,
   validateGoogleLoginRequest,
 } from '@/lib/auth-contract';
@@ -61,19 +62,24 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     );
   }
 
-  let session: LoginResponse;
+  let body: unknown;
 
   try {
-    const payload: unknown = await upstream.json();
-
-    if (!isLoginResponse(payload)) {
-      throw new Error('Invalid authentication response');
-    }
-
-    session = payload;
+    body = await upstream.json();
   } catch {
     return noStore({ message: 'Authentication service returned an invalid response.' }, 502);
   }
+
+  if (isOrganizationSelectionRequired(body)) {
+    const selection: OrganizationSelectionRequired = body;
+    return noStore(selection, 200);
+  }
+
+  if (!isLoginResponse(body)) {
+    return noStore({ message: 'Authentication service returned an invalid response.' }, 502);
+  }
+
+  const session: LoginResponse = body;
 
   const response = noStore(
     {
