@@ -1489,6 +1489,7 @@ model InventoryImportReceipt {
   totalQuantity   Int
   createdAt       DateTime @default(now())
 
+  @@unique([importJobId, tenantId, providerId])
   @@index([tenantId, providerId, createdAt(sort: Desc), id(sort: Desc)])
 }
 
