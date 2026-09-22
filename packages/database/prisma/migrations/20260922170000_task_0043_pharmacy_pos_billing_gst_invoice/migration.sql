@@ -54,6 +54,7 @@ CREATE TABLE "PharmacySale" (
     "tenantId" UUID NOT NULL,
     "providerId" UUID NOT NULL,
     "actorMembershipId" UUID NOT NULL,
+    "actorUserId" UUID NOT NULL,
     "reservationId" UUID,
     "status" "PharmacySaleStatus" NOT NULL DEFAULT 'COMPLETED',
     "currency" VARCHAR(3) NOT NULL DEFAULT 'INR',
@@ -199,6 +200,7 @@ CREATE TABLE "PharmacyInvoiceReprint" (
     "providerId" UUID NOT NULL,
     "invoiceId" UUID NOT NULL,
     "actorMembershipId" UUID NOT NULL,
+    "actorUserId" UUID NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "PharmacyInvoiceReprint_pkey" PRIMARY KEY ("id")
@@ -225,6 +227,7 @@ CREATE TABLE "PharmacySaleVoid" (
     "providerId" UUID NOT NULL,
     "saleId" UUID NOT NULL,
     "actorMembershipId" UUID NOT NULL,
+    "actorUserId" UUID NOT NULL,
     "reason" VARCHAR(500) NOT NULL,
     "idempotencyKey" VARCHAR(120) NOT NULL,
     "commandHash" VARCHAR(64) NOT NULL,
@@ -322,14 +325,12 @@ CREATE UNIQUE INDEX "PharmacyInvoice_id_tenantId_providerId_key" ON "PharmacyInv
 CREATE INDEX "PharmacyInvoiceReprint_tenantId_providerId_invoiceId_create_idx" ON "PharmacyInvoiceReprint"("tenantId", "providerId", "invoiceId", "createdAt" DESC);
 
 -- CreateIndex
-CREATE UNIQUE INDEX "PharmacySaleCommand_saleId_key" ON "PharmacySaleCommand"("saleId");
+CREATE UNIQUE INDEX "PharmacySaleCommand_saleId_commandType_key" ON "PharmacySaleCommand"("saleId", "commandType");
 
 -- CreateIndex
 CREATE INDEX "PharmacySaleCommand_tenantId_providerId_createdAt_idx" ON "PharmacySaleCommand"("tenantId", "providerId", "createdAt" DESC);
 
 -- CreateIndex
-CREATE UNIQUE INDEX "PharmacySaleCommand_saleId_tenantId_providerId_key" ON "PharmacySaleCommand"("saleId", "tenantId", "providerId");
-
 -- CreateIndex
 CREATE UNIQUE INDEX "PharmacySaleCommand_tenantId_idempotencyKey_key" ON "PharmacySaleCommand"("tenantId", "idempotencyKey");
 
@@ -367,7 +368,7 @@ ALTER TABLE "PharmacySale" ADD CONSTRAINT "PharmacySale_tenantId_fkey" FOREIGN K
 ALTER TABLE "PharmacySale" ADD CONSTRAINT "PharmacySale_providerId_tenantId_fkey" FOREIGN KEY ("providerId", "tenantId") REFERENCES "Provider"("id", "tenantId") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "PharmacySale" ADD CONSTRAINT "PharmacySale_actorMembershipId_tenantId_fkey" FOREIGN KEY ("actorMembershipId", "tenantId") REFERENCES "TenantMembership"("id", "tenantId") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "PharmacySale" ADD CONSTRAINT "PharmacySale_actorMembership_actorUser_tenant_fkey" FOREIGN KEY ("actorMembershipId", "actorUserId", "tenantId") REFERENCES "TenantMembership"("id", "userId", "tenantId") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "PharmacySale" ADD CONSTRAINT "PharmacySale_reservationId_tenantId_providerId_fkey" FOREIGN KEY ("reservationId", "tenantId", "providerId") REFERENCES "MedicineReservation"("id", "tenantId", "providerId") ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -439,7 +440,7 @@ ALTER TABLE "PharmacyInvoiceReprint" ADD CONSTRAINT "PharmacyInvoiceReprint_prov
 ALTER TABLE "PharmacyInvoiceReprint" ADD CONSTRAINT "PharmacyInvoiceReprint_invoiceId_tenantId_providerId_fkey" FOREIGN KEY ("invoiceId", "tenantId", "providerId") REFERENCES "PharmacyInvoice"("id", "tenantId", "providerId") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "PharmacyInvoiceReprint" ADD CONSTRAINT "PharmacyInvoiceReprint_actorMembershipId_tenantId_fkey" FOREIGN KEY ("actorMembershipId", "tenantId") REFERENCES "TenantMembership"("id", "tenantId") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "PharmacyInvoiceReprint" ADD CONSTRAINT "PharmacyInvoiceReprint_actorMembership_actorUser_tenant_fkey" FOREIGN KEY ("actorMembershipId", "actorUserId", "tenantId") REFERENCES "TenantMembership"("id", "userId", "tenantId") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "PharmacySaleCommand" ADD CONSTRAINT "PharmacySaleCommand_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -460,5 +461,255 @@ ALTER TABLE "PharmacySaleVoid" ADD CONSTRAINT "PharmacySaleVoid_providerId_tenan
 ALTER TABLE "PharmacySaleVoid" ADD CONSTRAINT "PharmacySaleVoid_saleId_tenantId_providerId_fkey" FOREIGN KEY ("saleId", "tenantId", "providerId") REFERENCES "PharmacySale"("id", "tenantId", "providerId") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "PharmacySaleVoid" ADD CONSTRAINT "PharmacySaleVoid_actorMembershipId_tenantId_fkey" FOREIGN KEY ("actorMembershipId", "tenantId") REFERENCES "TenantMembership"("id", "tenantId") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "PharmacySaleVoid" ADD CONSTRAINT "PharmacySaleVoid_actorMembership_actorUser_tenant_fkey" FOREIGN KEY ("actorMembershipId", "actorUserId", "tenantId") REFERENCES "TenantMembership"("id", "userId", "tenantId") ON DELETE RESTRICT ON UPDATE CASCADE;
 
+
+
+-- ---------------------------------------------------------------------------
+-- Task 0043 runtime catalogue synchronization and financial evidence hardening.
+-- The POS permission constants and audit catalogue are not usable until the
+-- database catalogues are updated in the same migration.
+-- ---------------------------------------------------------------------------
+ALTER TABLE "Permission"
+  DISABLE TRIGGER "Permission_reject_insert_update_delete";
+
+INSERT INTO "Permission" ("id", "name", "description")
+VALUES
+  (md5('medsphere:permission:billing.pos.read')::uuid,
+   'billing.pos.read',
+   'Read assigned-pharmacy POS sales, invoices, and fiscal configuration'),
+  (md5('medsphere:permission:billing.pos.checkout')::uuid,
+   'billing.pos.checkout',
+   'Complete assigned-pharmacy POS checkout transactions'),
+  (md5('medsphere:permission:billing.pos.configure')::uuid,
+   'billing.pos.configure',
+   'Configure assigned-pharmacy POS fiscal settings'),
+  (md5('medsphere:permission:billing.pos.void')::uuid,
+   'billing.pos.void',
+   'Record an assigned-pharmacy POS void/correction')
+ON CONFLICT ("name") DO NOTHING;
+
+ALTER TABLE "Permission"
+  ENABLE TRIGGER "Permission_reject_insert_update_delete";
+
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM (VALUES
+      ('billing.pos.read'),
+      ('billing.pos.checkout'),
+      ('billing.pos.configure'),
+      ('billing.pos.void')
+    ) AS required(name)
+    JOIN "Permission" p ON p."name" = required.name
+    WHERE p."id" <> md5('medsphere:permission:' || required.name)::uuid
+  ) THEN
+    RAISE EXCEPTION 'Task 0043 migration blocked: POS permission identifier does not match the authoritative catalogue';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1
+    FROM (VALUES
+      ('billing.pos.read'),
+      ('billing.pos.checkout'),
+      ('billing.pos.configure'),
+      ('billing.pos.void')
+    ) AS required(name)
+    LEFT JOIN "Permission" p ON p."name" = required.name
+    WHERE p."id" IS NULL
+  ) THEN
+    RAISE EXCEPTION 'Task 0043 migration blocked: POS permission catalogue is incomplete';
+  END IF;
+END $$;
+
+INSERT INTO "RolePermission" ("id", "tenantId", "roleId", "permissionId", "createdAt")
+SELECT
+  md5(r."id"::text || ':' || p."id"::text)::uuid,
+  r."tenantId",
+  r."id",
+  p."id",
+  CURRENT_TIMESTAMP
+FROM "Role" r
+JOIN "Permission" p
+  ON p."name" IN (
+    'billing.pos.read',
+    'billing.pos.checkout',
+    'billing.pos.configure',
+    'billing.pos.void'
+  )
+WHERE r."name" = 'TENANT_ADMINISTRATOR'
+  AND r."type" = 'SYSTEM'
+  AND r."deletedAt" IS NULL
+ON CONFLICT ("id") DO NOTHING;
+
+ALTER TABLE "AuditEvent"
+  DROP CONSTRAINT "AuditEvent_event_type_check";
+
+ALTER TABLE "AuditEvent"
+  ADD CONSTRAINT "AuditEvent_event_type_check"
+  CHECK ("eventType" IN (
+    'authorization.role.created', 'authorization.role.updated',
+    'authorization.role.deleted', 'authorization.assignment.added',
+    'authorization.assignment.removed', 'authorization.provider-access.added',
+    'authorization.provider-access.removed', 'authorization.permission.denied',
+    'authorization.membership.suspended', 'authorization.membership.revoked',
+    'authentication.session.created', 'authentication.session.refresh.succeeded',
+    'authentication.session.refresh.failed', 'authentication.session.refresh.replayed',
+    'authentication.session.logout.succeeded', 'authentication.sessions.logout.succeeded',
+    'authentication.session.locked', 'authentication.session.unlocked',
+    'authentication.session.unlock.failed', 'authentication.session.logout.locked',
+    'authentication.session.switched', 'authentication.session.reauthenticated',
+    'authentication.verification.completed', 'authentication.account.activated',
+    'authentication.otp.requested',
+    'authentication.organization.join.requested',
+    'authentication.organization.join.code.rejected',
+    'authentication.organization.join.code.issued',
+    'authentication.organization.join.code.revoked',
+    'privacy.consent.granted', 'privacy.consent.withdrawn', 'privacy.preference.changed',
+    'patient.profile.updated',
+    'inventory.listing.configured', 'inventory.batch.received',
+    'inventory.stock.adjusted', 'inventory.stock.transferred',
+    'inventory.stock.damaged', 'inventory.batch.expired', 'inventory.batch.quarantined',
+    'inventory.reservation.created', 'inventory.reservation.confirmed',
+    'inventory.reservation.ready', 'inventory.reservation.completed',
+    'inventory.reservation.cancelled', 'inventory.reservation.expired',
+    'inventory.availability-request.responded',
+    'inventory.availability-request.preference.configured',
+    'inventory.import.staged', 'inventory.import.applied',
+    'platform.authentication.session.created',
+    'platform.authentication.session.refresh.succeeded',
+    'platform.authentication.session.refresh.failed',
+    'platform.authentication.session.refresh.replayed',
+    'platform.authentication.session.logout.succeeded',
+    'platform.authentication.session.locked',
+    'platform.authentication.session.unlocked',
+    'platform.invitation.created', 'platform.invitation.revoked', 'platform.invitation.accepted',
+    'platform.role.assigned', 'platform.admin.suspended', 'platform.admin.reactivated',
+    'platform.session.revoked', 'platform.owner.bootstrap',
+    'pharmacy.verification.submitted', 'pharmacy.verification.resubmitted',
+    'pharmacy.verification.review-started', 'pharmacy.verification.approved',
+    'pharmacy.verification.rejected', 'pharmacy.verification.suspended',
+    'pharmacy.verification.expired',
+    'billing.pos.fiscal-profile.configured',
+    'billing.pos.inventory-fiscal-profile.configured',
+    'billing.pos.sale.completed',
+    'billing.pos.invoice.reprinted',
+    'billing.pos.sale.voided'
+  ));
+
+ALTER TABLE "PharmacyFiscalProfile"
+  ADD CONSTRAINT "PharmacyFiscalProfile_registration_gstin_check"
+  CHECK (
+    ("registrationType" = 'UNREGISTERED' AND "gstin" IS NULL)
+    OR
+    ("registrationType" IN ('GST_REGULAR', 'GST_COMPOSITION')
+      AND "gstin" IS NOT NULL
+      AND "gstin" ~ '^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$'
+      AND left("gstin", 2) = "stateCode")
+  ),
+  ADD CONSTRAINT "PharmacyFiscalProfile_stateCode_check"
+  CHECK ("stateCode" ~ '^[0-9]{2}$'),
+  ADD CONSTRAINT "PharmacyFiscalProfile_invoiceSeries_check"
+  CHECK ("invoiceSeries" ~ '^[A-Z0-9]{1,4}$');
+
+ALTER TABLE "InventoryFiscalProfile"
+  ADD CONSTRAINT "InventoryFiscalProfile_hsnCode_check"
+  CHECK ("hsnCode" ~ '^(?:[0-9]{4}|[0-9]{6}|[0-9]{8})$'),
+  ADD CONSTRAINT "InventoryFiscalProfile_uqc_check"
+  CHECK ("uqc" ~ '^[A-Z]{2,8}$'),
+  ADD CONSTRAINT "InventoryFiscalProfile_cessPercentage_check"
+  CHECK ("cessPercentage" >= 0 AND "cessPercentage" <= 100);
+
+ALTER TABLE "PharmacySale"
+  ADD CONSTRAINT "PharmacySale_money_nonnegative_check"
+  CHECK (
+    "subtotal" >= 0 AND "discountTotal" >= 0 AND "taxableTotal" >= 0
+    AND "cgstTotal" >= 0 AND "sgstTotal" >= 0 AND "igstTotal" >= 0
+    AND "cessTotal" >= 0 AND "grandTotal" > 0
+    AND ("cashTendered" IS NULL OR "cashTendered" >= 0)
+    AND ("changeDue" IS NULL OR "changeDue" >= 0)
+  ),
+  ADD CONSTRAINT "PharmacySale_stateCode_check"
+  CHECK ("placeOfSupplyStateCode" ~ '^[0-9]{2}$'),
+  ADD CONSTRAINT "PharmacySale_void_state_check"
+  CHECK (
+    ("status" = 'COMPLETED' AND "voidedAt" IS NULL)
+    OR ("status" = 'VOIDED' AND "voidedAt" IS NOT NULL)
+  );
+
+ALTER TABLE "PharmacySaleLine"
+  ADD CONSTRAINT "PharmacySaleLine_quantity_check" CHECK ("quantity" > 0),
+  ADD CONSTRAINT "PharmacySaleLine_money_check"
+  CHECK (
+    "unitPrice" >= 0 AND "mrp" >= 0 AND "grossValue" >= 0
+    AND "discountPercentage" >= 0 AND "discountPercentage" <= 100
+    AND "discountAmount" >= 0 AND "taxableValue" >= 0
+    AND "gstPercentage" >= 0 AND "gstPercentage" <= 100
+    AND "cessPercentage" >= 0 AND "cessPercentage" <= 100
+    AND "cgstAmount" >= 0 AND "sgstAmount" >= 0 AND "igstAmount" >= 0
+    AND "cessAmount" >= 0 AND "lineTotal" >= 0
+  );
+
+ALTER TABLE "PharmacySaleAllocation"
+  ADD CONSTRAINT "PharmacySaleAllocation_quantity_check" CHECK ("quantity" > 0);
+
+ALTER TABLE "PharmacySalePayment"
+  ADD CONSTRAINT "PharmacySalePayment_amount_check" CHECK ("amount" > 0);
+
+ALTER TABLE "PharmacyInvoiceSequence"
+  ADD CONSTRAINT "PharmacyInvoiceSequence_nextNumber_check" CHECK ("nextNumber" > 0),
+  ADD CONSTRAINT "PharmacyInvoiceSequence_financialYear_check"
+  CHECK ("financialYear" ~ '^[0-9]{4}-[0-9]{2}$'),
+  ADD CONSTRAINT "PharmacyInvoiceSequence_series_check"
+  CHECK ("series" ~ '^[A-Z0-9]{1,4}$');
+
+ALTER TABLE "PharmacyInvoice"
+  ADD CONSTRAINT "PharmacyInvoice_stateCode_check"
+  CHECK (
+    "supplierStateCode" ~ '^[0-9]{2}$'
+    AND "placeOfSupplyStateCode" ~ '^[0-9]{2}$'
+  ),
+  ADD CONSTRAINT "PharmacyInvoice_money_check"
+  CHECK (
+    "subtotal" >= 0 AND "discountTotal" >= 0 AND "taxableTotal" >= 0
+    AND "cgstTotal" >= 0 AND "sgstTotal" >= 0 AND "igstTotal" >= 0
+    AND "cessTotal" >= 0 AND "grandTotal" > 0
+  );
+
+CREATE OR REPLACE FUNCTION reject_task_0043_financial_evidence_mutation()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  RAISE EXCEPTION 'Task 0043 financial evidence rows are append-only';
+END;
+$$;
+
+CREATE TRIGGER "PharmacySaleLine_reject_update_delete"
+BEFORE UPDATE OR DELETE ON "PharmacySaleLine"
+FOR EACH ROW EXECUTE FUNCTION reject_task_0043_financial_evidence_mutation();
+
+CREATE TRIGGER "PharmacySaleAllocation_reject_update_delete"
+BEFORE UPDATE OR DELETE ON "PharmacySaleAllocation"
+FOR EACH ROW EXECUTE FUNCTION reject_task_0043_financial_evidence_mutation();
+
+CREATE TRIGGER "PharmacySalePayment_reject_update_delete"
+BEFORE UPDATE OR DELETE ON "PharmacySalePayment"
+FOR EACH ROW EXECUTE FUNCTION reject_task_0043_financial_evidence_mutation();
+
+CREATE TRIGGER "PharmacyInvoice_reject_update_delete"
+BEFORE UPDATE OR DELETE ON "PharmacyInvoice"
+FOR EACH ROW EXECUTE FUNCTION reject_task_0043_financial_evidence_mutation();
+
+CREATE TRIGGER "PharmacyInvoiceReprint_reject_update_delete"
+BEFORE UPDATE OR DELETE ON "PharmacyInvoiceReprint"
+FOR EACH ROW EXECUTE FUNCTION reject_task_0043_financial_evidence_mutation();
+
+CREATE TRIGGER "PharmacySaleCommand_reject_update_delete"
+BEFORE UPDATE OR DELETE ON "PharmacySaleCommand"
+FOR EACH ROW EXECUTE FUNCTION reject_task_0043_financial_evidence_mutation();
+
+CREATE TRIGGER "PharmacySaleVoid_reject_update_delete"
+BEFORE UPDATE OR DELETE ON "PharmacySaleVoid"
+FOR EACH ROW EXECUTE FUNCTION reject_task_0043_financial_evidence_mutation();

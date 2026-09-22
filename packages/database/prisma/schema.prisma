@@ -1620,7 +1620,8 @@ model PharmacySale {
   provider   Provider @relation(fields: [providerId, tenantId], references: [id, tenantId], onDelete: Restrict)
 
   actorMembershipId String           @db.Uuid
-  actorMembership   TenantMembership @relation(fields: [actorMembershipId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  actorUserId       String           @db.Uuid
+  actorMembership   TenantMembership @relation(fields: [actorMembershipId, actorUserId, tenantId], references: [id, userId, tenantId], onDelete: Restrict)
 
   reservationId String?              @unique @db.Uuid
   reservation   MedicineReservation? @relation(fields: [reservationId, tenantId, providerId], references: [id, tenantId, providerId], onDelete: Restrict)
@@ -1655,7 +1656,7 @@ model PharmacySale {
   lines       PharmacySaleLine[]
   payments    PharmacySalePayment[]
   invoice     PharmacyInvoice?
-  command     PharmacySaleCommand?
+  commands    PharmacySaleCommand[]
   voidRecord  PharmacySaleVoid?
 
   @@unique([tenantId, idempotencyKey])
@@ -1847,7 +1848,8 @@ model PharmacyInvoiceReprint {
   invoice   PharmacyInvoice @relation(fields: [invoiceId, tenantId, providerId], references: [id, tenantId, providerId], onDelete: Restrict)
 
   actorMembershipId String           @db.Uuid
-  actorMembership   TenantMembership @relation(fields: [actorMembershipId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  actorUserId       String           @db.Uuid
+  actorMembership   TenantMembership @relation(fields: [actorMembershipId, actorUserId, tenantId], references: [id, userId, tenantId], onDelete: Restrict)
 
   createdAt DateTime @default(now())
 
@@ -1863,7 +1865,7 @@ model PharmacySaleCommand {
   providerId String   @db.Uuid
   provider   Provider @relation(fields: [providerId, tenantId], references: [id, tenantId], onDelete: Restrict)
 
-  saleId String       @unique @db.Uuid
+  saleId String       @db.Uuid
   sale   PharmacySale @relation(fields: [saleId, tenantId, providerId], references: [id, tenantId, providerId], onDelete: Restrict)
 
   commandType    PharmacySaleCommandType
@@ -1871,7 +1873,7 @@ model PharmacySaleCommand {
   commandHash    String                  @db.VarChar(64)
   createdAt      DateTime                @default(now())
 
-  @@unique([saleId, tenantId, providerId])
+  @@unique([saleId, commandType])
   @@unique([tenantId, idempotencyKey])
   @@index([tenantId, providerId, createdAt(sort: Desc)])
 }
@@ -1889,7 +1891,8 @@ model PharmacySaleVoid {
   sale   PharmacySale @relation(fields: [saleId, tenantId, providerId], references: [id, tenantId, providerId], onDelete: Restrict)
 
   actorMembershipId String           @db.Uuid
-  actorMembership   TenantMembership @relation(fields: [actorMembershipId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  actorUserId       String           @db.Uuid
+  actorMembership   TenantMembership @relation(fields: [actorMembershipId, actorUserId, tenantId], references: [id, userId, tenantId], onDelete: Restrict)
 
   reason         String @db.VarChar(500)
   idempotencyKey String @db.VarChar(120)
