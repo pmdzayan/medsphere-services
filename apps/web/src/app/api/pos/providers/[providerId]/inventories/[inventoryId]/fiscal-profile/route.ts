@@ -6,7 +6,10 @@ import {
   upstreamHeaders,
 } from '@/lib/auth-api';
 import { isCanonicalUuid } from '@/lib/inventory-contract';
-import { isPosInventoryFiscalProfileRequest } from '@/lib/pos-contract';
+import {
+  isPosInventoryFiscalConfigurationResult,
+  isPosInventoryFiscalProfileRequest,
+} from '@/lib/pos-contract';
 import { ACCESS_COOKIE } from '@/lib/session-profile';
 
 type Context = { params: Promise<{ providerId: string; inventoryId: string }> };
@@ -54,9 +57,11 @@ export async function PUT(request: NextRequest, context: Context): Promise<NextR
         status(upstream.status),
       );
     const payload: unknown = await upstream.json();
-    if (!payload || typeof payload !== 'object')
-      return privateNoStore({ message: 'POS service returned an invalid response.' }, 502);
-    return privateNoStore(payload, 200);
+    return isPosInventoryFiscalConfigurationResult(payload) &&
+      payload.providerId === providerId &&
+      payload.inventoryId === inventoryId
+      ? privateNoStore(payload, 200)
+      : privateNoStore({ message: 'POS service returned an invalid response.' }, 502);
   } catch {
     return privateNoStore({ message: 'POS service is unavailable.' }, 503);
   }
