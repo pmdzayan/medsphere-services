@@ -1,0 +1,45 @@
+name: Task 0042 formatter
+
+on:
+  push:
+    branches:
+      - cto/0042-pharmacy-catalog-barcode-inventory-import
+    paths:
+      - .github/workflows/task-0042-format.yml
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: cto/0042-pharmacy-catalog-barcode-inventory-import
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+          run_install: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.12.0
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Format Task 0042 files
+        run: |
+          pnpm exec prettier --write             apps/auth-service/src/inventory/dto/inventory-catalog-query.dto.ts             apps/auth-service/src/inventory/dto/inventory-import.dto.ts             apps/auth-service/src/inventory/inventory-catalog.controller.ts             apps/auth-service/src/inventory/inventory-catalog.service.ts             apps/auth-service/src/inventory/inventory-import.controller.ts             apps/auth-service/src/inventory/inventory-import.service.ts             apps/auth-service/src/inventory/inventory-import.integration.spec.ts             apps/auth-service/src/inventory/inventory-import.types.ts             apps/auth-service/src/inventory/inventory.module.ts             apps/auth-service/src/inventory/product-identifier.ts             apps/auth-service/src/inventory/product-identifier.spec.ts             apps/web/src/app/api/inventory/providers/'[providerId]'/catalog/route.ts             apps/web/src/app/api/inventory/providers/'[providerId]'/imports/stage/route.ts             apps/web/src/app/api/inventory/providers/'[providerId]'/imports/'[importJobId]'/route.ts             apps/web/src/app/api/inventory/providers/'[providerId]'/imports/'[importJobId]'/apply/route.ts             apps/web/src/app/'(platform)'/inventory/import/page.tsx             apps/web/src/components/permission-explanation-dialog.tsx             apps/web/src/components/permission-explanation-dialog.test.tsx             apps/web/src/features/inventory/inventory-import-file.ts             apps/web/src/features/inventory/inventory-import-file.test.ts             apps/web/src/features/inventory/inventory-import-workspace.tsx             apps/web/src/features/inventory/inventory-workspace.tsx             apps/web/src/lib/api-client.ts             apps/web/src/lib/i18n-catalogs/inventory.ts             apps/web/src/lib/i18n-catalogs/permissions.ts             apps/web/src/lib/inventory-import-contract.ts             apps/web/src/lib/inventory-import-contract.test.ts             packages/database/src/audit.ts
+
+      - name: Commit formatting only
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apps/auth-service apps/web packages/database/src/audit.ts
+          git diff --cached --quiet && exit 0
+          git commit -m "style(task-0042): format catalog and import implementation"
+          git push origin HEAD:cto/0042-pharmacy-catalog-barcode-inventory-import
