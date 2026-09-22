@@ -1,5 +1,4 @@
-name: Task 0043 migration generator
-# Regenerate after validated tenant-scoped relation graph
+name: Task 0043 formatter helper
 
 on:
   push:
@@ -12,23 +11,9 @@ permissions:
   contents: write
 
 jobs:
-  generate:
+  format:
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    services:
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_USER: aim
-          POSTGRES_PASSWORD: aim
-          POSTGRES_DB: aim_shadow
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U aim -d aim_shadow"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 12
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
         with:
@@ -42,22 +27,35 @@ jobs:
           node-version: 22.12.0
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: Generate SQL diff
-        env:
-          DATABASE_URL: postgresql://aim:aim@localhost:5432/aim_shadow?schema=public
+      - name: Format Task 0043 files
         run: |
-          mkdir -p packages/database/prisma/migrations/20260922170000_task_0043_pharmacy_pos_billing_gst_invoice
-          pnpm --filter @medsphere/database exec prisma migrate diff \
-            --from-migrations prisma/migrations \
-            --to-schema-datamodel prisma/schema.prisma \
-            --shadow-database-url postgresql://aim:aim@localhost:5432/aim_shadow?schema=shadow \
-            --script > packages/database/prisma/migrations/20260922170000_task_0043_pharmacy_pos_billing_gst_invoice/migration.sql
-          test -s packages/database/prisma/migrations/20260922170000_task_0043_pharmacy_pos_billing_gst_invoice/migration.sql
-      - name: Commit generated migration
+          pnpm exec prettier --write \
+            apps/auth-service/src/pos/pos-checkout.service.ts \
+            apps/auth-service/src/pos/pos-event-writer.ts \
+            apps/auth-service/src/pos/pos-fiscal.service.ts \
+            apps/auth-service/src/pos/pos.controller.ts \
+            "apps/web/src/app/api/pos/providers/[providerId]/checkout/route.ts" \
+            "apps/web/src/app/api/pos/providers/[providerId]/fiscal-profile/route.ts" \
+            "apps/web/src/app/api/pos/providers/[providerId]/inventories/[inventoryId]/fiscal-profile/route.ts" \
+            "apps/web/src/app/api/pos/providers/[providerId]/products/[productId]/quote/route.ts" \
+            "apps/web/src/app/api/pos/providers/[providerId]/sales/[saleId]/reprint/route.ts" \
+            "apps/web/src/app/api/pos/providers/[providerId]/sales/[saleId]/route.ts" \
+            "apps/web/src/app/api/pos/providers/[providerId]/sales/[saleId]/void/route.ts" \
+            apps/web/src/lib/api-client.ts \
+            apps/web/src/lib/i18n-catalogs/pos.ts \
+            apps/web/src/lib/pos-contract.ts \
+            apps/web/src/lib/pos-money.ts
+      - name: Commit formatter output
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add packages/database/prisma/migrations/20260922170000_task_0043_pharmacy_pos_billing_gst_invoice/migration.sql
+          git add \
+            apps/auth-service/src/pos \
+            apps/web/src/app/api/pos \
+            apps/web/src/lib/api-client.ts \
+            apps/web/src/lib/i18n-catalogs/pos.ts \
+            apps/web/src/lib/pos-contract.ts \
+            apps/web/src/lib/pos-money.ts
           git diff --cached --quiet && exit 0
-          git commit -m "feat(database): migrate Task 0043 pharmacy POS core"
+          git commit -m "style(pos): format Task 0043 implementation"
           git push origin HEAD:cto/0043-pharmacy-pos-billing-gst-invoice
