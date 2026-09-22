@@ -1,5 +1,5 @@
 name: Task 0042 final certification
-# Rerun after filename-boundary lint correction
+# Rerun after PostgreSQL staging and filename-regex corrections
 
 on:
   push:
