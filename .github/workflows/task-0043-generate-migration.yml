@@ -1,0 +1,62 @@
+name: Task 0043 migration generator
+
+on:
+  push:
+    branches:
+      - cto/0043-pharmacy-pos-billing-gst-invoice
+    paths:
+      - .github/workflows/task-0043-generate-migration.yml
+
+permissions:
+  contents: write
+
+jobs:
+  generate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: aim
+          POSTGRES_PASSWORD: aim
+          POSTGRES_DB: aim_shadow
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U aim -d aim_shadow"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: cto/0043-pharmacy-pos-billing-gst-invoice
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.12.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Generate SQL diff
+        env:
+          DATABASE_URL: postgresql://aim:aim@localhost:5432/aim_shadow?schema=public
+        run: |
+          mkdir -p packages/database/prisma/migrations/20260922170000_task_0043_pharmacy_pos_billing_gst_invoice
+          pnpm --filter @medsphere/database exec prisma migrate diff \
+            --from-migrations packages/database/prisma/migrations \
+            --to-schema-datamodel packages/database/prisma/schema.prisma \
+            --shadow-database-url postgresql://aim:aim@localhost:5432/aim_shadow?schema=shadow \
+            --script > packages/database/prisma/migrations/20260922170000_task_0043_pharmacy_pos_billing_gst_invoice/migration.sql
+          test -s packages/database/prisma/migrations/20260922170000_task_0043_pharmacy_pos_billing_gst_invoice/migration.sql
+      - name: Commit generated migration
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add packages/database/prisma/migrations/20260922170000_task_0043_pharmacy_pos_billing_gst_invoice/migration.sql
+          git diff --cached --quiet && exit 0
+          git commit -m "feat(database): migrate Task 0043 pharmacy POS core"
+          git push origin HEAD:cto/0043-pharmacy-pos-billing-gst-invoice
