@@ -21,7 +21,10 @@ import {
 } from './dto/inventory-import.dto';
 import { assertTrustedProviderAccess } from './inventory-access';
 import type { TrustedInventoryActor } from './inventory-command.types';
-import { normalizeProductIdentifier } from './product-identifier';
+import {
+  equivalentLegacyBarcodeValues,
+  normalizeProductIdentifier,
+} from './product-identifier';
 
 type StagedPayload = {
   sku: string | null;
@@ -709,7 +712,7 @@ export class InventoryImportService {
             deletedAt: null,
             OR: [
               { identifiers: { some: { normalizedValue: canonical.normalizedValue } } },
-              { barcode: canonical.value },
+              { barcode: { in: equivalentLegacyBarcodeValues(canonical) } },
             ],
           },
           select: { id: true },
