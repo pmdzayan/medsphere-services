@@ -1,0 +1,45 @@
+name: Task 0042 dependency bootstrap
+
+on:
+  push:
+    branches:
+      - cto/0042-pharmacy-catalog-barcode-inventory-import
+    paths:
+      - .github/workflows/task-0042-dependency-bootstrap.yml
+
+permissions:
+  contents: write
+
+jobs:
+  bootstrap:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: cto/0042-pharmacy-catalog-barcode-inventory-import
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+          run_install: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.12.0
+          cache: pnpm
+
+      - name: Install existing locked dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Add bounded Task 0042 web dependencies
+        run: pnpm --filter @medsphere/web add --save-exact @zxing/browser@0.2.1 @zxing/library@0.23.0 read-excel-file@9.3.10
+
+      - name: Commit exact package and lockfile changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apps/web/package.json pnpm-lock.yaml
+          git diff --cached --quiet && exit 0
+          git commit -m "chore(web): add bounded barcode and xlsx dependencies"
+          git push origin HEAD:cto/0042-pharmacy-catalog-barcode-inventory-import
