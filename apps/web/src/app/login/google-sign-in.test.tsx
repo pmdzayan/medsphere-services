@@ -4,7 +4,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { LanguageProvider } from '@/components/language-provider';
-import { googleLogin } from '@/lib/api-client';
+import { googleLogin, selectGoogleOrganizationLogin } from '@/lib/api-client';
 import { GoogleSignIn } from './google-sign-in';
 
 const replace = vi.fn();
@@ -24,17 +24,17 @@ vi.mock('next/script', () => ({
 
 vi.mock('@/lib/api-client', async () => {
   const actual = await vi.importActual<typeof import('@/lib/api-client')>('@/lib/api-client');
-
   return {
     ...actual,
     googleLogin: vi.fn(),
+    selectGoogleOrganizationLogin: vi.fn(),
   };
 });
 
-function renderGoogleSignIn(tenantSlug: string, onError = vi.fn()) {
+function renderGoogleSignIn(onSelectionStateChange = vi.fn()) {
   return render(
     <LanguageProvider initialLocale="en">
-      <GoogleSignIn tenantSlug={tenantSlug} onError={onError} />
+      <GoogleSignIn onSelectionStateChange={onSelectionStateChange} />
     </LanguageProvider>,
   );
 }
@@ -53,16 +53,9 @@ describe('GoogleSignIn', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     credentialCallback = undefined;
-
     process.env.NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_ID = 'google-client-id';
-
     window.google = {
-      accounts: {
-        id: {
-          initialize,
-          renderButton,
-        },
-      },
+      accounts: { id: { initialize, renderButton } },
     };
   });
 
@@ -72,130 +65,122 @@ describe('GoogleSignIn', () => {
     delete window.google;
   });
 
-  it('does not expose Google sign-in when the client ID is absent', () => {
+  it('shows a clear disabled local-development option instead of silently disappearing without a client ID', () => {
     delete process.env.NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_ID;
+    renderGoogleSignIn();
 
-    const { container } = renderGoogleSignIn('central-pharmacy');
-
-    expect(container).toBeEmptyDOMElement();
+    expect(screen.getByRole('button', { name: 'Continue with Google' })).toBeDisabled();
+    expect(
+      screen.getByText(/Google sign-in is visible but not configured for this local environment/i),
+    ).toBeVisible();
   });
 
   it('initializes Google with the configured client ID', () => {
-    renderGoogleSignIn('central-pharmacy');
-
-    fireEvent.click(
-      screen.getByRole('button', {
-        name: 'load-google-script',
-      }),
-    );
-
+    renderGoogleSignIn();
+    fireEvent.click(screen.getByRole('button', { name: 'load-google-script' }));
     expect(initialize).toHaveBeenCalledWith(
-      expect.objectContaining({
-        client_id: 'google-client-id',
-      }),
+      expect.objectContaining({ client_id: 'google-client-id' }),
     );
-
     expect(renderButton).toHaveBeenCalled();
   });
 
-  it('exchanges the Google credential for the tenant-bound session', async () => {
-    vi.mocked(googleLogin).mockResolvedValue({
-      expiresIn: 900,
-      user: {
-        id: 'user-1',
-        email: 'user@example.com',
-        firstName: 'Test',
-        lastName: 'User',
-        preferredLanguage: 'en',
-      },
-      context: {
-        membershipId: 'membership-1',
-        tenantId: 'tenant-1',
-        tenantName: 'Central Pharmacy',
-        organizationType: 'PHARMACY',
-      },
-    });
+  it('exchanges only the Google proof for a single-membership session', async () => {
+    vi.mocked(googleLogin).mockResolvedValue(session('PHARMACY'));
 
-    const onError = vi.fn();
-
-    renderGoogleSignIn(' CENTRAL-PHARMACY ', onError);
-
-    fireEvent.click(
-      screen.getByRole('button', {
-        name: 'load-google-script',
-      }),
-    );
-
-    expect(credentialCallback).toBeTypeOf('function');
-
+    renderGoogleSignIn();
+    fireEvent.click(screen.getByRole('button', { name: 'load-google-script' }));
     await act(async () => {
-      await credentialCallback?.({
-        credential: 'google-id-token',
-      });
+      await credentialCallback?.({ credential: 'google-id-token' });
     });
 
-    await waitFor(() => {
-      expect(googleLogin).toHaveBeenCalledWith({
-        tenantSlug: 'central-pharmacy',
-        idToken: 'google-id-token',
-      });
-    });
-
+    await waitFor(() => expect(googleLogin).toHaveBeenCalledWith({ idToken: 'google-id-token' }));
     expect(replace).toHaveBeenCalledWith('/dashboard');
     expect(refresh).toHaveBeenCalled();
-    expect(onError).toHaveBeenCalledWith('');
   });
 
-  it('requires the tenant slug before exchanging a Google credential', async () => {
-    const onError = vi.fn();
+  it('routes a personal Google identity to the patient workspace', async () => {
+    vi.mocked(googleLogin).mockResolvedValue(session('NONE'));
 
-    renderGoogleSignIn('', onError);
-
-    fireEvent.click(
-      screen.getByRole('button', {
-        name: 'load-google-script',
-      }),
-    );
-
+    renderGoogleSignIn();
+    fireEvent.click(screen.getByRole('button', { name: 'load-google-script' }));
     await act(async () => {
-      await credentialCallback?.({
-        credential: 'google-id-token',
-      });
+      await credentialCallback?.({ credential: 'google-id-token' });
     });
 
-    expect(googleLogin).not.toHaveBeenCalled();
-    expect(onError).toHaveBeenCalledWith('Choose an organization before continuing with Google.');
+    await waitFor(() => expect(replace).toHaveBeenCalledWith('/patient/dashboard'));
   });
 
-  it('surfaces a bounded Google authentication failure', async () => {
-    vi.mocked(googleLogin).mockRejectedValue(
-      new Error('unbounded identity-provider English must not be reflected'),
-    );
+  it('lets the verified Google identity choose only from returned memberships', async () => {
+    vi.mocked(googleLogin).mockResolvedValue({
+      requiresOrganizationSelection: true,
+      organizations: [
+        {
+          membershipId: '93b31836-6a84-4db9-a935-1c55960c25da',
+          organizationName: 'Central Pharmacy',
+          organizationType: 'PHARMACY',
+        },
+        {
+          membershipId: 'd79a711a-239f-4756-8bb4-9397623569bd',
+          organizationName: 'Riverside Hospital',
+          organizationType: 'HOSPITAL',
+        },
+      ],
+    });
+    vi.mocked(selectGoogleOrganizationLogin).mockResolvedValue(session('HOSPITAL'));
+    const stateChange = vi.fn();
 
-    const onError = vi.fn();
+    renderGoogleSignIn(stateChange);
+    fireEvent.click(screen.getByRole('button', { name: 'load-google-script' }));
+    await act(async () => {
+      await credentialCallback?.({ credential: 'google-id-token' });
+    });
 
-    renderGoogleSignIn('central-pharmacy', onError);
+    expect(await screen.findByText('Central Pharmacy')).toBeVisible();
+    expect(screen.getByText('Riverside Hospital')).toBeVisible();
+    expect(stateChange).toHaveBeenCalledWith(true);
 
-    fireEvent.click(
-      screen.getByRole('button', {
-        name: 'load-google-script',
+    fireEvent.click(screen.getByRole('button', { name: 'Riverside Hospital' }));
+    await waitFor(() =>
+      expect(selectGoogleOrganizationLogin).toHaveBeenCalledWith({
+        idToken: 'google-id-token',
+        membershipId: 'd79a711a-239f-4756-8bb4-9397623569bd',
       }),
     );
+    expect(replace).toHaveBeenCalledWith('/dashboard');
+  });
 
+  it('surfaces a bounded Google failure', async () => {
+    vi.mocked(googleLogin).mockRejectedValue(new Error('secret upstream detail'));
+
+    renderGoogleSignIn();
+    fireEvent.click(screen.getByRole('button', { name: 'load-google-script' }));
     await act(async () => {
-      await credentialCallback?.({
-        credential: 'google-id-token',
-      });
+      await credentialCallback?.({ credential: 'google-id-token' });
     });
 
-    await waitFor(() => {
-      expect(onError).toHaveBeenCalledWith('Google sign-in failed. Try again.');
-    });
-
-    expect(onError).not.toHaveBeenCalledWith(
-      'unbounded identity-provider English must not be reflected',
+    await waitFor(() =>
+      expect(screen.getByRole('alert')).toHaveTextContent('Google sign-in failed. Try again.'),
     );
-
+    expect(screen.queryByText('secret upstream detail')).toBeNull();
     expect(replace).not.toHaveBeenCalled();
   });
 });
+
+function session(organizationType: 'PHARMACY' | 'HOSPITAL' | 'NONE') {
+  return {
+    expiresIn: 900,
+    user: {
+      id: 'user-1',
+      email: 'user@example.com',
+      firstName: 'Test',
+      lastName: 'User',
+      preferredLanguage: 'en' as const,
+    },
+    context: {
+      membershipId: '93b31836-6a84-4db9-a935-1c55960c25da',
+      tenantId: 'd79a711a-239f-4756-8bb4-9397623569bd',
+      tenantName: organizationType === 'NONE' ? 'AIM Personal Accounts' : 'Central Provider',
+      organizationType,
+    },
+  };
+}

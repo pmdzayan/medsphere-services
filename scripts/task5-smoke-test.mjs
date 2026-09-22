@@ -165,6 +165,21 @@ function sql(query) {
   }).trim();
 }
 
+async function fetchWithOneTransientRetry(input, init, groupLabel) {
+  try {
+    return await fetch(input, init);
+  } catch (error) {
+    const code = error?.cause?.code;
+    if (code !== 'UND_ERR_SOCKET' && code !== 'ECONNRESET') {
+      throw error;
+    }
+
+    assertProcessesAlive(groupLabel);
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    return fetch(input, init);
+  }
+}
+
 async function waitForHealth(name, url, timeoutMs = 60_000) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
@@ -730,7 +745,15 @@ async function main() {
   assertProcessesAlive('dashboard browser runtime certification');
   const browserCert = spawnSync(
     'pnpm',
-    ['--filter', '@medsphere/web', 'exec', 'playwright', 'test', 'e2e/dashboard.spec.ts'],
+    [
+      '--filter',
+      '@medsphere/web',
+      'exec',
+      'playwright',
+      'test',
+      'e2e/dashboard.spec.ts',
+      'e2e/accessibility-smoke.spec.ts',
+    ],
     {
       env: {
         ...process.env,
@@ -760,7 +783,7 @@ async function main() {
   // write.
   assertProcessesAlive('inventory listing + batch receipt');
 
-  const configureInventory = await fetch(
+  const configureInventory = await fetchWithOneTransientRetry(
     `${BACKEND}/inventory/providers/${providerAId}/products/${productId}`,
     {
       method: 'PUT',
@@ -784,6 +807,7 @@ async function main() {
         idempotencyKey: `task5-smoke-listing-${randomUUID()}`,
       }),
     },
+    'inventory listing + batch receipt',
   );
   const configureInventoryBody = await json(configureInventory);
   const configureInventoryOk =

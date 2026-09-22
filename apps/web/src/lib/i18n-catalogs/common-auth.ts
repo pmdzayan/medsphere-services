@@ -8,6 +8,9 @@ export const commonAuthEnglishMessages = {
   'auth.chooseOrganization': 'Choose an organization',
   'auth.back': 'Back',
   'auth.googleLoading': 'Loading Google sign-in…',
+  'auth.googleContinue': 'Continue with Google',
+  'auth.googleNotConfigured':
+    'Google sign-in is visible but not configured for this local environment. Add the Google OAuth client ID to enable it.',
   'auth.googleMissingOrganization': 'Choose an organization before continuing with Google.',
   'auth.googleCredentialInvalid': 'Google sign-in did not return a valid credential.',
   'auth.googleFailed': 'Google sign-in failed. Try again.',
@@ -25,6 +28,9 @@ export const commonAuthTamilMessages: Record<CommonAuthTranslationKey, string> =
   'auth.chooseOrganization': 'ஒரு நிறுவனத்தைத் தேர்ந்தெடுக்கவும்',
   'auth.back': 'பின்செல்',
   'auth.googleLoading': 'Google உள்நுழைவு ஏற்றப்படுகிறது…',
+  'auth.googleContinue': 'Google மூலம் தொடரவும்',
+  'auth.googleNotConfigured':
+    'இந்த உள்ளூர் சூழலில் Google உள்நுழைவு இன்னும் அமைக்கப்படவில்லை. அதை இயக்க Google OAuth client ID-ஐ சேர்க்கவும்.',
   'auth.googleMissingOrganization':
     'Google மூலம் தொடர்வதற்கு முன் ஒரு நிறுவனத்தைத் தேர்ந்தெடுக்கவும்.',
   'auth.googleCredentialInvalid': 'Google உள்நுழைவு செல்லுபடியாகும் சான்றை வழங்கவில்லை.',
@@ -41,6 +47,9 @@ export const commonAuthUrduMessages: Record<CommonAuthTranslationKey, string> = 
   'auth.chooseOrganization': 'ایک ادارہ منتخب کریں',
   'auth.back': 'واپس',
   'auth.googleLoading': 'Google سائن ان لوڈ ہو رہا ہے…',
+  'auth.googleContinue': 'Google کے ساتھ جاری رکھیں',
+  'auth.googleNotConfigured':
+    'اس مقامی ماحول میں Google سائن ان ابھی ترتیب نہیں دیا گیا۔ اسے فعال کرنے کے لیے Google OAuth client ID شامل کریں۔',
   'auth.googleMissingOrganization': 'Google کے ساتھ جاری رکھنے سے پہلے ایک ادارہ منتخب کریں۔',
   'auth.googleCredentialInvalid': 'Google سائن ان سے درست سند موصول نہیں ہوئی۔',
   'auth.googleFailed': 'Google سائن ان ناکام ہوا۔ دوبارہ کوشش کریں۔',

@@ -73,7 +73,30 @@ export function GoogleCredentialButton({
   }
 
   if (!clientId) {
-    return null;
+    if (process.env.NODE_ENV === 'production') {
+      return null;
+    }
+
+    return (
+      <div className="space-y-3">
+        <div className="flex items-center gap-3" aria-hidden="true">
+          <span className="h-px flex-1 bg-[#10201c]/10" />
+          <span className="text-xs font-semibold text-[#71807b]">{t('common.or')}</span>
+          <span className="h-px flex-1 bg-[#10201c]/10" />
+        </div>
+        <button
+          type="button"
+          disabled
+          aria-describedby="google-local-configuration"
+          className="flex h-11 w-full cursor-not-allowed items-center justify-center rounded-md border border-[#dadce0] bg-white px-4 text-sm font-semibold text-[#3c4043] opacity-70"
+        >
+          {t('auth.googleContinue')}
+        </button>
+        <p id="google-local-configuration" className="text-center text-xs leading-5 text-[#71807b]">
+          {t('auth.googleNotConfigured')}
+        </p>
+      </div>
+    );
   }
 
   return (

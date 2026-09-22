@@ -252,7 +252,10 @@ export function AppShell({
     const busy = lockingWorkstation || unlockingWorkstation || switchingUser || lockedSigningOut;
 
     return (
-      <main className="grid min-h-screen place-items-center bg-[#f3f6f3] px-5 py-10 text-[#12231e]">
+      <main
+        data-organization-theme={session.context.organizationType}
+        className="organization-theme-shell grid min-h-screen place-items-center px-5 py-10"
+      >
         <section
           className="w-full max-w-md rounded-[2rem] border border-[#102c24]/10 bg-white p-6 shadow-[0_28px_80px_rgba(7,35,28,.12)] sm:p-8"
           aria-labelledby="workstation-lock-title"
@@ -349,7 +352,10 @@ export function AppShell({
   }
 
   return (
-    <div className="min-h-screen bg-[#f3f6f3] text-[#12231e]">
+    <div
+      data-organization-theme={session.context.organizationType}
+      className="organization-theme-shell min-h-screen"
+    >
       <a
         href="#main-content"
         className="fixed left-4 top-3 z-[100] -translate-y-20 rounded-full bg-[#09251f] px-4 py-2 text-sm font-bold text-white transition focus:translate-y-0"
@@ -357,7 +363,7 @@ export function AppShell({
         {t('shell.skipToContent')}
       </a>
 
-      <aside className="fixed inset-y-0 left-0 z-40 hidden w-[17.5rem] flex-col bg-[#071713] px-4 pb-5 pt-5 text-white lg:flex">
+      <aside className="fixed inset-y-0 left-0 z-40 hidden w-[17.5rem] flex-col organization-theme-sidebar px-4 pb-5 pt-5 text-white lg:flex">
         <div className="px-2">
           <PlatformBrand />
         </div>
@@ -374,7 +380,7 @@ export function AppShell({
             onClick={() => setMobileNavigationOpen(false)}
             aria-label={t('shell.closeNavigation')}
           />
-          <aside className="relative flex h-full w-[min(88vw,21rem)] flex-col bg-[#071713] px-4 pb-5 pt-5 text-white shadow-2xl">
+          <aside className="relative flex h-full w-[min(88vw,21rem)] flex-col organization-theme-sidebar px-4 pb-5 pt-5 text-white shadow-2xl">
             <div className="flex items-center justify-between px-2">
               <PlatformBrand />
               <button
@@ -395,7 +401,7 @@ export function AppShell({
       ) : null}
 
       <div className="lg:pl-[17.5rem]">
-        <header className="sticky top-0 z-30 border-b border-[#102c24]/[.07] bg-[#f3f6f3]/90 backdrop-blur-xl">
+        <header className="organization-theme-header sticky top-0 z-30 border-b backdrop-blur-xl">
           <div className="flex h-[4.75rem] items-center gap-3 px-4 sm:px-6 lg:px-8">
             <button
               ref={mobileNavTriggerRef}
@@ -423,7 +429,7 @@ export function AppShell({
             </div>
 
             <div className="ml-auto flex items-center gap-2 sm:gap-3">
-              <span className="hidden items-center gap-2 rounded-full border border-emerald-800/10 bg-emerald-50 px-3 py-2 text-[11px] font-bold text-emerald-800 sm:flex">
+              <span className="organization-theme-soft hidden items-center gap-2 rounded-full border px-3 py-2 text-[11px] font-bold sm:flex">
                 <span className="size-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_#10b981]" />
                 {t('shell.secureSession')}
               </span>
@@ -431,12 +437,12 @@ export function AppShell({
                 <button
                   ref={accountMenuTriggerRef}
                   type="button"
-                  className="flex items-center gap-3 rounded-2xl border border-[#102c24]/10 bg-white py-1.5 pl-1.5 pr-2 shadow-sm transition hover:border-emerald-500/25"
+                  className="organization-theme-interactive flex items-center gap-3 rounded-2xl border border-[#102c24]/10 bg-white py-1.5 pl-1.5 pr-2 shadow-sm"
                   aria-label={t('shell.openAccountMenu')}
                   aria-expanded={accountMenuOpen}
                   onClick={() => setAccountMenuOpen((open) => !open)}
                 >
-                  <span className="grid size-8 place-items-center rounded-xl bg-[#0b342b] text-xs font-black text-emerald-200">
+                  <span className="organization-theme-mark grid size-8 place-items-center rounded-xl text-xs font-black">
                     {userInitials(session)}
                   </span>
                   <span className="hidden text-left xl:block">
@@ -497,7 +503,7 @@ export function AppShell({
       </div>
 
       <nav
-        className="fixed inset-x-3 bottom-3 z-30 flex h-[4.25rem] items-center justify-around rounded-[1.35rem] border border-white/10 bg-[#071713]/95 px-2 text-white shadow-[0_22px_60px_-20px_rgba(2,20,15,.75)] backdrop-blur-xl lg:hidden"
+        className="fixed inset-x-3 bottom-3 z-30 flex h-[4.25rem] items-center justify-around rounded-[1.35rem] border border-white/10 organization-theme-sidebar/95 px-2 text-white shadow-[0_22px_60px_-20px_rgba(2,20,15,.75)] backdrop-blur-xl lg:hidden"
         aria-label={t('shell.mobileNavigation')}
       >
         {primaryNavigation
@@ -534,7 +540,7 @@ function TenantContext({ session }: { session: SessionProfile }) {
   const { t } = useLanguage();
   return (
     <div className="mt-7 flex w-full items-center gap-3 rounded-2xl border border-white/[.08] bg-white/[.045] p-3 text-left">
-      <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-[#d9b568] text-xs font-black text-[#1f281e]">
+      <span className="organization-theme-mark grid size-10 shrink-0 place-items-center rounded-xl text-xs font-black">
         {tenantInitials(session.context.tenantName)}
       </span>
       <span className="min-w-0 flex-1">
@@ -614,7 +620,7 @@ function NavigationGroup({
             >
               <Icon
                 name={item.icon}
-                className={`size-[18px] ${active ? 'text-emerald-300' : 'text-white/34 group-hover:text-white/65'}`}
+                className={`size-[18px] ${active ? 'organization-theme-active-icon' : 'text-white/34 group-hover:text-white/65'}`}
               />
               <span className="flex-1">{t(item.labelKey)}</span>
               {item.badge ? (

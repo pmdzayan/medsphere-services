@@ -10,6 +10,10 @@ describe('S0.4 route policy', () => {
   it.each([
     [AuthController, 'register'],
     [AuthController, 'login'],
+    [AuthController, 'identifyLogin'],
+    [AuthController, 'selectOrganizationLogin'],
+    [AuthController, 'google'],
+    [AuthController, 'selectGoogleOrganization'],
     [AuthController, 'refresh'],
     [LocalizationController, 'getSupportedLanguages'],
   ])('marks only the accepted handler public: %s.%s', (controller, handler) => {

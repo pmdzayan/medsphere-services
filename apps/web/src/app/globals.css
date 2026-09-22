@@ -168,3 +168,210 @@ input {
   -webkit-backdrop-filter: blur(16px) saturate(140%);
   border: 1px solid rgba(255, 255, 255, 0.08);
 }
+
+
+/* -------------------------------------------------------------------------- */
+/* Organization-aware workspace theme                                          */
+/*                                                                            */
+/* Organization identity changes presentation only. Authorization, tenant      */
+/* context and healthcare behavior remain server-authoritative and unchanged.  */
+/* Every themed property transitions as one coordinated surface.               */
+/* -------------------------------------------------------------------------- */
+:root {
+  --org-primary: #0b5f4a;
+  --org-primary-hover: #084c3c;
+  --org-primary-soft: #ecfdf5;
+  --org-accent: #34d399;
+  --org-accent-text: #a7f3d0;
+  --org-active-bg: rgba(52, 211, 153, 0.12);
+  --org-sidebar: #071713;
+  --org-canvas: #f3f6f3;
+  --org-ink: #12231e;
+  --org-border: rgba(16, 44, 36, 0.1);
+  --org-glow: rgba(16, 185, 129, 0.22);
+  --org-on-primary: #ffffff;
+}
+
+[data-organization-theme='PHARMACY'] {
+  --org-primary: #0b5f4a;
+  --org-primary-hover: #084c3c;
+  --org-primary-soft: #ecfdf5;
+  --org-accent: #34d399;
+  --org-accent-text: #a7f3d0;
+  --org-active-bg: rgba(52, 211, 153, 0.12);
+  --org-sidebar: #071713;
+  --org-canvas: #f3f6f3;
+  --org-ink: #12231e;
+  --org-border: rgba(16, 44, 36, 0.1);
+  --org-glow: rgba(16, 185, 129, 0.22);
+}
+
+[data-organization-theme='HOSPITAL'] {
+  --org-primary: #1d4ed8;
+  --org-primary-hover: #1e40af;
+  --org-primary-soft: #eff6ff;
+  --org-accent: #60a5fa;
+  --org-accent-text: #bfdbfe;
+  --org-active-bg: rgba(96, 165, 250, 0.14);
+  --org-sidebar: #0b1830;
+  --org-canvas: #f4f7fb;
+  --org-ink: #14213a;
+  --org-border: rgba(30, 64, 175, 0.11);
+  --org-glow: rgba(59, 130, 246, 0.22);
+}
+
+[data-organization-theme='LABORATORY'] {
+  --org-primary: #6d28d9;
+  --org-primary-hover: #5b21b6;
+  --org-primary-soft: #f5f3ff;
+  --org-accent: #a78bfa;
+  --org-accent-text: #ddd6fe;
+  --org-active-bg: rgba(167, 139, 250, 0.14);
+  --org-sidebar: #1d1533;
+  --org-canvas: #f8f6fb;
+  --org-ink: #261a3d;
+  --org-border: rgba(109, 40, 217, 0.11);
+  --org-glow: rgba(139, 92, 246, 0.22);
+}
+
+[data-organization-theme='CLINIC'] {
+  --org-primary: #0f766e;
+  --org-primary-hover: #115e59;
+  --org-primary-soft: #f0fdfa;
+  --org-accent: #2dd4bf;
+  --org-accent-text: #99f6e4;
+  --org-active-bg: rgba(45, 212, 191, 0.13);
+  --org-sidebar: #092524;
+  --org-canvas: #f4f8f7;
+  --org-ink: #12302d;
+  --org-border: rgba(15, 118, 110, 0.11);
+  --org-glow: rgba(20, 184, 166, 0.22);
+}
+
+[data-organization-theme='BLOOD_BANK'] {
+  --org-primary: #b91c1c;
+  --org-primary-hover: #991b1b;
+  --org-primary-soft: #fff1f2;
+  --org-accent: #fb7185;
+  --org-accent-text: #fecdd3;
+  --org-active-bg: rgba(251, 113, 133, 0.13);
+  --org-sidebar: #2d1115;
+  --org-canvas: #faf5f5;
+  --org-ink: #34191c;
+  --org-border: rgba(185, 28, 28, 0.11);
+  --org-glow: rgba(225, 29, 72, 0.2);
+}
+
+[data-organization-theme='SUPPLIER'] {
+  --org-primary: #a16207;
+  --org-primary-hover: #854d0e;
+  --org-primary-soft: #fffbeb;
+  --org-accent: #fbbf24;
+  --org-accent-text: #fde68a;
+  --org-active-bg: rgba(251, 191, 36, 0.13);
+  --org-sidebar: #2a2111;
+  --org-canvas: #faf8f2;
+  --org-ink: #332a17;
+  --org-border: rgba(161, 98, 7, 0.12);
+  --org-glow: rgba(245, 158, 11, 0.2);
+}
+
+[data-organization-theme='NONE'] {
+  --org-primary: #0369a1;
+  --org-primary-hover: #075985;
+  --org-primary-soft: #f0f9ff;
+  --org-accent: #38bdf8;
+  --org-accent-text: #bae6fd;
+  --org-active-bg: rgba(56, 189, 248, 0.13);
+  --org-sidebar: #0b2230;
+  --org-canvas: #f4f8fa;
+  --org-ink: #142b36;
+  --org-border: rgba(3, 105, 161, 0.11);
+  --org-glow: rgba(14, 165, 233, 0.2);
+}
+
+.organization-theme-shell {
+  color: var(--org-ink);
+  background-color: var(--org-canvas);
+  transition:
+    color 440ms cubic-bezier(0.4, 0, 0.2, 1),
+    background-color 440ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.organization-theme-sidebar {
+  background-color: var(--org-sidebar);
+  transition: background-color 440ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.organization-theme-header {
+  border-color: var(--org-border);
+  background-color: color-mix(in srgb, var(--org-canvas) 90%, transparent);
+  transition:
+    border-color 440ms cubic-bezier(0.4, 0, 0.2, 1),
+    background-color 440ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.organization-theme-mark {
+  color: var(--org-on-primary);
+  background-color: var(--org-primary);
+  transition:
+    color 440ms cubic-bezier(0.4, 0, 0.2, 1),
+    background-color 440ms cubic-bezier(0.4, 0, 0.2, 1),
+    box-shadow 440ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.organization-theme-soft {
+  color: var(--org-primary);
+  background-color: var(--org-primary-soft);
+  border-color: var(--org-border);
+  transition:
+    color 440ms cubic-bezier(0.4, 0, 0.2, 1),
+    background-color 440ms cubic-bezier(0.4, 0, 0.2, 1),
+    border-color 440ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.organization-theme-active {
+  color: var(--org-accent-text);
+  background-color: var(--org-active-bg);
+  transition:
+    color 440ms cubic-bezier(0.4, 0, 0.2, 1),
+    background-color 440ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.organization-theme-active-icon {
+  color: var(--org-accent);
+  transition: color 440ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.organization-theme-interactive {
+  transition:
+    color 440ms cubic-bezier(0.4, 0, 0.2, 1),
+    background-color 440ms cubic-bezier(0.4, 0, 0.2, 1),
+    border-color 440ms cubic-bezier(0.4, 0, 0.2, 1),
+    box-shadow 440ms cubic-bezier(0.4, 0, 0.2, 1),
+    transform 180ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.organization-theme-interactive:hover {
+  border-color: var(--org-border);
+  box-shadow: 0 0 0 3px var(--org-glow);
+}
+
+.organization-theme-focus:focus,
+.organization-theme-focus:focus-visible {
+  border-color: var(--org-primary);
+  box-shadow: 0 0 0 4px var(--org-glow);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .organization-theme-shell,
+  .organization-theme-sidebar,
+  .organization-theme-header,
+  .organization-theme-mark,
+  .organization-theme-soft,
+  .organization-theme-active,
+  .organization-theme-active-icon,
+  .organization-theme-interactive {
+    transition-duration: 1ms !important;
+  }
+}
