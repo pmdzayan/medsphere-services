@@ -1,4 +1,7 @@
-import { normalizeProductIdentifier } from './product-identifier';
+import {
+  equivalentLegacyBarcodeValues,
+  normalizeProductIdentifier,
+} from './product-identifier';
 
 describe('Task 0042 product identifier normalization', () => {
   it.each([
@@ -20,6 +23,19 @@ describe('Task 0042 product identifier normalization', () => {
   it('accepts bounded scanner separators but still validates checksum', () => {
     expect(normalizeProductIdentifier('4006-3813 33931')?.normalizedValue).toBe('04006381333931');
     expect(normalizeProductIdentifier('4006381333932')).toBeNull();
+  });
+
+  it('returns only exact canonical equivalents for legacy Product.barcode compatibility', () => {
+    const canonical = normalizeProductIdentifier('4006381333931');
+    expect(canonical).not.toBeNull();
+    expect(equivalentLegacyBarcodeValues(canonical!)).toEqual([
+      '4006381333931',
+      '04006381333931',
+    ]);
+
+    const gtin = normalizeProductIdentifier('10012345000017');
+    expect(gtin).not.toBeNull();
+    expect(equivalentLegacyBarcodeValues(gtin!)).toEqual(['10012345000017']);
   });
 
   it.each(['', 'abc', '1234567', '123456789012345', '00000000000000'])(
