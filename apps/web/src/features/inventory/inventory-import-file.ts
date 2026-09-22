@@ -193,7 +193,7 @@ function sourceFormatForFile(name: string): 'CSV' | 'XLSX' {
   throw new Error('inventory-import-file-type');
 }
 
-function normalizeHeaders(row: readonly CellValue[]): string[] {
+function normalizeHeaders(row: readonly (CellValue | null)[]): string[] {
   const headers = row.map((cell) => cellToString(cell).trim());
   if (headers.length < 1 || headers.length > INVENTORY_IMPORT_MAX_COLUMNS) {
     throw new Error('inventory-import-headers');
@@ -207,11 +207,11 @@ function normalizeHeaders(row: readonly CellValue[]): string[] {
   return headers;
 }
 
-function normalizeDataRow(row: readonly CellValue[], width: number): string[] {
+function normalizeDataRow(row: readonly (CellValue | null)[], width: number): string[] {
   return Array.from({ length: width }, (_, index) => cellToString(row[index] ?? null));
 }
 
-function cellToString(cell: CellValue): string {
+function cellToString(cell: CellValue | null | undefined): string {
   if (cell === null || cell === undefined) return '';
   if (cell instanceof Date) return cell.toISOString();
   if (typeof cell === 'boolean') return cell ? 'true' : 'false';
