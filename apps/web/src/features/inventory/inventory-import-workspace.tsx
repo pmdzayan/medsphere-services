@@ -464,9 +464,9 @@ export function InventoryImportWorkspace() {
                       <p className="mt-1 text-xs text-[#7a8984]">{product.manufacturer}</p>
                     </div>
                     {product.requiresPrescription ? (
-                      <Badge tone="amber">Rx</Badge>
+                      <Badge tone="amber">{t('inventory.import.prescriptionRequired')}</Badge>
                     ) : (
-                      <Badge tone="emerald">OTC</Badge>
+                      <Badge tone="emerald">{t('inventory.import.nonPrescription')}</Badge>
                     )}
                   </div>
                 </article>
