@@ -373,7 +373,9 @@ export function InventoryImportWorkspace() {
           <p className="mt-3 text-sm text-[#71817c]">{t('inventory.noActiveProviderDetail')}</p>
         ) : null}
         {selectedProvider ? (
-          <p className="mt-3 text-xs font-semibold text-[#71817c]">{selectedProvider.businessName}</p>
+          <p className="mt-3 text-xs font-semibold text-[#71817c]">
+            {selectedProvider.businessName}
+          </p>
         ) : null}
       </Card>
 
@@ -477,9 +479,7 @@ export function InventoryImportWorkspace() {
 
         <Card>
           <h2 className="text-lg font-bold text-[#173128]">{t('inventory.import.fileTitle')}</h2>
-          <p className="mt-2 text-sm leading-6 text-[#60736c]">
-            {t('inventory.import.fileHelp')}
-          </p>
+          <p className="mt-2 text-sm leading-6 text-[#60736c]">{t('inventory.import.fileHelp')}</p>
           <label className="mt-5 block">
             <span className="mb-2 block text-xs font-bold text-canvas-700">
               {t('inventory.import.chooseFile')}
@@ -559,7 +559,9 @@ export function InventoryImportWorkspace() {
       {preview ? (
         <Card padded={false}>
           <div className="border-b border-[#edf1ef] p-5 sm:p-6">
-            <h2 className="text-lg font-bold text-[#173128]">{t('inventory.import.previewTitle')}</h2>
+            <h2 className="text-lg font-bold text-[#173128]">
+              {t('inventory.import.previewTitle')}
+            </h2>
             <div className="mt-4 flex flex-wrap gap-2">
               <Badge tone="slate">
                 {t('inventory.import.rows')}: {preview.rowCount}

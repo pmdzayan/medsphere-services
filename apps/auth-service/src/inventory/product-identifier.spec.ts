@@ -6,13 +6,16 @@ describe('Task 0042 product identifier normalization', () => {
     ['036000291452', 'UPC', '00036000291452'],
     ['10012345000017', 'GTIN', '10012345000017'],
     ['96385074', 'EAN', '00000096385074'],
-  ] as const)('normalizes valid %s identifiers without changing product authority', (value, type, normalized) => {
-    expect(normalizeProductIdentifier(value)).toEqual({
-      type,
-      value,
-      normalizedValue: normalized,
-    });
-  });
+  ] as const)(
+    'normalizes valid %s identifiers without changing product authority',
+    (value, type, normalized) => {
+      expect(normalizeProductIdentifier(value)).toEqual({
+        type,
+        value,
+        normalizedValue: normalized,
+      });
+    },
+  );
 
   it('accepts bounded scanner separators but still validates checksum', () => {
     expect(normalizeProductIdentifier('4006-3813 33931')?.normalizedValue).toBe('04006381333931');

@@ -42,7 +42,6 @@ describe('PermissionExplanationDialog', () => {
     await waitFor(() => expect(requestPermission).toHaveBeenCalledTimes(1));
   });
 
-
   it('does not request camera access before contextual approval and always requests audio off', async () => {
     const stream = { getTracks: () => [] } as unknown as MediaStream;
     const getUserMedia = vi.fn().mockResolvedValue(stream);

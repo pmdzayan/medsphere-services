@@ -94,7 +94,8 @@ export const inventoryEnglishMessages = {
   'inventory.import.fileHelp':
     'Choose one CSV or XLSX file up to 5 MB and 500 data rows. Parsing and mapping happen before any stock changes.',
   'inventory.import.chooseFile': 'Choose CSV or XLSX',
-  'inventory.import.fileError': 'The selected file could not be parsed within the import safety limits.',
+  'inventory.import.fileError':
+    'The selected file could not be parsed within the import safety limits.',
   'inventory.import.mappingTitle': 'Map source columns',
   'inventory.import.sourceColumn': 'Source column',
   'inventory.import.aimField': 'AIM field',
@@ -306,14 +307,16 @@ export const inventoryTamilMessages: Record<keyof typeof inventoryEnglishMessage
   'inventory.import.catalogHelp':
     'துல்லியமான பார்கோடு/USB ஸ்கேன் அல்லது கைமுறை பட்டியல் தேடலைப் பயன்படுத்தவும். ஸ்கேன் புதிய மருந்துப் பதிவை உருவாக்காது.',
   'inventory.import.manualLabel': 'கைமுறை பட்டியல் தேடல்',
-  'inventory.import.manualPlaceholder': 'மருந்து, பொதுப்பெயர், பிராண்ட், உற்பத்தியாளர் அல்லது வலிமை',
+  'inventory.import.manualPlaceholder':
+    'மருந்து, பொதுப்பெயர், பிராண்ட், உற்பத்தியாளர் அல்லது வலிமை',
   'inventory.import.barcodeLabel': 'பார்கோடு / USB ஸ்கேனர்',
   'inventory.import.barcodePlaceholder': 'GTIN, EAN அல்லது UPC ஸ்கேன் அல்லது உள்ளிடவும்',
   'inventory.import.lookup': 'தேடு',
   'inventory.import.camera': 'கேமராவைப் பயன்படுத்து',
   'inventory.import.cameraStop': 'கேமராவை நிறுத்து',
   'inventory.import.cameraScanning': 'மருந்துப் பார்கோடைக் கேமராவுக்கு முன் காட்டவும்.',
-  'inventory.import.cameraError': 'கேமரா ஸ்கேனை தொடங்கவோ ஆதரிக்கப்படும் பார்கோடை வாசிக்கவோ முடியவில்லை.',
+  'inventory.import.cameraError':
+    'கேமரா ஸ்கேனை தொடங்கவோ ஆதரிக்கப்படும் பார்கோடை வாசிக்கவோ முடியவில்லை.',
   'inventory.import.scannerHelp':
     'USB ஸ்கேனர் விசைப்பலகை போல செயல்படும்: பார்கோடு பெட்டியைத் தேர்ந்தெடுத்து ஸ்கேன் செய்யவும். தேட Enter அழுத்தவும்.',
   'inventory.import.noProduct': 'துல்லியமான பட்டியல் பொருத்தம் கிடைக்கவில்லை.',
@@ -323,7 +326,8 @@ export const inventoryTamilMessages: Record<keyof typeof inventoryEnglishMessage
   'inventory.import.fileHelp':
     '5 MB மற்றும் 500 தரவு வரிகளுக்குள் ஒரு CSV அல்லது XLSX கோப்பைத் தேர்ந்தெடுக்கவும். சரக்கு மாறுவதற்கு முன் பகுப்பாய்வும் புல இணைப்பும் நடக்கும்.',
   'inventory.import.chooseFile': 'CSV அல்லது XLSX தேர்வு',
-  'inventory.import.fileError': 'தேர்ந்தெடுத்த கோப்பை இறக்குமதி பாதுகாப்பு வரம்புகளுக்குள் படிக்க முடியவில்லை.',
+  'inventory.import.fileError':
+    'தேர்ந்தெடுத்த கோப்பை இறக்குமதி பாதுகாப்பு வரம்புகளுக்குள் படிக்க முடியவில்லை.',
   'inventory.import.mappingTitle': 'மூல நெடுவரிசைகளை இணைக்கவும்',
   'inventory.import.sourceColumn': 'மூல நெடுவரிசை',
   'inventory.import.aimField': 'AIM புலம்',

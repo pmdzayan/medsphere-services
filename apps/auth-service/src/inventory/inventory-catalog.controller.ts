@@ -1,12 +1,4 @@
-import {
-  Controller,
-  Get,
-  Header,
-  Param,
-  ParseUUIDPipe,
-  Query,
-  UseGuards,
-} from '@nestjs/common';
+import { Controller, Get, Header, Param, ParseUUIDPipe, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiForbiddenResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AuthenticatedIdentity } from '../auth/auth.types';
 import { CurrentIdentity } from '../common/decorators/current-identity.decorator';

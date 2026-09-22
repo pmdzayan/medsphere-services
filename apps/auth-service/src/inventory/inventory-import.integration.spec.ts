@@ -107,9 +107,15 @@ infra('Task 0042 PostgreSQL pharmacy inventory import integrity', () => {
     });
 
     const [inventoryBefore, batchesBefore, movementsBefore] = await Promise.all([
-      prisma.client.inventory.count({ where: { tenantId, providerId, productId: { in: [first, second] } } }),
-      prisma.client.batch.count({ where: { tenantId, providerId, productId: { in: [first, second] } } }),
-      prisma.client.stockMovement.count({ where: { tenantId, providerId, productId: { in: [first, second] } } }),
+      prisma.client.inventory.count({
+        where: { tenantId, providerId, productId: { in: [first, second] } },
+      }),
+      prisma.client.batch.count({
+        where: { tenantId, providerId, productId: { in: [first, second] } },
+      }),
+      prisma.client.stockMovement.count({
+        where: { tenantId, providerId, productId: { in: [first, second] } },
+      }),
     ]);
     expect({ inventoryBefore, batchesBefore, movementsBefore }).toEqual({
       inventoryBefore: 0,
@@ -162,24 +168,30 @@ infra('Task 0042 PostgreSQL pharmacy inventory import integrity', () => {
     ]);
 
     expect(inventories).toHaveLength(2);
-    expect(batches.map(({ receivedQuantity, onHandQuantity, heldQuantity }) => ({
-      receivedQuantity,
-      onHandQuantity,
-      heldQuantity,
-    }))).toEqual([
+    expect(
+      batches.map(({ receivedQuantity, onHandQuantity, heldQuantity }) => ({
+        receivedQuantity,
+        onHandQuantity,
+        heldQuantity,
+      })),
+    ).toEqual([
       { receivedQuantity: 7, onHandQuantity: 7, heldQuantity: 0 },
       { receivedQuantity: 11, onHandQuantity: 11, heldQuantity: 0 },
     ]);
-    expect(movements.map(({ type, delta, onHandBefore, onHandAfter }) => ({
-      type,
-      delta,
-      onHandBefore,
-      onHandAfter,
-    }))).toEqual([
+    expect(
+      movements.map(({ type, delta, onHandBefore, onHandAfter }) => ({
+        type,
+        delta,
+        onHandBefore,
+        onHandAfter,
+      })),
+    ).toEqual([
       { type: 'STOCK_IN', delta: 7, onHandBefore: 0, onHandAfter: 7 },
       { type: 'STOCK_IN', delta: 11, onHandBefore: 0, onHandAfter: 11 },
     ]);
-    expect(observations.map(({ observedOnHandQuantity }) => observedOnHandQuantity)).toEqual([7, 11]);
+    expect(observations.map(({ observedOnHandQuantity }) => observedOnHandQuantity)).toEqual([
+      7, 11,
+    ]);
     expect(receipts).toHaveLength(1);
     expect(receipts[0]).toMatchObject({
       id: applied.receiptId,

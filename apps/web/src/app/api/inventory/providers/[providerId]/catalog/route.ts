@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authApiUrl, boundedUpstreamMessage, upstreamHeaders } from '@/lib/auth-api';
-import {
-  isInventoryCatalogResponse,
-} from '@/lib/inventory-import-contract';
+import { isInventoryCatalogResponse } from '@/lib/inventory-import-contract';
 import { isCanonicalUuid } from '@/lib/inventory-contract';
 import { ACCESS_COOKIE } from '@/lib/session-profile';
 
@@ -56,7 +54,10 @@ export async function GET(request: NextRequest, context: Context): Promise<NextR
       { headers: upstreamHeaders(request, accessToken), cache: 'no-store' },
     );
     if (!upstream.ok) {
-      const message = await boundedUpstreamMessage(upstream, 'Unable to search medicine catalogue.');
+      const message = await boundedUpstreamMessage(
+        upstream,
+        'Unable to search medicine catalogue.',
+      );
       return privateNoStore({ message }, upstreamStatus(upstream.status));
     }
     const payload: unknown = await upstream.json();

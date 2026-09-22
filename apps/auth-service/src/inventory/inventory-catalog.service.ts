@@ -25,7 +25,11 @@ const PRODUCT_SELECT = {
 export class InventoryCatalogService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async search(identity: AuthenticatedIdentity, providerId: string, query: InventoryCatalogQueryDto) {
+  async search(
+    identity: AuthenticatedIdentity,
+    providerId: string,
+    query: InventoryCatalogQueryDto,
+  ) {
     await assertTrustedProviderAccess(this.prisma.client, identity, providerId);
     const provider = await this.prisma.client.provider.findFirst({
       where: {
@@ -60,10 +64,15 @@ export class InventoryCatalogService {
         },
         select: PRODUCT_SELECT,
       });
-      return { mode: 'IDENTIFIER' as const, canonicalIdentifier: canonical.normalizedValue, data: product ? [product] : [] };
+      return {
+        mode: 'IDENTIFIER' as const,
+        canonicalIdentifier: canonical.normalizedValue,
+        data: product ? [product] : [],
+      };
     }
 
-    if (!text || text.length < 2) throw new BadRequestException('Manual catalogue search requires at least 2 characters');
+    if (!text || text.length < 2)
+      throw new BadRequestException('Manual catalogue search requires at least 2 characters');
     const data = await this.prisma.client.product.findMany({
       where: {
         isActive: true,

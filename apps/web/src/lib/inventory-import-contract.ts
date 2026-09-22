@@ -153,7 +153,9 @@ export function isInventoryCatalogResponse(value: unknown): value is InventoryCa
   );
 }
 
-export function isStageInventoryImportRequest(value: unknown): value is StageInventoryImportRequest {
+export function isStageInventoryImportRequest(
+  value: unknown,
+): value is StageInventoryImportRequest {
   if (
     !hasExactKeys(value, [
       'sourceFormat',
@@ -316,10 +318,7 @@ function isImportMapping(value: unknown): value is Record<string, InventoryImpor
 function isImportStageRow(value: unknown): value is InventoryImportStageRowRequest {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
   const row = value as Record<string, unknown>;
-  const allowed = new Set([
-    'rowNumber',
-    ...INVENTORY_IMPORT_FIELDS,
-  ]);
+  const allowed = new Set(['rowNumber', ...INVENTORY_IMPORT_FIELDS]);
   if (Object.keys(row).some((key) => !allowed.has(key))) return false;
   if (!isInteger(row.rowNumber, 1, Number.MAX_SAFE_INTEGER)) return false;
   if (row.productId !== undefined && !isCanonicalUuid(row.productId)) return false;

@@ -93,7 +93,8 @@ export async function parseInventoryImportFile(file: File): Promise<ParsedInvent
       : await readSheet(file);
 
   if (data.length < 2) throw new Error('inventory-import-empty');
-  if (data.length - 1 > INVENTORY_IMPORT_MAX_ROWS) throw new Error('inventory-import-too-many-rows');
+  if (data.length - 1 > INVENTORY_IMPORT_MAX_ROWS)
+    throw new Error('inventory-import-too-many-rows');
   if (data.some((row) => row.length > INVENTORY_IMPORT_MAX_COLUMNS)) {
     throw new Error('inventory-import-too-many-columns');
   }
@@ -173,7 +174,14 @@ export function assertMapping(
   const hasReference =
     targets.has('productId') || targets.has('identifier') || targets.has('productName');
   if (!hasReference) throw new Error('inventory-import-product-reference');
-  for (const required of ['sellingPrice', 'mrp', 'batchNumber', 'expiryDate', 'quantity', 'purchasePrice']) {
+  for (const required of [
+    'sellingPrice',
+    'mrp',
+    'batchNumber',
+    'expiryDate',
+    'quantity',
+    'purchasePrice',
+  ]) {
     if (!targets.has(required)) throw new Error('inventory-import-required-mapping');
   }
 }

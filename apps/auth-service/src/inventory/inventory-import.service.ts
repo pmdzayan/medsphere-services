@@ -99,7 +99,9 @@ export class InventoryImportService {
       sourceFormat: dto.sourceFormat,
       sourceFileName: dto.sourceFileName,
       contentHash: dto.contentHash,
-      mapping: Object.fromEntries(Object.entries(dto.mapping).sort(([a], [b]) => a.localeCompare(b))),
+      mapping: Object.fromEntries(
+        Object.entries(dto.mapping).sort(([a], [b]) => a.localeCompare(b)),
+      ),
       rows: dto.rows.map((row) => this.rowHashInput(row)),
     });
 
@@ -1002,11 +1004,7 @@ export class InventoryImportService {
     return null;
   }
 
-  private dateValue(
-    value: string | undefined,
-    code: string,
-    errors: string[],
-  ): Date | null {
+  private dateValue(value: string | undefined, code: string, errors: string[]): Date | null {
     if (!value?.trim()) {
       errors.push(`${code}_REQUIRED`);
       return null;

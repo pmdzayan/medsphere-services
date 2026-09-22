@@ -36,7 +36,17 @@ describe('Task 0042 inventory import file boundary', () => {
     const parsed = {
       headers: ['Barcode', 'Name', 'Batch', 'Expiry', 'Qty', 'Buy', 'MRP', 'Sale', 'Internal Note'],
       rows: [
-        ['4006381333931', 'Medicine A', 'B-1', '2028-01-01', '10', '5.00', '8.00', '7.50', 'ignore me'],
+        [
+          '4006381333931',
+          'Medicine A',
+          'B-1',
+          '2028-01-01',
+          '10',
+          '5.00',
+          '8.00',
+          '7.50',
+          'ignore me',
+        ],
       ],
     };
     const mapping = {
@@ -70,17 +80,14 @@ describe('Task 0042 inventory import file boundary', () => {
       assertMapping(['Batch', 'Qty'], { Batch: 'batchNumber', Qty: 'quantity' }),
     ).toThrow();
     expect(() =>
-      assertMapping(
-        ['Barcode', 'Batch', 'Expiry', 'Qty', 'Buy', 'MRP'],
-        {
-          Barcode: 'identifier',
-          Batch: 'batchNumber',
-          Expiry: 'expiryDate',
-          Qty: 'quantity',
-          Buy: 'purchasePrice',
-          MRP: 'mrp',
-        },
-      ),
+      assertMapping(['Barcode', 'Batch', 'Expiry', 'Qty', 'Buy', 'MRP'], {
+        Barcode: 'identifier',
+        Batch: 'batchNumber',
+        Expiry: 'expiryDate',
+        Qty: 'quantity',
+        Buy: 'purchasePrice',
+        MRP: 'mrp',
+      }),
     ).toThrow();
   });
 
