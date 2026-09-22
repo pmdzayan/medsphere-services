@@ -1,5 +1,5 @@
 name: Task 0042 final certification
-# Rerun after deterministic PostgreSQL conservation assertions
+# Rerun after final web parser and isolated-test corrections
 
 on:
   push:
@@ -81,6 +81,9 @@ jobs:
       - name: Run Task 0042 backend boundary and PostgreSQL integrity tests
         run: |
           pnpm --filter @medsphere/auth-service exec jest             src/inventory/product-identifier.spec.ts             src/inventory/dto/inventory-import.dto.spec.ts             src/inventory/inventory-import.integration.spec.ts             --runInBand
+
+      - name: Build web workspace dependencies for isolated Vitest
+        run: pnpm --filter @medsphere/brand build
 
       - name: Run Task 0042 web boundary tests
         run: |
