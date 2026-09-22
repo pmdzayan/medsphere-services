@@ -3,7 +3,10 @@ import { AuthenticatedIdentity } from '../auth/auth.types';
 import { PrismaService } from '../prisma/prisma.service';
 import { assertTrustedProviderAccess } from './inventory-access';
 import { InventoryCatalogQueryDto } from './dto/inventory-catalog-query.dto';
-import { normalizeProductIdentifier } from './product-identifier';
+import {
+  equivalentLegacyBarcodeValues,
+  normalizeProductIdentifier,
+} from './product-identifier';
 
 const PRODUCT_SELECT = {
   id: true,
@@ -59,7 +62,7 @@ export class InventoryCatalogService {
           deletedAt: null,
           OR: [
             { identifiers: { some: { normalizedValue: canonical.normalizedValue } } },
-            { barcode: canonical.value },
+            { barcode: { in: equivalentLegacyBarcodeValues(canonical) } },
           ],
         },
         select: PRODUCT_SELECT,
