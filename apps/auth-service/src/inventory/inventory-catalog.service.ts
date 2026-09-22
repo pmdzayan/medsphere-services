@@ -3,10 +3,7 @@ import { AuthenticatedIdentity } from '../auth/auth.types';
 import { PrismaService } from '../prisma/prisma.service';
 import { assertTrustedProviderAccess } from './inventory-access';
 import { InventoryCatalogQueryDto } from './dto/inventory-catalog-query.dto';
-import {
-  equivalentLegacyBarcodeValues,
-  normalizeProductIdentifier,
-} from './product-identifier';
+import { equivalentLegacyBarcodeValues, normalizeProductIdentifier } from './product-identifier';
 
 const PRODUCT_SELECT = {
   id: true,

@@ -21,10 +21,7 @@ import {
 } from './dto/inventory-import.dto';
 import { assertTrustedProviderAccess } from './inventory-access';
 import type { TrustedInventoryActor } from './inventory-command.types';
-import {
-  equivalentLegacyBarcodeValues,
-  normalizeProductIdentifier,
-} from './product-identifier';
+import { equivalentLegacyBarcodeValues, normalizeProductIdentifier } from './product-identifier';
 
 type StagedPayload = {
   sku: string | null;

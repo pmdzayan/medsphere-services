@@ -27,10 +27,7 @@ export function normalizeProductIdentifier(raw: string): CanonicalProductIdentif
   };
 }
 
-
-export function equivalentLegacyBarcodeValues(
-  canonical: CanonicalProductIdentifier,
-): string[] {
+export function equivalentLegacyBarcodeValues(canonical: CanonicalProductIdentifier): string[] {
   const unpadded = canonical.normalizedValue.replace(/^0+(?=\d)/, '');
   return [...new Set([canonical.value, canonical.normalizedValue, unpadded])];
 }
