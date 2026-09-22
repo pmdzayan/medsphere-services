@@ -30,6 +30,7 @@ import {
   sumMoney,
 } from './pos-money';
 import { PosEventWriter } from './pos-event-writer';
+import { indianFinancialYear } from './pos-financial-year';
 import type {
   PharmacyCheckoutCommand,
   PosActor,
@@ -315,7 +316,7 @@ export class PosCheckoutService {
             : null;
 
           const saleId = randomUUID();
-          const financialYear = this.financialYear(now);
+          const financialYear = indianFinancialYear(now);
           const invoiceNumber = await this.allocateInvoiceNumber(
             transaction,
             command.actor.tenantId,
@@ -1592,11 +1593,6 @@ export class PosCheckoutService {
     return value;
   }
 
-  private financialYear(now: Date): string {
-    const year = now.getUTCFullYear();
-    const start = now.getUTCMonth() >= 3 ? year : year - 1;
-    return String(start) + '-' + String((start + 1) % 100).padStart(2, '0');
-  }
 
   private movementKey(idempotencyKey: string, lineId: string, batchId: string): string {
     return (

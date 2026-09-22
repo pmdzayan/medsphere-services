@@ -178,7 +178,7 @@ export interface PosSaleReceipt {
   replayed: boolean;
 }
 
-const MONEY = /^(?:0|[1-9]\d{0,11})(?:\.\d{1,2})?$/;
+const MONEY = /^(?:0|[1-9]\d{0,9})(?:\.\d{1,2})?$/;
 const PERCENT = /^(?:0|[1-9]\d{0,2})(?:\.\d{1,2})?$/;
 const GSTIN = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/;
 const STATE = /^\d{2}$/;
