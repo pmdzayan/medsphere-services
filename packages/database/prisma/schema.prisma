@@ -417,6 +417,7 @@ model Tenant {
   pharmacySaleVoids                      PharmacySaleVoid[]
   pharmacyInventoryFiscalProfiles        InventoryFiscalProfile[]
   pharmacySaleAllocations                PharmacySaleAllocation[]
+  pharmacyInvoiceReprints                PharmacyInvoiceReprint[]
 
   @@index([slug])
 }
@@ -1729,6 +1730,7 @@ model PharmacySaleAllocation {
 
   saleId      String @db.Uuid
   inventoryId String @db.Uuid
+  inventory   Inventory @relation(fields: [inventoryId, tenantId, providerId, productId], references: [id, tenantId, providerId, productId], onDelete: Restrict)
   productId   String @db.Uuid
 
   batchId String @db.Uuid
