@@ -82,6 +82,6 @@ import { PharmacyVerificationModule } from '../pharmacy-verification/pharmacy-ve
     InventoryCatalogService,
     InventoryImportService,
   ],
-  exports: [InventoryService, AvailabilityTrustService],
+  exports: [InventoryService, AvailabilityTrustService, InventoryEventWriter],
 })
 export class InventoryModule {}
