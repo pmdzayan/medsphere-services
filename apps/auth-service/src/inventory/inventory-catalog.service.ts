@@ -19,7 +19,7 @@ const PRODUCT_SELECT = {
     select: { type: true, value: true, normalizedValue: true, isPrimary: true },
     orderBy: [{ isPrimary: 'desc' as const }, { createdAt: 'asc' as const }],
   },
-} as const;
+};
 
 @Injectable()
 export class InventoryCatalogService {
