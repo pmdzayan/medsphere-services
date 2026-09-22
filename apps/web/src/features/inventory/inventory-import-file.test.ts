@@ -92,16 +92,15 @@ describe('Task 0042 inventory import file boundary', () => {
   });
 
   it('parses quoted CSV safely and records SHA-256 evidence before staging', async () => {
-    const file = new File(
-      [
-        [
-          'Barcode,Medicine Name,Batch Number,Expiry Date,Qty,Purchase Price,MRP,Selling Price',
-          '4006381333931,"Paracetamol, 500 mg",B-1,2028-01-01,10,5.00,8.00,7.50',
-        ].join('\n'),
-      ],
-      'inventory.csv',
-      { type: 'text/csv' },
-    );
+    const csv = [
+      'Barcode,Medicine Name,Batch Number,Expiry Date,Qty,Purchase Price,MRP,Selling Price',
+      '4006381333931,"Paracetamol, 500 mg",B-1,2028-01-01,10,5.00,8.00,7.50',
+    ].join('\n');
+    const file = new File([csv], 'inventory.csv', { type: 'text/csv' });
+    Object.defineProperty(file, 'arrayBuffer', {
+      configurable: true,
+      value: async () => new TextEncoder().encode(csv).buffer,
+    });
 
     const parsed = await parseInventoryImportFile(file);
     expect(parsed.sourceFormat).toBe('CSV');
