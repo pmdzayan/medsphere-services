@@ -34,6 +34,10 @@ import { PatientMedicineSearchService } from './patient-medicine-search.service'
 import { PatientReservationController } from './patient-reservation.controller';
 import { PatientReservationService } from './patient-reservation.service';
 import { InventoryAnalyticsService } from './inventory-analytics.service';
+import { InventoryCatalogController } from './inventory-catalog.controller';
+import { InventoryCatalogService } from './inventory-catalog.service';
+import { InventoryImportController } from './inventory-import.controller';
+import { InventoryImportService } from './inventory-import.service';
 import { PharmacyVerificationModule } from '../pharmacy-verification/pharmacy-verification.module';
 
 @Module({
@@ -45,6 +49,8 @@ import { PharmacyVerificationModule } from '../pharmacy-verification/pharmacy-ve
     PublicLiveAvailabilityController,
     PatientMedicineSearchController,
     PatientReservationController,
+    InventoryCatalogController,
+    InventoryImportController,
   ],
   providers: [
     InventoryRepository,
@@ -73,6 +79,8 @@ import { PharmacyVerificationModule } from '../pharmacy-verification/pharmacy-ve
     PatientMedicineSearchService,
     PatientReservationService,
     InventoryAnalyticsService,
+    InventoryCatalogService,
+    InventoryImportService,
   ],
   exports: [InventoryService, AvailabilityTrustService],
 })

@@ -267,6 +267,28 @@ enum ConsentStatus {
   WITHDRAWN
 }
 
+enum ProductIdentifierType {
+  GTIN
+  EAN
+  UPC
+}
+
+enum InventoryImportSourceFormat {
+  CSV
+  XLSX
+}
+
+enum InventoryImportStatus {
+  STAGED
+  APPLIED
+}
+
+enum InventoryImportRowStatus {
+  VALID
+  INVALID
+  APPLIED
+}
+
 /// Task 0021: platform-account lifecycle. Platform authority is granted ONLY
 /// through a PlatformAccount + live PlatformRoleAssignment -- never through
 /// tenant membership (TENANT AUTHORITY != PLATFORM AUTHORITY).
@@ -353,6 +375,9 @@ model Tenant {
   availabilityRequests                   AvailabilityRequest[]
   providerProductAvailabilityEvidence    ProviderProductAvailabilityEvidence[]
   pharmacyAvailabilityRequestPreferences PharmacyAvailabilityRequestPreference[]
+  inventoryImportJobs                    InventoryImportJob[]
+  inventoryImportRows                    InventoryImportRow[]
+  inventoryImportReceipts                InventoryImportReceipt[]
 
   @@index([slug])
 }
@@ -549,6 +574,9 @@ model TenantMembership {
   outboxEvents                 OutboxEvent[]
   createdOrganizationJoinCodes OrganizationJoinCode[]                @relation("OrganizationJoinCodeCreatedBy")
   availabilityResponseEvidence ProviderProductAvailabilityEvidence[]
+  stagedInventoryImports         InventoryImportJob[]     @relation("InventoryImportStagedBy")
+  appliedInventoryImports        InventoryImportJob[]     @relation("InventoryImportAppliedBy")
+  inventoryImportReceipts        InventoryImportReceipt[]
 
   @@unique([tenantId, userId])
   @@unique([id, tenantId])
@@ -1226,6 +1254,9 @@ model Provider {
   providerProductAvailabilityEvidence ProviderProductAvailabilityEvidence[]
   availabilityRequestPreference       PharmacyAvailabilityRequestPreference?
   verifications                       ProviderVerification[]
+  inventoryImportJobs                  InventoryImportJob[]
+  inventoryImportRows                  InventoryImportRow[]
+  inventoryImportReceipts              InventoryImportReceipt[]
 
   version Int @default(1)
 
@@ -1266,6 +1297,8 @@ model Product {
   batchStockObservations              BatchStockObservation[]
   availabilityRequests                AvailabilityRequest[]
   providerProductAvailabilityEvidence ProviderProductAvailabilityEvidence[]
+  identifiers                         ProductIdentifier[]
+  inventoryImportRows                 InventoryImportRow[]
 
   version Int @default(1)
 
@@ -1337,6 +1370,127 @@ model InventoryConfigurationCommand {
 
   @@unique([tenantId, idempotencyKey])
   @@index([tenantId, inventoryId, createdAt(sort: Desc)])
+}
+
+
+/// Task 0042: globally canonical identifiers for the existing Product catalogue.
+/// normalizedValue is a GTIN-14 canonical representation for GTIN/EAN/UPC inputs;
+/// raw scanned/user input is never trusted as an identifier authority.
+model ProductIdentifier {
+  id String @id @default(uuid()) @db.Uuid
+
+  productId String  @db.Uuid
+  product   Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  type            ProductIdentifierType
+  value           String                @db.VarChar(32)
+  normalizedValue String                @unique @db.VarChar(32)
+  isPrimary       Boolean               @default(false)
+
+  createdAt DateTime @default(now())
+
+  @@unique([productId, type, normalizedValue])
+  @@index([productId, isPrimary])
+}
+
+/// Task 0042: tenant/provider-scoped staged import authority. Staging never
+/// mutates Inventory/Batch/StockMovement. Only an explicit APPLIED transition
+/// may invoke the accepted inventory command authority.
+model InventoryImportJob {
+  id String @id @default(uuid()) @db.Uuid
+
+  tenantId String @db.Uuid
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+
+  providerId String   @db.Uuid
+  provider   Provider @relation(fields: [providerId, tenantId], references: [id, tenantId], onDelete: Restrict)
+
+  stagedByMembershipId String           @db.Uuid
+  stagedByMembership   TenantMembership @relation("InventoryImportStagedBy", fields: [stagedByMembershipId, tenantId], references: [id, tenantId], onDelete: Restrict)
+
+  appliedByMembershipId String?           @db.Uuid
+  appliedByMembership   TenantMembership? @relation("InventoryImportAppliedBy", fields: [appliedByMembershipId, tenantId], references: [id, tenantId], onDelete: Restrict)
+
+  sourceFormat   InventoryImportSourceFormat
+  sourceFileName String                      @db.VarChar(255)
+  contentHash    String                      @db.VarChar(64)
+  mapping        Json
+
+  stageIdempotencyKey String @db.VarChar(120)
+  stageCommandHash    String @db.VarChar(64)
+  applyIdempotencyKey String? @db.VarChar(120)
+  applyCommandHash    String? @db.VarChar(64)
+
+  status          InventoryImportStatus @default(STAGED)
+  rowCount        Int
+  validRowCount   Int
+  invalidRowCount Int
+  appliedAt       DateTime?
+  createdAt       DateTime              @default(now())
+
+  rows    InventoryImportRow[]
+  receipt InventoryImportReceipt?
+
+  @@unique([id, tenantId, providerId])
+  @@unique([tenantId, stageIdempotencyKey])
+  @@unique([tenantId, applyIdempotencyKey])
+  @@index([tenantId, providerId, createdAt(sort: Desc), id(sort: Desc)])
+}
+
+/// Immutable staged row evidence. payload contains only the bounded normalized
+/// import columns; validationErrors is a bounded array of machine-owned codes.
+model InventoryImportRow {
+  id String @id @default(uuid()) @db.Uuid
+
+  importJobId String @db.Uuid
+  tenantId    String @db.Uuid
+  providerId  String @db.Uuid
+
+  importJob InventoryImportJob @relation(fields: [importJobId, tenantId, providerId], references: [id, tenantId, providerId], onDelete: Restrict)
+  tenant    Tenant             @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  provider  Provider           @relation(fields: [providerId, tenantId], references: [id, tenantId], onDelete: Restrict)
+
+  rowNumber Int
+  productId String?  @db.Uuid
+  product   Product? @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  payload          Json
+  validationErrors Json
+  status           InventoryImportRowStatus
+
+  inventoryId String? @db.Uuid
+  batchId     String? @db.Uuid
+  appliedAt   DateTime?
+  createdAt   DateTime @default(now())
+
+  @@unique([importJobId, rowNumber])
+  @@index([tenantId, providerId, status])
+  @@index([productId])
+}
+
+/// One append-only apply receipt per import job. There is intentionally no
+/// update path: replay returns this same receipt.
+model InventoryImportReceipt {
+  id String @id @default(uuid()) @db.Uuid
+
+  importJobId String             @unique @db.Uuid
+  importJob   InventoryImportJob @relation(fields: [importJobId, tenantId, providerId], references: [id, tenantId, providerId], onDelete: Restrict)
+
+  tenantId String @db.Uuid
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+
+  providerId String   @db.Uuid
+  provider   Provider @relation(fields: [providerId, tenantId], references: [id, tenantId], onDelete: Restrict)
+
+  actorMembershipId String           @db.Uuid
+  actorMembership   TenantMembership @relation(fields: [actorMembershipId, tenantId], references: [id, tenantId], onDelete: Restrict)
+
+  appliedRowCount Int
+  totalQuantity   Int
+  createdAt       DateTime @default(now())
+
+  @@unique([importJobId, tenantId, providerId])
+  @@index([tenantId, providerId, createdAt(sort: Desc), id(sort: Desc)])
 }
 
 model Batch {

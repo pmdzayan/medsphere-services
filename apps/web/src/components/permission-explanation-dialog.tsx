@@ -10,7 +10,7 @@ export function PermissionExplanationDialog({
   onContinue,
   onAlternative,
 }: {
-  readonly kind: 'location' | 'notifications';
+  readonly kind: 'location' | 'notifications' | 'camera';
   readonly open: boolean;
   readonly busy?: boolean;
   readonly onContinue: () => void;
@@ -36,17 +36,29 @@ export function PermissionExplanationDialog({
   if (!open) return null;
 
   const titleKey =
-    kind === 'location' ? 'permissions.location.title' : 'permissions.notifications.title';
+    kind === 'location'
+      ? 'permissions.location.title'
+      : kind === 'camera'
+        ? 'permissions.camera.title'
+        : 'permissions.notifications.title';
   const explanationKey =
     kind === 'location'
       ? 'permissions.location.explanation'
-      : 'permissions.notifications.explanation';
+      : kind === 'camera'
+        ? 'permissions.camera.explanation'
+        : 'permissions.notifications.explanation';
   const precisionKey =
-    kind === 'location' ? 'permissions.location.precision' : 'permissions.notifications.precision';
+    kind === 'location'
+      ? 'permissions.location.precision'
+      : kind === 'camera'
+        ? 'permissions.camera.precision'
+        : 'permissions.notifications.precision';
   const continueKey =
     kind === 'location'
       ? 'permissions.action.continueLocation'
-      : 'permissions.action.continueNotifications';
+      : kind === 'camera'
+        ? 'permissions.action.continueCamera'
+        : 'permissions.action.continueNotifications';
   const alternativeKey =
     kind === 'location' ? 'permissions.action.manualLocation' : 'permissions.action.cancel';
 

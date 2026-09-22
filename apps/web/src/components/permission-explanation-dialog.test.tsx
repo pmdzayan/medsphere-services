@@ -2,7 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { LanguageProvider } from './language-provider';
 import { PermissionExplanationDialog } from './permission-explanation-dialog';
-import { requestBrowserNotifications } from '@/lib/browser-permissions';
+import { requestBrowserNotifications, startCameraScan } from '@/lib/browser-permissions';
 
 const originalNotification = globalThis.Notification;
 
@@ -40,6 +40,46 @@ describe('PermissionExplanationDialog', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Continue to browser settings' }));
     await waitFor(() => expect(requestPermission).toHaveBeenCalledTimes(1));
+  });
+
+  it('does not request camera access before contextual approval and always requests audio off', async () => {
+    const stream = { getTracks: () => [] } as unknown as MediaStream;
+    const getUserMedia = vi.fn().mockResolvedValue(stream);
+    const originalMediaDevices = navigator.mediaDevices;
+    Object.defineProperty(navigator, 'mediaDevices', {
+      configurable: true,
+      value: { getUserMedia },
+    });
+
+    try {
+      render(
+        <LanguageProvider initialLocale="en">
+          <PermissionExplanationDialog
+            kind="camera"
+            open
+            onAlternative={vi.fn()}
+            onContinue={() => void startCameraScan()}
+          />
+        </LanguageProvider>,
+      );
+
+      expect(screen.getByText('Use the camera to scan a barcode?')).toBeVisible();
+      expect(screen.getByText(/Audio is never requested/)).toBeVisible();
+      expect(getUserMedia).not.toHaveBeenCalled();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Open camera scanner' }));
+      await waitFor(() =>
+        expect(getUserMedia).toHaveBeenCalledWith({
+          audio: false,
+          video: { facingMode: { ideal: 'environment' } },
+        }),
+      );
+    } finally {
+      Object.defineProperty(navigator, 'mediaDevices', {
+        configurable: true,
+        value: originalMediaDevices,
+      });
+    }
   });
 
   it('provides keyboard dismissal, initial focus, and responsive dialog layout', async () => {

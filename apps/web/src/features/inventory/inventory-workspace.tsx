@@ -327,6 +327,12 @@ export function InventoryWorkspace() {
         </div>
         <div className="flex flex-wrap gap-3">
           <Link
+            href="/inventory/import"
+            className="inline-flex w-fit items-center rounded-xl bg-[#0b5f4b] px-4 py-2.5 text-sm font-bold text-white"
+          >
+            {t('inventory.import.open')}
+          </Link>
+          <Link
             href="/inventory/analytics"
             className="inline-flex w-fit items-center rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-bold text-white"
           >

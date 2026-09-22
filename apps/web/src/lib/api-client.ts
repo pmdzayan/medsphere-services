@@ -45,6 +45,13 @@ import {
 } from './inventory-contract';
 import type { InventoryAnalyticsResponse } from './inventory-analytics-contract';
 import type {
+  ApplyInventoryImportRequest,
+  InventoryCatalogResponse,
+  InventoryImportApplyReceipt,
+  InventoryImportPreview,
+  StageInventoryImportRequest,
+} from './inventory-import-contract';
+import type {
   ConsentStatus,
   LanguageUpdateRequest,
   LanguageUpdateResponse,
@@ -349,6 +356,57 @@ export async function searchNearbyMedicine(
 
   return requestJson<PublicNearbyMedicineSearchResponse>(
     `/api/public/medicine-discovery/nearby?${search.toString()}`,
+  );
+}
+
+export async function searchInventoryCatalog(
+  providerId: string,
+  input: { identifier?: string; query?: string; limit?: number },
+): Promise<InventoryCatalogResponse> {
+  const search = new URLSearchParams();
+  if (input.identifier) search.set('identifier', input.identifier);
+  if (input.query) search.set('query', input.query);
+  if (input.limit !== undefined) search.set('limit', String(input.limit));
+  return requestJson<InventoryCatalogResponse>(
+    `/api/inventory/providers/${encodeURIComponent(providerId)}/catalog?${search.toString()}`,
+  );
+}
+
+export async function stageInventoryImport(
+  providerId: string,
+  request: StageInventoryImportRequest,
+): Promise<InventoryImportPreview> {
+  return requestJson<InventoryImportPreview>(
+    `/api/inventory/providers/${encodeURIComponent(providerId)}/imports/stage`,
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(request),
+    },
+  );
+}
+
+export async function getInventoryImportPreview(
+  providerId: string,
+  importJobId: string,
+): Promise<InventoryImportPreview> {
+  return requestJson<InventoryImportPreview>(
+    `/api/inventory/providers/${encodeURIComponent(providerId)}/imports/${encodeURIComponent(importJobId)}`,
+  );
+}
+
+export async function applyInventoryImport(
+  providerId: string,
+  importJobId: string,
+  request: ApplyInventoryImportRequest,
+): Promise<InventoryImportApplyReceipt> {
+  return requestJson<InventoryImportApplyReceipt>(
+    `/api/inventory/providers/${encodeURIComponent(providerId)}/imports/${encodeURIComponent(importJobId)}/apply`,
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(request),
+    },
   );
 }
 

@@ -9,8 +9,14 @@ export const permissionsEnglishMessages = {
     'Browser notifications can alert you about supported {brandFullName} updates after you choose to enable them.',
   'permissions.notifications.precision':
     'Your {brandFullName} notification preference and your browser permission are separate controls.',
+  'permissions.camera.title': 'Use the camera to scan a barcode?',
+  'permissions.camera.explanation':
+    '{brandFullName} uses the camera only while this scanner is open to read a medicine barcode. Audio is never requested.',
+  'permissions.camera.precision':
+    'The camera stream stays on this device for decoding and stops when scanning ends. You can enter or scan the barcode with a USB scanner instead.',
   'permissions.action.continueLocation': 'Use my location',
   'permissions.action.continueNotifications': 'Continue to browser settings',
+  'permissions.action.continueCamera': 'Open camera scanner',
   'permissions.action.manualLocation': 'Search without location',
   'permissions.action.cancel': 'Not now',
 } as const;
@@ -28,8 +34,14 @@ export const permissionsTamilMessages: Record<PermissionsTranslationKey, string>
     'நீங்கள் இயக்கத் தேர்ந்தெடுத்த பிறகு, ஆதரிக்கப்படும் {brandFullName} புதுப்பிப்புகளை உலாவி அறிவிப்புகள் தெரிவிக்கலாம்.',
   'permissions.notifications.precision':
     'உங்கள் {brandFullName} அறிவிப்பு விருப்பமும் உலாவி அனுமதியும் தனித்தனி கட்டுப்பாடுகள்.',
+  'permissions.camera.title': 'பார்கோடை ஸ்கேன் செய்ய கேமராவைப் பயன்படுத்தலாமா?',
+  'permissions.camera.explanation':
+    'மருந்துப் பார்கோடைப் படிக்க இந்த ஸ்கேனர் திறந்திருக்கும் நேரத்தில் மட்டும் {brandFullName} கேமராவைப் பயன்படுத்தும். ஒலி ஒருபோதும் கோரப்படாது.',
+  'permissions.camera.precision':
+    'பார்கோடு வாசிப்பு இந்த சாதனத்திலேயே நடைபெறும்; ஸ்கேன் முடிந்ததும் கேமரா நிறுத்தப்படும். மாற்றாக பார்கோடை கைமுறையாக உள்ளிடலாம் அல்லது USB ஸ்கேனரைப் பயன்படுத்தலாம்.',
   'permissions.action.continueLocation': 'என் இருப்பிடத்தைப் பயன்படுத்து',
   'permissions.action.continueNotifications': 'உலாவி அமைப்புகளுக்குத் தொடரவும்',
+  'permissions.action.continueCamera': 'கேமரா ஸ்கேனரைத் திற',
   'permissions.action.manualLocation': 'இருப்பிடம் இல்லாமல் தேடு',
   'permissions.action.cancel': 'இப்போது வேண்டாம்',
 };
@@ -45,8 +57,14 @@ export const permissionsUrduMessages: Record<PermissionsTranslationKey, string> 
     'آپ کے فعال کرنے کے بعد براؤزر اطلاعات معاون {brandFullName} اپ ڈیٹس کے بارے میں آگاہ کر سکتی ہیں۔',
   'permissions.notifications.precision':
     'آپ کی {brandFullName} اطلاع ترجیح اور براؤزر اجازت الگ کنٹرول ہیں۔',
+  'permissions.camera.title': 'بارکوڈ اسکین کرنے کے لیے کیمرا استعمال کریں؟',
+  'permissions.camera.explanation':
+    '{brandFullName} کیمرا صرف اس وقت استعمال کرتا ہے جب یہ اسکینر دوا کا بارکوڈ پڑھنے کے لیے کھلا ہو۔ آڈیو کی کبھی درخواست نہیں کی جاتی۔',
+  'permissions.camera.precision':
+    'بارکوڈ کی شناخت اسی ڈیوائس پر ہوتی ہے اور اسکین ختم ہوتے ہی کیمرا بند ہو جاتا ہے۔ آپ بارکوڈ دستی طور پر درج کر سکتے ہیں یا USB اسکینر بھی استعمال کر سکتے ہیں۔',
   'permissions.action.continueLocation': 'میرا مقام استعمال کریں',
   'permissions.action.continueNotifications': 'براؤزر ترتیبات پر جاری رکھیں',
+  'permissions.action.continueCamera': 'کیمرا اسکینر کھولیں',
   'permissions.action.manualLocation': 'مقام کے بغیر تلاش کریں',
   'permissions.action.cancel': 'ابھی نہیں',
 };
