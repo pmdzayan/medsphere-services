@@ -1,4 +1,5 @@
 name: Task 0043 migration generator
+# Regenerate after validated tenant-scoped relation graph
 
 on:
   push:
