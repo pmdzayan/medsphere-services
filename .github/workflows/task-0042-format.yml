@@ -1,4 +1,5 @@
 name: Task 0042 formatter
+# Final formatting pass before Task 0042 certification
 
 on:
   push:
