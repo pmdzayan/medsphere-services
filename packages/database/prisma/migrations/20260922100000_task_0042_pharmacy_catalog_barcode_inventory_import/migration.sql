@@ -179,6 +179,8 @@ CREATE TABLE "InventoryImportReceipt" (
 
 CREATE UNIQUE INDEX "InventoryImportReceipt_importJobId_key"
   ON "InventoryImportReceipt"("importJobId");
+CREATE UNIQUE INDEX "InventoryImportReceipt_importJobId_tenantId_providerId_key"
+  ON "InventoryImportReceipt"("importJobId", "tenantId", "providerId");
 CREATE INDEX "InventoryImportReceipt_tenantId_providerId_createdAt_id_idx"
   ON "InventoryImportReceipt"("tenantId", "providerId", "createdAt" DESC, "id" DESC);
 
