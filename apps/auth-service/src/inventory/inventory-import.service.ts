@@ -152,20 +152,22 @@ export class InventoryImportService {
             rowCount: stagedRows.length,
             validRowCount,
             invalidRowCount,
-            rows: {
-              create: stagedRows.map((row) => ({
-                id: row.id,
-                tenantId: actor.tenantId,
-                providerId,
-                rowNumber: row.rowNumber,
-                productId: row.productId,
-                payload: row.payload,
-                validationErrors: row.errors,
-                status: row.errors.length === 0 ? 'VALID' : 'INVALID',
-              })),
-            },
           },
           select: { id: true },
+        });
+
+        await transaction.inventoryImportRow.createMany({
+          data: stagedRows.map((row) => ({
+            id: row.id,
+            importJobId: jobId,
+            tenantId: actor.tenantId,
+            providerId,
+            rowNumber: row.rowNumber,
+            productId: row.productId,
+            payload: row.payload,
+            validationErrors: row.errors,
+            status: row.errors.length === 0 ? 'VALID' : 'INVALID',
+          })),
         });
 
         await this.audit.appendTenantUser(transaction, {
