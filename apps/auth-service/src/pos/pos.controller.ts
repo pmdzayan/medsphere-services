@@ -10,12 +10,7 @@ import {
   Req,
   UseGuards,
 } from '@nestjs/common';
-import {
-  ApiBearerAuth,
-  ApiForbiddenResponse,
-  ApiOperation,
-  ApiTags,
-} from '@nestjs/swagger';
+import { ApiBearerAuth, ApiForbiddenResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { PERMISSIONS } from '../authorization/permission.constants';
 import { PermissionsGuard } from '../authorization/permissions.guard';
 import { RequirePermissions } from '../authorization/require-permissions.decorator';
@@ -169,5 +164,4 @@ export class PosController {
       request: extractRequestMetadata(request),
     });
   }
-
 }

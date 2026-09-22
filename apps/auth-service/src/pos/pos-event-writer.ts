@@ -4,9 +4,7 @@ import { appendOutboxEvent, type OutboxDatabase, type Prisma } from '@medsphere/
 import type { PosActor } from './pos.types';
 
 export type PosDomainEventType =
-  | 'billing.pos.sale.completed'
-  | 'billing.pos.invoice.reprinted'
-  | 'billing.pos.sale.voided';
+  'billing.pos.sale.completed' | 'billing.pos.invoice.reprinted' | 'billing.pos.sale.voided';
 
 @Injectable()
 export class PosEventWriter {

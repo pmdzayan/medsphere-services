@@ -226,7 +226,9 @@ export class PosCheckoutService {
             inventories.map((inventory) => [inventory.productId, inventory as InventoryForSale]),
           );
           if (inventoryByProduct.size !== normalized.lines.length) {
-            throw new NotFoundException('One or more POS products are not assigned to this pharmacy');
+            throw new NotFoundException(
+              'One or more POS products are not assigned to this pharmacy',
+            );
           }
 
           const collectGst = fiscal.registrationType === 'GST_REGULAR';
@@ -235,7 +237,9 @@ export class PosCheckoutService {
             const inventory = inventoryByProduct.get(line.productId);
             if (!inventory) throw new NotFoundException('POS product not found');
             if (!command.reservationId && !inventory.isVisible) {
-              throw new ConflictException('A hidden inventory listing cannot be sold as a walk-in item');
+              throw new ConflictException(
+                'A hidden inventory listing cannot be sold as a walk-in item',
+              );
             }
             if (inventory.product.requiresPrescription) {
               throw new ConflictException(
@@ -307,12 +311,7 @@ export class PosCheckoutService {
           }
 
           const reservation = command.reservationId
-            ? await this.loadReadyReservation(
-                transaction,
-                command,
-                normalized.lines,
-                now,
-              )
+            ? await this.loadReadyReservation(transaction, command, normalized.lines, now)
             : null;
 
           const saleId = randomUUID();
@@ -472,10 +471,7 @@ export class PosCheckoutService {
             select: { id: true },
           });
 
-          const totalQuantity = normalized.lines.reduce(
-            (total, line) => total + line.quantity,
-            0,
-          );
+          const totalQuantity = normalized.lines.reduce((total, line) => total + line.quantity, 0);
           await this.audit.appendTenantUser(transaction, {
             tenantId: command.actor.tenantId,
             actorMembershipId: command.actor.membershipId,
@@ -877,7 +873,11 @@ export class PosCheckoutService {
     ) {
       throw new BadRequestException('Idempotency key must contain 8 to 120 trimmed characters');
     }
-    if (!Array.isArray(command.lines) || command.lines.length < 1 || command.lines.length > MAX_LINES) {
+    if (
+      !Array.isArray(command.lines) ||
+      command.lines.length < 1 ||
+      command.lines.length > MAX_LINES
+    ) {
       throw new BadRequestException('POS checkout requires 1 to 100 lines');
     }
     if (
@@ -935,7 +935,9 @@ export class PosCheckoutService {
         throw new BadRequestException('Recipient GSTIN state prefix must match place of supply');
       }
       if (!recipientName || !recipientAddress) {
-        throw new BadRequestException('Recipient name and address are required with recipient GSTIN');
+        throw new BadRequestException(
+          'Recipient name and address are required with recipient GSTIN',
+        );
       }
     }
 
@@ -1087,7 +1089,9 @@ export class PosCheckoutService {
       }
 
       for (const allocation of allocations) {
-        const batch = line.inventory.batches.find((candidate) => candidate.id === allocation.batchId);
+        const batch = line.inventory.batches.find(
+          (candidate) => candidate.id === allocation.batchId,
+        );
         if (!batch) throw new ConflictException('FEFO allocation lost its source batch');
         const onHandAfter = batch.onHandQuantity - allocation.quantity;
         if (onHandAfter < batch.heldQuantity) {
@@ -1232,11 +1236,7 @@ export class PosCheckoutService {
           referenceType: 'pharmacy.sale.checkout.reservation',
           referenceId: saleId,
           reason: 'POS checkout from ready medicine reservation',
-          idempotencyKey: this.movementKey(
-            command.idempotencyKey,
-            line.id,
-            allocation.batchId,
-          ),
+          idempotencyKey: this.movementKey(command.idempotencyKey, line.id, allocation.batchId),
           commandHash,
           resultingBatchVersion: allocation.batch.version + 1,
           actorType: 'TENANT_USER',

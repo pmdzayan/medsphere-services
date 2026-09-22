@@ -773,7 +773,6 @@ export async function revokePharmacyStaffAccess(
   );
 }
 
-
 export async function getPosFiscalProfile(providerId: string): Promise<PosFiscalProfileResponse> {
   return requestJson<PosFiscalProfileResponse>(
     '/api/pos/providers/' + encodeURIComponent(providerId) + '/fiscal-profile',
@@ -840,15 +839,9 @@ export async function checkoutPosSale(
   );
 }
 
-export async function getPosSale(
-  providerId: string,
-  saleId: string,
-): Promise<PosSaleReceipt> {
+export async function getPosSale(providerId: string, saleId: string): Promise<PosSaleReceipt> {
   return requestJson<PosSaleReceipt>(
-    '/api/pos/providers/' +
-      encodeURIComponent(providerId) +
-      '/sales/' +
-      encodeURIComponent(saleId),
+    '/api/pos/providers/' + encodeURIComponent(providerId) + '/sales/' + encodeURIComponent(saleId),
   );
 }
 

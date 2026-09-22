@@ -1,7 +1,8 @@
 export const posEnglishMessages = {
   'pos.eyebrow': 'Pharmacy transaction core',
   'pos.title': 'Billing & POS',
-  'pos.description': 'Server-authoritative checkout, GST snapshots, FEFO stock commitment, payments and immutable invoices.',
+  'pos.description':
+    'Server-authoritative checkout, GST snapshots, FEFO stock commitment, payments and immutable invoices.',
   'pos.provider': 'Assigned pharmacy',
   'pos.fiscal.title': 'Fiscal setup',
   'pos.fiscal.help': 'Configure the pharmacy registration and invoice series before checkout.',
@@ -69,14 +70,17 @@ export const posEnglishMessages = {
   'pos.error.checkout': 'Unable to complete the sale.',
   'pos.error.void': 'Unable to void the sale.',
   'pos.error.reprint': 'Unable to record invoice reprint.',
-  'pos.notice.clinical': 'Prescription-required medicines are blocked here and must use the clinical dispensing workflow.',
-  'pos.notice.taxReview': 'GST behavior is deterministic software logic and still requires qualified India tax/legal release review.',
+  'pos.notice.clinical':
+    'Prescription-required medicines are blocked here and must use the clinical dispensing workflow.',
+  'pos.notice.taxReview':
+    'GST behavior is deterministic software logic and still requires qualified India tax/legal release review.',
 } as const;
 
 export const posTamilMessages = {
   'pos.eyebrow': 'மருந்தக பரிவர்த்தனை மையம்',
   'pos.title': 'பில்லிங் & POS',
-  'pos.description': 'சேவையக கட்டுப்பாட்டிலான விற்பனை, GST பதிவு, FEFO சரக்கு, பணம் மற்றும் மாற்றமற்ற விலைப்பட்டியல்.',
+  'pos.description':
+    'சேவையக கட்டுப்பாட்டிலான விற்பனை, GST பதிவு, FEFO சரக்கு, பணம் மற்றும் மாற்றமற்ற விலைப்பட்டியல்.',
   'pos.provider': 'ஒதுக்கப்பட்ட மருந்தகம்',
   'pos.fiscal.title': 'வரி அமைப்பு',
   'pos.fiscal.help': 'விற்பனைக்கு முன் மருந்தக பதிவு மற்றும் விலைப்பட்டியல் தொடரை அமைக்கவும்.',
@@ -144,14 +148,17 @@ export const posTamilMessages = {
   'pos.error.checkout': 'விற்பனையை முடிக்க முடியவில்லை.',
   'pos.error.void': 'விற்பனையை ரத்து செய்ய முடியவில்லை.',
   'pos.error.reprint': 'மறுஅச்சைப் பதிவு செய்ய முடியவில்லை.',
-  'pos.notice.clinical': 'மருத்துவர் சீட்டு தேவைப்படும் மருந்துகள் இங்கே தடுக்கப்படுகின்றன; மருத்துவ விநியோக நடைமுறையைப் பயன்படுத்தவும்.',
-  'pos.notice.taxReview': 'GST கணக்கீடு நிர்ணயிக்கப்பட்ட மென்பொருள் விதியாகும்; வெளியீட்டிற்கு முன் இந்திய வரி/சட்ட நிபுணர் மதிப்பாய்வு தேவை.',
+  'pos.notice.clinical':
+    'மருத்துவர் சீட்டு தேவைப்படும் மருந்துகள் இங்கே தடுக்கப்படுகின்றன; மருத்துவ விநியோக நடைமுறையைப் பயன்படுத்தவும்.',
+  'pos.notice.taxReview':
+    'GST கணக்கீடு நிர்ணயிக்கப்பட்ட மென்பொருள் விதியாகும்; வெளியீட்டிற்கு முன் இந்திய வரி/சட்ட நிபுணர் மதிப்பாய்வு தேவை.',
 } as const;
 
 export const posUrduMessages = {
   'pos.eyebrow': 'فارمیسی ٹرانزیکشن کور',
   'pos.title': 'بلنگ اور POS',
-  'pos.description': 'سرور کے اختیار میں چیک آؤٹ، GST اسنیپ شاٹس، FEFO اسٹاک، ادائیگیاں اور ناقابلِ تبدیلی انوائس۔',
+  'pos.description':
+    'سرور کے اختیار میں چیک آؤٹ، GST اسنیپ شاٹس، FEFO اسٹاک، ادائیگیاں اور ناقابلِ تبدیلی انوائس۔',
   'pos.provider': 'تفویض شدہ فارمیسی',
   'pos.fiscal.title': 'مالیاتی ترتیب',
   'pos.fiscal.help': 'چیک آؤٹ سے پہلے فارمیسی رجسٹریشن اور انوائس سیریز ترتیب دیں۔',
@@ -219,6 +226,8 @@ export const posUrduMessages = {
   'pos.error.checkout': 'فروخت مکمل نہیں ہو سکی۔',
   'pos.error.void': 'فروخت منسوخ نہیں ہو سکی۔',
   'pos.error.reprint': 'انوائس ری پرنٹ درج نہیں ہو سکا۔',
-  'pos.notice.clinical': 'نسخہ درکار ادویات یہاں بلاک ہیں اور کلینیکل ڈسپنسنگ ورک فلو استعمال کرنا ہوگا۔',
-  'pos.notice.taxReview': 'GST منطق طے شدہ سافٹ ویئر حساب ہے اور ریلیز سے پہلے ہندوستانی ٹیکس/قانونی ماہر کی جانچ درکار ہے۔',
+  'pos.notice.clinical':
+    'نسخہ درکار ادویات یہاں بلاک ہیں اور کلینیکل ڈسپنسنگ ورک فلو استعمال کرنا ہوگا۔',
+  'pos.notice.taxReview':
+    'GST منطق طے شدہ سافٹ ویئر حساب ہے اور ریلیز سے پہلے ہندوستانی ٹیکس/قانونی ماہر کی جانچ درکار ہے۔',
 } as const;

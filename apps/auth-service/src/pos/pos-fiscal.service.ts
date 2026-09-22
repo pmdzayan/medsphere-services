@@ -1,4 +1,9 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import {
   Prisma,
   SerializableRetryError,
@@ -365,7 +370,9 @@ export class PosFiscalService {
       throw new BadRequestException('Fiscal state code must contain exactly two digits');
     }
     if (!INVOICE_SERIES_PATTERN.test(command.invoiceSeries)) {
-      throw new BadRequestException('Invoice series must contain 1 to 4 uppercase letters or digits');
+      throw new BadRequestException(
+        'Invoice series must contain 1 to 4 uppercase letters or digits',
+      );
     }
     if (
       command.expectedVersion !== undefined &&
@@ -413,7 +420,9 @@ export class PosFiscalService {
   }
 
   private async databaseNow(transaction: Prisma.TransactionClient): Promise<Date> {
-    const [row] = await transaction.$queryRawUnsafe<Array<{ now: Date }>>('SELECT CURRENT_TIMESTAMP AS "now"');
+    const [row] = await transaction.$queryRawUnsafe<Array<{ now: Date }>>(
+      'SELECT CURRENT_TIMESTAMP AS "now"',
+    );
     if (!row?.now) throw new Error('Database time unavailable');
     return row.now;
   }

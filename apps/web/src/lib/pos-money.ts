@@ -72,19 +72,19 @@ export function sumPosMoney(values: readonly string[]): string {
 
 function parseMoneyToPaise(value: string): bigint {
   if (!/^(?:0|[1-9]\d{0,9})(?:\.\d{1,2})?$/.test(value)) throw new Error('Invalid money');
-  const [whole, fraction=''] = value.split('.');
-  return BigInt(whole) * 100n + BigInt(fraction.padEnd(2,'0'));
+  const [whole, fraction = ''] = value.split('.');
+  return BigInt(whole) * 100n + BigInt(fraction.padEnd(2, '0'));
 }
 function parsePercentageToBasisPoints(value: string): bigint {
   if (!/^(?:0|[1-9]\d{0,2})(?:\.\d{1,2})?$/.test(value)) throw new Error('Invalid percentage');
-  const [whole, fraction=''] = value.split('.');
-  const result=BigInt(whole)*100n+BigInt(fraction.padEnd(2,'0'));
-  if (result>10000n) throw new Error('Percentage exceeds 100');
+  const [whole, fraction = ''] = value.split('.');
+  const result = BigInt(whole) * 100n + BigInt(fraction.padEnd(2, '0'));
+  if (result > 10000n) throw new Error('Percentage exceeds 100');
   return result;
 }
 function round(numerator: bigint, denominator: bigint): bigint {
   return (numerator + denominator / 2n) / denominator;
 }
 function format(value: bigint): string {
-  return String(value/100n)+'.'+String(value%100n).padStart(2,'0');
+  return String(value / 100n) + '.' + String(value % 100n).padStart(2, '0');
 }
