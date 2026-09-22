@@ -13,7 +13,11 @@ import {
   searchInventoryCatalog,
   stageInventoryImport,
 } from '@/lib/api-client';
-import { startCameraScan, type CameraSession } from '@/lib/browser-permissions';
+import {
+  startCameraScan,
+  validateUserSelectedFile,
+  type CameraSession,
+} from '@/lib/browser-permissions';
 import type {
   InventoryCatalogProduct,
   InventoryImportApplyReceipt,
@@ -27,6 +31,8 @@ import type { TranslationKey } from '@/lib/i18n';
 import {
   assertMapping,
   buildInventoryImportRows,
+  INVENTORY_IMPORT_ACCEPTED_TYPES,
+  INVENTORY_IMPORT_MAX_BYTES,
   parseInventoryImportFile,
   type ParsedInventoryImportFile,
 } from './inventory-import-file';
@@ -193,10 +199,14 @@ export function InventoryImportWorkspace() {
   async function stopCamera() {
     const controls = scannerControlsRef.current;
     scannerControlsRef.current = null;
-    cameraSessionRef.current?.stop();
+    const session = cameraSessionRef.current;
     cameraSessionRef.current = null;
     setCameraActive(false);
-    if (controls) await controls.stop();
+    if (controls) {
+      await controls.stop();
+    } else {
+      session?.stop();
+    }
   }
 
   async function selectFile(file: File | null) {
@@ -212,6 +222,11 @@ export function InventoryImportWorkspace() {
     if (!file) return;
 
     try {
+      const selectionFailure = validateUserSelectedFile(file, {
+        acceptedTypes: INVENTORY_IMPORT_ACCEPTED_TYPES,
+        maximumBytes: INVENTORY_IMPORT_MAX_BYTES,
+      });
+      if (selectionFailure) throw new Error(`inventory-import-${selectionFailure}`);
       const parsed = await parseInventoryImportFile(file);
       setParsedFile(parsed);
       setMapping(parsed.suggestedMapping);
