@@ -169,29 +169,35 @@ infra('Task 0042 PostgreSQL pharmacy inventory import integrity', () => {
 
     expect(inventories).toHaveLength(2);
     expect(
-      batches.map(({ receivedQuantity, onHandQuantity, heldQuantity }) => ({
-        receivedQuantity,
-        onHandQuantity,
-        heldQuantity,
-      })),
+      batches
+        .map(({ receivedQuantity, onHandQuantity, heldQuantity }) => ({
+          receivedQuantity,
+          onHandQuantity,
+          heldQuantity,
+        }))
+        .sort((left, right) => left.receivedQuantity - right.receivedQuantity),
     ).toEqual([
       { receivedQuantity: 7, onHandQuantity: 7, heldQuantity: 0 },
       { receivedQuantity: 11, onHandQuantity: 11, heldQuantity: 0 },
     ]);
     expect(
-      movements.map(({ type, delta, onHandBefore, onHandAfter }) => ({
-        type,
-        delta,
-        onHandBefore,
-        onHandAfter,
-      })),
+      movements
+        .map(({ type, delta, onHandBefore, onHandAfter }) => ({
+          type,
+          delta,
+          onHandBefore,
+          onHandAfter,
+        }))
+        .sort((left, right) => left.delta - right.delta),
     ).toEqual([
       { type: 'STOCK_IN', delta: 7, onHandBefore: 0, onHandAfter: 7 },
       { type: 'STOCK_IN', delta: 11, onHandBefore: 0, onHandAfter: 11 },
     ]);
-    expect(observations.map(({ observedOnHandQuantity }) => observedOnHandQuantity)).toEqual([
-      7, 11,
-    ]);
+    expect(
+      observations
+        .map(({ observedOnHandQuantity }) => observedOnHandQuantity)
+        .sort((left, right) => left - right),
+    ).toEqual([7, 11]);
     expect(receipts).toHaveLength(1);
     expect(receipts[0]).toMatchObject({
       id: applied.receiptId,
