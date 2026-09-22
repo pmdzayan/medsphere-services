@@ -5,6 +5,7 @@ import {
   Header,
   Param,
   ParseUUIDPipe,
+  Post,
   Put,
   Req,
   UseGuards,
@@ -24,7 +25,10 @@ import { CurrentIdentity } from '../common/decorators/current-identity.decorator
 import {
   ConfigureInventoryFiscalProfileDto,
   ConfigurePharmacyFiscalProfileDto,
+  PharmacyCheckoutDto,
+  VoidPharmacySaleDto,
 } from './dto/pos.dto';
+import { PosCheckoutService } from './pos-checkout.service';
 import { PosFiscalService } from './pos-fiscal.service';
 
 @Controller('pos/providers/:providerId')
@@ -33,7 +37,10 @@ import { PosFiscalService } from './pos-fiscal.service';
 @UseGuards(PermissionsGuard)
 @ApiForbiddenResponse({ description: 'Permission denied' })
 export class PosController {
-  constructor(private readonly fiscal: PosFiscalService) {}
+  constructor(
+    private readonly fiscal: PosFiscalService,
+    private readonly checkout: PosCheckoutService,
+  ) {}
 
   @Get('fiscal-profile')
   @Header('Cache-Control', 'private, no-store')
@@ -95,4 +102,72 @@ export class PosController {
   ) {
     return this.fiscal.getProductQuote(identity, providerId, productId);
   }
+  @Post('checkout')
+  @Header('Cache-Control', 'private, no-store')
+  @RequirePermissions(PERMISSIONS.billingPosCheckout)
+  @ApiOperation({ summary: 'Commit an atomic assigned-pharmacy POS checkout' })
+  checkoutSale(
+    @CurrentIdentity() identity: AuthenticatedIdentity,
+    @Param('providerId', new ParseUUIDPipe({ version: '4' })) providerId: string,
+    @Body() dto: PharmacyCheckoutDto,
+    @Req() request: MetadataHttpRequest,
+  ) {
+    return this.checkout.checkout({
+      actor: identity,
+      providerId,
+      ...dto,
+      request: extractRequestMetadata(request),
+    });
+  }
+
+  @Get('sales/:saleId')
+  @Header('Cache-Control', 'private, no-store')
+  @RequirePermissions(PERMISSIONS.billingPosRead)
+  @ApiOperation({ summary: 'Read an assigned-pharmacy POS sale and invoice snapshot' })
+  getSale(
+    @CurrentIdentity() identity: AuthenticatedIdentity,
+    @Param('providerId', new ParseUUIDPipe({ version: '4' })) providerId: string,
+    @Param('saleId', new ParseUUIDPipe({ version: '4' })) saleId: string,
+  ) {
+    return this.checkout.getSale(identity, providerId, saleId);
+  }
+
+  @Post('sales/:saleId/reprint')
+  @Header('Cache-Control', 'private, no-store')
+  @RequirePermissions(PERMISSIONS.billingPosRead)
+  @ApiOperation({ summary: 'Record immutable invoice reprint evidence and return the receipt' })
+  reprintInvoice(
+    @CurrentIdentity() identity: AuthenticatedIdentity,
+    @Param('providerId', new ParseUUIDPipe({ version: '4' })) providerId: string,
+    @Param('saleId', new ParseUUIDPipe({ version: '4' })) saleId: string,
+    @Req() request: MetadataHttpRequest,
+  ) {
+    return this.checkout.reprintInvoice({
+      actor: identity,
+      providerId,
+      saleId,
+      request: extractRequestMetadata(request),
+    });
+  }
+
+  @Post('sales/:saleId/void')
+  @Header('Cache-Control', 'private, no-store')
+  @RequirePermissions(PERMISSIONS.billingPosVoid)
+  @ApiOperation({ summary: 'Void a POS sale and atomically restore its sold stock' })
+  voidSale(
+    @CurrentIdentity() identity: AuthenticatedIdentity,
+    @Param('providerId', new ParseUUIDPipe({ version: '4' })) providerId: string,
+    @Param('saleId', new ParseUUIDPipe({ version: '4' })) saleId: string,
+    @Body() dto: VoidPharmacySaleDto,
+    @Req() request: MetadataHttpRequest,
+  ) {
+    return this.checkout.voidSale({
+      actor: identity,
+      providerId,
+      saleId,
+      ...dto,
+      request: extractRequestMetadata(request),
+    });
+  }
+
 }
