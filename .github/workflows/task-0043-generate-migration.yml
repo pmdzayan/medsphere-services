@@ -48,8 +48,8 @@ jobs:
         run: |
           mkdir -p packages/database/prisma/migrations/20260922170000_task_0043_pharmacy_pos_billing_gst_invoice
           pnpm --filter @medsphere/database exec prisma migrate diff \
-            --from-migrations packages/database/prisma/migrations \
-            --to-schema-datamodel packages/database/prisma/schema.prisma \
+            --from-migrations prisma/migrations \
+            --to-schema-datamodel prisma/schema.prisma \
             --shadow-database-url postgresql://aim:aim@localhost:5432/aim_shadow?schema=shadow \
             --script > packages/database/prisma/migrations/20260922170000_task_0043_pharmacy_pos_billing_gst_invoice/migration.sql
           test -s packages/database/prisma/migrations/20260922170000_task_0043_pharmacy_pos_billing_gst_invoice/migration.sql
