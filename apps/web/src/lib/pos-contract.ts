@@ -53,6 +53,27 @@ export interface PosFiscalProfileResponse {
   };
 }
 
+export interface PosFiscalConfigurationResult {
+  providerId: string;
+  registrationType: PosRegistrationType;
+  legalName: string;
+  gstin: string | null;
+  stateCode: string;
+  invoiceSeries: string;
+  pricesIncludeTax: boolean;
+  version: number;
+}
+
+export interface PosInventoryFiscalConfigurationResult {
+  providerId: string;
+  inventoryId: string;
+  productId: string;
+  hsnCode: string;
+  uqc: string;
+  cessPercentage: string;
+  version: number;
+}
+
 export interface PosProductQuote {
   providerId: string;
   inventoryId: string;
@@ -301,6 +322,70 @@ export function isPosFiscalProfileResponse(value: unknown): value is PosFiscalPr
     trimmed(v.address, 1, 500) &&
     typeof v.isActive === 'boolean' &&
     (v.fiscalProfile === null || isFiscalProfile(v.fiscalProfile))
+  );
+}
+
+export function isPosFiscalConfigurationResult(
+  value: unknown,
+): value is PosFiscalConfigurationResult {
+  if (
+    !hasExactKeys(value, [
+      'providerId',
+      'registrationType',
+      'legalName',
+      'gstin',
+      'stateCode',
+      'invoiceSeries',
+      'pricesIncludeTax',
+      'version',
+    ])
+  ) {
+    return false;
+  }
+  const v = value as Partial<PosFiscalConfigurationResult>;
+  return (
+    isCanonicalUuid(v.providerId) &&
+    (v.registrationType === 'GST_REGULAR' ||
+      v.registrationType === 'GST_COMPOSITION' ||
+      v.registrationType === 'UNREGISTERED') &&
+    trimmed(v.legalName, 1, 200) &&
+    (v.gstin === null || (typeof v.gstin === 'string' && GSTIN.test(v.gstin))) &&
+    typeof v.stateCode === 'string' &&
+    STATE.test(v.stateCode) &&
+    typeof v.invoiceSeries === 'string' &&
+    SERIES.test(v.invoiceSeries) &&
+    typeof v.pricesIncludeTax === 'boolean' &&
+    integer(v.version, 1, 2147483647)
+  );
+}
+
+export function isPosInventoryFiscalConfigurationResult(
+  value: unknown,
+): value is PosInventoryFiscalConfigurationResult {
+  if (
+    !hasExactKeys(value, [
+      'providerId',
+      'inventoryId',
+      'productId',
+      'hsnCode',
+      'uqc',
+      'cessPercentage',
+      'version',
+    ])
+  ) {
+    return false;
+  }
+  const v = value as Partial<PosInventoryFiscalConfigurationResult>;
+  return (
+    isCanonicalUuid(v.providerId) &&
+    isCanonicalUuid(v.inventoryId) &&
+    isCanonicalUuid(v.productId) &&
+    typeof v.hsnCode === 'string' &&
+    HSN.test(v.hsnCode) &&
+    typeof v.uqc === 'string' &&
+    UQC.test(v.uqc) &&
+    percent(v.cessPercentage) &&
+    integer(v.version, 1, 2147483647)
   );
 }
 
