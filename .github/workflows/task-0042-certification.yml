@@ -1,0 +1,92 @@
+name: Task 0042 final certification
+
+on:
+  push:
+    branches:
+      - cto/0042-pharmacy-catalog-barcode-inventory-import
+    paths:
+      - .github/workflows/task-0042-certification.yml
+
+permissions:
+  contents: read
+
+jobs:
+  certify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    env:
+      DATABASE_URL: postgresql://medsphere_ci:medsphere_ci@localhost:5432/medsphere_ci?schema=public
+      REDIS_CLUSTER_URL: redis://localhost:6379
+      RUN_AUTH_INFRASTRUCTURE_TESTS: 'true'
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: medsphere_ci
+          POSTGRES_PASSWORD: medsphere_ci
+          POSTGRES_DB: medsphere_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U medsphere_ci -d medsphere_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: cto/0042-pharmacy-catalog-barcode-inventory-import
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+          run_install: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.12.0
+          cache: pnpm
+
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Audit production dependencies
+        run: pnpm audit:prod
+
+      - name: Verify clean database migration and drift
+        run: pnpm db:verify
+
+      - name: Verify populated upgrade safety including Task 0042
+        run: pnpm db:verify-upgrade
+
+      - name: Check formatting
+        run: pnpm format:check
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Run Task 0042 backend boundary and PostgreSQL integrity tests
+        run: |
+          pnpm --filter @medsphere/auth-service exec jest             src/inventory/product-identifier.spec.ts             src/inventory/dto/inventory-import.dto.spec.ts             src/inventory/inventory-import.integration.spec.ts             --runInBand
+
+      - name: Run Task 0042 web boundary tests
+        run: |
+          pnpm --filter @medsphere/web exec vitest run             src/lib/inventory-import-contract.test.ts             src/features/inventory/inventory-import-file.test.ts             src/components/permission-explanation-dialog.test.tsx
+
+      - name: Run full architecture and workspace test suite
+        run: pnpm test
+
+      - name: Build full workspace
+        run: pnpm build
