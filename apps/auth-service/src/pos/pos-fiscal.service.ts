@@ -413,7 +413,7 @@ export class PosFiscalService {
   }
 
   private async databaseNow(transaction: Prisma.TransactionClient): Promise<Date> {
-    const [row] = await transaction.$queryRaw<Array<{ now: Date }>>\`SELECT CURRENT_TIMESTAMP AS "now"\`;
+    const [row] = await transaction.$queryRawUnsafe<Array<{ now: Date }>>('SELECT CURRENT_TIMESTAMP AS "now"');
     if (!row?.now) throw new Error('Database time unavailable');
     return row.now;
   }
