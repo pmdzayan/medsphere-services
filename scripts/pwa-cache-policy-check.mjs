@@ -5,7 +5,9 @@ import { fileURLToPath } from 'node:url';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const serviceWorkerPath = path.join(root, 'apps/web/public/sw.js');
 
-export function checkPwaCachePolicy(source = fs.readFileSync(serviceWorkerPath, 'utf8')) {
+export function checkPwaCachePolicy(
+  source = fs.readFileSync(serviceWorkerPath, 'utf8'),
+) {
   const failures = [];
 
   const requiredSnippets = [
