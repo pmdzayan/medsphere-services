@@ -8,7 +8,7 @@ const SUPPORTED_LENGTHS = new Set([8, 12, 13, 14]);
 
 export function normalizeProductIdentifier(raw: string): CanonicalProductIdentifier | null {
   const value = raw.trim().replace(/[\s-]+/g, '');
-  if (!/^\d+$/.test(value) || !SUPPORTED_LENGTHS.has(value.length)) return null;
+  if (!/^\d+$/.test(value) || /^0+$/.test(value) || !SUPPORTED_LENGTHS.has(value.length)) return null;
 
   const payload = value.slice(0, -1);
   const actualCheckDigit = Number(value.at(-1));
