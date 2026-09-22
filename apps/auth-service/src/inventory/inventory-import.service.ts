@@ -895,7 +895,13 @@ export class InventoryImportService {
       createdAt: job.createdAt.toISOString(),
       appliedAt: job.appliedAt?.toISOString() ?? null,
       replayed,
-      receipt: job.receipt ?? null,
+      receipt: job.receipt
+        ? {
+            id: job.receipt.id,
+            appliedRowCount: job.receipt.appliedRowCount,
+            totalQuantity: job.receipt.totalQuantity,
+          }
+        : null,
       rows: job.rows.map((row) => ({
         rowId: row.id,
         rowNumber: row.rowNumber,
