@@ -88,6 +88,8 @@ export const inventoryEnglishMessages = {
   'inventory.import.scannerHelp':
     'USB scanners work like a keyboard: focus the barcode box and scan. Press Enter to look up.',
   'inventory.import.noProduct': 'No exact catalog match was found.',
+  'inventory.import.prescriptionRequired': 'Prescription required',
+  'inventory.import.nonPrescription': 'Non-prescription listing',
   'inventory.import.fileTitle': 'Import inventory',
   'inventory.import.fileHelp':
     'Choose one CSV or XLSX file up to 5 MB and 500 data rows. Parsing and mapping happen before any stock changes.',
@@ -315,6 +317,8 @@ export const inventoryTamilMessages: Record<keyof typeof inventoryEnglishMessage
   'inventory.import.scannerHelp':
     'USB ஸ்கேனர் விசைப்பலகை போல செயல்படும்: பார்கோடு பெட்டியைத் தேர்ந்தெடுத்து ஸ்கேன் செய்யவும். தேட Enter அழுத்தவும்.',
   'inventory.import.noProduct': 'துல்லியமான பட்டியல் பொருத்தம் கிடைக்கவில்லை.',
+  'inventory.import.prescriptionRequired': 'மருத்துவர் பரிந்துரை தேவை',
+  'inventory.import.nonPrescription': 'மருத்துவர் பரிந்துரை குறியீடு இல்லை',
   'inventory.import.fileTitle': 'சரக்கை இறக்குமதி செய்',
   'inventory.import.fileHelp':
     '5 MB மற்றும் 500 தரவு வரிகளுக்குள் ஒரு CSV அல்லது XLSX கோப்பைத் தேர்ந்தெடுக்கவும். சரக்கு மாறுவதற்கு முன் பகுப்பாய்வும் புல இணைப்பும் நடக்கும்.',
@@ -539,6 +543,8 @@ export const inventoryUrduMessages: Record<keyof typeof inventoryEnglishMessages
   'inventory.import.scannerHelp':
     'USB اسکینر کی بورڈ کی طرح کام کرتا ہے: بارکوڈ خانے پر فوکس کریں اور اسکین کریں۔ تلاش کے لیے Enter دبائیں۔',
   'inventory.import.noProduct': 'کوئی درست کیٹلاگ مماثلت نہیں ملی۔',
+  'inventory.import.prescriptionRequired': 'نسخہ درکار ہے',
+  'inventory.import.nonPrescription': 'نسخہ نشان زد نہیں',
   'inventory.import.fileTitle': 'انوینٹری درآمد کریں',
   'inventory.import.fileHelp':
     '5 MB اور 500 ڈیٹا قطاروں تک ایک CSV یا XLSX فائل منتخب کریں۔ ذخیرہ بدلنے سے پہلے پارسنگ اور کالم میپنگ ہوتی ہے۔',
