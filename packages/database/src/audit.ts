@@ -68,6 +68,8 @@ export const AUDIT_EVENT_TYPES = [
   'inventory.reservation.expired',
   'inventory.availability-request.responded',
   'inventory.availability-request.preference.configured',
+  'inventory.import.staged',
+  'inventory.import.applied',
   // Task 0039 (PROVISIONAL): pharmacy onboarding & verification closure.
   'pharmacy.verification.submitted',
   'pharmacy.verification.resubmitted',
@@ -171,6 +173,14 @@ export const AUDIT_METADATA_KEYS = {
     'quietHoursStartMinute',
     'quietHoursEndMinute',
   ],
+  'inventory.import.staged': [
+    'providerId',
+    'rowCount',
+    'validRowCount',
+    'invalidRowCount',
+    'sourceFormat',
+  ],
+  'inventory.import.applied': ['providerId', 'rowCount', 'totalQuantity'],
   // Task 0039 (PROVISIONAL): no document/evidence content, license
   // numbers, government references, or reviewer notes are ever
   // included -- only bounded structural identifiers and status
