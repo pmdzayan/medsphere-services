@@ -1,5 +1,5 @@
 name: Task 0042 formatter
-# Final formatting pass before Task 0042 certification (post PostgreSQL test correction)
+# Final formatting pass before Task 0042 certification (order-independent test assertions)
 
 on:
   push:
