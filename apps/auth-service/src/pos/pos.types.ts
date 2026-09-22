@@ -54,3 +54,10 @@ export interface VoidPharmacySaleCommand {
   readonly reason: string;
   readonly request?: AuditRequestContext;
 }
+
+export interface ReprintPharmacyInvoiceCommand {
+  readonly actor: PosActor;
+  readonly providerId: string;
+  readonly saleId: string;
+  readonly request?: AuditRequestContext;
+}
