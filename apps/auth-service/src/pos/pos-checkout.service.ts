@@ -44,11 +44,6 @@ const STATE_CODE_PATTERN = /^\\d{2}$/;
 const GSTIN_PATTERN = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/;
 
 type Transaction = Prisma.TransactionClient;
-type Database = Pick<
-  Prisma.TransactionClient,
-  'pharmacySale' | 'pharmacySaleCommand'
->;
-
 interface NormalizedLine {
   readonly productId: string;
   readonly quantity: number;
@@ -685,29 +680,33 @@ export class PosCheckoutService {
               id: true,
               status: true,
               reservationId: true,
-              lines: { select: { quantity: true } },
-              invoice: { select: { invoiceNumber: true } },
-              allocations: {
+              lines: {
                 select: {
-                  id: true,
                   quantity: true,
-                  lineId: true,
-                  inventoryId: true,
-                  productId: true,
-                  batchId: true,
-                  batch: {
+                  allocations: {
                     select: {
-                      onHandQuantity: true,
-                      heldQuantity: true,
-                      version: true,
-                      status: true,
-                      expiryDate: true,
-                      deletedAt: true,
+                      id: true,
+                      quantity: true,
+                      lineId: true,
+                      inventoryId: true,
+                      productId: true,
+                      batchId: true,
+                      batch: {
+                        select: {
+                          onHandQuantity: true,
+                          heldQuantity: true,
+                          version: true,
+                          status: true,
+                          expiryDate: true,
+                          deletedAt: true,
+                        },
+                      },
                     },
+                    orderBy: { id: 'asc' },
                   },
                 },
-                orderBy: { id: 'asc' },
               },
+              invoice: { select: { invoiceNumber: true } },
             },
           });
           if (!sale?.invoice) throw new NotFoundException('POS sale not found');
@@ -716,7 +715,8 @@ export class PosCheckoutService {
           }
 
           const now = await this.databaseNow(transaction);
-          for (const allocation of sale.allocations) {
+          const saleAllocations = sale.lines.flatMap((line) => line.allocations);
+          for (const allocation of saleAllocations) {
             if (allocation.batch.deletedAt !== null) {
               throw new ConflictException('Cannot void a sale whose source batch was deleted');
             }
