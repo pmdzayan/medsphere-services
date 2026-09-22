@@ -1,0 +1,40 @@
+name: Temporary Prettier Capture
+
+on:
+  push:
+    branches:
+      - cto/0042a-completed-aim-25pct-improvement
+
+permissions:
+  contents: read
+
+jobs:
+  capture:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+          run_install: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.12.0
+          cache: pnpm
+
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Format target files exactly
+        run: |
+          pnpm exec prettier --write apps/web/e2e/accessibility-smoke.spec.ts scripts/pwa-cache-policy-check.mjs
+          echo '===ACCESSIBILITY_BASE64==='
+          base64 -w0 apps/web/e2e/accessibility-smoke.spec.ts
+          echo
+          echo '===PWA_BASE64==='
+          base64 -w0 scripts/pwa-cache-policy-check.mjs
+          echo
+          echo '===END_FORMATTED_FILES==='
