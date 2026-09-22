@@ -147,6 +147,7 @@ export class StageInventoryImportDto {
   @ApiProperty({ maxLength: 255 })
   @IsString()
   @MaxLength(255)
+  @Matches(/^[^\s\u0000-\u001F\u007F](?:[^\u0000-\u001F\u007F]*[^\s\u0000-\u001F\u007F])?$/)
   sourceFileName!: string;
 
   @ApiProperty({ description: 'SHA-256 hex digest of the parsed source file' })
