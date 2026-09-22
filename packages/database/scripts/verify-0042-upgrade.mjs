@@ -97,7 +97,10 @@ function createMigrationProject() {
     ].join('\n'),
     'utf8',
   );
-  cpSync(join(sourceMigrations, 'migration_lock.toml'), join(migrationsRoot, 'migration_lock.toml'));
+  cpSync(
+    join(sourceMigrations, 'migration_lock.toml'),
+    join(migrationsRoot, 'migration_lock.toml'),
+  );
 
   const migrationNames = readdirSync(sourceMigrations, { withFileTypes: true })
     .filter((entry) => entry.isDirectory())
