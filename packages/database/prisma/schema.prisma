@@ -1573,6 +1573,7 @@ model PharmacyFiscalProfile {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@unique([providerId, tenantId])
   @@unique([id, tenantId, providerId])
   @@index([tenantId, providerId])
 }
@@ -1601,6 +1602,7 @@ model InventoryFiscalProfile {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@unique([inventoryId, tenantId, providerId, productId])
   @@unique([id, tenantId, providerId, inventoryId, productId])
   @@index([tenantId, providerId, productId])
 }
@@ -1656,6 +1658,7 @@ model PharmacySale {
   voidRecord  PharmacySaleVoid?
 
   @@unique([tenantId, idempotencyKey])
+  @@unique([reservationId, tenantId, providerId])
   @@unique([id, tenantId, providerId])
   @@index([tenantId, providerId, completedAt(sort: Desc), id(sort: Desc)])
   @@index([actorMembershipId, completedAt(sort: Desc), id(sort: Desc)])
@@ -1738,6 +1741,7 @@ model PharmacySaleAllocation {
   createdAt DateTime @default(now())
 
   @@unique([lineId, batchId])
+  @@unique([stockMovementId, tenantId, inventoryId, batchId, providerId, productId])
   @@index([tenantId, providerId, batchId])
 }
 
@@ -1822,6 +1826,7 @@ model PharmacyInvoice {
 
   reprints PharmacyInvoiceReprint[]
 
+  @@unique([saleId, tenantId, providerId])
   @@unique([tenantId, providerId, financialYear, invoiceNumber])
   @@unique([id, tenantId, providerId])
   @@index([tenantId, providerId, issuedAt(sort: Desc), id(sort: Desc)])
@@ -1864,6 +1869,7 @@ model PharmacySaleCommand {
   commandHash    String                  @db.VarChar(64)
   createdAt      DateTime                @default(now())
 
+  @@unique([saleId, tenantId, providerId])
   @@unique([tenantId, idempotencyKey])
   @@index([tenantId, providerId, createdAt(sort: Desc)])
 }
@@ -1889,6 +1895,7 @@ model PharmacySaleVoid {
   occurredAt     DateTime
   createdAt      DateTime @default(now())
 
+  @@unique([saleId, tenantId, providerId])
   @@unique([tenantId, idempotencyKey])
   @@index([tenantId, providerId, occurredAt(sort: Desc), id(sort: Desc)])
 }
@@ -1930,6 +1937,7 @@ model Batch {
   expiryRecord           BatchExpiryRecord?
   quarantineRecord       BatchQuarantineRecord?
   stockObservations      BatchStockObservation[]
+  pharmacySaleAllocations PharmacySaleAllocation[]
 
   @@unique([tenantId, providerId, productId, batchNumber])
   @@unique([id, tenantId, inventoryId, providerId, productId])
