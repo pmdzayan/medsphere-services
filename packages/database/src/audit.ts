@@ -70,6 +70,11 @@ export const AUDIT_EVENT_TYPES = [
   'inventory.availability-request.preference.configured',
   'inventory.import.staged',
   'inventory.import.applied',
+  'billing.pos.fiscal-profile.configured',
+  'billing.pos.inventory-fiscal-profile.configured',
+  'billing.pos.sale.completed',
+  'billing.pos.invoice.reprinted',
+  'billing.pos.sale.voided',
   // Task 0039 (PROVISIONAL): pharmacy onboarding & verification closure.
   'pharmacy.verification.submitted',
   'pharmacy.verification.resubmitted',
@@ -181,6 +186,18 @@ export const AUDIT_METADATA_KEYS = {
     'sourceFormat',
   ],
   'inventory.import.applied': ['providerId', 'rowCount', 'totalQuantity'],
+  'billing.pos.fiscal-profile.configured': ['providerId', 'registrationType', 'version'],
+  'billing.pos.inventory-fiscal-profile.configured': ['providerId', 'productId', 'version'],
+  'billing.pos.sale.completed': [
+    'providerId',
+    'lineCount',
+    'totalQuantity',
+    'grandTotal',
+    'invoiceNumber',
+    'reservationId',
+  ],
+  'billing.pos.invoice.reprinted': ['providerId', 'saleId', 'invoiceNumber'],
+  'billing.pos.sale.voided': ['providerId', 'lineCount', 'totalQuantity', 'invoiceNumber'],
   // Task 0039 (PROVISIONAL): no document/evidence content, license
   // numbers, government references, or reviewer notes are ever
   // included -- only bounded structural identifiers and status
