@@ -91,30 +91,26 @@ test('keyboard focus remains visible on the login journey', async ({ page }) => 
   expect(focus?.outlineWidth).not.toBe('0px');
 });
 
-test(
-  'reduced-motion preference collapses startup and organization theme animation',
-  async ({ page }) => {
-    await page.emulateMedia({ reducedMotion: 'reduce' });
-    await page.goto('/login');
+test('reduced-motion preference collapses startup and organization theme animation', async ({
+  page,
+}) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto('/login');
 
-    const startupDuration = await page.locator('.brand-startup').evaluate((element) =>
-      Number.parseFloat(getComputedStyle(element).animationDuration),
-    );
-    expect(startupDuration).toBeLessThanOrEqual(0.001);
-  },
-);
+  const startupDuration = await page
+    .locator('.brand-startup')
+    .evaluate((element) => Number.parseFloat(getComputedStyle(element).animationDuration));
+  expect(startupDuration).toBeLessThanOrEqual(0.001);
+});
 
-test(
-  'PWA runtime registers the static-only AIM service worker on localhost',
-  async ({ page }) => {
-    await page.goto('/');
+test('PWA runtime registers the static-only AIM service worker on localhost', async ({ page }) => {
+  await page.goto('/');
 
-    const registered = await page.evaluate(async () => {
-      if (!('serviceWorker' in navigator)) return false;
-      await navigator.serviceWorker.ready;
-      return Boolean(await navigator.serviceWorker.getRegistration('/'));
-    });
+  const registered = await page.evaluate(async () => {
+    if (!('serviceWorker' in navigator)) return false;
+    await navigator.serviceWorker.ready;
+    return Boolean(await navigator.serviceWorker.getRegistration('/'));
+  });
 
-    expect(registered).toBe(true);
-  },
-);
+  expect(registered).toBe(true);
+});
