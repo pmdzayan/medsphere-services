@@ -1,5 +1,5 @@
 name: Task 0042 final certification
-# Rerun after PostgreSQL staging and filename-regex corrections
+# Rerun after deterministic PostgreSQL conservation assertions
 
 on:
   push:
