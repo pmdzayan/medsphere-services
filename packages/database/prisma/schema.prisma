@@ -116,6 +116,7 @@ enum BatchStatus {
   EXPIRED
   EXHAUSTED
   QUARANTINED
+  RECALLED
 }
 
 enum BatchQuarantineReason {
@@ -136,6 +137,7 @@ enum StockMovementType {
   RETURN_OUT
   EXPIRED
   DAMAGED
+  DISPOSAL
 }
 
 /// Task 0025: closed catalogue of accepted BATCH-BOUND physical-stock evidence
@@ -318,6 +320,32 @@ enum PharmacySaleCommandType {
   VOID
 }
 
+enum PharmacyReturnReason {
+  CUSTOMER_REQUEST
+  WRONG_ITEM
+  DAMAGED_PACKAGE
+  PRODUCT_DEFECT
+  OTHER
+}
+
+enum BatchRecallReason {
+  MANUFACTURER_RECALL
+  REGULATORY_RECALL
+  QUALITY_ALERT
+  OTHER
+}
+
+enum InventoryExceptionAction {
+  QUARANTINE_RELEASE
+  DISPOSAL
+  SUPPLIER_RETURN
+}
+
+enum InventoryExceptionDecisionOutcome {
+  APPROVED
+  REJECTED
+}
+
 /// Task 0021: platform-account lifecycle. Platform authority is granted ONLY
 /// through a PlatformAccount + live PlatformRoleAssignment -- never through
 /// tenant membership (TENANT AUTHORITY != PLATFORM AUTHORITY).
@@ -415,6 +443,12 @@ model Tenant {
   pharmacyInvoiceSequences               PharmacyInvoiceSequence[]
   pharmacySaleCommands                   PharmacySaleCommand[]
   pharmacySaleVoids                      PharmacySaleVoid[]
+  pharmacySaleReturns                    PharmacySaleReturn[]
+  pharmacySaleReturnLines                PharmacySaleReturnLine[]
+  pharmacySaleReturnAllocations          PharmacySaleReturnAllocation[]
+  batchRecallRecords                     BatchRecallRecord[]
+  inventoryExceptionRequests             InventoryExceptionRequest[]
+  inventoryExceptionDecisions            InventoryExceptionDecision[]
   pharmacyInventoryFiscalProfiles        InventoryFiscalProfile[]
   pharmacySaleAllocations                PharmacySaleAllocation[]
   pharmacyInvoiceReprints                PharmacyInvoiceReprint[]
@@ -619,6 +653,10 @@ model TenantMembership {
   inventoryImportReceipts        InventoryImportReceipt[]
   pharmacySales                  PharmacySale[]
   pharmacySaleVoids              PharmacySaleVoid[]
+  pharmacySaleReturns            PharmacySaleReturn[]
+  batchRecallRecords             BatchRecallRecord[]
+  inventoryExceptionRequests     InventoryExceptionRequest[]
+  inventoryExceptionDecisions    InventoryExceptionDecision[]
   pharmacyInvoiceReprints        PharmacyInvoiceReprint[]
 
   @@unique([tenantId, userId])
@@ -1308,6 +1346,12 @@ model Provider {
   pharmacyInvoiceSequences             PharmacyInvoiceSequence[]
   pharmacySaleCommands                 PharmacySaleCommand[]
   pharmacySaleVoids                    PharmacySaleVoid[]
+  pharmacySaleReturns                  PharmacySaleReturn[]
+  pharmacySaleReturnLines              PharmacySaleReturnLine[]
+  pharmacySaleReturnAllocations        PharmacySaleReturnAllocation[]
+  batchRecallRecords                   BatchRecallRecord[]
+  inventoryExceptionRequests           InventoryExceptionRequest[]
+  inventoryExceptionDecisions          InventoryExceptionDecision[]
   pharmacyInventoryFiscalProfiles      InventoryFiscalProfile[]
   pharmacySaleAllocations              PharmacySaleAllocation[]
   pharmacyInvoiceReprints              PharmacyInvoiceReprint[]
@@ -1658,6 +1702,7 @@ model PharmacySale {
   invoice     PharmacyInvoice?
   commands    PharmacySaleCommand[]
   voidRecord  PharmacySaleVoid?
+  returns     PharmacySaleReturn[]
 
   @@unique([tenantId, idempotencyKey])
   @@unique([reservationId, tenantId, providerId])
@@ -1711,6 +1756,7 @@ model PharmacySaleLine {
   createdAt DateTime @default(now())
 
   allocations PharmacySaleAllocation[]
+  returnLines PharmacySaleReturnLine[]
 
   @@unique([saleId, lineNumber])
   @@unique([id, tenantId, saleId, providerId, inventoryId, productId])
@@ -1743,7 +1789,10 @@ model PharmacySaleAllocation {
   quantity  Int
   createdAt DateTime @default(now())
 
+  returnAllocations PharmacySaleReturnAllocation[]
+
   @@unique([lineId, batchId])
+  @@unique([id, tenantId, providerId, saleId, lineId, inventoryId, productId, batchId], map: "PharmacySaleAllocation_return_scope_key")
   @@unique([stockMovementId, tenantId, inventoryId, batchId, providerId, productId])
   @@index([tenantId, providerId, batchId])
 }
@@ -1905,6 +1954,216 @@ model PharmacySaleVoid {
   @@index([tenantId, providerId, occurredAt(sort: Desc), id(sort: Desc)])
 }
 
+model PharmacySaleReturn {
+  id String @id @default(uuid()) @db.Uuid
+
+  tenantId String @db.Uuid
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+
+  providerId String   @db.Uuid
+  provider   Provider @relation(fields: [providerId, tenantId], references: [id, tenantId], onDelete: Restrict)
+
+  saleId String       @db.Uuid
+  sale   PharmacySale @relation(fields: [saleId, tenantId, providerId], references: [id, tenantId, providerId], onDelete: Restrict)
+
+  actorMembershipId String           @db.Uuid
+  actorUserId       String           @db.Uuid
+  actorMembership   TenantMembership @relation(fields: [actorMembershipId, actorUserId, tenantId], references: [id, userId, tenantId], onDelete: Restrict, map: "PharmacySaleReturn_actorMembership_actorUser_tenant_fkey")
+
+  reasonCode PharmacyReturnReason
+  reason     String @db.VarChar(500)
+
+  refundMethod            PharmacyPaymentMethod
+  refundExternalReference String? @db.VarChar(80)
+
+  subtotal      Decimal @db.Decimal(12, 2)
+  discountTotal Decimal @db.Decimal(12, 2)
+  taxableTotal  Decimal @db.Decimal(12, 2)
+  cgstTotal     Decimal @db.Decimal(12, 2)
+  sgstTotal     Decimal @db.Decimal(12, 2)
+  igstTotal     Decimal @db.Decimal(12, 2)
+  cessTotal     Decimal @db.Decimal(12, 2)
+  refundTotal   Decimal @db.Decimal(12, 2)
+
+  idempotencyKey String @db.VarChar(120)
+  commandHash    String @db.VarChar(64)
+
+  occurredAt DateTime
+  createdAt  DateTime @default(now())
+
+  lines PharmacySaleReturnLine[]
+
+  @@unique([tenantId, idempotencyKey])
+  @@unique([id, tenantId, providerId])
+  @@index([tenantId, providerId, occurredAt(sort: Desc), id(sort: Desc)])
+  @@index([saleId, occurredAt(sort: Desc), id(sort: Desc)])
+}
+
+model PharmacySaleReturnLine {
+  id String @id @default(uuid()) @db.Uuid
+
+  tenantId  String @db.Uuid
+  tenant    Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  providerId String @db.Uuid
+  provider   Provider @relation(fields: [providerId, tenantId], references: [id, tenantId], onDelete: Restrict)
+
+  returnId String             @db.Uuid
+  return   PharmacySaleReturn @relation(fields: [returnId, tenantId, providerId], references: [id, tenantId, providerId], onDelete: Restrict)
+
+  saleId      String @db.Uuid
+  saleLineId  String @db.Uuid
+  inventoryId String @db.Uuid
+  productId   String @db.Uuid
+  saleLine PharmacySaleLine @relation(fields: [saleLineId, tenantId, saleId, providerId, inventoryId, productId], references: [id, tenantId, saleId, providerId, inventoryId, productId], onDelete: Restrict)
+
+  quantity Int
+
+  subtotal      Decimal @db.Decimal(12, 2)
+  discountAmount Decimal @db.Decimal(12, 2)
+  taxableValue   Decimal @db.Decimal(12, 2)
+  cgstAmount     Decimal @db.Decimal(12, 2)
+  sgstAmount     Decimal @db.Decimal(12, 2)
+  igstAmount     Decimal @db.Decimal(12, 2)
+  cessAmount     Decimal @db.Decimal(12, 2)
+  refundTotal    Decimal @db.Decimal(12, 2)
+
+  createdAt DateTime @default(now())
+
+  allocations PharmacySaleReturnAllocation[]
+
+  @@unique([returnId, saleLineId])
+  @@unique([id, tenantId, providerId, saleId, saleLineId, inventoryId, productId], map: "PharmacySaleReturnLine_scope_key")
+  @@index([tenantId, providerId, saleId])
+}
+
+model PharmacySaleReturnAllocation {
+  id String @id @default(uuid()) @db.Uuid
+
+  tenantId  String @db.Uuid
+  tenant    Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  providerId String @db.Uuid
+  provider   Provider @relation(fields: [providerId, tenantId], references: [id, tenantId], onDelete: Restrict)
+
+  returnId     String @db.Uuid
+  returnLineId String @db.Uuid
+  returnLine PharmacySaleReturnLine @relation(fields: [returnLineId, tenantId, providerId, saleId, saleLineId, inventoryId, productId], references: [id, tenantId, providerId, saleId, saleLineId, inventoryId, productId], onDelete: Restrict, map: "PharmacySaleReturnAllocation_return_line_scope_fkey")
+
+  saleId           String @db.Uuid
+  saleLineId       String @db.Uuid
+  saleAllocationId String @db.Uuid
+  inventoryId      String @db.Uuid
+  productId        String @db.Uuid
+  batchId          String @db.Uuid
+
+  saleAllocation PharmacySaleAllocation @relation(fields: [saleAllocationId, tenantId, providerId, saleId, saleLineId, inventoryId, productId, batchId], references: [id, tenantId, providerId, saleId, lineId, inventoryId, productId, batchId], onDelete: Restrict, map: "PharmacySaleReturnAllocation_sale_allocation_scope_fkey")
+  batch Batch @relation(fields: [batchId, tenantId, inventoryId, providerId, productId], references: [id, tenantId, inventoryId, providerId, productId], onDelete: Restrict)
+
+  stockMovementId String        @unique @db.Uuid
+  stockMovement   StockMovement @relation(fields: [stockMovementId, tenantId, inventoryId, batchId, providerId, productId], references: [id, tenantId, inventoryId, batchId, providerId, productId], onDelete: Restrict)
+
+  quantity Int
+  createdAt DateTime @default(now())
+
+  @@unique([returnLineId, saleAllocationId])
+  @@index([tenantId, providerId, batchId])
+}
+
+model BatchRecallRecord {
+  id String @id @default(uuid()) @db.Uuid
+
+  tenantId    String @db.Uuid
+  inventoryId String @db.Uuid
+  providerId  String @db.Uuid
+  productId   String @db.Uuid
+  batchId     String @db.Uuid
+  batch Batch @relation(fields: [batchId, tenantId, inventoryId, providerId, productId], references: [id, tenantId, inventoryId, providerId, productId], onDelete: Restrict)
+
+  actorMembershipId String @db.Uuid
+  actorUserId       String @db.Uuid
+  actorMembership TenantMembership @relation(fields: [actorMembershipId, actorUserId, tenantId], references: [id, userId, tenantId], onDelete: Restrict, map: "BatchRecallRecord_actorMembership_actorUser_tenant_fkey")
+
+  reasonCode BatchRecallReason
+  reason     String @db.VarChar(500)
+
+  onHandQuantity           Int
+  affectedReservationCount Int
+  releasedUnitCount        Int
+  resultingBatchVersion    Int
+
+  idempotencyKey String @db.VarChar(120)
+  commandHash    String @db.VarChar(64)
+  occurredAt     DateTime
+  createdAt      DateTime @default(now())
+
+  @@unique([batchId])
+  @@unique([tenantId, idempotencyKey])
+  @@index([tenantId, providerId, occurredAt(sort: Desc), id(sort: Desc)])
+}
+
+model InventoryExceptionRequest {
+  id String @id @default(uuid()) @db.Uuid
+
+  tenantId    String @db.Uuid
+  inventoryId String @db.Uuid
+  providerId  String @db.Uuid
+  productId   String @db.Uuid
+  batchId     String @db.Uuid
+  batch Batch @relation(fields: [batchId, tenantId, inventoryId, providerId, productId], references: [id, tenantId, inventoryId, providerId, productId], onDelete: Restrict)
+
+  requestedByMembershipId String @db.Uuid
+  requestedByUserId       String @db.Uuid
+  requestedBy TenantMembership @relation(fields: [requestedByMembershipId, requestedByUserId, tenantId], references: [id, userId, tenantId], onDelete: Restrict, map: "InventoryExceptionRequest_actorMembership_actorUser_tenant_fkey")
+
+  action   InventoryExceptionAction
+  quantity Int?
+  reason   String @db.VarChar(500)
+
+  requestedBatchVersion Int
+  idempotencyKey        String @db.VarChar(120)
+  commandHash           String @db.VarChar(64)
+  requestedAt           DateTime
+  createdAt             DateTime @default(now())
+
+  decision InventoryExceptionDecision?
+
+  @@unique([tenantId, idempotencyKey])
+  @@unique([id, tenantId, providerId, batchId])
+  @@index([tenantId, providerId, requestedAt(sort: Desc), id(sort: Desc)])
+}
+
+model InventoryExceptionDecision {
+  id String @id @default(uuid()) @db.Uuid
+
+  requestId String @unique @db.Uuid
+  tenantId  String @db.Uuid
+  providerId String @db.Uuid
+  batchId   String @db.Uuid
+
+  request InventoryExceptionRequest @relation(fields: [requestId, tenantId, providerId, batchId], references: [id, tenantId, providerId, batchId], onDelete: Restrict)
+
+  decidedByMembershipId String @db.Uuid
+  decidedByUserId       String @db.Uuid
+  decidedBy TenantMembership @relation(fields: [decidedByMembershipId, decidedByUserId, tenantId], references: [id, userId, tenantId], onDelete: Restrict, map: "InventoryExceptionDecision_actorMembership_actorUser_tenant_fkey")
+
+  outcome InventoryExceptionDecisionOutcome
+  reason  String @db.VarChar(500)
+
+  movementId String? @unique @db.Uuid
+  movement   StockMovement? @relation(fields: [movementId], references: [id], onDelete: Restrict)
+
+  onHandBefore         Int?
+  onHandAfter          Int?
+  resultingBatchVersion Int?
+
+  idempotencyKey String @db.VarChar(120)
+  commandHash    String @db.VarChar(64)
+  occurredAt     DateTime
+  createdAt      DateTime @default(now())
+
+  @@unique([tenantId, idempotencyKey])
+  @@index([tenantId, providerId, occurredAt(sort: Desc), id(sort: Desc)])
+}
+
 model Batch {
   id String @id @default(uuid()) @db.Uuid
 
@@ -1943,6 +2202,10 @@ model Batch {
   quarantineRecord       BatchQuarantineRecord?
   stockObservations      BatchStockObservation[]
   pharmacySaleAllocations PharmacySaleAllocation[]
+  pharmacySaleReturnAllocations PharmacySaleReturnAllocation[]
+  batchRecallRecords BatchRecallRecord[]
+  inventoryExceptionRequests InventoryExceptionRequest[]
+  inventoryExceptionDecisions InventoryExceptionDecision[]
 
   @@unique([tenantId, providerId, productId, batchNumber])
   @@unique([id, tenantId, inventoryId, providerId, productId])
@@ -2058,6 +2321,8 @@ model StockMovement {
   destinationTransfers InventoryTransfer[]     @relation("InventoryTransferDestinationMovement")
   stockObservations    BatchStockObservation[] @relation("BatchStockObservationMovement")
   pharmacySaleAllocation PharmacySaleAllocation?
+  pharmacySaleReturnAllocation PharmacySaleReturnAllocation?
+  inventoryExceptionDecision InventoryExceptionDecision?
 
   @@unique([tenantId, idempotencyKey])
   @@unique([id, tenantId, inventoryId, batchId, providerId, productId])
