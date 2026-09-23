@@ -508,6 +508,7 @@ export function AppShell({
       >
         {primaryNavigation
           .filter((item) => item.available !== false)
+          .slice(0, 3)
           .map((item) => {
             const active = isActivePath(pathname, item.href);
             return (
