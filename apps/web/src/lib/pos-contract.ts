@@ -488,7 +488,8 @@ export function isPosSaleReceipt(value: unknown): value is PosSaleReceipt {
     (v.recipientName === null || trimmed(v.recipientName, 1, 200)) &&
     (v.recipientAddress === null || trimmed(v.recipientAddress, 1, 500)) &&
     (v.recipientGstin === null ||
-      (GSTIN.test(v.recipientGstin) &&
+      (typeof v.recipientGstin === 'string' &&
+        GSTIN.test(v.recipientGstin) &&
         v.recipientGstin.slice(0, 2) === v.placeOfSupplyStateCode)) &&
     iso(v.completedAt) &&
     (v.voidedAt === null || iso(v.voidedAt)) &&
