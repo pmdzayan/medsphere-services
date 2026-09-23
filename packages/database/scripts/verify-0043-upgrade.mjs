@@ -210,9 +210,9 @@ VALUES
   ('${importReceiptId}','${importJobId}','${tenantId}','${providerId}','${membershipId}',1,3,CURRENT_TIMESTAMP);
 
 INSERT INTO "MedicineReservation"
-  ("id","tenantId","providerId","subjectUserId","status","expiresAt","readyAt","idempotencyKey","creationHash","version","createdAt","updatedAt")
+  ("id","tenantId","providerId","subjectUserId","status","expiresAt","confirmedAt","readyAt","idempotencyKey","creationHash","version","createdAt","updatedAt")
 VALUES
-  ('${reservationId}','${tenantId}','${providerId}','${userId}','READY','2030-01-01',CURRENT_TIMESTAMP,'task-0043-preserved-reservation',repeat('d',64),2,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP);
+  ('${reservationId}','${tenantId}','${providerId}','${userId}','READY','2030-01-01',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,'task-0043-preserved-reservation',repeat('d',64),2,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP);
 
 INSERT INTO "MedicineReservationItem"
   ("id","tenantId","reservationId","providerId","productId","quantity","createdAt")
