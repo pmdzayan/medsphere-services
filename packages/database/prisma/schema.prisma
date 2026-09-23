@@ -1398,6 +1398,8 @@ model Product {
   identifiers                         ProductIdentifier[]
   inventoryImportRows                 InventoryImportRow[]
   pharmacySaleLines                   PharmacySaleLine[]
+  batchRecallRecords                  BatchRecallRecord[]
+  inventoryExceptionRequests          InventoryExceptionRequest[]
 
   version Int @default(1)
 
@@ -1447,6 +1449,8 @@ model Inventory {
   fiscalProfile          InventoryFiscalProfile?
   pharmacySaleLines      PharmacySaleLine[]
   pharmacySaleAllocations PharmacySaleAllocation[]
+  batchRecallRecords BatchRecallRecord[]
+  inventoryExceptionRequests InventoryExceptionRequest[]
 
   @@unique([id, tenantId])
   @@unique([id, tenantId, providerId, productId])
@@ -2071,11 +2075,19 @@ model PharmacySaleReturnAllocation {
 model BatchRecallRecord {
   id String @id @default(uuid()) @db.Uuid
 
-  tenantId    String @db.Uuid
-  inventoryId String @db.Uuid
-  providerId  String @db.Uuid
-  productId   String @db.Uuid
-  batchId     String @db.Uuid
+  tenantId String @db.Uuid
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+
+  inventoryId String    @db.Uuid
+  inventory   Inventory @relation(fields: [inventoryId, tenantId, providerId, productId], references: [id, tenantId, providerId, productId], onDelete: Restrict)
+
+  providerId String   @db.Uuid
+  provider   Provider @relation(fields: [providerId, tenantId], references: [id, tenantId], onDelete: Restrict)
+
+  productId String  @db.Uuid
+  product   Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  batchId String @db.Uuid
   batch Batch @relation(fields: [batchId, tenantId, inventoryId, providerId, productId], references: [id, tenantId, inventoryId, providerId, productId], onDelete: Restrict)
 
   actorMembershipId String @db.Uuid
@@ -2103,11 +2115,19 @@ model BatchRecallRecord {
 model InventoryExceptionRequest {
   id String @id @default(uuid()) @db.Uuid
 
-  tenantId    String @db.Uuid
-  inventoryId String @db.Uuid
-  providerId  String @db.Uuid
-  productId   String @db.Uuid
-  batchId     String @db.Uuid
+  tenantId String @db.Uuid
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+
+  inventoryId String    @db.Uuid
+  inventory   Inventory @relation(fields: [inventoryId, tenantId, providerId, productId], references: [id, tenantId, providerId, productId], onDelete: Restrict)
+
+  providerId String   @db.Uuid
+  provider   Provider @relation(fields: [providerId, tenantId], references: [id, tenantId], onDelete: Restrict)
+
+  productId String  @db.Uuid
+  product   Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  batchId String @db.Uuid
   batch Batch @relation(fields: [batchId, tenantId, inventoryId, providerId, productId], references: [id, tenantId, inventoryId, providerId, productId], onDelete: Restrict)
 
   requestedByMembershipId String @db.Uuid
@@ -2135,9 +2155,15 @@ model InventoryExceptionDecision {
   id String @id @default(uuid()) @db.Uuid
 
   requestId String @unique @db.Uuid
-  tenantId  String @db.Uuid
-  providerId String @db.Uuid
-  batchId   String @db.Uuid
+
+  tenantId String @db.Uuid
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+
+  providerId String   @db.Uuid
+  provider   Provider @relation(fields: [providerId, tenantId], references: [id, tenantId], onDelete: Restrict)
+
+  batchId String @db.Uuid
+  batch   Batch @relation(fields: [batchId], references: [id], onDelete: Restrict)
 
   request InventoryExceptionRequest @relation(fields: [requestId, tenantId, providerId, batchId], references: [id, tenantId, providerId, batchId], onDelete: Restrict)
 
