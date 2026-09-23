@@ -359,8 +359,10 @@ infra('Task 0043 PostgreSQL POS transaction integrity and concurrency', () => {
         providerId,
         subjectUserId: userId,
         status: 'READY',
+        createdAt: new Date('2026-01-01T00:00:00.000Z'),
+        confirmedAt: new Date('2026-01-02T00:00:00.000Z'),
+        readyAt: new Date('2026-01-03T00:00:00.000Z'),
         expiresAt: new Date('2030-01-01T00:00:00.000Z'),
-        readyAt: new Date(),
         idempotencyKey: `reservation-${randomUUID()}`,
         creationHash: 'a'.repeat(64),
         version: 2,
@@ -576,6 +578,10 @@ infra('Task 0043 PostgreSQL POS transaction integrity and concurrency', () => {
       const batch = input.batches[index]!;
       const id = randomUUID();
       batchIds.push(id);
+      const expiryDate = new Date(batch.expiry);
+      const manufacturingDate = new Date(expiryDate);
+      manufacturingDate.setUTCFullYear(manufacturingDate.getUTCFullYear() - 1);
+
       await prisma.client.batch.create({
         data: {
           id,
@@ -584,8 +590,8 @@ infra('Task 0043 PostgreSQL POS transaction integrity and concurrency', () => {
           providerId,
           productId,
           batchNumber: `T43-${input.label.replaceAll(' ', '-')}-${index}-${randomUUID()}`,
-          manufacturingDate: new Date('2026-01-01T00:00:00.000Z'),
-          expiryDate: new Date(batch.expiry),
+          manufacturingDate,
+          expiryDate,
           receivedQuantity: batch.onHand,
           onHandQuantity: batch.onHand,
           heldQuantity: batch.held,
