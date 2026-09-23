@@ -109,7 +109,7 @@ export interface BatchAvailabilityCandidate {
   readonly expiryDate: Date;
   readonly onHandQuantity: number;
   readonly heldQuantity: number;
-  readonly status: 'ACTIVE' | 'EXPIRED' | 'EXHAUSTED' | 'QUARANTINED';
+  readonly status: 'ACTIVE' | 'EXPIRED' | 'EXHAUSTED' | 'QUARANTINED' | 'RECALLED';
   readonly deletedAt: Date | null;
 }
 
