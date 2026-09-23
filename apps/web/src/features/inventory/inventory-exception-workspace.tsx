@@ -24,7 +24,10 @@ interface BatchOption {
   medicineName: string;
 }
 
-const RECALL_REASON_KEYS: Record<BatchRecallReason, Parameters<ReturnType<typeof useLanguage>['t']>[0]> = {
+const RECALL_REASON_KEYS: Record<
+  BatchRecallReason,
+  Parameters<ReturnType<typeof useLanguage>['t']>[0]
+> = {
   MANUFACTURER_RECALL: 'task0044.inventory.reason.manufacturer',
   REGULATORY_RECALL: 'task0044.inventory.reason.regulatory',
   QUALITY_ALERT: 'task0044.inventory.reason.quality',
@@ -42,7 +45,8 @@ export function InventoryExceptionWorkspace() {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
 
-  const [recallReasonCode, setRecallReasonCode] = useState<BatchRecallReason>('MANUFACTURER_RECALL');
+  const [recallReasonCode, setRecallReasonCode] =
+    useState<BatchRecallReason>('MANUFACTURER_RECALL');
   const [recallReason, setRecallReason] = useState('');
   const [recallKey, setRecallKey] = useState('');
 
@@ -97,7 +101,11 @@ export function InventoryExceptionWorkspace() {
       setLoading(true);
       setError('');
       try {
-        const first = await getProviderStock({ providerId: selectedProvider, limit: 100, offset: 0 });
+        const first = await getProviderStock({
+          providerId: selectedProvider,
+          limit: 100,
+          offset: 0,
+        });
         const pages = [first];
         let offset = first.data.length;
         while (offset < first.total && pages.length < 5) {
@@ -116,7 +124,9 @@ export function InventoryExceptionWorkspace() {
         );
         setBatches(options);
         setBatchId((current) =>
-          options.some((entry) => entry.batch.id === current) ? current : (options[0]?.batch.id ?? ''),
+          options.some((entry) => entry.batch.id === current)
+            ? current
+            : (options[0]?.batch.id ?? ''),
         );
       } catch (cause) {
         setBatches([]);
@@ -237,7 +247,10 @@ export function InventoryExceptionWorkspace() {
   const decisionSubmitting = mutation === 'decision';
 
   return (
-    <section className="mx-auto mt-6 max-w-[94rem] space-y-4" aria-labelledby="task-0044-inventory-title">
+    <section
+      className="mx-auto mt-6 max-w-[94rem] space-y-4"
+      aria-labelledby="task-0044-inventory-title"
+    >
       <header>
         <p className="text-xs font-extrabold uppercase tracking-[.18em] text-rose-700">
           {t('task0044.inventory.eyebrow')}
@@ -283,9 +296,7 @@ export function InventoryExceptionWorkspace() {
             >
               {batches.length === 0 ? (
                 <option value="">
-                  {loading
-                    ? t('task0044.inventory.loading')
-                    : t('task0044.inventory.noBatches')}
+                  {loading ? t('task0044.inventory.loading') : t('task0044.inventory.noBatches')}
                 </option>
               ) : null}
               {batches.map(({ batch, medicineName }) => (
@@ -395,7 +406,9 @@ export function InventoryExceptionWorkspace() {
         <SectionCard>
           <form onSubmit={submitDecision} className="space-y-3 p-5">
             <h3 className="font-bold text-[#173c31]">{t('task0044.inventory.decisionTitle')}</h3>
-            <p className="text-xs leading-5 text-[#71817c]">{t('task0044.inventory.decisionHelp')}</p>
+            <p className="text-xs leading-5 text-[#71817c]">
+              {t('task0044.inventory.decisionHelp')}
+            </p>
             <label className="block text-sm font-semibold text-[#38544b]">
               <span className="mb-1.5 block">{t('task0044.inventory.requestId')}</span>
               <input

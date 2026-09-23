@@ -3,12 +3,7 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { SectionCard, StatusBadge } from '@/components/platform/dashboard-primitives';
 import { useLanguage } from '@/components/language-provider';
-import {
-  ApiError,
-  getAssignedProviders,
-  getPosSale,
-  returnPosSale,
-} from '@/lib/api-client';
+import { ApiError, getAssignedProviders, getPosSale, returnPosSale } from '@/lib/api-client';
 import type { ProviderAccess } from '@/lib/inventory-contract';
 import type { PosSaleReceipt } from '@/lib/pos-contract';
 import {
@@ -130,7 +125,10 @@ export function PosReturnWorkspace() {
   }
 
   return (
-    <section className="mx-auto mt-6 max-w-[94rem] space-y-4" aria-labelledby="task-0044-return-title">
+    <section
+      className="mx-auto mt-6 max-w-[94rem] space-y-4"
+      aria-labelledby="task-0044-return-title"
+    >
       <header>
         <p className="text-xs font-extrabold uppercase tracking-[.18em] text-violet-700">
           {t('task0044.return.eyebrow')}
@@ -154,7 +152,10 @@ export function PosReturnWorkspace() {
       ) : null}
 
       <SectionCard>
-        <form onSubmit={loadSale} className="grid gap-3 p-5 md:grid-cols-[minmax(14rem,22rem)_1fr_auto] md:items-end">
+        <form
+          onSubmit={loadSale}
+          className="grid gap-3 p-5 md:grid-cols-[minmax(14rem,22rem)_1fr_auto] md:items-end"
+        >
           <label className="text-sm font-semibold text-[#38544b]">
             <span className="mb-1.5 block">{t('task0044.return.provider')}</span>
             <select
