@@ -1470,16 +1470,16 @@ export class PosCheckoutService {
       status: sale.status,
       currency: sale.currency,
       pricesIncludeTax: sale.pricesIncludeTax,
-      subtotal: String(sale.subtotal),
-      discountTotal: String(sale.discountTotal),
-      taxableTotal: String(sale.taxableTotal),
-      cgstTotal: String(sale.cgstTotal),
-      sgstTotal: String(sale.sgstTotal),
-      igstTotal: String(sale.igstTotal),
-      cessTotal: String(sale.cessTotal),
-      grandTotal: String(sale.grandTotal),
-      cashTendered: sale.cashTendered === null ? null : String(sale.cashTendered),
-      changeDue: sale.changeDue === null ? null : String(sale.changeDue),
+      subtotal: this.formatStoredMoney(sale.subtotal),
+      discountTotal: this.formatStoredMoney(sale.discountTotal),
+      taxableTotal: this.formatStoredMoney(sale.taxableTotal),
+      cgstTotal: this.formatStoredMoney(sale.cgstTotal),
+      sgstTotal: this.formatStoredMoney(sale.sgstTotal),
+      igstTotal: this.formatStoredMoney(sale.igstTotal),
+      cessTotal: this.formatStoredMoney(sale.cessTotal),
+      grandTotal: this.formatStoredMoney(sale.grandTotal),
+      cashTendered: sale.cashTendered === null ? null : this.formatStoredMoney(sale.cashTendered),
+      changeDue: sale.changeDue === null ? null : this.formatStoredMoney(sale.changeDue),
       placeOfSupplyStateCode: sale.placeOfSupplyStateCode,
       recipientName: sale.recipientName,
       recipientAddress: sale.recipientAddress,
@@ -1488,23 +1488,23 @@ export class PosCheckoutService {
       voidedAt: sale.voidedAt?.toISOString() ?? null,
       lines: sale.lines.map((line) => ({
         ...line,
-        unitPrice: String(line.unitPrice),
-        mrp: String(line.mrp),
-        grossValue: String(line.grossValue),
+        unitPrice: this.formatStoredMoney(line.unitPrice),
+        mrp: this.formatStoredMoney(line.mrp),
+        grossValue: this.formatStoredMoney(line.grossValue),
         discountPercentage: String(line.discountPercentage),
-        discountAmount: String(line.discountAmount),
-        taxableValue: String(line.taxableValue),
+        discountAmount: this.formatStoredMoney(line.discountAmount),
+        taxableValue: this.formatStoredMoney(line.taxableValue),
         gstPercentage: String(line.gstPercentage),
         cessPercentage: String(line.cessPercentage),
-        cgstAmount: String(line.cgstAmount),
-        sgstAmount: String(line.sgstAmount),
-        igstAmount: String(line.igstAmount),
-        cessAmount: String(line.cessAmount),
-        lineTotal: String(line.lineTotal),
+        cgstAmount: this.formatStoredMoney(line.cgstAmount),
+        sgstAmount: this.formatStoredMoney(line.sgstAmount),
+        igstAmount: this.formatStoredMoney(line.igstAmount),
+        cessAmount: this.formatStoredMoney(line.cessAmount),
+        lineTotal: this.formatStoredMoney(line.lineTotal),
       })),
       payments: sale.payments.map((payment) => ({
         ...payment,
-        amount: String(payment.amount),
+        amount: this.formatStoredMoney(payment.amount),
       })),
       invoice: {
         id: sale.invoice.id,
@@ -1520,14 +1520,14 @@ export class PosCheckoutService {
         recipientName: sale.invoice.recipientName,
         recipientAddress: sale.invoice.recipientAddress,
         recipientGstin: sale.invoice.recipientGstin,
-        subtotal: String(sale.invoice.subtotal),
-        discountTotal: String(sale.invoice.discountTotal),
-        taxableTotal: String(sale.invoice.taxableTotal),
-        cgstTotal: String(sale.invoice.cgstTotal),
-        sgstTotal: String(sale.invoice.sgstTotal),
-        igstTotal: String(sale.invoice.igstTotal),
-        cessTotal: String(sale.invoice.cessTotal),
-        grandTotal: String(sale.invoice.grandTotal),
+        subtotal: this.formatStoredMoney(sale.invoice.subtotal),
+        discountTotal: this.formatStoredMoney(sale.invoice.discountTotal),
+        taxableTotal: this.formatStoredMoney(sale.invoice.taxableTotal),
+        cgstTotal: this.formatStoredMoney(sale.invoice.cgstTotal),
+        sgstTotal: this.formatStoredMoney(sale.invoice.sgstTotal),
+        igstTotal: this.formatStoredMoney(sale.invoice.igstTotal),
+        cessTotal: this.formatStoredMoney(sale.invoice.cessTotal),
+        grandTotal: this.formatStoredMoney(sale.invoice.grandTotal),
         reprintCount: sale.invoice._count.reprints,
       },
       voidRecord: sale.voidRecord
@@ -1570,6 +1570,11 @@ export class PosCheckoutService {
     ) {
       throw new BadRequestException('Void reason must contain 1 to 500 trimmed characters');
     }
+  }
+
+  private formatStoredMoney(value: Prisma.Decimal): string {
+    const paise = parseMoneyToPaise(String(value));
+    return String(paise / 100n) + '.' + String(paise % 100n).padStart(2, '0');
   }
 
   private normalizeMoney(value: string, label: string): string {
