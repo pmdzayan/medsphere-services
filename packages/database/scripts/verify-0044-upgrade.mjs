@@ -21,11 +21,18 @@ if (!databaseUrlValue) {
 const databaseUrl = new URL(databaseUrlValue);
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const sourceMigrations = join(packageRoot, 'prisma', 'migrations');
-const upgradeMigration = '20260923190000_task_0044_inventory_exception_closure';
+const upgradeMigrations = [
+  '20260923185000_task_0044_inventory_exception_enum_prelude',
+  '20260923190000_task_0044_inventory_exception_closure',
+];
+const firstUpgradeMigration = upgradeMigrations[0];
+const upgradeMigration = upgradeMigrations[1];
 const pnpmCommand = process.platform === 'win32' ? process.env.ComSpec || 'cmd.exe' : 'pnpm';
 
-if (!existsSync(join(sourceMigrations, upgradeMigration, 'migration.sql'))) {
-  throw new Error(`Required migration is missing: ${upgradeMigration}`);
+for (const migrationName of upgradeMigrations) {
+  if (!existsSync(join(sourceMigrations, migrationName, 'migration.sql'))) {
+    throw new Error(`Required migration is missing: ${migrationName}`);
+  }
 }
 
 function prismaProcessArgs(args) {
@@ -103,7 +110,7 @@ function createMigrationProject() {
     .filter((entry) => entry.isDirectory())
     .map((entry) => entry.name)
     .sort()) {
-    if (migrationName >= upgradeMigration) continue;
+    if (migrationName >= firstUpgradeMigration) continue;
     cpSync(join(sourceMigrations, migrationName), join(migrationsRoot, migrationName), {
       recursive: true,
     });
@@ -112,9 +119,11 @@ function createMigrationProject() {
 }
 
 function copyUpgrade(project) {
-  cpSync(join(sourceMigrations, upgradeMigration), join(project.migrationsRoot, upgradeMigration), {
-    recursive: true,
-  });
+  for (const migrationName of upgradeMigrations) {
+    cpSync(join(sourceMigrations, migrationName), join(project.migrationsRoot, migrationName), {
+      recursive: true,
+    });
+  }
 }
 
 function createDatabase(schemaFile, name) {
