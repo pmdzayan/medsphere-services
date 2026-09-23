@@ -232,6 +232,10 @@ export function InventoryExceptionWorkspace() {
     }
   }
 
+  const recallSubmitting = mutation === 'recall';
+  const requestSubmitting = mutation === 'request';
+  const decisionSubmitting = mutation === 'decision';
+
   return (
     <section className="mx-auto mt-6 max-w-[94rem] space-y-4" aria-labelledby="task-0044-inventory-title">
       <header>
@@ -326,7 +330,7 @@ export function InventoryExceptionWorkspace() {
               disabled={!selected || mutation !== null}
               className="w-full rounded-xl bg-rose-700 px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50"
             >
-              {mutation === 'recall'
+              {recallSubmitting
                 ? t('task0044.inventory.recallSubmitting')
                 : t('task0044.inventory.recallSubmit')}
             </button>
@@ -381,7 +385,7 @@ export function InventoryExceptionWorkspace() {
               disabled={!selected || mutation !== null}
               className="w-full rounded-xl bg-amber-700 px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50"
             >
-              {mutation === 'request'
+              {requestSubmitting
                 ? t('task0044.inventory.requestSubmitting')
                 : t('task0044.inventory.requestSubmit')}
             </button>
@@ -425,7 +429,7 @@ export function InventoryExceptionWorkspace() {
               disabled={mutation !== null}
               className="w-full rounded-xl bg-[#0b5f4b] px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50"
             >
-              {mutation === 'decision'
+              {decisionSubmitting
                 ? t('task0044.inventory.decisionSubmitting')
                 : t('task0044.inventory.decisionSubmit')}
             </button>
