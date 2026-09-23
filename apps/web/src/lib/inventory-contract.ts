@@ -11,7 +11,7 @@ export interface InventoryBatchStock {
   batchNumber: string;
   expiryDate: string;
   manufacturingDate: string | null;
-  status: 'ACTIVE' | 'EXPIRED' | 'EXHAUSTED' | 'QUARANTINED';
+  status: 'ACTIVE' | 'EXPIRED' | 'EXHAUSTED' | 'QUARANTINED' | 'RECALLED';
   version: number;
   onHandQuantity: number;
   heldQuantity: number;
@@ -502,7 +502,8 @@ function isInventoryBatchStock(value: unknown): value is InventoryBatchStock {
     (batch.status === 'ACTIVE' ||
       batch.status === 'EXPIRED' ||
       batch.status === 'EXHAUSTED' ||
-      batch.status === 'QUARANTINED') &&
+      batch.status === 'QUARANTINED' ||
+      batch.status === 'RECALLED') &&
     isIntegerBetween(batch.version, 1, 2_147_483_647) &&
     isQuantity(batch.onHandQuantity) &&
     isQuantity(batch.heldQuantity) &&
