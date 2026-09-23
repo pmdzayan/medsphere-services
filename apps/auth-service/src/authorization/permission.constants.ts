@@ -36,6 +36,11 @@ export const PERMISSIONS = {
   billingPosConfigure: 'billing.pos.configure',
   billingPosVoid: 'billing.pos.void',
   billingPosReturn: 'billing.pos.return',
+  /** Task 0045: retention, legal-hold and data-subject policy closure. */
+  compliancePolicyRead: 'compliance.policy.read',
+  compliancePolicyManage: 'compliance.policy.manage',
+  complianceLegalHoldManage: 'compliance.legal-hold.manage',
+  complianceSubjectRequestManage: 'compliance.subject-request.manage',
 } as const;
 
 export const PERMISSION_KEYS = Object.values(PERMISSIONS);
