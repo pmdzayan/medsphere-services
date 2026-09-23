@@ -11,6 +11,7 @@ import { AuthRateLimitModule } from './security/auth-rate-limit.module';
 import { AuthorizationModule } from './authorization/authorization.module';
 import { AuditModule } from './audit/audit.module';
 import { InventoryModule } from './inventory/inventory.module';
+import { PosModule } from './pos/pos.module';
 import { NotificationModule } from './notifications/notification.module';
 import { VerificationModule } from './verification/verification.module';
 import { ConsentModule } from './consent/consent.module';
@@ -37,6 +38,7 @@ import { AuthReadinessService } from './health/auth-readiness.service';
     AuthorizationModule,
     AuditModule,
     InventoryModule,
+    PosModule,
     NotificationModule,
     VerificationModule,
     ConsentModule,

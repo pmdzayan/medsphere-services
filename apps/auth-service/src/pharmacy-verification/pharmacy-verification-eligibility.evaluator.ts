@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import type { Prisma } from '@medsphere/database';
 import { PrismaService } from '../prisma/prisma.service';
 
 /**
@@ -55,9 +56,22 @@ export class PharmacyVerificationEligibilityEvaluator {
    * of ordering.
    */
   async evaluate(input: EvaluatePharmacyEligibilityInput): Promise<PharmacyEligibilityResult> {
+    return this.evaluateWithDatabase(this.prisma.client, input);
+  }
+
+  /**
+   * Transaction-scoped form used by financially or stock-sensitive commands.
+   * Keeping the same evaluator logic inside the caller's serializable
+   * transaction prevents a verification state check from being split from
+   * the mutation it authorizes.
+   */
+  async evaluateWithDatabase(
+    database: Pick<Prisma.TransactionClient, 'provider' | 'providerVerification'>,
+    input: EvaluatePharmacyEligibilityInput,
+  ): Promise<PharmacyEligibilityResult> {
     const now = input.now ?? new Date();
 
-    const provider = await this.prisma.client.provider.findFirst({
+    const provider = await database.provider.findFirst({
       where: { id: input.providerId, tenantId: input.tenantId },
       select: {
         providerType: true,
@@ -93,7 +107,7 @@ export class PharmacyVerificationEligibilityEvaluator {
     // to share an id collision across tenants (which cannot happen
     // given UUIDs, but the check costs nothing and documents the
     // invariant explicitly).
-    const currentVerification = await this.prisma.client.providerVerification.findFirst({
+    const currentVerification = await database.providerVerification.findFirst({
       where: {
         providerId: input.providerId,
         tenantId: input.tenantId,

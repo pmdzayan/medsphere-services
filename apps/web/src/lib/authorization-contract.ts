@@ -16,6 +16,10 @@ export const AUTHORIZATION_PERMISSIONS = {
   providerAccessManage: 'authorization.provider-access.manage',
   membershipsManage: 'authorization.memberships.manage',
   auditEventsRead: 'audit.events.read',
+  billingPosRead: 'billing.pos.read',
+  billingPosCheckout: 'billing.pos.checkout',
+  billingPosConfigure: 'billing.pos.configure',
+  billingPosVoid: 'billing.pos.void',
 } as const;
 
 export type AuthorizationPermission =

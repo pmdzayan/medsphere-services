@@ -92,6 +92,15 @@ import type {
   MarkAllReadResponse,
   PatientNotification,
 } from './patient-notification-contract';
+import type {
+  PosCheckoutRequest,
+  PosFiscalProfileRequest,
+  PosFiscalProfileResponse,
+  PosInventoryFiscalProfileRequest,
+  PosProductQuote,
+  PosSaleReceipt,
+  PosVoidRequest,
+} from './pos-contract';
 
 export class ApiError extends Error {
   constructor(
@@ -761,6 +770,111 @@ export async function revokePharmacyStaffAccess(
   await requestJson<{ revoked: true }>(
     `/api/pharmacy/providers/${encodeURIComponent(providerId)}/staff/members/${encodeURIComponent(membershipId)}`,
     { method: 'DELETE' },
+  );
+}
+
+export async function getPosFiscalProfile(providerId: string): Promise<PosFiscalProfileResponse> {
+  return requestJson<PosFiscalProfileResponse>(
+    '/api/pos/providers/' + encodeURIComponent(providerId) + '/fiscal-profile',
+  );
+}
+
+export async function configurePosFiscalProfile(
+  providerId: string,
+  request: PosFiscalProfileRequest,
+): Promise<unknown> {
+  return requestJson<unknown>(
+    '/api/pos/providers/' + encodeURIComponent(providerId) + '/fiscal-profile',
+    {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(request),
+    },
+  );
+}
+
+export async function configurePosInventoryFiscalProfile(
+  providerId: string,
+  inventoryId: string,
+  request: PosInventoryFiscalProfileRequest,
+): Promise<unknown> {
+  return requestJson<unknown>(
+    '/api/pos/providers/' +
+      encodeURIComponent(providerId) +
+      '/inventories/' +
+      encodeURIComponent(inventoryId) +
+      '/fiscal-profile',
+    {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(request),
+    },
+  );
+}
+
+export async function getPosProductQuote(
+  providerId: string,
+  productId: string,
+): Promise<PosProductQuote> {
+  return requestJson<PosProductQuote>(
+    '/api/pos/providers/' +
+      encodeURIComponent(providerId) +
+      '/products/' +
+      encodeURIComponent(productId) +
+      '/quote',
+  );
+}
+
+export async function checkoutPosSale(
+  providerId: string,
+  request: PosCheckoutRequest,
+): Promise<PosSaleReceipt> {
+  return requestJson<PosSaleReceipt>(
+    '/api/pos/providers/' + encodeURIComponent(providerId) + '/checkout',
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(request),
+    },
+  );
+}
+
+export async function getPosSale(providerId: string, saleId: string): Promise<PosSaleReceipt> {
+  return requestJson<PosSaleReceipt>(
+    '/api/pos/providers/' + encodeURIComponent(providerId) + '/sales/' + encodeURIComponent(saleId),
+  );
+}
+
+export async function reprintPosInvoice(
+  providerId: string,
+  saleId: string,
+): Promise<PosSaleReceipt> {
+  return requestJson<PosSaleReceipt>(
+    '/api/pos/providers/' +
+      encodeURIComponent(providerId) +
+      '/sales/' +
+      encodeURIComponent(saleId) +
+      '/reprint',
+    { method: 'POST' },
+  );
+}
+
+export async function voidPosSale(
+  providerId: string,
+  saleId: string,
+  request: PosVoidRequest,
+): Promise<PosSaleReceipt> {
+  return requestJson<PosSaleReceipt>(
+    '/api/pos/providers/' +
+      encodeURIComponent(providerId) +
+      '/sales/' +
+      encodeURIComponent(saleId) +
+      '/void',
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(request),
+    },
   );
 }
 

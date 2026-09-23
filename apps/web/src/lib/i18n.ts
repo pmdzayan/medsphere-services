@@ -71,6 +71,7 @@ import {
   pharmacyStaffTamilMessages,
   pharmacyStaffUrduMessages,
 } from './i18n-catalogs/pharmacy-staff';
+import { posEnglishMessages, posTamilMessages, posUrduMessages } from './i18n-catalogs/pos';
 import { workstationSecurityLocaleMessages } from './i18n-catalogs/workstation-security';
 
 export const localeOptions = [
@@ -121,6 +122,7 @@ const englishMessages = {
   ...permissionsEnglishMessages,
   ...patientMedicinesEnglishMessages,
   ...pharmacyStaffEnglishMessages,
+  ...posEnglishMessages,
   'language.label': 'Language',
   'meta.login.title': 'Sign in',
   'meta.register.title': 'Request access',
@@ -138,6 +140,8 @@ const englishMessages = {
   'meta.team.title': 'Team & access',
   'meta.settings.title': 'Settings',
   'meta.settings.description': 'Personal privacy and language settings.',
+  'meta.billing.title': 'Billing & POS',
+  'meta.billing.description': 'Pharmacy POS, GST and invoice transaction workspace.',
   'shell.skipToContent': 'Skip to content',
   'shell.closeNavigation': 'Close navigation',
   'shell.openNavigation': 'Open navigation',
@@ -280,6 +284,7 @@ const tamilMessages: MessageOverrides = {
   ...permissionsTamilMessages,
   ...patientMedicinesTamilMessages,
   ...pharmacyStaffTamilMessages,
+  ...posTamilMessages,
   'language.label': 'மொழி',
   'meta.login.title': 'உள்நுழைக',
   'meta.register.title': 'அணுகலைக் கோருங்கள்',
@@ -297,6 +302,8 @@ const tamilMessages: MessageOverrides = {
   'meta.team.title': 'குழு மற்றும் அணுகல்',
   'meta.settings.title': 'அமைப்புகள்',
   'meta.settings.description': 'தனிப்பட்ட தனியுரிமை மற்றும் மொழி அமைப்புகள்.',
+  'meta.billing.title': 'பில்லிங் & POS',
+  'meta.billing.description': 'மருந்தக POS, GST மற்றும் விலைப்பட்டியல் பரிவர்த்தனை பணியிடம்.',
   'shell.skipToContent': 'உள்ளடக்கத்திற்குச் செல்லவும்',
   'shell.closeNavigation': 'வழிசெலுத்தலை மூடு',
   'shell.openNavigation': 'வழிசெலுத்தலைத் திற',
@@ -469,6 +476,7 @@ const urduMessages: MessageOverrides = {
   ...permissionsUrduMessages,
   ...patientMedicinesUrduMessages,
   ...pharmacyStaffUrduMessages,
+  ...posUrduMessages,
   'language.label': 'زبان',
   'meta.login.title': 'سائن ان',
   'meta.register.title': 'رسائی کی درخواست',
@@ -486,6 +494,8 @@ const urduMessages: MessageOverrides = {
   'meta.team.title': 'ٹیم اور رسائی',
   'meta.settings.title': 'ترتیبات',
   'meta.settings.description': 'ذاتی رازداری اور زبان کی ترتیبات۔',
+  'meta.billing.title': 'بلنگ اور POS',
+  'meta.billing.description': 'فارمیسی POS، GST اور انوائس ٹرانزیکشن ورک اسپیس۔',
   'shell.skipToContent': 'مواد پر جائیں',
   'shell.closeNavigation': 'نیویگیشن بند کریں',
   'shell.openNavigation': 'نیویگیشن کھولیں',

@@ -19,7 +19,7 @@ const primaryNavigation: NavigationItem[] = [
   { labelKey: 'shell.overview', href: '/dashboard', icon: 'dashboard' },
   { labelKey: 'shell.inventory', href: '/inventory', icon: 'inventory' },
   { labelKey: 'shell.reservations', href: '/reservations', icon: 'reservations' },
-  { labelKey: 'shell.billing', href: '/billing', icon: 'billing', available: false },
+  { labelKey: 'shell.billing', href: '/billing', icon: 'billing' },
   { labelKey: 'shell.documents', href: '/documents', icon: 'documents', available: false },
 ];
 
@@ -508,6 +508,7 @@ export function AppShell({
       >
         {primaryNavigation
           .filter((item) => item.available !== false)
+          .slice(0, 3)
           .map((item) => {
             const active = isActivePath(pathname, item.href);
             return (
