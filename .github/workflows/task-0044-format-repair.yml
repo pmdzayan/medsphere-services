@@ -1,0 +1,66 @@
+name: Task 0044 formatting repair
+
+on:
+  push:
+    branches:
+      - cto/0044-inventory-exception-closure
+
+permissions:
+  contents: write
+
+concurrency:
+  group: task-0044-format-repair
+  cancel-in-progress: true
+
+jobs:
+  format:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: cto/0044-inventory-exception-closure
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.12.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Format Task 0044 files
+        run: |
+          pnpm exec prettier --write \
+            apps/auth-service/src/inventory/dto/inventory-exception.dto.ts \
+            apps/auth-service/src/inventory/inventory-exception.service.ts \
+            apps/auth-service/src/inventory/inventory.controller.ts \
+            apps/auth-service/src/pos/pos-return.service.ts \
+            apps/auth-service/src/pos/task-0044-inventory-exception.integration.spec.ts \
+            apps/web/src/app/api/inventory/providers/[providerId]/batches/[batchId]/recall/route.ts \
+            apps/web/src/app/api/inventory/providers/[providerId]/exceptions/[requestId]/decision/route.ts \
+            apps/web/src/app/api/inventory/providers/[providerId]/exceptions/route.ts \
+            apps/web/src/lib/i18n-catalogs/task-0044.ts \
+            apps/web/src/lib/inventory-exception-contract.ts \
+            apps/web/src/lib/pos-return-contract.ts
+      - name: Commit formatting
+        run: |
+          if git diff --quiet; then exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            apps/auth-service/src/inventory/dto/inventory-exception.dto.ts \
+            apps/auth-service/src/inventory/inventory-exception.service.ts \
+            apps/auth-service/src/inventory/inventory.controller.ts \
+            apps/auth-service/src/pos/pos-return.service.ts \
+            apps/auth-service/src/pos/task-0044-inventory-exception.integration.spec.ts \
+            apps/web/src/app/api/inventory/providers/[providerId]/batches/[batchId]/recall/route.ts \
+            apps/web/src/app/api/inventory/providers/[providerId]/exceptions/[requestId]/decision/route.ts \
+            apps/web/src/app/api/inventory/providers/[providerId]/exceptions/route.ts \
+            apps/web/src/lib/i18n-catalogs/task-0044.ts \
+            apps/web/src/lib/inventory-exception-contract.ts \
+            apps/web/src/lib/pos-return-contract.ts
+          git commit -m "chore(task-0044): format inventory exception closure files"
+          git push origin HEAD:cto/0044-inventory-exception-closure
