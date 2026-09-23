@@ -8,6 +8,7 @@ import { PosCheckoutService } from './pos-checkout.service';
 import { PosController } from './pos.controller';
 import { PosEventWriter } from './pos-event-writer';
 import { PosFiscalService } from './pos-fiscal.service';
+import { PosReturnService } from './pos-return.service';
 
 @Module({
   imports: [
@@ -18,7 +19,7 @@ import { PosFiscalService } from './pos-fiscal.service';
     PharmacyVerificationModule,
   ],
   controllers: [PosController],
-  providers: [PosFiscalService, PosCheckoutService, PosEventWriter],
-  exports: [PosFiscalService, PosCheckoutService],
+  providers: [PosFiscalService, PosCheckoutService, PosReturnService, PosEventWriter],
+  exports: [PosFiscalService, PosCheckoutService, PosReturnService],
 })
 export class PosModule {}
