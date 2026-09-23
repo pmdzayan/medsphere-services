@@ -13,6 +13,7 @@ export const INVENTORY_DOMAIN_EVENT_TYPES = [
   'inventory.batch.expired',
   'inventory.batch.quarantined',
   'inventory.batch.recalled',
+  'inventory.exception.requested',
   'inventory.exception.approved',
   'inventory.exception.rejected',
   'inventory.stock.damaged',
