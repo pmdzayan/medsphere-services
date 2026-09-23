@@ -227,6 +227,7 @@ infra('Task 0044 PostgreSQL return, recall and disposition integrity', () => {
     const reservationId = randomUUID();
     const itemId = randomUUID();
     const allocationId = randomUUID();
+    const reservationOccurredAt = new Date();
     await prisma.client.medicineReservation.create({
       data: {
         id: reservationId,
@@ -235,8 +236,10 @@ infra('Task 0044 PostgreSQL return, recall and disposition integrity', () => {
         subjectUserId: userId,
         status: 'READY',
         expiresAt: new Date('2030-01-01T00:00:00.000Z'),
-        confirmedAt: new Date(),
-        readyAt: new Date(),
+        confirmedAt: reservationOccurredAt,
+        readyAt: reservationOccurredAt,
+        createdAt: reservationOccurredAt,
+        updatedAt: reservationOccurredAt,
         idempotencyKey: `reservation-${randomUUID()}`,
         creationHash: 'a'.repeat(64),
         version: 2,
