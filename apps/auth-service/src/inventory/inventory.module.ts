@@ -12,6 +12,7 @@ import { ReservationLifecycleService } from './reservation-lifecycle.service';
 import { ReservationExpiryService } from './reservation-expiry.service';
 import { BatchExpiryService } from './batch-expiry.service';
 import { InventoryQuarantineService } from './inventory-quarantine.service';
+import { InventoryExceptionService } from './inventory-exception.service';
 import { ReservationRepository } from './reservation.repository';
 import { ReservationService } from './reservation.service';
 import { ReservationCreationService } from './reservation-creation.service';
@@ -74,6 +75,7 @@ import { PharmacyVerificationModule } from '../pharmacy-verification/pharmacy-ve
     ReservationExpiryService,
     BatchExpiryService,
     InventoryQuarantineService,
+    InventoryExceptionService,
     PublicMedicineSearchService,
     PublicNearbyMedicineSearchService,
     PatientMedicineSearchService,
