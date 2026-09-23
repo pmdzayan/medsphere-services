@@ -727,6 +727,8 @@ model TenantMembership {
   inventoryExceptionRequests     InventoryExceptionRequest[]
   inventoryExceptionDecisions    InventoryExceptionDecision[]
   pharmacyInvoiceReprints        PharmacyInvoiceReprint[]
+  complianceLegalHoldsSubject     ComplianceLegalHold[]            @relation("ComplianceLegalHoldSubjectMembership")
+  complianceDecisionsSubject      CompliancePolicyDecisionRecord[] @relation("ComplianceDecisionSubjectMembership")
 
   @@unique([tenantId, userId])
   @@unique([id, tenantId])
@@ -2727,8 +2729,10 @@ model ComplianceLegalHold {
   tenantId String @db.Uuid
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
 
-  subjectUserId String @db.Uuid
-  subjectUser   User   @relation("ComplianceLegalHoldSubject", fields: [subjectUserId], references: [id], onDelete: Restrict)
+  subjectUserId       String           @db.Uuid
+  subjectUser         User             @relation("ComplianceLegalHoldSubject", fields: [subjectUserId], references: [id], onDelete: Restrict)
+  subjectMembershipId String           @db.Uuid
+  subjectMembership   TenantMembership @relation("ComplianceLegalHoldSubjectMembership", fields: [subjectMembershipId, subjectUserId, tenantId], references: [id, userId, tenantId], onDelete: Restrict)
 
   dataClass ComplianceDataClass?
 
@@ -2767,8 +2771,10 @@ model CompliancePolicyDecisionRecord {
   tenantId String @db.Uuid
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
 
-  subjectUserId String @db.Uuid
-  subjectUser   User   @relation("ComplianceDecisionSubject", fields: [subjectUserId], references: [id], onDelete: Restrict)
+  subjectUserId       String           @db.Uuid
+  subjectUser         User             @relation("ComplianceDecisionSubject", fields: [subjectUserId], references: [id], onDelete: Restrict)
+  subjectMembershipId String           @db.Uuid
+  subjectMembership   TenantMembership @relation("ComplianceDecisionSubjectMembership", fields: [subjectMembershipId, subjectUserId, tenantId], references: [id, userId, tenantId], onDelete: Restrict)
 
   dataClass ComplianceDataClass
   purpose   CompliancePurpose
