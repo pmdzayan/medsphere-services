@@ -19,7 +19,8 @@ export const posEnglishMessages = {
   'pos.fiscal.saving': 'Saving…',
   'pos.fiscal.missing': 'Fiscal setup is required before checkout.',
   'pos.accessTitle': 'POS access is not assigned',
-  'pos.accessDetail': 'Your membership needs the billing.pos.read permission and assigned-pharmacy access.',
+  'pos.accessDetail':
+    'Your membership needs the billing.pos.read permission and assigned-pharmacy access.',
   'pos.search.title': 'Add medicine',
   'pos.search.placeholder': 'Medicine, generic, brand or strength',
   'pos.search.action': 'Search',
@@ -108,7 +109,8 @@ export const posTamilMessages = {
   'pos.fiscal.saving': 'சேமிக்கிறது…',
   'pos.fiscal.missing': 'விற்பனைக்கு முன் வரி அமைப்பு தேவை.',
   'pos.accessTitle': 'POS அணுகல் ஒதுக்கப்படவில்லை',
-  'pos.accessDetail': 'உங்கள் உறுப்பினர் அணுகலுக்கு billing.pos.read அனுமதியும் ஒதுக்கப்பட்ட மருந்தக அணுகலும் தேவை.',
+  'pos.accessDetail':
+    'உங்கள் உறுப்பினர் அணுகலுக்கு billing.pos.read அனுமதியும் ஒதுக்கப்பட்ட மருந்தக அணுகலும் தேவை.',
   'pos.search.title': 'மருந்தைச் சேர்க்கவும்',
   'pos.search.placeholder': 'மருந்து, பொதுப்பெயர், பிராண்ட் அல்லது வலிமை',
   'pos.search.action': 'தேடு',

@@ -302,7 +302,11 @@ infra('Task 0043 PostgreSQL POS transaction integrity and concurrency', () => {
         where: { tenantId, providerId, productId: fixture.productId, type: 'STOCK_OUT' },
       }),
       prisma.client.pharmacyInvoice.count({
-        where: { tenantId, providerId, sale: { lines: { some: { productId: fixture.productId } } } },
+        where: {
+          tenantId,
+          providerId,
+          sale: { lines: { some: { productId: fixture.productId } } },
+        },
       }),
     ]);
     expect(batch.onHandQuantity).toBe(4);
@@ -510,9 +514,7 @@ infra('Task 0043 PostgreSQL POS transaction integrity and concurrency', () => {
         isActive: true,
       },
     });
-    await expect(
-      service.getSale(actor, otherProviderId, randomUUID()),
-    ).rejects.toBeTruthy();
+    await expect(service.getSale(actor, otherProviderId, randomUUID())).rejects.toBeTruthy();
   });
 
   async function checkout(productId: string, quantity: number, key: string, amount: string) {

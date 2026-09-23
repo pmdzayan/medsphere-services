@@ -1593,7 +1593,6 @@ export class PosCheckoutService {
     return value;
   }
 
-
   private movementKey(idempotencyKey: string, lineId: string, batchId: string): string {
     return (
       'pos:' +
