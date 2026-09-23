@@ -1,7 +1,5 @@
 import { randomUUID } from 'node:crypto';
 
-import type { Prisma } from '@medsphere/database';
-
 import { AuditWriter } from '../audit/audit-writer.service';
 import { isInfrastructureTestEnabled, requireEnv } from '../auth/testing/infrastructure-test-gate';
 import { InventoryEventWriter } from '../inventory/inventory-event-writer';
