@@ -50,8 +50,9 @@ export function PosWorkspace() {
   const [fiscalLoading, setFiscalLoading] = useState(false);
   const [fiscalSaving, setFiscalSaving] = useState(false);
   const [fiscalError, setFiscalError] = useState<string | null>(null);
-  const [registrationType, setRegistrationType] =
-    useState<'GST_REGULAR' | 'GST_COMPOSITION' | 'UNREGISTERED'>('GST_REGULAR');
+  const [registrationType, setRegistrationType] = useState<
+    'GST_REGULAR' | 'GST_COMPOSITION' | 'UNREGISTERED'
+  >('GST_REGULAR');
   const [legalName, setLegalName] = useState('');
   const [gstin, setGstin] = useState('');
   const [stateCode, setStateCode] = useState('');
@@ -463,9 +464,7 @@ export function PosWorkspace() {
         <h1 className="mt-3 font-[var(--font-display)] text-3xl font-bold tracking-[-.045em] text-[#10271f] sm:text-[2.45rem]">
           {t('pos.title')}
         </h1>
-        <p className="mt-2 max-w-4xl text-sm leading-6 text-[#71817c]">
-          {t('pos.description')}
-        </p>
+        <p className="mt-2 max-w-4xl text-sm leading-6 text-[#71817c]">{t('pos.description')}</p>
       </header>
 
       <Card>
@@ -497,10 +496,7 @@ export function PosWorkspace() {
 
       {!bootLoading && providerId && !canRead ? (
         <Card>
-          <EmptyState
-            title={t('pos.accessTitle')}
-            description={t('pos.accessDetail')}
-          />
+          <EmptyState title={t('pos.accessTitle')} description={t('pos.accessDetail')} />
         </Card>
       ) : null}
 
@@ -512,7 +508,9 @@ export function PosWorkspace() {
                 <h2 className="text-lg font-bold text-[#173128]">{t('pos.fiscal.title')}</h2>
                 <p className="mt-1 text-sm text-[#60736c]">{t('pos.fiscal.help')}</p>
               </div>
-              {fiscalProfile ? <Badge tone="emerald">{fiscalProfile.registrationType}</Badge> : null}
+              {fiscalProfile ? (
+                <Badge tone="emerald">{fiscalProfile.registrationType}</Badge>
+              ) : null}
             </div>
 
             {fiscalLoading ? (
@@ -528,10 +526,7 @@ export function PosWorkspace() {
                     disabled={!canConfigure || fiscalSaving}
                     onChange={(event) =>
                       setRegistrationType(
-                        event.target.value as
-                          | 'GST_REGULAR'
-                          | 'GST_COMPOSITION'
-                          | 'UNREGISTERED',
+                        event.target.value as 'GST_REGULAR' | 'GST_COMPOSITION' | 'UNREGISTERED',
                       )
                     }
                     className="organization-theme-focus h-[3.15rem] w-full rounded-xl border border-ink-900/[.11] bg-canvas-50 px-3 text-sm"
@@ -593,7 +588,9 @@ export function PosWorkspace() {
                       type="submit"
                       loading={fiscalSaving}
                       loadingLabel={t('pos.fiscal.saving')}
-                      disabled={!legalName.trim() || !/^\d{2}$/.test(stateCode) || !invoiceSeries.trim()}
+                      disabled={
+                        !legalName.trim() || !/^\d{2}$/.test(stateCode) || !invoiceSeries.trim()
+                      }
                     >
                       {t('pos.fiscal.save')}
                     </Button>
@@ -711,8 +708,14 @@ export function PosWorkspace() {
 
                         {linePreview ? (
                           <dl className="mt-4 grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
-                            <Metric label={t('pos.receipt.discount')} value={linePreview.money.discountAmount} />
-                            <Metric label={t('pos.receipt.taxable')} value={linePreview.money.taxableValue} />
+                            <Metric
+                              label={t('pos.receipt.discount')}
+                              value={linePreview.money.discountAmount}
+                            />
+                            <Metric
+                              label={t('pos.receipt.taxable')}
+                              value={linePreview.money.taxableValue}
+                            />
                             <Metric
                               label={
                                 Number(linePreview.money.igstAmount) > 0
@@ -725,7 +728,10 @@ export function PosWorkspace() {
                                   : linePreview.money.cgstAmount
                               }
                             />
-                            <Metric label={t('pos.receipt.total')} value={linePreview.money.lineTotal} />
+                            <Metric
+                              label={t('pos.receipt.total')}
+                              value={linePreview.money.lineTotal}
+                            />
                           </dl>
                         ) : null}
 
@@ -977,7 +983,9 @@ export function PosWorkspace() {
                     {receipt.lines.map((line) => (
                       <tr key={line.lineNumber}>
                         <td className="px-4 py-3">
-                          <span className="font-bold text-[#173128]">{line.productNameSnapshot}</span>
+                          <span className="font-bold text-[#173128]">
+                            {line.productNameSnapshot}
+                          </span>
                           <span className="mt-1 block text-xs text-[#71817c]">
                             {line.hsnCodeSnapshot} · {line.uqcSnapshot}
                           </span>
@@ -1071,7 +1079,11 @@ function Metric({
   return (
     <div>
       <dt className="text-[10px] font-bold uppercase tracking-wide text-[#71817c]">{label}</dt>
-      <dd className={strong ? 'mt-1 text-base font-black text-[#10271f]' : 'mt-1 font-bold text-[#29483f]'}>
+      <dd
+        className={
+          strong ? 'mt-1 text-base font-black text-[#10271f]' : 'mt-1 font-bold text-[#29483f]'
+        }
+      >
         ₹{value}
       </dd>
     </div>
