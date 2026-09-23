@@ -60,6 +60,10 @@ export const AUDIT_EVENT_TYPES = [
   'inventory.stock.damaged',
   'inventory.batch.expired',
   'inventory.batch.quarantined',
+  'inventory.batch.recalled',
+  'inventory.exception.requested',
+  'inventory.exception.approved',
+  'inventory.exception.rejected',
   'inventory.reservation.created',
   'inventory.reservation.confirmed',
   'inventory.reservation.ready',
@@ -75,6 +79,7 @@ export const AUDIT_EVENT_TYPES = [
   'billing.pos.sale.completed',
   'billing.pos.invoice.reprinted',
   'billing.pos.sale.voided',
+  'billing.pos.return.completed',
   // Task 0039 (PROVISIONAL): pharmacy onboarding & verification closure.
   'pharmacy.verification.submitted',
   'pharmacy.verification.resubmitted',
@@ -165,6 +170,24 @@ export const AUDIT_METADATA_KEYS = {
     'releasedUnits',
     'resultingVersion',
   ],
+  'inventory.batch.recalled': [
+    'productId',
+    'reasonCode',
+    'onHandQuantity',
+    'affectedReservations',
+    'releasedUnits',
+    'resultingVersion',
+  ],
+  'inventory.exception.requested': ['providerId', 'action', 'quantity', 'requestedVersion'],
+  'inventory.exception.approved': [
+    'providerId',
+    'action',
+    'quantity',
+    'onHandBefore',
+    'onHandAfter',
+    'resultingVersion',
+  ],
+  'inventory.exception.rejected': ['providerId', 'action', 'quantity'],
   'inventory.reservation.created': ['itemCount', 'totalQuantity', 'expiresAt'],
   'inventory.reservation.confirmed': ['previousStatus', 'version'],
   'inventory.reservation.ready': ['previousStatus', 'version'],
@@ -198,6 +221,13 @@ export const AUDIT_METADATA_KEYS = {
   ],
   'billing.pos.invoice.reprinted': ['providerId', 'saleId', 'invoiceNumber'],
   'billing.pos.sale.voided': ['providerId', 'lineCount', 'totalQuantity', 'invoiceNumber'],
+  'billing.pos.return.completed': [
+    'providerId',
+    'saleId',
+    'lineCount',
+    'totalQuantity',
+    'refundTotal',
+  ],
   // Task 0039 (PROVISIONAL): no document/evidence content, license
   // numbers, government references, or reviewer notes are ever
   // included -- only bounded structural identifiers and status

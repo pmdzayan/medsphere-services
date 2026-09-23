@@ -18,6 +18,10 @@ export const PERMISSIONS = {
   inventoryStockTransfer: 'inventory.stock.transfer',
   inventoryStockDamage: 'inventory.stock.damage',
   inventoryBatchQuarantine: 'inventory.batch.quarantine',
+  /** Task 0044: inventory exception closure. */
+  inventoryBatchRecall: 'inventory.batch.recall',
+  inventoryExceptionRequest: 'inventory.exception.request',
+  inventoryExceptionApprove: 'inventory.exception.approve',
   inventoryReservationsRead: 'inventory.reservations.read',
   inventoryReservationsCreate: 'inventory.reservations.create',
   inventoryReservationsManage: 'inventory.reservations.manage',
@@ -31,6 +35,7 @@ export const PERMISSIONS = {
   billingPosCheckout: 'billing.pos.checkout',
   billingPosConfigure: 'billing.pos.configure',
   billingPosVoid: 'billing.pos.void',
+  billingPosReturn: 'billing.pos.return',
 } as const;
 
 export const PERMISSION_KEYS = Object.values(PERMISSIONS);
