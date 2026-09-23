@@ -141,8 +141,11 @@ infra('Task 0043 PostgreSQL POS transaction integrity and concurrency', () => {
         placeOfSupplyStateCode: '33',
       },
     });
-    expect(receipt.cgstTotal).not.toBe('0.00');
-    expect(receipt.sgstTotal).toBe(receipt.cgstTotal);
+    // Inclusive 5% GST on this fixture produces an odd ₹14.29 tax amount.
+    // Preserve every paise deterministically: CGST receives the lower half and
+    // SGST receives the one-paise remainder.
+    expect(receipt.cgstTotal).toBe('7.14');
+    expect(receipt.sgstTotal).toBe('7.15');
     expect(receipt.igstTotal).toBe('0.00');
 
     const batches = await prisma.client.batch.findMany({
