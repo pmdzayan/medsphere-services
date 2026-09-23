@@ -716,6 +716,8 @@ model TenantMembership {
   releasedComplianceLegalHolds    ComplianceLegalHold[]        @relation("ComplianceLegalHoldReleasedBy")
   requestedComplianceRequests     ComplianceSubjectRequest[]   @relation("ComplianceSubjectRequestRequestedBy")
   decidedComplianceRequests       ComplianceSubjectRequest[]   @relation("ComplianceSubjectRequestDecidedBy")
+  subjectComplianceLegalHolds      ComplianceLegalHold[]        @relation("ComplianceLegalHoldSubjectMembership")
+  subjectComplianceRequests        ComplianceSubjectRequest[]   @relation("ComplianceSubjectRequestSubjectMembership")
 
   @@unique([tenantId, userId])
   @@unique([id, tenantId])
@@ -822,8 +824,10 @@ model ComplianceLegalHold {
   tenantId String @db.Uuid
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
 
-  subjectUserId String @db.Uuid
-  subjectUser   User   @relation("ComplianceLegalHoldSubject", fields: [subjectUserId], references: [id], onDelete: Restrict)
+  subjectUserId       String           @db.Uuid
+  subjectUser         User             @relation("ComplianceLegalHoldSubject", fields: [subjectUserId], references: [id], onDelete: Restrict)
+  subjectMembershipId String           @db.Uuid
+  subjectMembership   TenantMembership @relation("ComplianceLegalHoldSubjectMembership", fields: [subjectMembershipId, subjectUserId, tenantId], references: [id, userId, tenantId], onDelete: Restrict)
 
   dataClass     ComplianceDataClass?
   reasonCode    ComplianceLegalHoldReason
@@ -857,8 +861,10 @@ model ComplianceSubjectRequest {
   tenantId String @db.Uuid
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
 
-  subjectUserId String @db.Uuid
-  subjectUser   User   @relation("ComplianceSubjectRequestSubject", fields: [subjectUserId], references: [id], onDelete: Restrict)
+  subjectUserId       String           @db.Uuid
+  subjectUser         User             @relation("ComplianceSubjectRequestSubject", fields: [subjectUserId], references: [id], onDelete: Restrict)
+  subjectMembershipId String           @db.Uuid
+  subjectMembership   TenantMembership @relation("ComplianceSubjectRequestSubjectMembership", fields: [subjectMembershipId, subjectUserId, tenantId], references: [id, userId, tenantId], onDelete: Restrict)
 
   dataClass ComplianceDataClass?
   action    ComplianceSubjectRequestAction
