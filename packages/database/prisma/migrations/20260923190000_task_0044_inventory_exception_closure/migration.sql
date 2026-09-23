@@ -10,12 +10,6 @@ CREATE TYPE "InventoryExceptionAction" AS ENUM ('QUARANTINE_RELEASE', 'DISPOSAL'
 -- CreateEnum
 CREATE TYPE "InventoryExceptionDecisionOutcome" AS ENUM ('APPROVED', 'REJECTED');
 
--- AlterEnum
-ALTER TYPE "BatchStatus" ADD VALUE 'RECALLED';
-
--- AlterEnum
-ALTER TYPE "StockMovementType" ADD VALUE 'DISPOSAL';
-
 -- CreateTable
 CREATE TABLE "PharmacySaleReturn" (
     "id" UUID NOT NULL,
