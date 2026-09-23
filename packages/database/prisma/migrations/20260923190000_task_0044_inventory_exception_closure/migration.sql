@@ -716,3 +716,35 @@ ALTER TABLE "AuditEvent"
     'billing.pos.sale.voided',
     'billing.pos.return.completed'
   ));
+
+
+-- Task 0044 recall cancellations are exact-user actions. Preserve the prior
+-- quarantine SYSTEM cause while allowing the new recall cause only for an
+-- authenticated tenant user with exact membership+user attribution.
+ALTER TABLE "AuditEvent"
+  DROP CONSTRAINT IF EXISTS "AuditEvent_reservation_quarantine_cause_check";
+
+ALTER TABLE "AuditEvent"
+  ADD CONSTRAINT "AuditEvent_reservation_unavailability_cause_check" CHECK (
+    "eventType" <> 'inventory.reservation.cancelled'
+    OR NOT ("metadata" ? 'cause')
+    OR (
+      (
+        "metadata"->>'cause' = 'BATCH_QUARANTINE'
+        AND "scope" = 'TENANT'
+        AND "actorType" = 'SYSTEM'
+        AND "actorMembershipId" IS NULL
+        AND "actorUserId" IS NULL
+        AND "platformActorUserId" IS NULL
+      )
+      OR
+      (
+        "metadata"->>'cause' = 'BATCH_RECALL'
+        AND "scope" = 'TENANT'
+        AND "actorType" = 'TENANT_USER'
+        AND "actorMembershipId" IS NOT NULL
+        AND "actorUserId" IS NOT NULL
+        AND "platformActorUserId" IS NULL
+      )
+    )
+  );
