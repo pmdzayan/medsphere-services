@@ -15,9 +15,11 @@ import { ACCESS_COOKIE } from '@/lib/session-profile';
 type Context = { params: Promise<{ providerId: string }> };
 
 export async function POST(request: NextRequest, context: Context): Promise<NextResponse> {
-  if (!isSameOriginMutation(request)) return privateNoStore({ message: 'Cross-origin request rejected.' }, 403);
+  if (!isSameOriginMutation(request))
+    return privateNoStore({ message: 'Cross-origin request rejected.' }, 403);
   const { providerId } = await context.params;
-  if (!isCanonicalUuid(providerId)) return privateNoStore({ message: 'A valid provider identifier is required.' }, 400);
+  if (!isCanonicalUuid(providerId))
+    return privateNoStore({ message: 'A valid provider identifier is required.' }, 400);
   const token = request.cookies.get(ACCESS_COOKIE)?.value;
   if (!token) return privateNoStore({ message: 'Your session has expired. Sign in again.' }, 401);
 
@@ -40,14 +42,22 @@ export async function POST(request: NextRequest, context: Context): Promise<Next
     );
     if (!upstream.ok) {
       return privateNoStore(
-        { message: await boundedUpstreamMessage(upstream, 'Unable to request inventory disposition.') },
+        {
+          message: await boundedUpstreamMessage(
+            upstream,
+            'Unable to request inventory disposition.',
+          ),
+        },
         mutationStatus(upstream.status),
       );
     }
     const payload: unknown = await upstream.json();
     return isInventoryExceptionRequestResponse(payload) && payload.providerId === providerId
       ? privateNoStore(payload, 200)
-      : privateNoStore({ message: 'Inventory service returned an invalid exception request receipt.' }, 502);
+      : privateNoStore(
+          { message: 'Inventory service returned an invalid exception request receipt.' },
+          502,
+        );
   } catch {
     return privateNoStore({ message: 'Inventory service is unavailable.' }, 503);
   }

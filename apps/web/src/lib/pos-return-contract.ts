@@ -55,7 +55,11 @@ export function isPosReturnRequest(value: unknown): value is PosReturnRequest {
     'refundMethod',
   ];
   if (!keys.every((key) => allowed.includes(key))) return false;
-  if (!['idempotencyKey', 'lines', 'reason', 'reasonCode', 'refundMethod'].every((key) => keys.includes(key))) {
+  if (
+    !['idempotencyKey', 'lines', 'reason', 'reasonCode', 'refundMethod'].every((key) =>
+      keys.includes(key),
+    )
+  ) {
     return false;
   }
   return (
@@ -131,7 +135,12 @@ export function isPosReturnReceipt(value: unknown): value is PosReturnReceipt {
 }
 
 function trimmed(value: unknown, min: number, max: number): value is string {
-  return typeof value === 'string' && value === value.trim() && value.length >= min && value.length <= max;
+  return (
+    typeof value === 'string' &&
+    value === value.trim() &&
+    value.length >= min &&
+    value.length <= max
+  );
 }
 function integer(value: unknown, min: number, max: number): value is number {
   return Number.isSafeInteger(value) && Number(value) >= min && Number(value) <= max;

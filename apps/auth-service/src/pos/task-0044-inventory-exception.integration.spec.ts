@@ -369,7 +369,13 @@ infra('Task 0044 PostgreSQL return, recall and disposition integrity', () => {
           batchId: fixture.batchId,
           referenceType: 'inventory.exception.disposal',
         },
-        select: { type: true, delta: true, onHandBefore: true, onHandAfter: true, actorMembershipId: true },
+        select: {
+          type: true,
+          delta: true,
+          onHandBefore: true,
+          onHandAfter: true,
+          actorMembershipId: true,
+        },
       }),
       prisma.client.inventoryExceptionDecision.findUniqueOrThrow({
         where: { requestId: request.requestId },

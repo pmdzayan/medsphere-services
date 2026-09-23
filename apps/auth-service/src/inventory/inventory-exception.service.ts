@@ -154,7 +154,9 @@ export class InventoryExceptionService {
                 reservation.status as (typeof ACTIVE_RESERVATION_STATUSES)[number],
               )
             ) {
-              throw new SerializableRetryError('Concurrent reservation terminal transition detected');
+              throw new SerializableRetryError(
+                'Concurrent reservation terminal transition detected',
+              );
             }
             if (reservation.allocations.some(({ status }) => status !== 'HELD')) {
               throw new ConflictException('Active reservation contains a non-held allocation');
@@ -195,8 +197,7 @@ export class InventoryExceptionService {
               throw new SerializableRetryError('Concurrent reservation recall detected');
             }
 
-            const reservationIdempotencyKey =
-              `batch-recall:${batch.id}:${reservation.id}:${reservation.version}`;
+            const reservationIdempotencyKey = `batch-recall:${batch.id}:${reservation.id}:${reservation.version}`;
             const reservationCommandHash = createHash('sha256')
               .update(
                 JSON.stringify({
@@ -470,7 +471,9 @@ export class InventoryExceptionService {
             select: { id: true },
           });
           if (pending) {
-            throw new ConflictException('A matching inventory exception request is already pending');
+            throw new ConflictException(
+              'A matching inventory exception request is already pending',
+            );
           }
 
           const requestId = randomUUID();
@@ -611,7 +614,8 @@ export class InventoryExceptionService {
             },
           });
           if (!request) throw new NotFoundException('Inventory exception request not found');
-          if (request.decision) throw new ConflictException('Inventory exception request is decided');
+          if (request.decision)
+            throw new ConflictException('Inventory exception request is decided');
           if (
             request.requestedByMembershipId === command.actor.membershipId ||
             request.requestedByUserId === command.actor.userId
@@ -862,7 +866,9 @@ export class InventoryExceptionService {
       quantity < 1 ||
       quantity > MAX_DATABASE_INTEGER
     ) {
-      throw new BadRequestException('Disposition quantity must be a positive database-safe integer');
+      throw new BadRequestException(
+        'Disposition quantity must be a positive database-safe integer',
+      );
     }
     if (!['QUARANTINED', 'RECALLED', 'EXPIRED'].includes(batch.status)) {
       throw new ConflictException(
@@ -1133,7 +1139,5 @@ function safeAdd(left: number, right: number, message: string): number {
 }
 
 function movementKey(idempotencyKey: string, requestId: string): string {
-  return `exception:${createHash('sha256')
-    .update(`${idempotencyKey}:${requestId}`)
-    .digest('hex')}`;
+  return `exception:${createHash('sha256').update(`${idempotencyKey}:${requestId}`).digest('hex')}`;
 }

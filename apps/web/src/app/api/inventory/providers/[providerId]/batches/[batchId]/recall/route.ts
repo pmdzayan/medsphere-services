@@ -12,7 +12,8 @@ import { ACCESS_COOKIE } from '@/lib/session-profile';
 type Context = { params: Promise<{ providerId: string; batchId: string }> };
 
 export async function POST(request: NextRequest, context: Context): Promise<NextResponse> {
-  if (!isSameOriginMutation(request)) return privateNoStore({ message: 'Cross-origin request rejected.' }, 403);
+  if (!isSameOriginMutation(request))
+    return privateNoStore({ message: 'Cross-origin request rejected.' }, 403);
   const { providerId, batchId } = await context.params;
   if (!isCanonicalUuid(providerId) || !isCanonicalUuid(batchId)) {
     return privateNoStore({ message: 'Valid provider and batch identifiers are required.' }, 400);
@@ -26,7 +27,8 @@ export async function POST(request: NextRequest, context: Context): Promise<Next
   } catch {
     return privateNoStore({ message: 'A valid recall command is required.' }, 400);
   }
-  if (!isRecallBatchRequest(command)) return privateNoStore({ message: 'A valid recall command is required.' }, 400);
+  if (!isRecallBatchRequest(command))
+    return privateNoStore({ message: 'A valid recall command is required.' }, 400);
 
   try {
     const headers = upstreamHeaders(request, token);

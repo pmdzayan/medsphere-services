@@ -98,7 +98,8 @@ export const task0044TamilMessages = {
   'task0044.inventory.requestSubmit': 'அனுமதி கோரிக்கையை உருவாக்கு',
   'task0044.inventory.requestSubmitting': 'உருவாக்குகிறது…',
   'task0044.inventory.decisionTitle': 'இரண்டாம் நபர் அனுமதி',
-  'task0044.inventory.decisionHelp': 'அனுமதிப்பவர் கோரிக்கை செய்த நபரிலிருந்து வேறுபட்டவராக இருக்க வேண்டும்.',
+  'task0044.inventory.decisionHelp':
+    'அனுமதிப்பவர் கோரிக்கை செய்த நபரிலிருந்து வேறுபட்டவராக இருக்க வேண்டும்.',
   'task0044.inventory.requestId': 'கோரிக்கை ID',
   'task0044.inventory.outcome': 'முடிவு',
   'task0044.inventory.approve': 'அனுமதி',
@@ -172,7 +173,8 @@ export const task0044UrduMessages = {
   'task0044.inventory.requestSubmit': 'منظوری درخواست بنائیں',
   'task0044.inventory.requestSubmitting': 'بن رہی ہے…',
   'task0044.inventory.decisionTitle': 'دوسرے فرد کی منظوری',
-  'task0044.inventory.decisionHelp': 'منظوری دینے والا آپریٹر درخواست بنانے والے سے مختلف ہونا چاہیے۔',
+  'task0044.inventory.decisionHelp':
+    'منظوری دینے والا آپریٹر درخواست بنانے والے سے مختلف ہونا چاہیے۔',
   'task0044.inventory.requestId': 'درخواست ID',
   'task0044.inventory.outcome': 'فیصلہ',
   'task0044.inventory.approve': 'منظور',

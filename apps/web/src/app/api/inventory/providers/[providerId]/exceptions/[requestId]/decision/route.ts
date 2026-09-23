@@ -15,7 +15,8 @@ import { ACCESS_COOKIE } from '@/lib/session-profile';
 type Context = { params: Promise<{ providerId: string; requestId: string }> };
 
 export async function POST(request: NextRequest, context: Context): Promise<NextResponse> {
-  if (!isSameOriginMutation(request)) return privateNoStore({ message: 'Cross-origin request rejected.' }, 403);
+  if (!isSameOriginMutation(request))
+    return privateNoStore({ message: 'Cross-origin request rejected.' }, 403);
   const { providerId, requestId } = await context.params;
   if (!isCanonicalUuid(providerId) || !isCanonicalUuid(requestId)) {
     return privateNoStore({ message: 'Valid provider and request identifiers are required.' }, 400);
@@ -44,7 +45,12 @@ export async function POST(request: NextRequest, context: Context): Promise<Next
     );
     if (!upstream.ok) {
       return privateNoStore(
-        { message: await boundedUpstreamMessage(upstream, 'Unable to decide inventory disposition.') },
+        {
+          message: await boundedUpstreamMessage(
+            upstream,
+            'Unable to decide inventory disposition.',
+          ),
+        },
         mutationStatus(upstream.status),
       );
     }

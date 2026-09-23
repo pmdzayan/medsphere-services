@@ -223,7 +223,9 @@ export class InventoryController {
   @ApiOperation({ summary: 'Approve or reject an inventory exception using a different actor' })
   @ApiOkResponse({ type: InventoryExceptionDecisionResponseDto })
   @ApiNotFoundResponse({ description: 'Inventory exception request not found' })
-  @ApiConflictResponse({ description: 'Actor separation, stale state, stock, or idempotency conflict' })
+  @ApiConflictResponse({
+    description: 'Actor separation, stale state, stock, or idempotency conflict',
+  })
   decideInventoryException(
     @CurrentIdentity() identity: AuthenticatedIdentity,
     @Param('providerId', new ParseUUIDPipe({ version: '4' })) providerId: string,

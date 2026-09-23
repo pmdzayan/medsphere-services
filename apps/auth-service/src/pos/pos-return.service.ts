@@ -672,7 +672,11 @@ function decimalTotals(values: {
 
 function safeAdd(left: number, right: number, message: string): number {
   const result = left + right;
-  if (!Number.isSafeInteger(left) || !Number.isSafeInteger(right) || !Number.isSafeInteger(result)) {
+  if (
+    !Number.isSafeInteger(left) ||
+    !Number.isSafeInteger(right) ||
+    !Number.isSafeInteger(result)
+  ) {
     throw new ConflictException(message);
   }
   if (result > MAX_DATABASE_INTEGER) throw new ConflictException(message);

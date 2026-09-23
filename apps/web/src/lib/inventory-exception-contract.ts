@@ -242,7 +242,9 @@ export function isInventoryExceptionDecisionResponse(
     integer(v.onHandBefore, 0, 2_147_483_647) &&
     integer(v.onHandAfter, 0, 2_147_483_647) &&
     integer(v.resultingBatchVersion, 1, 2_147_483_647) &&
-    (v.action === 'QUARANTINE_RELEASE' ? v.movementId === null && v.onHandBefore === v.onHandAfter : isCanonicalUuid(v.movementId))
+    (v.action === 'QUARANTINE_RELEASE'
+      ? v.movementId === null && v.onHandBefore === v.onHandAfter
+      : isCanonicalUuid(v.movementId))
   );
 }
 
