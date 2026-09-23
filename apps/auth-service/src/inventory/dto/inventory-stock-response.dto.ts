@@ -13,8 +13,8 @@ export class InventoryBatchStockResponseDto {
   @ApiPropertyOptional({ format: 'date-time' })
   manufacturingDate!: Date | null;
 
-  @ApiProperty({ enum: ['ACTIVE', 'EXPIRED', 'EXHAUSTED', 'QUARANTINED'] })
-  status!: 'ACTIVE' | 'EXPIRED' | 'EXHAUSTED' | 'QUARANTINED';
+  @ApiProperty({ enum: ['ACTIVE', 'EXPIRED', 'EXHAUSTED', 'QUARANTINED', 'RECALLED'] })
+  status!: 'ACTIVE' | 'EXPIRED' | 'EXHAUSTED' | 'QUARANTINED' | 'RECALLED';
 
   @ApiProperty({ minimum: 1, description: 'Optimistic concurrency token for batch commands' })
   version!: number;
