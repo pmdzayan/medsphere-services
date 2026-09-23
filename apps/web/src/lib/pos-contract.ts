@@ -507,11 +507,9 @@ export function isPosSaleReceipt(value: unknown): value is PosSaleReceipt {
 }
 
 function isLine(value: unknown): value is PosCheckoutRequest['lines'][number] {
-  return (
-    hasExactKeys(value, ['productId', 'quantity']) &&
-    isCanonicalUuid((value as any).productId) &&
-    integer((value as any).quantity, 1, 2147483647)
-  );
+  if (!hasExactKeys(value, ['productId', 'quantity'])) return false;
+  const v = value as PosCheckoutRequest['lines'][number];
+  return isCanonicalUuid(v.productId) && integer(v.quantity, 1, 2147483647);
 }
 function isPayment(value: unknown): value is PosCheckoutRequest['payments'][number] {
   if (
@@ -519,7 +517,7 @@ function isPayment(value: unknown): value is PosCheckoutRequest['payments'][numb
     !requiredKeys(value, ['method', 'amount'])
   )
     return false;
-  const v = value as any;
+  const v = value as PosCheckoutRequest['payments'][number];
   return (
     ['CASH', 'CARD', 'UPI', 'OTHER'].includes(v.method) &&
     money(v.amount) &&
@@ -539,7 +537,7 @@ function isFiscalProfile(value: unknown): boolean {
     ])
   )
     return false;
-  const v = value as any;
+  const v = value as NonNullable<PosFiscalProfileResponse['fiscalProfile']>;
   return (
     ['GST_REGULAR', 'GST_COMPOSITION', 'UNREGISTERED'].includes(v.registrationType) &&
     trimmed(v.legalName, 1, 200) &&
@@ -552,7 +550,7 @@ function isFiscalProfile(value: unknown): boolean {
 }
 function isInventoryFiscalProfile(value: unknown): boolean {
   if (!hasExactKeys(value, ['hsnCode', 'uqc', 'cessPercentage', 'version'])) return false;
-  const v = value as any;
+  const v = value as NonNullable<PosProductQuote['fiscalProfile']>;
   return (
     HSN.test(v.hsnCode) &&
     UQC.test(v.uqc) &&
@@ -588,7 +586,7 @@ function isReceiptLine(value: unknown): boolean {
     ])
   )
     return false;
-  const v = value as any;
+  const v = value as PosSaleReceipt['lines'][number];
   return (
     integer(v.lineNumber, 1, 100) &&
     isCanonicalUuid(v.productId) &&
@@ -615,11 +613,12 @@ function isReceiptLine(value: unknown): boolean {
   );
 }
 function isReceiptPayment(value: unknown): boolean {
+  if (!hasExactKeys(value, ['method', 'amount', 'externalReference'])) return false;
+  const v = value as PosSaleReceipt['payments'][number];
   return (
-    hasExactKeys(value, ['method', 'amount', 'externalReference']) &&
-    ['CASH', 'CARD', 'UPI', 'OTHER'].includes((value as any).method) &&
-    money((value as any).amount) &&
-    ((value as any).externalReference === null || trimmed((value as any).externalReference, 1, 80))
+    ['CASH', 'CARD', 'UPI', 'OTHER'].includes(v.method) &&
+    money(v.amount) &&
+    (v.externalReference === null || trimmed(v.externalReference, 1, 80))
   );
 }
 function isInvoice(value: unknown): boolean {
@@ -650,7 +649,7 @@ function isInvoice(value: unknown): boolean {
     ])
   )
     return false;
-  const v = value as any;
+  const v = value as PosSaleReceipt['invoice'];
   return (
     isCanonicalUuid(v.id) &&
     ['TAX_INVOICE', 'BILL_OF_SUPPLY', 'COMMERCIAL_RECEIPT'].includes(v.documentType) &&
@@ -677,11 +676,9 @@ function isInvoice(value: unknown): boolean {
   );
 }
 function isVoidRecord(value: unknown): boolean {
-  return (
-    hasExactKeys(value, ['reason', 'occurredAt']) &&
-    trimmed((value as any).reason, 1, 500) &&
-    iso((value as any).occurredAt)
-  );
+  if (!hasExactKeys(value, ['reason', 'occurredAt'])) return false;
+  const v = value as NonNullable<PosSaleReceipt['voidRecord']>;
+  return trimmed(v.reason, 1, 500) && iso(v.occurredAt);
 }
 function hasExactKeys(value: unknown, keys: readonly string[]): value is Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
