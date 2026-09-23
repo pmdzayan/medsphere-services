@@ -2069,6 +2069,7 @@ model PharmacySaleReturnAllocation {
   createdAt DateTime @default(now())
 
   @@unique([returnLineId, saleAllocationId])
+  @@unique([stockMovementId, tenantId, inventoryId, batchId, providerId, productId], map: "PharmacySaleReturnAllocation_movement_scope_key")
   @@index([tenantId, providerId, batchId])
 }
 
@@ -2169,7 +2170,7 @@ model InventoryExceptionDecision {
 
   decidedByMembershipId String @db.Uuid
   decidedByUserId       String @db.Uuid
-  decidedBy TenantMembership @relation(fields: [decidedByMembershipId, decidedByUserId, tenantId], references: [id, userId, tenantId], onDelete: Restrict, map: "InventoryExceptionDecision_actorMembership_actorUser_tenant_fkey")
+  decidedBy TenantMembership @relation(fields: [decidedByMembershipId, decidedByUserId, tenantId], references: [id, userId, tenantId], onDelete: Restrict, map: "InventoryExceptionDecision_actor_scope_fkey")
 
   outcome InventoryExceptionDecisionOutcome
   reason  String @db.VarChar(500)
@@ -2187,6 +2188,7 @@ model InventoryExceptionDecision {
   createdAt      DateTime @default(now())
 
   @@unique([tenantId, idempotencyKey])
+  @@unique([requestId, tenantId, providerId, batchId], map: "InventoryExceptionDecision_request_scope_key")
   @@index([tenantId, providerId, occurredAt(sort: Desc), id(sort: Desc)])
 }
 
