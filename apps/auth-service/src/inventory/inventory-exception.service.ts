@@ -513,6 +513,19 @@ export class InventoryExceptionService {
               requestedVersion: batch.version,
             },
           });
+          await this.events.appendTenantUser(transaction, command.actor, {
+            eventType: 'inventory.exception.requested',
+            aggregateType: 'InventoryExceptionRequest',
+            aggregateId: requestId,
+            occurredAt: requestedAt,
+            payload: {
+              providerId: command.providerId,
+              batchId: batch.id,
+              action: command.action,
+              quantity: command.quantity ?? 0,
+              requestedVersion: batch.version,
+            },
+          });
 
           return {
             requestId,
