@@ -45,6 +45,14 @@ import {
 } from './inventory-contract';
 import type { InventoryAnalyticsResponse } from './inventory-analytics-contract';
 import type {
+  BatchRecallResponse,
+  InventoryExceptionDecisionRequest,
+  InventoryExceptionDecisionResponse,
+  InventoryExceptionRequest,
+  InventoryExceptionRequestResponse,
+  RecallBatchRequest,
+} from './inventory-exception-contract';
+import type {
   ApplyInventoryImportRequest,
   InventoryCatalogResponse,
   InventoryImportApplyReceipt,
@@ -101,6 +109,7 @@ import type {
   PosSaleReceipt,
   PosVoidRequest,
 } from './pos-contract';
+import type { PosReturnReceipt, PosReturnRequest } from './pos-return-contract';
 
 export class ApiError extends Error {
   constructor(
@@ -461,6 +470,50 @@ export async function quarantineBatch(
 ): Promise<BatchQuarantineResponse> {
   return requestJson<BatchQuarantineResponse>(
     `/api/inventory/providers/${encodeURIComponent(providerId)}/batches/${encodeURIComponent(batchId)}/quarantine`,
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(request),
+    },
+  );
+}
+
+export async function recallInventoryBatch(
+  providerId: string,
+  batchId: string,
+  request: RecallBatchRequest,
+): Promise<BatchRecallResponse> {
+  return requestJson<BatchRecallResponse>(
+    `/api/inventory/providers/${encodeURIComponent(providerId)}/batches/${encodeURIComponent(batchId)}/recall`,
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(request),
+    },
+  );
+}
+
+export async function requestInventoryException(
+  providerId: string,
+  request: InventoryExceptionRequest,
+): Promise<InventoryExceptionRequestResponse> {
+  return requestJson<InventoryExceptionRequestResponse>(
+    `/api/inventory/providers/${encodeURIComponent(providerId)}/exceptions`,
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(request),
+    },
+  );
+}
+
+export async function decideInventoryException(
+  providerId: string,
+  requestId: string,
+  request: InventoryExceptionDecisionRequest,
+): Promise<InventoryExceptionDecisionResponse> {
+  return requestJson<InventoryExceptionDecisionResponse>(
+    `/api/inventory/providers/${encodeURIComponent(providerId)}/exceptions/${encodeURIComponent(requestId)}/decision`,
     {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -870,6 +923,25 @@ export async function voidPosSale(
       '/sales/' +
       encodeURIComponent(saleId) +
       '/void',
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(request),
+    },
+  );
+}
+
+export async function returnPosSale(
+  providerId: string,
+  saleId: string,
+  request: PosReturnRequest,
+): Promise<PosReturnReceipt> {
+  return requestJson<PosReturnReceipt>(
+    '/api/pos/providers/' +
+      encodeURIComponent(providerId) +
+      '/sales/' +
+      encodeURIComponent(saleId) +
+      '/returns',
     {
       method: 'POST',
       headers: { 'content-type': 'application/json' },

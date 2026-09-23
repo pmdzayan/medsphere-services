@@ -11,8 +11,8 @@ export class InventoryQuarantineEvidenceItemDto {
   @ApiProperty() brand!: string;
   @ApiPropertyOptional() sku!: string | null;
   @ApiProperty() batchNumber!: string;
-  @ApiProperty({ enum: ['ACTIVE', 'EXPIRED', 'EXHAUSTED', 'QUARANTINED'] })
-  currentStatus!: 'ACTIVE' | 'EXPIRED' | 'EXHAUSTED' | 'QUARANTINED';
+  @ApiProperty({ enum: ['ACTIVE', 'EXPIRED', 'EXHAUSTED', 'QUARANTINED', 'RECALLED'] })
+  currentStatus!: 'ACTIVE' | 'EXPIRED' | 'EXHAUSTED' | 'QUARANTINED' | 'RECALLED';
   @ApiProperty({
     enum: [
       'QUALITY_SUSPECT',

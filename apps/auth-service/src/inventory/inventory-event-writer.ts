@@ -12,6 +12,10 @@ export const INVENTORY_DOMAIN_EVENT_TYPES = [
   'inventory.reservation.expired',
   'inventory.batch.expired',
   'inventory.batch.quarantined',
+  'inventory.batch.recalled',
+  'inventory.exception.requested',
+  'inventory.exception.approved',
+  'inventory.exception.rejected',
   'inventory.stock.damaged',
   'inventory.stock.transferred',
   'inventory.availability.request.created',
@@ -23,7 +27,11 @@ export type InventoryDomainEventType = (typeof INVENTORY_DOMAIN_EVENT_TYPES)[num
 interface InventoryDomainEventInput {
   readonly eventType: InventoryDomainEventType;
   readonly aggregateType:
-    'MedicineReservation' | 'Batch' | 'InventoryTransfer' | 'AvailabilityRequest';
+    | 'MedicineReservation'
+    | 'Batch'
+    | 'InventoryTransfer'
+    | 'AvailabilityRequest'
+    | 'InventoryExceptionRequest';
   readonly aggregateId: string;
   readonly occurredAt: Date;
   readonly payload: Prisma.InputJsonObject;

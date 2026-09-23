@@ -57,6 +57,7 @@ describe('InventoryController availability-request-demand - Task 0028', () => {
       {} as never,
       {} as never,
       {} as never,
+      {} as never,
       { readDemand } as never,
       {} as never,
     );

@@ -1404,6 +1404,7 @@ export class PosCheckoutService {
         lines: {
           orderBy: { lineNumber: 'asc' },
           select: {
+            id: true,
             lineNumber: true,
             productId: true,
             quantity: true,
@@ -1486,8 +1487,9 @@ export class PosCheckoutService {
       recipientGstin: sale.recipientGstin,
       completedAt: sale.completedAt.toISOString(),
       voidedAt: sale.voidedAt?.toISOString() ?? null,
-      lines: sale.lines.map((line) => ({
+      lines: sale.lines.map(({ id, ...line }) => ({
         ...line,
+        saleLineId: id,
         unitPrice: this.formatStoredMoney(line.unitPrice),
         mrp: this.formatStoredMoney(line.mrp),
         grossValue: this.formatStoredMoney(line.grossValue),

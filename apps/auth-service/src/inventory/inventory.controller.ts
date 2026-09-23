@@ -60,6 +60,15 @@ import { InventoryDamageService } from './inventory-damage.service';
 import { QuarantineBatchDto } from './dto/inventory-quarantine.dto';
 import { BatchQuarantineResponseDto } from './dto/inventory-quarantine-response.dto';
 import { InventoryQuarantineService } from './inventory-quarantine.service';
+import {
+  BatchRecallResponseDto,
+  DecideInventoryExceptionDto,
+  InventoryExceptionDecisionResponseDto,
+  InventoryExceptionRequestResponseDto,
+  RecallBatchDto,
+  RequestInventoryExceptionDto,
+} from './dto/inventory-exception.dto';
+import { InventoryExceptionService } from './inventory-exception.service';
 import { CreateProviderReservationDto } from './dto/reservation-creation.dto';
 import { ProviderReservationCreationResponseDto } from './dto/reservation-creation-response.dto';
 import { ReservationCreationService } from './reservation-creation.service';
@@ -102,6 +111,7 @@ export class InventoryController {
     private readonly inventoryTransfers: InventoryTransferService,
     private readonly inventoryDamage: InventoryDamageService,
     private readonly inventoryQuarantine: InventoryQuarantineService,
+    private readonly inventoryExceptions: InventoryExceptionService,
     private readonly reservationCreation: ReservationCreationService,
     private readonly availabilityRequests: AvailabilityRequestService,
     private readonly availabilityRequestPreferences: AvailabilityRequestPreferenceService,
@@ -155,6 +165,78 @@ export class InventoryController {
       actor: identity,
       providerId,
       batchId,
+      ...dto,
+      request: extractRequestMetadata(request),
+    });
+  }
+
+  @Post('providers/:providerId/batches/:batchId/recall')
+  @HttpCode(HttpStatus.OK)
+  @Header('Cache-Control', 'private, no-store')
+  @RequirePermissions(PERMISSIONS.inventoryBatchRecall)
+  @ApiOperation({ summary: 'Recall a batch and immediately remove it from saleable availability' })
+  @ApiOkResponse({ type: BatchRecallResponseDto })
+  @ApiNotFoundResponse({ description: 'Assigned provider batch not found' })
+  @ApiConflictResponse({ description: 'State, version, reservation, or idempotency conflict' })
+  recallBatch(
+    @CurrentIdentity() identity: AuthenticatedIdentity,
+    @Param('providerId', new ParseUUIDPipe({ version: '4' })) providerId: string,
+    @Param('batchId', new ParseUUIDPipe({ version: '4' })) batchId: string,
+    @Body() dto: RecallBatchDto,
+    @Req() request: MetadataHttpRequest,
+  ) {
+    return this.inventoryExceptions.recall({
+      actor: identity,
+      providerId,
+      batchId,
+      ...dto,
+      request: extractRequestMetadata(request),
+    });
+  }
+
+  @Post('providers/:providerId/exceptions')
+  @HttpCode(HttpStatus.OK)
+  @Header('Cache-Control', 'private, no-store')
+  @RequirePermissions(PERMISSIONS.inventoryExceptionRequest)
+  @ApiOperation({ summary: 'Request a two-person inventory exception disposition' })
+  @ApiOkResponse({ type: InventoryExceptionRequestResponseDto })
+  @ApiNotFoundResponse({ description: 'Assigned provider batch not found' })
+  @ApiConflictResponse({ description: 'State, version, quantity, or duplicate-pending conflict' })
+  requestInventoryException(
+    @CurrentIdentity() identity: AuthenticatedIdentity,
+    @Param('providerId', new ParseUUIDPipe({ version: '4' })) providerId: string,
+    @Body() dto: RequestInventoryExceptionDto,
+    @Req() request: MetadataHttpRequest,
+  ) {
+    return this.inventoryExceptions.request({
+      actor: identity,
+      providerId,
+      ...dto,
+      request: extractRequestMetadata(request),
+    });
+  }
+
+  @Post('providers/:providerId/exceptions/:requestId/decision')
+  @HttpCode(HttpStatus.OK)
+  @Header('Cache-Control', 'private, no-store')
+  @RequirePermissions(PERMISSIONS.inventoryExceptionApprove)
+  @ApiOperation({ summary: 'Approve or reject an inventory exception using a different actor' })
+  @ApiOkResponse({ type: InventoryExceptionDecisionResponseDto })
+  @ApiNotFoundResponse({ description: 'Inventory exception request not found' })
+  @ApiConflictResponse({
+    description: 'Actor separation, stale state, stock, or idempotency conflict',
+  })
+  decideInventoryException(
+    @CurrentIdentity() identity: AuthenticatedIdentity,
+    @Param('providerId', new ParseUUIDPipe({ version: '4' })) providerId: string,
+    @Param('requestId', new ParseUUIDPipe({ version: '4' })) requestId: string,
+    @Body() dto: DecideInventoryExceptionDto,
+    @Req() request: MetadataHttpRequest,
+  ) {
+    return this.inventoryExceptions.decide({
+      actor: identity,
+      providerId,
+      requestId,
       ...dto,
       request: extractRequestMetadata(request),
     });

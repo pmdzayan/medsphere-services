@@ -122,6 +122,7 @@ export interface PosSaleReceipt {
   completedAt: string;
   voidedAt: string | null;
   lines: Array<{
+    saleLineId: string;
     lineNumber: number;
     productId: string;
     quantity: number;
@@ -562,6 +563,7 @@ function isInventoryFiscalProfile(value: unknown): boolean {
 function isReceiptLine(value: unknown): boolean {
   if (
     !hasExactKeys(value, [
+      'saleLineId',
       'lineNumber',
       'productId',
       'quantity',
@@ -589,6 +591,7 @@ function isReceiptLine(value: unknown): boolean {
     return false;
   const v = value as PosSaleReceipt['lines'][number];
   return (
+    isCanonicalUuid(v.saleLineId) &&
     integer(v.lineNumber, 1, 100) &&
     isCanonicalUuid(v.productId) &&
     integer(v.quantity, 1, 2147483647) &&

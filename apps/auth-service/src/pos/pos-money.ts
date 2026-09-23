@@ -123,7 +123,7 @@ function divideRoundHalfUp(numerator: bigint, denominator: bigint): bigint {
   return (numerator + denominator / 2n) / denominator;
 }
 
-function formatPaise(value: bigint): string {
+export function formatPaise(value: bigint): string {
   if (value < 0n) throw new Error('POS money cannot be negative');
   const whole = value / 100n;
   const fraction = String(value % 100n).padStart(2, '0');

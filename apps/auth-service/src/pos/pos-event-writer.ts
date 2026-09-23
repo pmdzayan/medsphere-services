@@ -4,7 +4,10 @@ import { appendOutboxEvent, type OutboxDatabase, type Prisma } from '@medsphere/
 import type { PosActor } from './pos.types';
 
 export type PosDomainEventType =
-  'billing.pos.sale.completed' | 'billing.pos.invoice.reprinted' | 'billing.pos.sale.voided';
+  | 'billing.pos.sale.completed'
+  | 'billing.pos.invoice.reprinted'
+  | 'billing.pos.sale.voided'
+  | 'billing.pos.return.completed';
 
 @Injectable()
 export class PosEventWriter {
@@ -13,7 +16,7 @@ export class PosEventWriter {
     actor: PosActor,
     input: {
       readonly eventType: PosDomainEventType;
-      readonly aggregateType: 'PharmacySale' | 'PharmacyInvoice';
+      readonly aggregateType: 'PharmacySale' | 'PharmacyInvoice' | 'PharmacySaleReturn';
       readonly aggregateId: string;
       readonly occurredAt: Date;
       readonly payload: Prisma.InputJsonObject;

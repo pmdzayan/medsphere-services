@@ -10,7 +10,13 @@ import {
   Req,
   UseGuards,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiForbiddenResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiForbiddenResponse,
+  ApiOkResponse,
+  ApiOperation,
+  ApiTags,
+} from '@nestjs/swagger';
 import { PERMISSIONS } from '../authorization/permission.constants';
 import { PermissionsGuard } from '../authorization/permissions.guard';
 import { RequirePermissions } from '../authorization/require-permissions.decorator';
@@ -23,8 +29,10 @@ import {
   PharmacyCheckoutDto,
   VoidPharmacySaleDto,
 } from './dto/pos.dto';
+import { PharmacySaleReturnReceiptDto, ReturnPharmacySaleDto } from './dto/pos-return.dto';
 import { PosCheckoutService } from './pos-checkout.service';
 import { PosFiscalService } from './pos-fiscal.service';
+import { PosReturnService } from './pos-return.service';
 
 @Controller('pos/providers/:providerId')
 @ApiTags('Pharmacy POS')
@@ -35,6 +43,7 @@ export class PosController {
   constructor(
     private readonly fiscal: PosFiscalService,
     private readonly checkout: PosCheckoutService,
+    private readonly returns: PosReturnService,
   ) {}
 
   @Get('fiscal-profile')
@@ -141,6 +150,27 @@ export class PosController {
       actor: identity,
       providerId,
       saleId,
+      request: extractRequestMetadata(request),
+    });
+  }
+
+  @Post('sales/:saleId/returns')
+  @Header('Cache-Control', 'private, no-store')
+  @RequirePermissions(PERMISSIONS.billingPosReturn)
+  @ApiOperation({ summary: 'Record an atomic bounded customer return and refund evidence' })
+  @ApiOkResponse({ type: PharmacySaleReturnReceiptDto })
+  returnSale(
+    @CurrentIdentity() identity: AuthenticatedIdentity,
+    @Param('providerId', new ParseUUIDPipe({ version: '4' })) providerId: string,
+    @Param('saleId', new ParseUUIDPipe({ version: '4' })) saleId: string,
+    @Body() dto: ReturnPharmacySaleDto,
+    @Req() request: MetadataHttpRequest,
+  ) {
+    return this.returns.returnSale({
+      actor: identity,
+      providerId,
+      saleId,
+      ...dto,
       request: extractRequestMetadata(request),
     });
   }
