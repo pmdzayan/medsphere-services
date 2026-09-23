@@ -68,6 +68,7 @@ CREATE TABLE "ComplianceLegalHold" (
   "id" UUID NOT NULL,
   "tenantId" UUID NOT NULL,
   "subjectUserId" UUID NOT NULL,
+  "subjectMembershipId" UUID NOT NULL,
   "dataClass" "ComplianceDataClass",
   "reasonCode" "ComplianceLegalHoldReason" NOT NULL,
   "referenceHash" VARCHAR(64),
@@ -95,6 +96,7 @@ CREATE TABLE "CompliancePolicyDecisionRecord" (
   "id" UUID NOT NULL,
   "tenantId" UUID NOT NULL,
   "subjectUserId" UUID NOT NULL,
+  "subjectMembershipId" UUID NOT NULL,
   "dataClass" "ComplianceDataClass" NOT NULL,
   "purpose" "CompliancePurpose" NOT NULL,
   "context" "ComplianceEvaluationContext" NOT NULL,
@@ -137,18 +139,18 @@ CREATE INDEX "CompliancePolicy_dataClass_supersededAt_idx"
 CREATE UNIQUE INDEX "ComplianceLegalHold_placedBy_idempotency_key"
   ON "ComplianceLegalHold" ("placedByPlatformUserId", "idempotencyKey");
 CREATE INDEX "ComplianceLegalHold_tenant_subject_status_idx"
-  ON "ComplianceLegalHold" ("tenantId", "subjectUserId", "status");
+  ON "ComplianceLegalHold" ("tenantId", "subjectMembershipId", "status");
 CREATE INDEX "ComplianceLegalHold_tenant_subject_class_status_idx"
-  ON "ComplianceLegalHold" ("tenantId", "subjectUserId", "dataClass", "status");
+  ON "ComplianceLegalHold" ("tenantId", "subjectMembershipId", "dataClass", "status");
 CREATE UNIQUE INDEX "ComplianceLegalHold_active_all_classes_key"
-  ON "ComplianceLegalHold" ("tenantId", "subjectUserId")
+  ON "ComplianceLegalHold" ("tenantId", "subjectMembershipId")
   WHERE "status" = 'ACTIVE' AND "dataClass" IS NULL;
 CREATE UNIQUE INDEX "ComplianceLegalHold_active_class_key"
-  ON "ComplianceLegalHold" ("tenantId", "subjectUserId", "dataClass")
+  ON "ComplianceLegalHold" ("tenantId", "subjectMembershipId", "dataClass")
   WHERE "status" = 'ACTIVE' AND "dataClass" IS NOT NULL;
 
 CREATE INDEX "CompliancePolicyDecision_tenant_subject_evaluated_idx"
-  ON "CompliancePolicyDecisionRecord" ("tenantId", "subjectUserId", "evaluatedAt" DESC);
+  ON "CompliancePolicyDecisionRecord" ("tenantId", "subjectMembershipId", "evaluatedAt" DESC);
 CREATE INDEX "CompliancePolicyDecision_tenant_class_evaluated_idx"
   ON "CompliancePolicyDecisionRecord" ("tenantId", "dataClass", "evaluatedAt" DESC);
 CREATE INDEX "CompliancePolicyDecision_policyId_idx"
@@ -170,6 +172,10 @@ ALTER TABLE "ComplianceLegalHold"
   ADD CONSTRAINT "ComplianceLegalHold_subjectUserId_fkey"
   FOREIGN KEY ("subjectUserId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 ALTER TABLE "ComplianceLegalHold"
+  ADD CONSTRAINT "ComplianceLegalHold_subject_scope_fkey"
+  FOREIGN KEY ("subjectMembershipId","subjectUserId","tenantId")
+  REFERENCES "TenantMembership"("id","userId","tenantId") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "ComplianceLegalHold"
   ADD CONSTRAINT "ComplianceLegalHold_placedByPlatformUserId_fkey"
   FOREIGN KEY ("placedByPlatformUserId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 ALTER TABLE "ComplianceLegalHold"
@@ -182,6 +188,10 @@ ALTER TABLE "CompliancePolicyDecisionRecord"
 ALTER TABLE "CompliancePolicyDecisionRecord"
   ADD CONSTRAINT "CompliancePolicyDecisionRecord_subjectUserId_fkey"
   FOREIGN KEY ("subjectUserId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "CompliancePolicyDecisionRecord"
+  ADD CONSTRAINT "CompliancePolicyDecisionRecord_subject_scope_fkey"
+  FOREIGN KEY ("subjectMembershipId","subjectUserId","tenantId")
+  REFERENCES "TenantMembership"("id","userId","tenantId") ON DELETE RESTRICT ON UPDATE CASCADE;
 ALTER TABLE "CompliancePolicyDecisionRecord"
   ADD CONSTRAINT "CompliancePolicyDecisionRecord_policyId_fkey"
   FOREIGN KEY ("policyId") REFERENCES "CompliancePolicy"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -247,6 +257,7 @@ BEGIN
      OR NEW."id" <> OLD."id"
      OR NEW."tenantId" <> OLD."tenantId"
      OR NEW."subjectUserId" <> OLD."subjectUserId"
+     OR NEW."subjectMembershipId" <> OLD."subjectMembershipId"
      OR NEW."dataClass" IS DISTINCT FROM OLD."dataClass"
      OR NEW."reasonCode" <> OLD."reasonCode"
      OR NEW."referenceHash" IS DISTINCT FROM OLD."referenceHash"
