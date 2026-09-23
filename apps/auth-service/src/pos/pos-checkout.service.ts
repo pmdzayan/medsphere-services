@@ -41,7 +41,7 @@ import type {
 const MAX_LINES = 100;
 const MAX_PAYMENTS = 4;
 const SERIALIZABLE_ATTEMPTS = 10;
-const STATE_CODE_PATTERN = /^\\d{2}$/;
+const STATE_CODE_PATTERN = /^\d{2}$/;
 const GSTIN_PATTERN = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/;
 
 type Transaction = Prisma.TransactionClient;
