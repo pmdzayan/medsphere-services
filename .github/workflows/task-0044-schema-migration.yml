@@ -1,0 +1,71 @@
+name: Task 0044 schema and migration generation
+
+on:
+  push:
+    branches:
+      - cto/0044-inventory-exception-closure
+
+permissions:
+  contents: write
+
+concurrency:
+  group: task-0044-schema-migration
+  cancel-in-progress: true
+
+jobs:
+  generate:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgis/postgis:16-3.4-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: medsphere_task0044
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/medsphere_task0044?schema=public
+      SHADOW_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/medsphere_task0044_shadow?schema=public
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: cto/0044-inventory-exception-closure
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.12.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Validate Prisma schema
+        run: pnpm --filter @medsphere/database prisma:validate
+      - name: Create shadow database
+        run: PGPASSWORD=postgres psql -h localhost -U postgres -d postgres -c 'CREATE DATABASE medsphere_task0044_shadow;'
+      - name: Generate structural migration
+        run: |
+          mkdir -p packages/database/prisma/migrations/20260923190000_task_0044_inventory_exception_closure
+          pnpm --filter @medsphere/database exec prisma migrate diff \
+            --from-migrations prisma/migrations \
+            --to-schema-datamodel prisma/schema.prisma \
+            --shadow-database-url "$SHADOW_DATABASE_URL" \
+            --script > packages/database/prisma/migrations/20260923190000_task_0044_inventory_exception_closure/migration.sql
+          test -s packages/database/prisma/migrations/20260923190000_task_0044_inventory_exception_closure/migration.sql
+      - name: Commit generated migration
+        run: |
+          if git diff --quiet; then exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add packages/database/prisma/migrations/20260923190000_task_0044_inventory_exception_closure/migration.sql
+          git commit -m "db(task-0044): generate inventory exception closure migration"
+          git push origin HEAD:cto/0044-inventory-exception-closure
