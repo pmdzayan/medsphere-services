@@ -1621,7 +1621,7 @@ model PharmacySale {
 
   actorMembershipId String           @db.Uuid
   actorUserId       String           @db.Uuid
-  actorMembership   TenantMembership @relation(fields: [actorMembershipId, actorUserId, tenantId], references: [id, userId, tenantId], onDelete: Restrict)
+  actorMembership   TenantMembership @relation(fields: [actorMembershipId, actorUserId, tenantId], references: [id, userId, tenantId], onDelete: Restrict, map: "PharmacySale_actorMembership_actorUser_tenant_fkey")
 
   reservationId String?              @unique @db.Uuid
   reservation   MedicineReservation? @relation(fields: [reservationId, tenantId, providerId], references: [id, tenantId, providerId], onDelete: Restrict)
@@ -1849,7 +1849,7 @@ model PharmacyInvoiceReprint {
 
   actorMembershipId String           @db.Uuid
   actorUserId       String           @db.Uuid
-  actorMembership   TenantMembership @relation(fields: [actorMembershipId, actorUserId, tenantId], references: [id, userId, tenantId], onDelete: Restrict)
+  actorMembership   TenantMembership @relation(fields: [actorMembershipId, actorUserId, tenantId], references: [id, userId, tenantId], onDelete: Restrict, map: "PharmacyInvoiceReprint_actorMembership_actorUser_tenant_fkey")
 
   createdAt DateTime @default(now())
 
@@ -1892,7 +1892,7 @@ model PharmacySaleVoid {
 
   actorMembershipId String           @db.Uuid
   actorUserId       String           @db.Uuid
-  actorMembership   TenantMembership @relation(fields: [actorMembershipId, actorUserId, tenantId], references: [id, userId, tenantId], onDelete: Restrict)
+  actorMembership   TenantMembership @relation(fields: [actorMembershipId, actorUserId, tenantId], references: [id, userId, tenantId], onDelete: Restrict, map: "PharmacySaleVoid_actorMembership_actorUser_tenant_fkey")
 
   reason         String @db.VarChar(500)
   idempotencyKey String @db.VarChar(120)
