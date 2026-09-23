@@ -714,7 +714,12 @@ ALTER TABLE "AuditEvent"
 
 -- Task 0044 recall cancellations are exact-user actions. Preserve the prior
 -- quarantine SYSTEM cause while allowing the new recall cause only for an
--- authenticated tenant user with exact membership+user attribution.
+-- authenticated tenant user. The Task 0019 historical-upgrade verifier
+-- intentionally deploys every later migration before reinstalling the exact-user
+-- migration, so this migration cannot statically reference AuditEvent.actorUserId.
+-- A dynamic trigger below rejects recall evidence until that column exists and is
+-- populated; once Task 0019 is installed, its composite FK proves the exact
+-- membership+user+tenant attribution.
 ALTER TABLE "AuditEvent"
   DROP CONSTRAINT IF EXISTS "AuditEvent_reservation_quarantine_cause_check";
 
@@ -728,7 +733,6 @@ ALTER TABLE "AuditEvent"
         AND "scope" = 'TENANT'
         AND "actorType" = 'SYSTEM'
         AND "actorMembershipId" IS NULL
-        AND "actorUserId" IS NULL
         AND "platformActorUserId" IS NULL
       )
       OR
@@ -737,8 +741,26 @@ ALTER TABLE "AuditEvent"
         AND "scope" = 'TENANT'
         AND "actorType" = 'TENANT_USER'
         AND "actorMembershipId" IS NOT NULL
-        AND "actorUserId" IS NOT NULL
         AND "platformActorUserId" IS NULL
       )
     )
   );
+
+CREATE OR REPLACE FUNCTION validate_task_0044_recall_audit_actor()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $
+BEGIN
+  IF NEW."eventType" = 'inventory.reservation.cancelled'
+     AND NEW."metadata"->>'cause' = 'BATCH_RECALL'
+     AND NULLIF(to_jsonb(NEW)->>'actorUserId', '') IS NULL
+  THEN
+    RAISE EXCEPTION 'Task 0044 recall cancellation requires exact-user attribution';
+  END IF;
+  RETURN NEW;
+END;
+$;
+
+CREATE TRIGGER "AuditEvent_task_0044_recall_actor"
+BEFORE INSERT ON "AuditEvent"
+FOR EACH ROW EXECUTE FUNCTION validate_task_0044_recall_audit_actor();
