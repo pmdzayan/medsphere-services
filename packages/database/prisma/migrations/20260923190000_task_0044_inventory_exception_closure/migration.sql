@@ -749,7 +749,7 @@ ALTER TABLE "AuditEvent"
 CREATE OR REPLACE FUNCTION validate_task_0044_recall_audit_actor()
 RETURNS trigger
 LANGUAGE plpgsql
-AS $
+AS $task0044$
 BEGIN
   IF NEW."eventType" = 'inventory.reservation.cancelled'
      AND NEW."metadata"->>'cause' = 'BATCH_RECALL'
@@ -759,7 +759,7 @@ BEGIN
   END IF;
   RETURN NEW;
 END;
-$;
+$task0044$;
 
 CREATE TRIGGER "AuditEvent_task_0044_recall_actor"
 BEFORE INSERT ON "AuditEvent"
