@@ -24,9 +24,8 @@ function buildService() {
   };
   const prisma = {
     client: {
-      $transaction: jest.fn(
-        async (operation: (database: typeof transaction) => Promise<unknown>) =>
-          operation(transaction),
+      $transaction: jest.fn(async (operation: (database: typeof transaction) => Promise<unknown>) =>
+        operation(transaction),
       ),
     },
   };
