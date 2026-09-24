@@ -231,7 +231,9 @@ export class ComplianceService {
         });
         if (replay) {
           if (replay.commandHash !== commandHash) {
-            throw new ConflictException('Legal-hold idempotency key was reused with different input');
+            throw new ConflictException(
+              'Legal-hold idempotency key was reused with different input',
+            );
           }
           return { ...withoutCommandHash(replay), replayed: true };
         }
@@ -247,10 +249,7 @@ export class ComplianceService {
             tenantId: dto.tenantId,
             subjectMembershipId: membership.id,
             status: 'ACTIVE',
-            OR: [
-              { dataClass: null },
-              ...(dto.dataClass ? [{ dataClass: dto.dataClass }] : []),
-            ],
+            OR: [{ dataClass: null }, ...(dto.dataClass ? [{ dataClass: dto.dataClass }] : [])],
           },
           select: { id: true },
         });
@@ -420,11 +419,7 @@ export class ComplianceService {
           dto.tenantId,
           dto.subjectUserId,
         );
-        const policy = await this.resolvePolicy(
-          transaction,
-          dto.tenantId,
-          dto.dataClass,
-        );
+        const policy = await this.resolvePolicy(transaction, dto.tenantId, dto.dataClass);
         const hold = await this.findEffectiveHold(
           transaction,
           dto.tenantId,
@@ -545,11 +540,7 @@ export class ComplianceService {
           return { ...withoutCommandHash(replay), replayed: true };
         }
 
-        const policy = await this.resolvePolicy(
-          transaction,
-          identity.tenantId,
-          dto.dataClass,
-        );
+        const policy = await this.resolvePolicy(transaction, identity.tenantId, dto.dataClass);
         const hold = await this.findEffectiveHold(
           transaction,
           identity.tenantId,
@@ -691,14 +682,10 @@ export class ComplianceService {
       throw new BadRequestException('Policy reference is required');
     }
     if (descriptor.scope === 'GLOBAL_USER' && dto.tenantId) {
-      throw new BadRequestException(
-        'Global-user data classes require a platform baseline policy',
-      );
+      throw new BadRequestException('Global-user data classes require a platform baseline policy');
     }
     if (!descriptor.retentionDispositions.includes(dto.expiryDisposition)) {
-      throw new BadRequestException(
-        'Expiry disposition is not executable for this data class',
-      );
+      throw new BadRequestException('Expiry disposition is not executable for this data class');
     }
     if (!descriptor.subjectRequestDispositions.includes(dto.subjectRequestDisposition)) {
       throw new BadRequestException(
