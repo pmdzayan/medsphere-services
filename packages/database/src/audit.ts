@@ -75,6 +75,8 @@ export const AUDIT_EVENT_TYPES = [
   'inventory.reservation.completed',
   'inventory.reservation.cancelled',
   'inventory.reservation.expired',
+  'inventory.pickup.token.issued',
+  'inventory.pickup.handoff.completed',
   'inventory.availability-request.responded',
   'inventory.availability-request.preference.configured',
   'inventory.import.staged',
@@ -223,6 +225,13 @@ export const AUDIT_METADATA_KEYS = {
   'inventory.reservation.completed': ['previousStatus', 'version', 'totalQuantity'],
   'inventory.reservation.cancelled': ['previousStatus', 'version', 'totalQuantity', 'cause'],
   'inventory.reservation.expired': ['previousStatus', 'version', 'totalQuantity', 'cause'],
+  'inventory.pickup.token.issued': ['providerId', 'reservationVersion', 'tokenVersion', 'expiresAt'],
+  'inventory.pickup.handoff.completed': [
+    'providerId',
+    'saleId',
+    'verificationMethod',
+    'tokenVersion',
+  ],
   'inventory.availability-request.responded': ['outcome'],
   'inventory.availability-request.preference.configured': [
     'liveRequestsEnabled',
