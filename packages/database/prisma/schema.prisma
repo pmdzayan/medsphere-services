@@ -840,7 +840,7 @@ model PatientNotification {
   @@unique([sourceType, sourceEventId])
   @@index([recipientUserId, readAt, createdAt(sort: Desc), id(sort: Desc)])
   @@index([recipientUserId, createdAt(sort: Desc), id(sort: Desc)])
-  @@index([recipientUserId, privacyDispositionAt, createdAt])
+  @@index([recipientUserId, privacyDispositionAt, createdAt], map: "PatientNotification_recipient_privacy_created_idx")
 }
 
 enum PatientNotificationCategory {
@@ -900,7 +900,7 @@ model PatientTimelineEvent {
 
   @@unique([sourceType, sourceEventId])
   @@index([recipientUserId, occurredAt(sort: Desc), id(sort: Desc)])
-  @@index([recipientUserId, privacyDispositionAt, occurredAt])
+  @@index([recipientUserId, privacyDispositionAt, occurredAt], map: "PatientTimelineEvent_recipient_privacy_occurred_idx")
 }
 
 enum PatientTimelineDestinationType {
@@ -2782,8 +2782,8 @@ model ComplianceLegalHold {
   dispositionJobs ComplianceDispositionJob[]
 
   @@unique([placedByPlatformUserId, idempotencyKey])
-  @@index([tenantId, subjectUserId, status])
-  @@index([tenantId, subjectUserId, dataClass, status])
+  @@index([tenantId, subjectMembershipId, status], map: "ComplianceLegalHold_tenant_subject_status_idx")
+  @@index([tenantId, subjectMembershipId, dataClass, status], map: "ComplianceLegalHold_tenant_subject_class_status_idx")
 }
 
 /// Task 0045: immutable operational evidence produced every time the policy
@@ -2820,12 +2820,12 @@ model CompliancePolicyDecisionRecord {
 
   evaluatedAt DateTime @default(now())
 
-  @@index([tenantId, subjectUserId, evaluatedAt(sort: Desc)])
-  @@index([tenantId, dataClass, evaluatedAt(sort: Desc)])
-  @@index([policyId])
   dispositionJob ComplianceDispositionJob?
 
-  @@index([legalHoldId])
+  @@index([tenantId, subjectMembershipId, evaluatedAt(sort: Desc)], map: "CompliancePolicyDecision_tenant_subject_evaluated_idx")
+  @@index([tenantId, dataClass, evaluatedAt(sort: Desc)], map: "CompliancePolicyDecision_tenant_class_evaluated_idx")
+  @@index([policyId], map: "CompliancePolicyDecision_policyId_idx")
+  @@index([legalHoldId], map: "CompliancePolicyDecision_legalHoldId_idx")
 }
 
 /// Task 0045: immutable operational evidence for an evaluated disposition
@@ -2869,11 +2869,11 @@ model ComplianceDispositionJob {
 
   occurredAt DateTime @default(now())
 
-  @@unique([subjectMembershipId, idempotencyKey])
-  @@index([tenantId, subjectMembershipId, occurredAt(sort: Desc)])
-  @@index([subjectUserId, dataClass, occurredAt(sort: Desc)])
-  @@index([policyId, source, occurredAt(sort: Desc)])
-  @@index([legalHoldId])
+  @@unique([subjectMembershipId, idempotencyKey], map: "ComplianceDispositionJob_subject_idempotency_key")
+  @@index([tenantId, subjectMembershipId, occurredAt(sort: Desc)], map: "ComplianceDispositionJob_tenant_subject_occurred_idx")
+  @@index([subjectUserId, dataClass, occurredAt(sort: Desc)], map: "ComplianceDispositionJob_subject_class_occurred_idx")
+  @@index([policyId, source, occurredAt(sort: Desc)], map: "ComplianceDispositionJob_policy_source_occurred_idx")
+  @@index([legalHoldId], map: "ComplianceDispositionJob_legalHoldId_idx")
 }
 
 model AuditEvent {
