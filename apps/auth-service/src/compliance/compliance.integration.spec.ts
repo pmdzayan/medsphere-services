@@ -262,12 +262,7 @@ describeComplianceInfra('Task 0045 compliance PostgreSQL enforcement', () => {
     expect(preserved.title).toBe('Sensitive title');
     expect(preserved.privacyDispositionAt).toBeNull();
 
-    await service.releaseLegalHold(
-      platformActor,
-      hold.id,
-      { expectedVersion: 1 },
-      {},
-    );
+    await service.releaseLegalHold(platformActor, hold.id, { expectedVersion: 1 }, {});
 
     const completed = await service.requestSubjectDisposition(
       subjectInB,
