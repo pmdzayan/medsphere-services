@@ -77,6 +77,24 @@ jobs:
       - name: Verify populated S0.3 through G3.9 upgrade safety
         run: pnpm db:verify-upgrade
 
+      - name: Task 0045 formatting diagnostic
+        run: |
+          pnpm format
+          git diff -- \
+            apps/auth-service/src/compliance/compliance-retention.service.ts \
+            apps/auth-service/src/compliance/compliance.integration.spec.ts \
+            apps/auth-service/src/compliance/compliance.service.ts \
+            apps/auth-service/src/compliance/compliance.types.ts \
+            apps/auth-service/src/compliance/dto/compliance.dto.ts \
+            apps/auth-service/src/consent/consent.service.spec.ts \
+            apps/auth-service/src/platform/platform-compliance.controller.ts \
+            docs/operations/backup-retention-policy.md \
+            packages/database/scripts/verify-0045-upgrade.mjs
+          if ! git diff --quiet; then
+            echo "Task 0045 formatting diff emitted above."
+            exit 1
+          fi
+
       - name: Check formatting
         run: pnpm format:check
 
