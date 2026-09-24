@@ -163,3 +163,29 @@ export class EvaluateCompliancePolicyDto {
   @IsIn(COMPLIANCE_DISPOSITIONS)
   requestedDisposition?: ComplianceDisposition;
 }
+
+
+export class RequestComplianceDispositionDto {
+  @ApiProperty({ enum: COMPLIANCE_DATA_CLASSES })
+  @IsIn(COMPLIANCE_DATA_CLASSES)
+  dataClass!: ComplianceDataClass;
+
+  @ApiProperty({ enum: COMPLIANCE_DISPOSITIONS })
+  @IsIn(COMPLIANCE_DISPOSITIONS)
+  requestedDisposition!: ComplianceDisposition;
+
+  @ApiProperty({ minLength: 8, maxLength: 120 })
+  @IsString()
+  @MaxLength(120)
+  idempotencyKey!: string;
+}
+
+export class ListSubjectDispositionJobsQueryDto {
+  @ApiPropertyOptional({ minimum: 1, maximum: 50, default: 25 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(50)
+  limit?: number;
+}
