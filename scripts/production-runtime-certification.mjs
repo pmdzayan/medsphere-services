@@ -164,6 +164,38 @@ function checkComponentBoundaryInvariants() {
   }
 }
 
+function checkNotificationWorkerDeploymentInvariants() {
+  const composePath = 'compose/docker-compose.notification-worker.production.yml';
+  const compose = readRequired(composePath);
+  const daemon = readRequired('apps/auth-service/src/notification-delivery.daemon.ts');
+
+  const requiredFragments = [
+    'NODE_ENV: production',
+    'AIM_AUTH_IMAGE:?',
+    'RELEASE_SHA:?',
+    'APP_VERSION:?',
+    "command: ['dist/notification-delivery.daemon.js']",
+    'NOTIFICATION_WORKER_POLL_INTERVAL_MS',
+    'NOTIFICATION_EMAIL_PROVIDER_ENABLED',
+    'MEDSPHERE_NOTIFICATION_SMTP_URL',
+  ];
+  for (const expected of requiredFragments) {
+    if (!compose.includes(expected)) {
+      throw new Error(`Task 0046 production notification worker contract is missing: ${expected}`);
+    }
+  }
+
+  if (compose.includes('build:')) {
+    throw new Error('Task 0046 production notification worker must use an immutable prebuilt image');
+  }
+  if (!daemon.includes('assertAuthProductionRuntimePolicy(process.env)')) {
+    throw new Error('Notification daemon must reuse the accepted production runtime policy');
+  }
+  if (compose.includes('container_name:')) {
+    throw new Error('Production notification worker must not pin a singleton container name');
+  }
+}
+
 function checkContainerInvariants() {
   const dockerfilePath = path.join(REPO_ROOT, 'Dockerfile');
   const dockerignorePath = path.join(REPO_ROOT, '.dockerignore');
@@ -256,6 +288,12 @@ function runCertification() {
   console.log('✓ Shared auth readiness provider wiring verified');
   console.log('✓ Accepted full auth configuration parser reuse verified');
   console.log('✓ Web build-time NEXT_PUBLIC secret boundary wiring verified\n');
+
+  console.log('--- 2B. TASK 0046 NOTIFICATION DEPLOYMENT INVARIANTS ---');
+  checkNotificationWorkerDeploymentInvariants();
+  console.log('✓ Production notification daemon uses immutable artifact + runtime secret injection');
+  console.log('✓ Notification daemon reuses fail-closed production runtime validation');
+  console.log('✓ No singleton container name; leased SKIP LOCKED claims remain overlap authority\n');
 
   console.log('--- 3. CONTAINER & RUNTIME SAFETY INVARIANTS ---');
   checkContainerInvariants();
