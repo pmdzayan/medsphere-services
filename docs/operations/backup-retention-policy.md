@@ -79,3 +79,15 @@ Reasoning:
 - `docs/operations/v1-observability-runbook.md` (backup metrics)
 - `docs/operations/v1-alert-rules.prometheus.yml` (backup alerts)
 - `docs/adr/0027-production-backup-recovery-foundation.md` (architecture record)
+
+
+## Task 0045 application-data reconciliation
+
+Backup archive retention and live application-data disposition are intentionally separate controls.
+
+- Application DELETE/ANONYMIZE does not rewrite historical backup archives in place.
+- A later restore must re-run the Task 0045 retention reconciliation before normal scheduled processing resumes.
+- Active legal holds must be restored and evaluated before destructive processing.
+- Operators must not extend or shorten backup archive retention merely because an application-data policy exists.
+
+See `docs/operations/task-0045-restore-retention-reconciliation.md` for the required restore sequence.
