@@ -25,6 +25,7 @@ export interface PosCheckoutRequest {
   lines: { productId: string; quantity: number }[];
   payments: { method: PosPaymentMethod; amount: string; externalReference?: string }[];
   reservationId?: string;
+  pickupToken?: string;
   placeOfSupplyStateCode: string;
   recipientName?: string;
   recipientAddress?: string;
@@ -186,6 +187,7 @@ const STATE = /^\d{2}$/;
 const HSN = /^(?:\d{4}|\d{6}|\d{8})$/;
 const UQC = /^[A-Z]{2,8}$/;
 const SERIES = /^[A-Z0-9]{1,4}$/;
+const PICKUP_TOKEN = /^[A-Za-z0-9_-]{32}$/;
 
 export function isPosFiscalProfileRequest(value: unknown): value is PosFiscalProfileRequest {
   if (
@@ -258,6 +260,7 @@ export function isPosCheckoutRequest(value: unknown): value is PosCheckoutReques
       'lines',
       'payments',
       'reservationId',
+      'pickupToken',
       'placeOfSupplyStateCode',
       'recipientName',
       'recipientAddress',
@@ -286,6 +289,11 @@ export function isPosCheckoutRequest(value: unknown): value is PosCheckoutReques
     return false;
   if (!STATE.test(String(v.placeOfSupplyStateCode))) return false;
   if (v.reservationId !== undefined && !isCanonicalUuid(v.reservationId)) return false;
+  if (v.reservationId !== undefined) {
+    if (typeof v.pickupToken !== 'string' || !PICKUP_TOKEN.test(v.pickupToken)) return false;
+  } else if (v.pickupToken !== undefined) {
+    return false;
+  }
   if (v.recipientName !== undefined && !trimmed(v.recipientName, 1, 200)) return false;
   if (v.recipientAddress !== undefined && !trimmed(v.recipientAddress, 1, 500)) return false;
   if (
