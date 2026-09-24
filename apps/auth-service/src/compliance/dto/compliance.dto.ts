@@ -90,7 +90,10 @@ export class PlaceComplianceLegalHoldDto {
   @IsUUID('4')
   subjectUserId!: string;
 
-  @ApiPropertyOptional({ enum: COMPLIANCE_DATA_CLASSES, description: 'Omit to cover all data classes' })
+  @ApiPropertyOptional({
+    enum: COMPLIANCE_DATA_CLASSES,
+    description: 'Omit to cover all data classes',
+  })
   @IsOptional()
   @IsIn(COMPLIANCE_DATA_CLASSES)
   dataClass?: ComplianceDataClass;
@@ -163,7 +166,6 @@ export class EvaluateCompliancePolicyDto {
   @IsIn(COMPLIANCE_DISPOSITIONS)
   requestedDisposition?: ComplianceDisposition;
 }
-
 
 export class RequestComplianceDispositionDto {
   @ApiProperty({ enum: COMPLIANCE_DATA_CLASSES })
