@@ -2755,7 +2755,7 @@ model ComplianceLegalHold {
   subjectUserId       String           @db.Uuid
   subjectUser         User             @relation("ComplianceLegalHoldSubject", fields: [subjectUserId], references: [id], onDelete: Restrict)
   subjectMembershipId String           @db.Uuid
-  subjectMembership   TenantMembership @relation("ComplianceLegalHoldSubjectMembership", fields: [subjectMembershipId, subjectUserId, tenantId], references: [id, userId, tenantId], onDelete: Restrict)
+  subjectMembership   TenantMembership @relation("ComplianceLegalHoldSubjectMembership", fields: [subjectMembershipId, subjectUserId, tenantId], references: [id, userId, tenantId], onDelete: Restrict, map: "ComplianceLegalHold_subject_scope_fkey")
 
   dataClass ComplianceDataClass?
 
@@ -2781,7 +2781,7 @@ model ComplianceLegalHold {
   decisions CompliancePolicyDecisionRecord[]
   dispositionJobs ComplianceDispositionJob[]
 
-  @@unique([placedByPlatformUserId, idempotencyKey])
+  @@unique([placedByPlatformUserId, idempotencyKey], map: "ComplianceLegalHold_placedBy_idempotency_key")
   @@index([tenantId, subjectMembershipId, status], map: "ComplianceLegalHold_tenant_subject_status_idx")
   @@index([tenantId, subjectMembershipId, dataClass, status], map: "ComplianceLegalHold_tenant_subject_class_status_idx")
 }
@@ -2798,7 +2798,7 @@ model CompliancePolicyDecisionRecord {
   subjectUserId       String           @db.Uuid
   subjectUser         User             @relation("ComplianceDecisionSubject", fields: [subjectUserId], references: [id], onDelete: Restrict)
   subjectMembershipId String           @db.Uuid
-  subjectMembership   TenantMembership @relation("ComplianceDecisionSubjectMembership", fields: [subjectMembershipId, subjectUserId, tenantId], references: [id, userId, tenantId], onDelete: Restrict)
+  subjectMembership   TenantMembership @relation("ComplianceDecisionSubjectMembership", fields: [subjectMembershipId, subjectUserId, tenantId], references: [id, userId, tenantId], onDelete: Restrict, map: "CompliancePolicyDecisionRecord_subject_scope_fkey")
 
   dataClass ComplianceDataClass
   purpose   CompliancePurpose
@@ -2840,7 +2840,7 @@ model ComplianceDispositionJob {
   subjectUserId       String           @db.Uuid
   subjectUser         User             @relation("ComplianceDispositionJobSubject", fields: [subjectUserId], references: [id], onDelete: Restrict)
   subjectMembershipId String           @db.Uuid
-  subjectMembership   TenantMembership @relation("ComplianceDispositionJobSubjectMembership", fields: [subjectMembershipId, subjectUserId, tenantId], references: [id, userId, tenantId], onDelete: Restrict)
+  subjectMembership   TenantMembership @relation("ComplianceDispositionJobSubjectMembership", fields: [subjectMembershipId, subjectUserId, tenantId], references: [id, userId, tenantId], onDelete: Restrict, map: "ComplianceDispositionJob_subject_scope_fkey")
 
   dataClass ComplianceDataClass
   purpose   CompliancePurpose
