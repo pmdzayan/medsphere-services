@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { useLanguage } from '@/components/language-provider';
 import { SectionCard, StatusBadge } from '@/components/platform/dashboard-primitives';
 import { Icon } from '@/components/platform/icon';
 import {
@@ -19,6 +20,7 @@ import type { ProviderAccess } from '@/lib/inventory-contract';
 const PAGE_SIZE = 25;
 
 export function AvailabilityRequestQueueWorkspace() {
+  const { locale, t } = useLanguage();
   const [providers, setProviders] = useState<ProviderAccess[]>([]);
   const [providerId, setProviderId] = useState('');
   const [page, setPage] = useState<AvailabilityRequestQueuePage | null>(null);
@@ -40,31 +42,34 @@ export function AvailabilityRequestQueueWorkspace() {
     } catch {
       setProviders([]);
       setProviderId('');
-      setError('Unable to load assigned pharmacies.');
+      setError(t('reservations.availability.errorProviders'));
     }
-  }, []);
+  }, [t]);
 
-  const loadQueue = useCallback(async (selectedProviderId: string) => {
-    if (!selectedProviderId) {
-      setPage(null);
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
-    setError(null);
-    try {
-      setPage(await getProviderAvailabilityRequests(selectedProviderId, PAGE_SIZE, 0));
-    } catch (loadError) {
-      setPage(null);
-      setError(
-        loadError instanceof ApiError && loadError.status === 403
-          ? 'Live availability requests are not assigned to this membership.'
-          : 'Unable to load live availability requests.',
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const loadQueue = useCallback(
+    async (selectedProviderId: string) => {
+      if (!selectedProviderId) {
+        setPage(null);
+        setLoading(false);
+        return;
+      }
+      setLoading(true);
+      setError(null);
+      try {
+        setPage(await getProviderAvailabilityRequests(selectedProviderId, PAGE_SIZE, 0));
+      } catch (loadError) {
+        setPage(null);
+        setError(
+          loadError instanceof ApiError && loadError.status === 403
+            ? t('reservations.availability.errorDenied')
+            : t('reservations.availability.errorLoad'),
+        );
+      } finally {
+        setLoading(false);
+      }
+    },
+    [t],
+  );
 
   useEffect(() => void loadProviders(), [loadProviders]);
   useEffect(() => void loadQueue(providerId), [loadQueue, providerId]);
@@ -82,7 +87,7 @@ export function AvailabilityRequestQueueWorkspace() {
       });
       await loadQueue(providerId);
     } catch {
-      setError('The response was not saved. Refresh the queue and try again.');
+      setError(t('reservations.availability.errorRespond'));
     } finally {
       setRespondingId(null);
     }
@@ -94,24 +99,25 @@ export function AvailabilityRequestQueueWorkspace() {
         <div className="flex flex-col gap-4 border-b border-[#edf1ef] p-5 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <p className="text-xs font-extrabold uppercase tracking-[.16em] text-emerald-700">
-              Pharmacy operations
+              {t('reservations.availability.eyebrow')}
             </p>
             <h2 className="mt-2 text-xl font-bold tracking-[-.025em] text-[#10271f]">
-              Live availability requests
+              {t('reservations.availability.title')}
             </h2>
             <p className="mt-1 max-w-2xl text-sm leading-6 text-[#71817c]">
-              Patient-free product requests awaiting a pharmacy confirmation. No patient identity,
-              contact information, notes, or prescription data are exposed here.
+              {t('reservations.availability.description')}
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
             <select
-              aria-label="Assigned pharmacy"
+              aria-label={t('reservations.availability.providerAria')}
               value={providerId}
               onChange={(event) => setProviderId(event.target.value)}
               className="h-10 rounded-xl border border-[#dce5e1] bg-white px-3 text-sm font-semibold text-[#38544b]"
             >
-              {providers.length === 0 ? <option value="">No assigned pharmacy</option> : null}
+              {providers.length === 0 ? (
+                <option value="">{t('reservations.availability.noProvider')}</option>
+              ) : null}
               {providers.map((provider) => (
                 <option key={provider.providerId} value={provider.providerId}>
                   {provider.businessName}
@@ -125,7 +131,7 @@ export function AvailabilityRequestQueueWorkspace() {
               className="inline-flex items-center gap-2 rounded-xl border border-[#d8e2de] bg-white px-3 py-2 text-sm font-bold text-[#436158] disabled:opacity-50"
             >
               <Icon name="refresh" className={`size-4 ${loading ? 'animate-spin' : ''}`} />
-              Refresh
+              {t('reservations.availability.refresh')}
             </button>
           </div>
         </div>
@@ -137,17 +143,19 @@ export function AvailabilityRequestQueueWorkspace() {
         ) : null}
 
         {loading ? (
-          <div className="p-8 text-center text-sm text-[#71817c]">Loading live requests…</div>
+          <div className="p-8 text-center text-sm text-[#71817c]">
+            {t('reservations.availability.loading')}
+          </div>
         ) : page?.data.length ? (
           <div className="overflow-x-auto">
             <table className="min-w-full text-left text-sm">
               <thead className="bg-[#fbfcfb] text-[11px] uppercase tracking-[.12em] text-[#70827b]">
                 <tr>
-                  <th className="px-5 py-3">Medicine</th>
-                  <th className="px-5 py-3">Requested</th>
-                  <th className="px-5 py-3">Expires</th>
-                  <th className="px-5 py-3">Status</th>
-                  <th className="px-5 py-3">Response</th>
+                  <th className="px-5 py-3">{t('reservations.availability.tableMedicine')}</th>
+                  <th className="px-5 py-3">{t('reservations.availability.tableRequested')}</th>
+                  <th className="px-5 py-3">{t('reservations.availability.tableExpires')}</th>
+                  <th className="px-5 py-3">{t('reservations.availability.tableStatus')}</th>
+                  <th className="px-5 py-3">{t('reservations.availability.tableResponse')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#edf1ef]">
@@ -162,13 +170,21 @@ export function AvailabilityRequestQueueWorkspace() {
                       </div>
                     </td>
                     <td className="px-5 py-4 text-[#50665f]">
-                      {new Date(row.requestedAt).toLocaleString()}
+                      {new Date(row.requestedAt).toLocaleString(locale)}
                     </td>
                     <td className="px-5 py-4 text-[#50665f]">
-                      {new Date(row.expiresAt).toLocaleString()}
+                      {new Date(row.expiresAt).toLocaleString(locale)}
                     </td>
                     <td className="px-5 py-4">
-                      <StatusBadge tone={row.status === 'PENDING' ? 'amber' : row.status === 'RESPONDED' ? 'emerald' : 'slate'}>
+                      <StatusBadge
+                        tone={
+                          row.status === 'PENDING'
+                            ? 'amber'
+                            : row.status === 'RESPONDED'
+                              ? 'emerald'
+                              : 'slate'
+                        }
+                      >
                         {row.status}
                       </StatusBadge>
                     </td>
@@ -176,23 +192,25 @@ export function AvailabilityRequestQueueWorkspace() {
                       {row.status === 'PENDING' ? (
                         <div className="flex flex-wrap gap-2">
                           <ResponseButton
-                            label="Available"
+                            label={t('reservations.availability.available')}
                             disabled={respondingId !== null}
                             onClick={() => void respond(row, 'AVAILABLE')}
                           />
                           <ResponseButton
-                            label="Unavailable"
+                            label={t('reservations.availability.unavailable')}
                             disabled={respondingId !== null}
                             onClick={() => void respond(row, 'UNAVAILABLE')}
                           />
                           <ResponseButton
-                            label="Check in 15 min"
+                            label={t('reservations.availability.checkLater')}
                             disabled={respondingId !== null}
                             onClick={() => void respond(row, 'CHECK_LATER')}
                           />
                         </div>
                       ) : (
-                        <span className="text-xs text-[#81918c]">Closed</span>
+                        <span className="text-xs text-[#81918c]">
+                          {t('reservations.availability.closed')}
+                        </span>
                       )}
                     </td>
                   </tr>
@@ -202,9 +220,9 @@ export function AvailabilityRequestQueueWorkspace() {
           </div>
         ) : (
           <div className="p-8 text-center">
-            <p className="font-bold text-[#29483e]">No live requests</p>
+            <p className="font-bold text-[#29483e]">{t('reservations.availability.empty')}</p>
             <p className="mt-1 text-sm text-[#71817c]">
-              New product-confirmation requests will appear here without patient identity data.
+              {t('reservations.availability.emptyDetail')}
             </p>
           </div>
         )}
