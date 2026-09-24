@@ -21,8 +21,7 @@ if (!databaseUrlValue) {
 const databaseUrl = new URL(databaseUrlValue);
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const sourceMigrations = join(packageRoot, 'prisma', 'migrations');
-const upgradeMigration =
-  '20260924010000_task_0045_compliance_retention_legal_hold_policy';
+const upgradeMigration = '20260924010000_task_0045_compliance_retention_legal_hold_policy';
 const pnpmCommand = process.platform === 'win32' ? process.env.ComSpec || 'cmd.exe' : 'pnpm';
 
 if (!existsSync(join(sourceMigrations, upgradeMigration, 'migration.sql'))) {
@@ -140,11 +139,9 @@ function createMigrationProject() {
 }
 
 function copyUpgrade(project) {
-  cpSync(
-    join(sourceMigrations, upgradeMigration),
-    join(project.migrationsRoot, upgradeMigration),
-    { recursive: true },
-  );
+  cpSync(join(sourceMigrations, upgradeMigration), join(project.migrationsRoot, upgradeMigration), {
+    recursive: true,
+  });
 }
 
 function createDatabase(schemaFile, name) {
@@ -152,11 +149,7 @@ function createDatabase(schemaFile, name) {
 }
 
 function dropDatabase(schemaFile, name) {
-  executeSql(
-    schemaFile,
-    databaseUrl.toString(),
-    `DROP DATABASE IF EXISTS "${name}" WITH (FORCE);`,
-  );
+  executeSql(schemaFile, databaseUrl.toString(), `DROP DATABASE IF EXISTS "${name}" WITH (FORCE);`);
 }
 
 const tenantId = '10000000-0000-4000-8000-000000004501';
