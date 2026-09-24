@@ -245,7 +245,7 @@ ALTER TABLE "AuditEvent"
     'inventory.reservation.completed',
     'inventory.reservation.cancelled',
     'inventory.reservation.expired',
-    'inventory.pickup.token.issued',
+    'inventory.pickup.proof.issued',
     'inventory.pickup.handoff.completed',
     'inventory.availability-request.responded',
     'inventory.availability-request.preference.configured',
