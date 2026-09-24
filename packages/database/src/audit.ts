@@ -53,6 +53,7 @@ export const AUDIT_EVENT_TYPES = [
   'compliance.legal-hold.placed',
   'compliance.legal-hold.released',
   'compliance.policy.evaluated',
+  'compliance.disposition.processed',
   'inventory.listing.configured',
   /// Candidate Task 0032 (pre-0031): a global personal-identity
   /// action, always written via appendPlatformUser -- see
@@ -163,6 +164,14 @@ export const AUDIT_METADATA_KEYS = {
     'context',
     'decision',
     'effectiveDisposition',
+  ],
+  'compliance.disposition.processed': [
+    'dataClass',
+    'source',
+    'decision',
+    'effectiveDisposition',
+    'status',
+    'affectedRowCount',
   ],
   'inventory.listing.configured': ['productId', 'version'],
   'patient.profile.updated': ['fieldsChanged'],
