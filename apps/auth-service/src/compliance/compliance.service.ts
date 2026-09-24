@@ -862,6 +862,7 @@ function hashCommand(value: Readonly<Record<string, unknown>>) {
 }
 
 function withoutCommandHash<T extends { commandHash: string }>(value: T): Omit<T, 'commandHash'> {
-  const { commandHash: _commandHash, ...rest } = value;
-  return rest;
+  return Object.fromEntries(
+    Object.entries(value).filter(([key]) => key !== 'commandHash'),
+  ) as Omit<T, 'commandHash'>;
 }
