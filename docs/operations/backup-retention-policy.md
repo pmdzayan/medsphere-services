@@ -80,7 +80,6 @@ Reasoning:
 - `docs/operations/v1-alert-rules.prometheus.yml` (backup alerts)
 - `docs/adr/0027-production-backup-recovery-foundation.md` (architecture record)
 
-
 ## Task 0045 application-data reconciliation
 
 Backup archive retention and live application-data disposition are intentionally separate controls.
