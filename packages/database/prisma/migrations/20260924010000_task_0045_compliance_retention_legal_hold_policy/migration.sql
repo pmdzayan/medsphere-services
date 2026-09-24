@@ -95,7 +95,7 @@ CREATE TABLE "ComplianceLegalHold" (
   "version" INTEGER NOT NULL DEFAULT 1,
   "placedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
   "releasedAt" TIMESTAMP(3),
-  "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" TIMESTAMP(3) NOT NULL,
   CONSTRAINT "ComplianceLegalHold_pkey" PRIMARY KEY ("id"),
   CONSTRAINT "ComplianceLegalHold_reference_hash_check"
     CHECK ("referenceHash" IS NULL OR "referenceHash" ~ '^[0-9a-f]{64}$'),
