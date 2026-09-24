@@ -11,7 +11,7 @@ export const RESERVATION_STATUSES = [
 
 export type ReservationStatus = (typeof RESERVATION_STATUSES)[number];
 export type ReservationAllocationStatus = 'HELD' | 'CONSUMED' | 'RELEASED';
-export const RESERVATION_TRANSITIONS = ['CONFIRM', 'READY', 'COMPLETE', 'CANCEL'] as const;
+export const RESERVATION_TRANSITIONS = ['CONFIRM', 'READY', 'CANCEL'] as const;
 export type ReservationTransition = (typeof RESERVATION_TRANSITIONS)[number];
 
 export interface ReservationTransitionRequest {
