@@ -110,6 +110,11 @@ import type {
   PosVoidRequest,
 } from './pos-contract';
 import type { PosReturnReceipt, PosReturnRequest } from './pos-return-contract';
+import type {
+  AvailabilityRequestQueuePage,
+  AvailabilityResponseReceipt,
+  AvailabilityResponseRequest,
+} from './availability-request-contract';
 
 export class ApiError extends Error {
   constructor(
@@ -583,6 +588,32 @@ export async function createProviderReservation(
 ): Promise<ReservationCreationResponse> {
   return requestJson<ReservationCreationResponse>(
     `/api/inventory/providers/${encodeURIComponent(providerId)}/reservations`,
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(request),
+    },
+  );
+}
+
+export async function getProviderAvailabilityRequests(
+  providerId: string,
+  limit = 25,
+  offset = 0,
+): Promise<AvailabilityRequestQueuePage> {
+  const search = new URLSearchParams({ limit: String(limit), offset: String(offset) });
+  return requestJson<AvailabilityRequestQueuePage>(
+    `/api/inventory/providers/${encodeURIComponent(providerId)}/availability-requests?${search.toString()}`,
+  );
+}
+
+export async function respondProviderAvailabilityRequest(
+  providerId: string,
+  requestId: string,
+  request: AvailabilityResponseRequest,
+): Promise<AvailabilityResponseReceipt> {
+  return requestJson<AvailabilityResponseReceipt>(
+    `/api/inventory/providers/${encodeURIComponent(providerId)}/availability-requests/${encodeURIComponent(requestId)}/responses`,
     {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
