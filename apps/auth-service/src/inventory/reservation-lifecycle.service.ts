@@ -397,6 +397,11 @@ export class ReservationLifecycleService {
   }
 
   private validate(command: TransitionProviderReservationCommand): void {
+    if (command.transition === 'COMPLETE') {
+      throw new ConflictException(
+        'Reservation completion requires pickup-authorized POS checkout',
+      );
+    }
     if (command.reservationId.length === 0 || command.providerId.length === 0) {
       throw new BadRequestException('Reservation and provider identifiers are required');
     }
