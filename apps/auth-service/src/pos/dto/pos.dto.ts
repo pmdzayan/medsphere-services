@@ -132,7 +132,56 @@ export class PharmacyCheckoutDto {
   @IsUUID('4')
   reservationId?: string;
 
-  @ApiProperty({ pattern: '^\\d{2}$' })
+  @ApiPropertyOptional({
+    description: 'Short-lived one-time pickup proof issued to the reservation owner',
+    minLength: 32,
+    maxLength: 32,
+  })
+  @IsOptional()
+  @IsString()
+  @Matches(/^[A-Za-z0-9_-]{32}$/)
+  pickupToken?: string;
+
+  @ApiProperty({ pattern: '^\\d{2}  @Matches(/^\d{2}$/)
+  placeOfSupplyStateCode!: string;
+
+  @ApiPropertyOptional({ maxLength: 200 })
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  recipientName?: string;
+
+  @ApiPropertyOptional({ maxLength: 500 })
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  recipientAddress?: string;
+
+  @ApiPropertyOptional({ maxLength: 15 })
+  @IsOptional()
+  @IsString()
+  @Matches(/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/)
+  recipientGstin?: string;
+
+  @ApiPropertyOptional({ maxLength: 32 })
+  @IsOptional()
+  @IsString()
+  @MaxLength(32)
+  cashTendered?: string;
+}
+
+export class VoidPharmacySaleDto {
+  @ApiProperty({ maxLength: 120 })
+  @IsString()
+  @MaxLength(120)
+  idempotencyKey!: string;
+
+  @ApiProperty({ maxLength: 500 })
+  @IsString()
+  @MaxLength(500)
+  reason!: string;
+}
+ })
   @Matches(/^\d{2}$/)
   placeOfSupplyStateCode!: string;
 
