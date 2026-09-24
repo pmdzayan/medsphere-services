@@ -34,6 +34,7 @@ import { PatientMedicineSearchController } from './patient-medicine-search.contr
 import { PatientMedicineSearchService } from './patient-medicine-search.service';
 import { PatientReservationController } from './patient-reservation.controller';
 import { PatientReservationService } from './patient-reservation.service';
+import { PickupHandoffService } from './pickup-handoff.service';
 import { InventoryAnalyticsService } from './inventory-analytics.service';
 import { InventoryCatalogController } from './inventory-catalog.controller';
 import { InventoryCatalogService } from './inventory-catalog.service';
@@ -80,10 +81,11 @@ import { PharmacyVerificationModule } from '../pharmacy-verification/pharmacy-ve
     PublicNearbyMedicineSearchService,
     PatientMedicineSearchService,
     PatientReservationService,
+    PickupHandoffService,
     InventoryAnalyticsService,
     InventoryCatalogService,
     InventoryImportService,
   ],
-  exports: [InventoryService, AvailabilityTrustService, InventoryEventWriter],
+  exports: [InventoryService, AvailabilityTrustService, InventoryEventWriter, PickupHandoffService],
 })
 export class InventoryModule {}
