@@ -10,12 +10,7 @@ import {
   Req,
   UseGuards,
 } from '@nestjs/common';
-import {
-  ApiBearerAuth,
-  ApiForbiddenResponse,
-  ApiOperation,
-  ApiTags,
-} from '@nestjs/swagger';
+import { ApiBearerAuth, ApiForbiddenResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { DedicatedAuthEndpoint } from '../auth/dedicated-auth-endpoint.decorator';
 import { extractRequestMetadata, type MetadataHttpRequest } from '../auth/request-metadata';
 import { ComplianceService } from '../compliance/compliance.service';
@@ -54,7 +49,9 @@ export class PlatformComplianceController {
 
   @Get('policies')
   @RequirePlatformPermissions(PLATFORM_PERMISSIONS.complianceRead)
-  @ApiOperation({ summary: 'Read active platform baseline and optional tenant compliance policies' })
+  @ApiOperation({
+    summary: 'Read active platform baseline and optional tenant compliance policies',
+  })
   @ApiForbiddenResponse({ description: 'Requires platform.compliance.read' })
   listPolicies(@Query() query: ListCompliancePoliciesQueryDto) {
     return this.compliance.listPolicies(query);
@@ -70,12 +67,7 @@ export class PlatformComplianceController {
     @Body() dto: ReviseCompliancePolicyDto,
     @Req() request: MetadataHttpRequest,
   ) {
-    return this.compliance.revisePolicy(
-      identity,
-      dataClass,
-      dto,
-      extractRequestMetadata(request),
-    );
+    return this.compliance.revisePolicy(identity, dataClass, dto, extractRequestMetadata(request));
   }
 
   @Get('legal-holds')
@@ -108,12 +100,7 @@ export class PlatformComplianceController {
     @Body() dto: ReleaseComplianceLegalHoldDto,
     @Req() request: MetadataHttpRequest,
   ) {
-    return this.compliance.releaseLegalHold(
-      identity,
-      holdId,
-      dto,
-      extractRequestMetadata(request),
-    );
+    return this.compliance.releaseLegalHold(identity, holdId, dto, extractRequestMetadata(request));
   }
 
   @Post('evaluate')
