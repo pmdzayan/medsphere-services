@@ -41,6 +41,21 @@ CREATE TYPE "ComplianceLegalHoldReason" AS ENUM (
   'OTHER'
 );
 
+CREATE TYPE "ComplianceDispositionJobSource" AS ENUM ('SUBJECT_REQUEST', 'RETENTION_EXPIRY');
+CREATE TYPE "ComplianceDispositionJobStatus" AS ENUM ('DENIED', 'HELD', 'COMPLETED');
+
+ALTER TABLE "PatientNotification"
+  ADD COLUMN "privacyDispositionAt" TIMESTAMP(3);
+
+ALTER TABLE "PatientTimelineEvent"
+  ADD COLUMN "privacyDispositionAt" TIMESTAMP(3);
+
+CREATE INDEX "PatientNotification_recipient_privacy_created_idx"
+  ON "PatientNotification" ("recipientUserId", "privacyDispositionAt", "createdAt");
+
+CREATE INDEX "PatientTimelineEvent_recipient_privacy_occurred_idx"
+  ON "PatientTimelineEvent" ("recipientUserId", "privacyDispositionAt", "occurredAt");
+
 CREATE TABLE "CompliancePolicy" (
   "id" UUID NOT NULL,
   "tenantId" UUID,
@@ -123,6 +138,50 @@ CREATE TABLE "CompliancePolicyDecisionRecord" (
     )
 );
 
+CREATE TABLE "ComplianceDispositionJob" (
+  "id" UUID NOT NULL,
+  "tenantId" UUID NOT NULL,
+  "subjectUserId" UUID NOT NULL,
+  "subjectMembershipId" UUID NOT NULL,
+  "dataClass" "ComplianceDataClass" NOT NULL,
+  "purpose" "CompliancePurpose" NOT NULL,
+  "source" "ComplianceDispositionJobSource" NOT NULL,
+  "requestedDisposition" "ComplianceDisposition",
+  "effectiveDisposition" "ComplianceDisposition" NOT NULL,
+  "decision" "CompliancePolicyDecision" NOT NULL,
+  "status" "ComplianceDispositionJobStatus" NOT NULL,
+  "policyId" UUID,
+  "legalHoldId" UUID,
+  "decisionRecordId" UUID NOT NULL,
+  "idempotencyKey" VARCHAR(120) NOT NULL,
+  "commandHash" VARCHAR(64) NOT NULL,
+  "affectedRowCount" INTEGER NOT NULL DEFAULT 0,
+  "cutoffAt" TIMESTAMP(3),
+  "occurredAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT "ComplianceDispositionJob_pkey" PRIMARY KEY ("id"),
+  CONSTRAINT "ComplianceDispositionJob_affected_rows_check"
+    CHECK ("affectedRowCount" >= 0),
+  CONSTRAINT "ComplianceDispositionJob_decision_status_check"
+    CHECK (
+      ("decision" = 'DENY' AND "status" = 'DENIED' AND "affectedRowCount" = 0)
+      OR ("decision" = 'LEGAL_HOLD' AND "status" = 'HELD' AND "affectedRowCount" = 0)
+      OR ("decision" = 'ALLOW' AND "status" = 'COMPLETED')
+    )
+);
+
+CREATE UNIQUE INDEX "ComplianceDispositionJob_decisionRecordId_key"
+  ON "ComplianceDispositionJob" ("decisionRecordId");
+CREATE UNIQUE INDEX "ComplianceDispositionJob_subject_idempotency_key"
+  ON "ComplianceDispositionJob" ("subjectMembershipId", "idempotencyKey");
+CREATE INDEX "ComplianceDispositionJob_tenant_subject_occurred_idx"
+  ON "ComplianceDispositionJob" ("tenantId", "subjectMembershipId", "occurredAt" DESC);
+CREATE INDEX "ComplianceDispositionJob_subject_class_occurred_idx"
+  ON "ComplianceDispositionJob" ("subjectUserId", "dataClass", "occurredAt" DESC);
+CREATE INDEX "ComplianceDispositionJob_policy_source_occurred_idx"
+  ON "ComplianceDispositionJob" ("policyId", "source", "occurredAt" DESC);
+CREATE INDEX "ComplianceDispositionJob_legalHoldId_idx"
+  ON "ComplianceDispositionJob" ("legalHoldId");
+
 CREATE UNIQUE INDEX "CompliancePolicy_active_platform_class_key"
   ON "CompliancePolicy" ("dataClass")
   WHERE "tenantId" IS NULL AND "supersededAt" IS NULL;
@@ -201,6 +260,65 @@ ALTER TABLE "CompliancePolicyDecisionRecord"
 ALTER TABLE "CompliancePolicyDecisionRecord"
   ADD CONSTRAINT "CompliancePolicyDecisionRecord_evaluatedByPlatformUserId_fkey"
   FOREIGN KEY ("evaluatedByPlatformUserId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+ALTER TABLE "ComplianceDispositionJob"
+  ADD CONSTRAINT "ComplianceDispositionJob_tenantId_fkey"
+  FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "ComplianceDispositionJob"
+  ADD CONSTRAINT "ComplianceDispositionJob_subjectUserId_fkey"
+  FOREIGN KEY ("subjectUserId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "ComplianceDispositionJob"
+  ADD CONSTRAINT "ComplianceDispositionJob_subject_scope_fkey"
+  FOREIGN KEY ("subjectMembershipId", "subjectUserId", "tenantId")
+  REFERENCES "TenantMembership"("id", "userId", "tenantId") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "ComplianceDispositionJob"
+  ADD CONSTRAINT "ComplianceDispositionJob_policyId_fkey"
+  FOREIGN KEY ("policyId") REFERENCES "CompliancePolicy"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "ComplianceDispositionJob"
+  ADD CONSTRAINT "ComplianceDispositionJob_legalHoldId_fkey"
+  FOREIGN KEY ("legalHoldId") REFERENCES "ComplianceLegalHold"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "ComplianceDispositionJob"
+  ADD CONSTRAINT "ComplianceDispositionJob_decisionRecordId_fkey"
+  FOREIGN KEY ("decisionRecordId") REFERENCES "CompliancePolicyDecisionRecord"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- Only explicitly supported V1 data classes may configure destructive
+-- execution. Global-user classes never accept tenant overrides, avoiding a
+-- tenant policy deleting data that belongs to the same user in another tenant.
+CREATE OR REPLACE FUNCTION validate_task_0045_compliance_policy()
+RETURNS TRIGGER AS $task0045$
+BEGIN
+  IF NEW."dataClass" IN (
+    'IDENTITY_PROFILE',
+    'AUTHENTICATION_SECURITY',
+    'PRIVACY_PREFERENCES',
+    'CONSENT_EVIDENCE',
+    'PATIENT_PROFILE',
+    'PATIENT_NOTIFICATION',
+    'PATIENT_TIMELINE'
+  ) AND NEW."tenantId" IS NOT NULL THEN
+    RAISE EXCEPTION 'Global-user compliance data classes require the platform baseline policy';
+  END IF;
+
+  IF NEW."dataClass" = 'PRIVACY_PREFERENCES' THEN
+    IF NEW."expiryDisposition" <> 'RETAIN' THEN
+      RAISE EXCEPTION 'Privacy preferences do not support automatic destructive retention';
+    END IF;
+  ELSIF NEW."dataClass" IN ('PATIENT_NOTIFICATION', 'PATIENT_TIMELINE') THEN
+    NULL;
+  ELSE
+    IF NEW."expiryDisposition" <> 'RETAIN'
+       OR NEW."subjectRequestDisposition" <> 'RETAIN' THEN
+      RAISE EXCEPTION 'This compliance data class is retain-only in V1';
+    END IF;
+  END IF;
+
+  RETURN NEW;
+END;
+$task0045$ LANGUAGE plpgsql;
+
+CREATE TRIGGER "CompliancePolicy_execution_matrix"
+BEFORE INSERT ON "CompliancePolicy"
+FOR EACH ROW EXECUTE FUNCTION validate_task_0045_compliance_policy();
 
 -- Policy rows are historical evidence. They may only transition from active
 -- to superseded; all substantive fields are immutable after insert.
@@ -287,6 +405,17 @@ $task0045$ LANGUAGE plpgsql;
 CREATE TRIGGER "CompliancePolicyDecisionRecord_append_only"
 BEFORE UPDATE OR DELETE ON "CompliancePolicyDecisionRecord"
 FOR EACH ROW EXECUTE FUNCTION reject_task_0045_policy_decision_mutation();
+
+CREATE OR REPLACE FUNCTION reject_task_0045_disposition_job_mutation()
+RETURNS TRIGGER AS $task0045$
+BEGIN
+  RAISE EXCEPTION 'ComplianceDispositionJob is append-only';
+END;
+$task0045$ LANGUAGE plpgsql;
+
+CREATE TRIGGER "ComplianceDispositionJob_append_only"
+BEFORE UPDATE OR DELETE ON "ComplianceDispositionJob"
+FOR EACH ROW EXECUTE FUNCTION reject_task_0045_disposition_job_mutation();
 
 -- Dedicated platform permissions. Read is granted to owner/admin; management
 -- is owner-only, matching the existing consequential-action precedent.
@@ -438,5 +567,6 @@ ALTER TABLE "AuditEvent"
     'compliance.policy.revised',
     'compliance.legal-hold.placed',
     'compliance.legal-hold.released',
-    'compliance.policy.evaluated'
+    'compliance.policy.evaluated',
+    'compliance.disposition.processed'
   ));
