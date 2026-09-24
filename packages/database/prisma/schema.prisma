@@ -1827,7 +1827,7 @@ model PharmacySaleLine {
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
 
   saleId String       @db.Uuid
-  sale   PharmacySale @relation(fields: [saleId, tenantId, providerId], references: [id, tenantId, providerId], onDelete: Restrict, map: "MedicinePickupHandoff_sale_scope_fkey")
+  sale   PharmacySale @relation(fields: [saleId, tenantId, providerId], references: [id, tenantId, providerId], onDelete: Restrict)
 
   providerId String   @db.Uuid
   provider   Provider @relation(fields: [providerId, tenantId], references: [id, tenantId], onDelete: Restrict)
@@ -3160,7 +3160,7 @@ model MedicinePickupHandoff {
   subjectUser   User @relation("MedicinePickupHandoffSubject", fields: [subjectUserId], references: [id], onDelete: Restrict)
 
   saleId String @unique @db.Uuid
-  sale   PharmacySale @relation(fields: [saleId, tenantId, providerId], references: [id, tenantId, providerId], onDelete: Restrict)
+  sale   PharmacySale @relation(fields: [saleId, tenantId, providerId], references: [id, tenantId, providerId], onDelete: Restrict, map: "MedicinePickupHandoff_sale_scope_fkey")
 
   verifiedByMembershipId String @db.Uuid
   verifiedByMembership   TenantMembership @relation("MedicinePickupHandoffVerifiedBy", fields: [verifiedByMembershipId, tenantId], references: [id, tenantId], onDelete: Restrict, map: "MedicinePickupHandoff_verified_membership_scope_fkey")
