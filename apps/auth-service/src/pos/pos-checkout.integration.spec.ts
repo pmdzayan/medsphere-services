@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { AuditWriter } from '../audit/audit-writer.service';
 import { isInfrastructureTestEnabled, requireEnv } from '../auth/testing/infrastructure-test-gate';
 import { InventoryEventWriter } from '../inventory/inventory-event-writer';
+import { PickupHandoffService } from '../inventory/pickup-handoff.service';
 import { PharmacyVerificationEligibilityEvaluator } from '../pharmacy-verification/pharmacy-verification-eligibility.evaluator';
 import { PrismaService } from '../prisma/prisma.service';
 import { PosCheckoutService } from './pos-checkout.service';
@@ -14,15 +15,19 @@ if (isInfrastructureTestEnabled()) requireEnv('DATABASE_URL');
 infra('Task 0043 PostgreSQL POS transaction integrity and concurrency', () => {
   const prisma = new PrismaService();
   const audit = new AuditWriter();
+  const pickupHandoff = new PickupHandoffService(prisma, audit);
   const service = new PosCheckoutService(
     prisma,
     audit,
     new PosEventWriter(),
     new InventoryEventWriter(),
+    pickupHandoff,
     new PharmacyVerificationEligibilityEvaluator(prisma),
   );
 
   const tenantId = randomUUID();
+  const personalTenantId = randomUUID();
+  const personalMembershipId = randomUUID();
   const userId = randomUUID();
   const membershipId = randomUUID();
   const providerId = randomUUID();
@@ -35,6 +40,14 @@ infra('Task 0043 PostgreSQL POS transaction integrity and concurrency', () => {
         name: 'Task 0043 POS tenant',
         slug: `task0043-${tenantId}`,
         organizationType: 'PHARMACY',
+      },
+    });
+    await prisma.client.tenant.create({
+      data: {
+        id: personalTenantId,
+        name: 'Task 0046 Personal Account',
+        slug: `task0046-personal-${personalTenantId}`,
+        organizationType: 'NONE',
       },
     });
     await prisma.client.user.create({
@@ -52,6 +65,16 @@ infra('Task 0043 PostgreSQL POS transaction integrity and concurrency', () => {
         tenantId,
         userId,
         status: 'ACTIVE',
+        joinedAt: new Date(),
+      },
+    });
+    await prisma.client.tenantMembership.create({
+      data: {
+        id: personalMembershipId,
+        tenantId: personalTenantId,
+        userId,
+        status: 'ACTIVE',
+        isDefault: true,
         joinedAt: new Date(),
       },
     });
@@ -277,6 +300,7 @@ infra('Task 0043 PostgreSQL POS transaction integrity and concurrency', () => {
       failingAudit,
       new PosEventWriter(),
       new InventoryEventWriter(),
+      new PickupHandoffService(prisma, failingAudit),
       new PharmacyVerificationEligibilityEvaluator(prisma),
     );
 
@@ -396,6 +420,30 @@ infra('Task 0043 PostgreSQL POS transaction integrity and concurrency', () => {
       },
     });
 
+    await expect(
+      service.checkout({
+        actor,
+        providerId,
+        idempotencyKey: `checkout-${randomUUID()}`,
+        lines: [{ productId: fixture.productId, quantity: 2 }],
+        payments: [{ method: 'CASH', amount: '200.00' }],
+        reservationId,
+        placeOfSupplyStateCode: '33',
+      }),
+    ).rejects.toThrow('patient pickup proof');
+
+    const proof = await pickupHandoff.issuePatientProof(
+      {
+        userId,
+        tenantId: personalTenantId,
+        membershipId: personalMembershipId,
+        sessionId: randomUUID(),
+        securityVersion: 1,
+        tokenId: randomUUID(),
+      },
+      reservationId,
+    );
+
     const key = `checkout-${randomUUID()}`;
     const command = {
       actor,
@@ -404,6 +452,7 @@ infra('Task 0043 PostgreSQL POS transaction integrity and concurrency', () => {
       lines: [{ productId: fixture.productId, quantity: 2 }],
       payments: [{ method: 'CASH' as const, amount: '200.00' }],
       reservationId,
+      pickupToken: proof.pickupToken,
       placeOfSupplyStateCode: '33',
     };
     const first = await service.checkout(command);
@@ -435,6 +484,41 @@ infra('Task 0043 PostgreSQL POS transaction integrity and concurrency', () => {
     expect(allocation.status).toBe('CONSUMED');
     expect(allocation.consumedAt).not.toBeNull();
     expect(movementCount).toBe(1);
+
+    const [handoff, pickupToken, patientNotification, patientTimeline] = await Promise.all([
+      prisma.client.medicinePickupHandoff.findUnique({ where: { reservationId } }),
+      prisma.client.medicinePickupToken.findUnique({ where: { reservationId } }),
+      prisma.client.patientNotification.findFirst({
+        where: { recipientUserId: userId, sourceType: 'pickup-handoff-v1' },
+        orderBy: { createdAt: 'desc' },
+      }),
+      prisma.client.patientTimelineEvent.findFirst({
+        where: { recipientUserId: userId, sourceType: 'pickup-handoff-v1' },
+        orderBy: { createdAt: 'desc' },
+      }),
+    ]);
+    expect(handoff).toMatchObject({
+      reservationId,
+      saleId: first.saleId,
+      subjectUserId: userId,
+      verifiedByMembershipId: membershipId,
+      verificationMethod: 'ONE_TIME_TOKEN',
+    });
+    expect(pickupToken?.consumedAt).not.toBeNull();
+    expect(patientNotification).toMatchObject({
+      destinationType: 'RESERVATION',
+      destinationId: reservationId,
+      title: 'Pickup completed',
+    });
+    expect(patientTimeline).toMatchObject({
+      destinationType: 'RESERVATION',
+      destinationId: reservationId,
+      eventType: 'PICKUP_HANDOFF_COMPLETED',
+    });
+
+    await expect(
+      prisma.client.medicinePickupHandoff.delete({ where: { reservationId } }),
+    ).rejects.toThrow(/append-only/);
   });
 
   it('voids once, restores stock exactly once, keeps invoice immutable and records reprint evidence', async () => {
