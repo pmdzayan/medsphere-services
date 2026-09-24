@@ -988,7 +988,7 @@ function defaultExpiryValue(): string {
 function transitionsFor(status: ReservationStatus): ReservationTransition[] {
   if (status === 'PENDING') return ['CONFIRM', 'CANCEL'];
   if (status === 'CONFIRMED') return ['READY', 'CANCEL'];
-  if (status === 'READY') return ['COMPLETE', 'CANCEL'];
+  if (status === 'READY') return ['CANCEL'];
   return [];
 }
 
@@ -1008,14 +1008,12 @@ function transitionLabel(transition: ReservationTransition, t: Translator): stri
     CONFIRM: 'reservations.transition.confirmAction',
     CANCEL: 'reservations.transition.cancelAction',
     READY: 'reservations.transition.readyAction',
-    COMPLETE: 'reservations.transition.completeAction',
   };
   return t(keyByTransition[transition]);
 }
 
 function transitionWarning(transition: ReservationTransition, t: Translator): string {
   const keyByTransition: Record<ReservationTransition, TranslationKey> = {
-    COMPLETE: 'reservations.transition.completeWarning',
     CANCEL: 'reservations.transition.cancelWarning',
     CONFIRM: 'reservations.transition.confirmWarning',
     READY: 'reservations.transition.readyWarning',
