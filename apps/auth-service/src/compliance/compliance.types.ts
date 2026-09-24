@@ -53,17 +53,10 @@ export type ComplianceLegalHoldReason = (typeof COMPLIANCE_LEGAL_HOLD_REASONS)[n
 export const COMPLIANCE_LEGAL_HOLD_STATUSES = ['ACTIVE', 'RELEASED'] as const;
 export type ComplianceLegalHoldStatus = (typeof COMPLIANCE_LEGAL_HOLD_STATUSES)[number];
 
-export const COMPLIANCE_DISPOSITION_JOB_SOURCES = [
-  'SUBJECT_REQUEST',
-  'RETENTION_EXPIRY',
-] as const;
+export const COMPLIANCE_DISPOSITION_JOB_SOURCES = ['SUBJECT_REQUEST', 'RETENTION_EXPIRY'] as const;
 export type ComplianceDispositionJobSource = (typeof COMPLIANCE_DISPOSITION_JOB_SOURCES)[number];
 
-export const COMPLIANCE_DISPOSITION_JOB_STATUSES = [
-  'DENIED',
-  'HELD',
-  'COMPLETED',
-] as const;
+export const COMPLIANCE_DISPOSITION_JOB_STATUSES = ['DENIED', 'HELD', 'COMPLETED'] as const;
 export type ComplianceDispositionJobStatus = (typeof COMPLIANCE_DISPOSITION_JOB_STATUSES)[number];
 
 export type ComplianceDataScope = 'GLOBAL_USER' | 'TENANT';
