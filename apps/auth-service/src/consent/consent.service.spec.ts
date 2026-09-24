@@ -5,28 +5,41 @@ const identity = {
   tenantId: 'tenant-1',
   membershipId: 'membership-1',
   sessionId: 'session-1',
+  securityVersion: 1,
   tokenId: 'token-1',
 };
 
 function buildService() {
+  const transaction = {
+    userPrivacy: {
+      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+    },
+  };
   const consentRepository = {
-    append: jest.fn(),
+    appendWith: jest.fn(),
     findLatestPerCategory: jest.fn(),
   };
   const audit = {
     appendTenantUser: jest.fn().mockResolvedValue(undefined),
   };
-  const prisma = { client: {} };
+  const prisma = {
+    client: {
+      $transaction: jest.fn(
+        async (operation: (database: typeof transaction) => Promise<unknown>) =>
+          operation(transaction),
+      ),
+    },
+  };
 
   const service = new ConsentService(consentRepository as never, audit as never, prisma as never);
 
-  return { service, consentRepository, audit };
+  return { service, consentRepository, audit, transaction };
 }
 
 describe('ConsentService.recordConsent', () => {
-  it('always appends a new row rather than mutating a prior one -- never a database update call', async () => {
-    const { service, consentRepository } = buildService();
-    consentRepository.append.mockResolvedValue({
+  it('appends the grant and audit in the same transaction without silently enabling preferences', async () => {
+    const { service, consentRepository, transaction } = buildService();
+    consentRepository.appendWith.mockResolvedValue({
       status: 'GRANTED',
       createdAt: new Date('2026-01-01T00:00:00.000Z'),
     });
@@ -38,12 +51,14 @@ describe('ConsentService.recordConsent', () => {
       'nearby_search_prompt',
     );
 
-    expect(consentRepository.append).toHaveBeenCalledWith(
+    expect(consentRepository.appendWith).toHaveBeenCalledWith(
+      transaction,
       identity.userId,
       'LOCATION_USE',
       'GRANTED',
       'nearby_search_prompt',
     );
+    expect(transaction.userPrivacy.updateMany).not.toHaveBeenCalled();
     expect(result).toEqual({
       category: 'LOCATION_USE',
       status: 'GRANTED',
@@ -51,9 +66,9 @@ describe('ConsentService.recordConsent', () => {
     });
   });
 
-  it('records a withdrawal the same way -- as a new append, never a delete or update', async () => {
-    const { service, consentRepository } = buildService();
-    consentRepository.append.mockResolvedValue({
+  it('withdraws reservation notification consent and disables its future preference atomically', async () => {
+    const { service, consentRepository, transaction } = buildService();
+    consentRepository.appendWith.mockResolvedValue({
       status: 'WITHDRAWN',
       createdAt: new Date('2026-01-02T00:00:00.000Z'),
     });
@@ -65,17 +80,35 @@ describe('ConsentService.recordConsent', () => {
       'settings_privacy_page',
     );
 
-    expect(consentRepository.append).toHaveBeenCalledWith(
-      identity.userId,
-      'NOTIFICATIONS_RESERVATIONS',
+    expect(transaction.userPrivacy.updateMany).toHaveBeenCalledWith({
+      where: { userId: identity.userId },
+      data: { wantsReservationNotifications: false },
+    });
+  });
+
+  it('withdraws operational notification consent and disables its future preference atomically', async () => {
+    const { service, consentRepository, transaction } = buildService();
+    consentRepository.appendWith.mockResolvedValue({
+      status: 'WITHDRAWN',
+      createdAt: new Date('2026-01-02T00:00:00.000Z'),
+    });
+
+    await service.recordConsent(
+      identity as never,
+      'NOTIFICATIONS_OPERATIONAL',
       'WITHDRAWN',
       'settings_privacy_page',
     );
+
+    expect(transaction.userPrivacy.updateMany).toHaveBeenCalledWith({
+      where: { userId: identity.userId },
+      data: { wantsOperationalAlerts: false },
+    });
   });
 
-  it('audits the event with only the bounded category -- never raw source text, coordinates, or notification content', async () => {
+  it('audits only the bounded category and never the source text', async () => {
     const { service, consentRepository, audit } = buildService();
-    consentRepository.append.mockResolvedValue({
+    consentRepository.appendWith.mockResolvedValue({
       status: 'GRANTED',
       createdAt: new Date('2026-01-01T00:00:00.000Z'),
     });
@@ -94,17 +127,17 @@ describe('ConsentService.recordConsent', () => {
         outcome: 'SUCCEEDED',
         tenantId: identity.tenantId,
         actorMembershipId: identity.membershipId,
+        actorUserId: identity.userId,
         metadata: { category: 'LOCATION_USE' },
       }),
     );
     const [, auditInput] = audit.appendTenantUser.mock.calls[0];
-    const serialized = JSON.stringify(auditInput);
-    expect(serialized).not.toContain('nearby_search_prompt');
+    expect(JSON.stringify(auditInput)).not.toContain('nearby_search_prompt');
   });
 
-  it('audits a withdrawal with the distinct privacy.consent.withdrawn event type', async () => {
+  it('audits a withdrawal with the distinct event type', async () => {
     const { service, consentRepository, audit } = buildService();
-    consentRepository.append.mockResolvedValue({
+    consentRepository.appendWith.mockResolvedValue({
       status: 'WITHDRAWN',
       createdAt: new Date('2026-01-01T00:00:00.000Z'),
     });
@@ -124,13 +157,11 @@ describe('ConsentService.recordConsent', () => {
 });
 
 describe('ConsentService.getConsentStatus', () => {
-  it('returns null status for a category with no prior consent event, never a default of GRANTED', async () => {
+  it('returns null for a category with no prior consent event', async () => {
     const { service, consentRepository } = buildService();
     consentRepository.findLatestPerCategory.mockResolvedValue(new Map());
 
-    const result = await service.getConsentStatus(identity.userId);
-
-    expect(result).toEqual([
+    await expect(service.getConsentStatus(identity.userId)).resolves.toEqual([
       { category: 'LOCATION_USE', status: null, updatedAt: null },
       { category: 'NOTIFICATIONS_RESERVATIONS', status: null, updatedAt: null },
       { category: 'NOTIFICATIONS_OPERATIONAL', status: null, updatedAt: null },
@@ -153,7 +184,6 @@ describe('ConsentService.getConsentStatus', () => {
     );
 
     const result = await service.getConsentStatus(identity.userId);
-
     expect(result).toContainEqual({
       category: 'LOCATION_USE',
       status: 'GRANTED',
