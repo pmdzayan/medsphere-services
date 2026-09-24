@@ -6,7 +6,6 @@ import type { ProviderReservationTransition } from '../reservation.types';
 const PROVIDER_TRANSITIONS: readonly ProviderReservationTransition[] = [
   'CONFIRM',
   'READY',
-  'COMPLETE',
   'CANCEL',
 ];
 
