@@ -32,7 +32,9 @@ import {
   PatientReservationListResponseDto,
   PatientReservationResponseDto,
 } from './dto/patient-reservation-response.dto';
+import { PatientPickupProofResponseDto } from './dto/patient-pickup-proof-response.dto';
 import { PatientReservationService } from './patient-reservation.service';
+import { PickupHandoffService } from './pickup-handoff.service';
 
 /**
  * Task 0034 - Patient medicine reservation surface.
@@ -50,7 +52,10 @@ import { PatientReservationService } from './patient-reservation.service';
 @ApiTags('Patient Reservations')
 @ApiBearerAuth()
 export class PatientReservationController {
-  constructor(private readonly reservations: PatientReservationService) {}
+  constructor(
+    private readonly reservations: PatientReservationService,
+    private readonly pickupHandoff: PickupHandoffService,
+  ) {}
 
   @Post('providers/:providerId')
   @HttpCode(HttpStatus.CREATED)
@@ -98,6 +103,27 @@ export class PatientReservationController {
     @Param('reservationId', new ParseUUIDPipe({ version: '4' })) reservationId: string,
   ) {
     return this.reservations.get(identity, reservationId);
+  }
+
+  @Post(':reservationId/pickup-proof')
+  @HttpCode(HttpStatus.OK)
+  @Header('Cache-Control', 'private, no-store')
+  @ApiOperation({
+    summary: 'Issue or rotate a short-lived one-time pickup proof for a ready reservation',
+  })
+  @ApiOkResponse({ type: PatientPickupProofResponseDto })
+  @ApiNotFoundResponse({ description: 'Medicine reservation not found' })
+  @ApiConflictResponse({ description: 'Reservation is not ready, expired, or already handed off' })
+  issuePickupProof(
+    @CurrentIdentity() identity: AuthenticatedIdentity,
+    @Param('reservationId', new ParseUUIDPipe({ version: '4' })) reservationId: string,
+    @Req() request: MetadataHttpRequest,
+  ) {
+    return this.pickupHandoff.issuePatientProof(
+      identity,
+      reservationId,
+      extractRequestMetadata(request),
+    );
   }
 
   @Post(':reservationId/cancel')
