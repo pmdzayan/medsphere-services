@@ -71,15 +71,6 @@ jobs:
       - name: Audit production dependencies
         run: pnpm audit:prod
 
-      - name: Task 0045 one-file formatting diagnostic
-        run: |
-          pnpm exec prettier --write apps/auth-service/src/compliance/compliance.service.ts
-          git diff -- apps/auth-service/src/compliance/compliance.service.ts
-          if ! git diff --quiet -- apps/auth-service/src/compliance/compliance.service.ts; then
-            exit 1
-          fi
-
-
       - name: Verify clean database migration and drift
         run: pnpm db:verify
 
