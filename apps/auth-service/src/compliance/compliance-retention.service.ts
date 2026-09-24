@@ -74,12 +74,7 @@ export class ComplianceRetentionService {
       for (const subjectUserId of users) {
         selected += 1;
         try {
-          const result = await this.processCandidate(
-            policy,
-            subjectUserId,
-            cutoff,
-            asOf,
-          );
+          const result = await this.processCandidate(policy, subjectUserId, cutoff, asOf);
           if (result.status === 'COMPLETED') completed += 1;
           if (result.status === 'HELD') held += 1;
           if (result.status === 'DENIED') denied += 1;
@@ -310,9 +305,7 @@ export class ComplianceRetentionService {
       orderBy: [{ isDefault: 'desc' }, { createdAt: 'asc' }, { id: 'asc' }],
       select: { id: true, tenantId: true },
     });
-    return membership
-      ? { tenantId: membership.tenantId, membershipId: membership.id }
-      : null;
+    return membership ? { tenantId: membership.tenantId, membershipId: membership.id } : null;
   }
 
   private async executeRetentionDisposition(
