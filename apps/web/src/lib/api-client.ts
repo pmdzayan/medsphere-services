@@ -94,6 +94,7 @@ import {
   type PatientReservation,
   type PatientReservationFilters,
   type PatientReservationPage,
+  type PatientPickupProof,
 } from './patient-reservation-contract';
 import type {
   ListPatientNotificationsResponse,
@@ -779,6 +780,13 @@ export async function listPatientReservations(
 
 export async function getPatientReservation(reservationId: string): Promise<PatientReservation> {
   return requestJson<PatientReservation>(`/api/patient/medicine-reservations/${reservationId}`);
+}
+
+export async function issuePatientPickupProof(reservationId: string): Promise<PatientPickupProof> {
+  return requestJson<PatientPickupProof>(
+    `/api/patient/medicine-reservations/${encodeURIComponent(reservationId)}/pickup-proof`,
+    { method: 'POST' },
+  );
 }
 
 export async function createPatientReservation(
