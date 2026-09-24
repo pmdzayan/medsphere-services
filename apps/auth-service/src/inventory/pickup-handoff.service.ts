@@ -236,6 +236,36 @@ export class PickupHandoffService {
       },
       request: input.request,
     });
+
+    await transaction.patientNotification.create({
+      data: {
+        recipientUserId: input.subjectUserId,
+        category: 'RESERVATION',
+        title: 'Pickup completed',
+        message: 'Your reserved medicines were handed over after pickup verification.',
+        destinationType: 'RESERVATION',
+        destinationId: input.reservationId,
+        sourceType: 'pickup-handoff-v1',
+        sourceEventId: handoff.id,
+        createdAt: input.occurredAt,
+      },
+      select: { id: true },
+    });
+
+    await transaction.patientTimelineEvent.create({
+      data: {
+        recipientUserId: input.subjectUserId,
+        sourceType: 'pickup-handoff-v1',
+        sourceEventId: handoff.id,
+        eventType: 'PICKUP_HANDOFF_COMPLETED',
+        title: 'Pickup completed',
+        summary: 'Your reservation was collected after pickup verification.',
+        destinationType: 'RESERVATION',
+        destinationId: input.reservationId,
+        occurredAt: input.occurredAt,
+      },
+      select: { id: true },
+    });
   }
 
   private async rotateToken(
