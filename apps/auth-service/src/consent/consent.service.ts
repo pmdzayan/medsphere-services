@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { withSerializableRetry, type Prisma } from '@medsphere/database';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditWriter } from '../audit/audit-writer.service';
 import { AuthenticatedIdentity } from '../auth/auth.types';
@@ -15,11 +16,10 @@ export class ConsentService {
   ) {}
 
   /**
-   * Records a new consent event (grant or withdrawal) as an append-only
-   * row -- never an update of a prior row. Withdrawal only affects
-   * future behavior (the caller's next status read reflects it); it
-   * never deletes or rewrites the historical GRANTED row, preserving
-   * evidence of what was actually granted and when.
+   * Task 0045 closes the withdrawal-consequence gap. The append-only consent
+   * event, any preference shutoff, and the audit event commit atomically.
+   * A grant never silently opts the user into notifications; it only records
+   * consent. A withdrawal can only reduce future processing.
    */
   async recordConsent(
     identity: AuthenticatedIdentity,
@@ -27,32 +27,36 @@ export class ConsentService {
     status: 'GRANTED' | 'WITHDRAWN',
     source: ConsentSource,
   ): Promise<ConsentStatusDto> {
-    const record = await this.consentRepository.append(identity.userId, category, status, source);
+    return withSerializableRetry(this.prisma.client, async (transaction) => {
+      const record = await this.consentRepository.appendWith(
+        transaction,
+        identity.userId,
+        category,
+        status,
+        source,
+      );
 
-    await this.audit.appendTenantUser(this.prisma.client, {
-      eventType: status === 'GRANTED' ? 'privacy.consent.granted' : 'privacy.consent.withdrawn',
-      outcome: 'SUCCEEDED',
-      tenantId: identity.tenantId,
-      actorMembershipId: identity.membershipId,
-      actorUserId: identity.userId,
-      // Only the bounded category name is recorded -- never the
-      // source string verbatim beyond what's already a fixed,
-      // non-identifying tag, and never any location/notification
-      // payload content, since none is ever collected here.
-      metadata: { category },
+      if (status === 'WITHDRAWN') {
+        await this.applyWithdrawalConsequence(transaction, identity.userId, category);
+      }
+
+      await this.audit.appendTenantUser(transaction, {
+        eventType: status === 'GRANTED' ? 'privacy.consent.granted' : 'privacy.consent.withdrawn',
+        outcome: 'SUCCEEDED',
+        tenantId: identity.tenantId,
+        actorMembershipId: identity.membershipId,
+        actorUserId: identity.userId,
+        metadata: { category },
+      });
+
+      return {
+        category,
+        status: record.status as 'GRANTED' | 'WITHDRAWN',
+        updatedAt: record.createdAt.toISOString(),
+      };
     });
-
-    return {
-      category,
-      status: record.status as 'GRANTED' | 'WITHDRAWN',
-      updatedAt: record.createdAt.toISOString(),
-    };
   }
 
-  /**
-   * Current effective consent per category -- the latest row for each,
-   * or null (never asked) when no row exists yet for that category.
-   */
   async getConsentStatus(userId: string): Promise<ConsentStatusDto[]> {
     const latestByCategory = await this.consentRepository.findLatestPerCategory(userId);
     return CONSENT_CATEGORIES.map((category) => {
@@ -63,5 +67,30 @@ export class ConsentService {
         updatedAt: record ? record.createdAt.toISOString() : null,
       };
     });
+  }
+
+  private async applyWithdrawalConsequence(
+    transaction: Prisma.TransactionClient,
+    userId: string,
+    category: ConsentCategory,
+  ) {
+    if (category === 'NOTIFICATIONS_RESERVATIONS') {
+      await transaction.userPrivacy.updateMany({
+        where: { userId },
+        data: { wantsReservationNotifications: false },
+      });
+      return;
+    }
+
+    if (category === 'NOTIFICATIONS_OPERATIONAL') {
+      await transaction.userPrivacy.updateMany({
+        where: { userId },
+        data: { wantsOperationalAlerts: false },
+      });
+    }
+
+    // LOCATION_USE has no persisted background-location state in AIM. Its
+    // withdrawal consequence is therefore enforced by the existing
+    // request-time permission boundary rather than a stored-data mutation.
   }
 }

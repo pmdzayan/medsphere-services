@@ -346,6 +346,77 @@ enum InventoryExceptionDecisionOutcome {
   REJECTED
 }
 
+/// Task 0045: closed data-class catalogue used by the compliance policy
+/// boundary. New clinical domains must extend this catalogue explicitly
+/// before they can process or dispose of additional PHI classes.
+enum ComplianceDataClass {
+  IDENTITY_PROFILE
+  AUTHENTICATION_SECURITY
+  PRIVACY_PREFERENCES
+  CONSENT_EVIDENCE
+  TENANT_MEMBERSHIP
+  AUDIT_EVIDENCE
+  PATIENT_PROFILE
+  PATIENT_NOTIFICATION
+  PATIENT_TIMELINE
+  MEDICINE_RESERVATION
+  INVENTORY_OPERATION
+  BILLING_FINANCIAL
+}
+
+enum CompliancePurpose {
+  ACCOUNT_SECURITY
+  SERVICE_DELIVERY
+  INVENTORY_OPERATIONS
+  BILLING_TAX
+  PRIVACY_PREFERENCE
+  LEGAL_COMPLIANCE
+  AUDIT_SECURITY
+  PATIENT_CARE
+}
+
+enum ComplianceDisposition {
+  RETAIN
+  DELETE
+  ANONYMIZE
+}
+
+enum ComplianceEvaluationContext {
+  ACCESS
+  SUBJECT_REQUEST
+  RETENTION_EXPIRY
+}
+
+enum CompliancePolicyDecision {
+  ALLOW
+  DENY
+  LEGAL_HOLD
+}
+
+enum ComplianceLegalHoldStatus {
+  ACTIVE
+  RELEASED
+}
+
+enum ComplianceLegalHoldReason {
+  LITIGATION
+  REGULATORY_REQUEST
+  SECURITY_INVESTIGATION
+  CONTRACTUAL_PRESERVATION
+  OTHER
+}
+
+enum ComplianceDispositionJobSource {
+  SUBJECT_REQUEST
+  RETENTION_EXPIRY
+}
+
+enum ComplianceDispositionJobStatus {
+  DENIED
+  HELD
+  COMPLETED
+}
+
 /// Task 0021: platform-account lifecycle. Platform authority is granted ONLY
 /// through a PlatformAccount + live PlatformRoleAssignment -- never through
 /// tenant membership (TENANT AUTHORITY != PLATFORM AUTHORITY).
@@ -452,6 +523,10 @@ model Tenant {
   pharmacyInventoryFiscalProfiles        InventoryFiscalProfile[]
   pharmacySaleAllocations                PharmacySaleAllocation[]
   pharmacyInvoiceReprints                PharmacyInvoiceReprint[]
+  compliancePolicies                    CompliancePolicy[]
+  complianceLegalHolds                  ComplianceLegalHold[]
+  compliancePolicyDecisions             CompliancePolicyDecisionRecord[]
+  complianceDispositionJobs             ComplianceDispositionJob[]
 
   @@index([slug])
 }
@@ -541,6 +616,13 @@ model User {
   acceptedPlatformInvitations  PlatformInvitation[]                  @relation("PlatformInvitationAccepted")
   revokedPlatformInvitations   PlatformInvitation[]                  @relation("PlatformInvitationRevokedBy")
   availabilityResponseEvidence ProviderProductAvailabilityEvidence[]
+  compliancePoliciesCreated      CompliancePolicy[]               @relation("CompliancePolicyCreatedBy")
+  complianceLegalHoldsSubject    ComplianceLegalHold[]            @relation("ComplianceLegalHoldSubject")
+  complianceLegalHoldsPlaced     ComplianceLegalHold[]            @relation("ComplianceLegalHoldPlacedBy")
+  complianceLegalHoldsReleased   ComplianceLegalHold[]            @relation("ComplianceLegalHoldReleasedBy")
+  complianceDecisionsSubject     CompliancePolicyDecisionRecord[] @relation("ComplianceDecisionSubject")
+  complianceDecisionsEvaluated   CompliancePolicyDecisionRecord[] @relation("ComplianceDecisionEvaluator")
+  complianceDispositionJobsSubject ComplianceDispositionJob[]      @relation("ComplianceDispositionJobSubject")
 }
 
 model ExternalAuthIdentity {
@@ -658,6 +740,9 @@ model TenantMembership {
   inventoryExceptionRequests     InventoryExceptionRequest[]
   inventoryExceptionDecisions    InventoryExceptionDecision[]
   pharmacyInvoiceReprints        PharmacyInvoiceReprint[]
+  complianceLegalHoldsSubject     ComplianceLegalHold[]            @relation("ComplianceLegalHoldSubjectMembership")
+  complianceDecisionsSubject      CompliancePolicyDecisionRecord[] @relation("ComplianceDecisionSubjectMembership")
+  complianceDispositionJobsSubject ComplianceDispositionJob[]      @relation("ComplianceDispositionJobSubjectMembership")
 
   @@unique([tenantId, userId])
   @@unique([id, tenantId])
@@ -748,10 +833,14 @@ model PatientNotification {
 
   readAt DateTime?
   createdAt DateTime @default(now())
+  /// Task 0045: marks a projection row whose sensitive presentation fields
+  /// were anonymized by the compliance disposition executor.
+  privacyDispositionAt DateTime?
 
   @@unique([sourceType, sourceEventId])
   @@index([recipientUserId, readAt, createdAt(sort: Desc), id(sort: Desc)])
   @@index([recipientUserId, createdAt(sort: Desc), id(sort: Desc)])
+  @@index([recipientUserId, privacyDispositionAt, createdAt], map: "PatientNotification_recipient_privacy_created_idx")
 }
 
 enum PatientNotificationCategory {
@@ -805,9 +894,13 @@ model PatientTimelineEvent {
   /// it is always server/producer-supplied.
   occurredAt DateTime
   createdAt  DateTime @default(now())
+  /// Task 0045: marks a projection row whose sensitive presentation fields
+  /// were anonymized by the compliance disposition executor.
+  privacyDispositionAt DateTime?
 
   @@unique([sourceType, sourceEventId])
   @@index([recipientUserId, occurredAt(sort: Desc), id(sort: Desc)])
+  @@index([recipientUserId, privacyDispositionAt, occurredAt], map: "PatientTimelineEvent_recipient_privacy_occurred_idx")
 }
 
 enum PatientTimelineDestinationType {
@@ -2603,6 +2696,184 @@ model InventoryTransfer {
   @@unique([destinationMovementId])
   @@index([tenantId, sourceProviderId, completedAt(sort: Desc), id(sort: Desc)])
   @@index([tenantId, destinationProviderId, completedAt(sort: Desc), id(sort: Desc)])
+}
+
+/// Task 0045: versioned policy revision. A policy is never overwritten in
+/// place; a later revision sets supersededAt on the prior active row and
+/// inserts a new row with an incremented version.
+model CompliancePolicy {
+  id String @id @default(uuid()) @db.Uuid
+
+  /// NULL means the platform baseline. A tenant-specific active policy wins
+  /// over the platform baseline for that tenant/data-class pair.
+  tenantId String? @db.Uuid
+  tenant   Tenant? @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+
+  dataClass ComplianceDataClass
+
+  /// Closed enum array; never free-form purpose text.
+  allowedPurposes CompliancePurpose[]
+
+  /// NULL deliberately means no automatic expiry clock is configured. AIM
+  /// does not invent legal retention periods.
+  retentionDays Int?
+
+  expiryDisposition         ComplianceDisposition @default(RETAIN)
+  subjectRequestDisposition ComplianceDisposition @default(RETAIN)
+
+  /// Internal policy/control reference only; it is not a claim of legal
+  /// compliance or a place for case details / PHI.
+  policyReference String @db.VarChar(120)
+
+  version      Int      @default(1)
+  effectiveAt  DateTime @default(now())
+  supersededAt DateTime?
+
+  createdByPlatformUserId String @db.Uuid
+  createdByPlatformUser   User   @relation("CompliancePolicyCreatedBy", fields: [createdByPlatformUserId], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now())
+
+  decisions CompliancePolicyDecisionRecord[]
+  dispositionJobs ComplianceDispositionJob[]
+
+  @@index([tenantId, dataClass, supersededAt])
+  @@index([dataClass, supersededAt])
+}
+
+/// Task 0045: a bounded preservation hold. No free-form legal narrative is
+/// persisted. referenceHash may contain only a SHA-256 digest of an external
+/// case/reference identifier so AIM does not become a store of legal case
+/// text. dataClass=NULL means the hold covers all data classes for the subject
+/// in this tenant.
+model ComplianceLegalHold {
+  id String @id @default(uuid()) @db.Uuid
+
+  tenantId String @db.Uuid
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+
+  subjectUserId       String           @db.Uuid
+  subjectUser         User             @relation("ComplianceLegalHoldSubject", fields: [subjectUserId], references: [id], onDelete: Restrict)
+  subjectMembershipId String           @db.Uuid
+  subjectMembership   TenantMembership @relation("ComplianceLegalHoldSubjectMembership", fields: [subjectMembershipId, subjectUserId, tenantId], references: [id, userId, tenantId], onDelete: Restrict, map: "ComplianceLegalHold_subject_scope_fkey")
+
+  dataClass ComplianceDataClass?
+
+  reasonCode    ComplianceLegalHoldReason
+  referenceHash String?                   @db.VarChar(64)
+
+  status ComplianceLegalHoldStatus @default(ACTIVE)
+
+  placedByPlatformUserId String @db.Uuid
+  placedByPlatformUser   User   @relation("ComplianceLegalHoldPlacedBy", fields: [placedByPlatformUserId], references: [id], onDelete: Restrict)
+
+  releasedByPlatformUserId String? @db.Uuid
+  releasedByPlatformUser   User?   @relation("ComplianceLegalHoldReleasedBy", fields: [releasedByPlatformUserId], references: [id], onDelete: Restrict)
+
+  idempotencyKey String @db.VarChar(120)
+  commandHash    String @db.VarChar(64)
+
+  version    Int       @default(1)
+  placedAt   DateTime  @default(now())
+  releasedAt DateTime?
+  updatedAt  DateTime  @updatedAt
+
+  decisions CompliancePolicyDecisionRecord[]
+  dispositionJobs ComplianceDispositionJob[]
+
+  @@unique([placedByPlatformUserId, idempotencyKey], map: "ComplianceLegalHold_placedBy_idempotency_key")
+  @@index([tenantId, subjectMembershipId, status], map: "ComplianceLegalHold_tenant_subject_status_idx")
+  @@index([tenantId, subjectMembershipId, dataClass, status], map: "ComplianceLegalHold_tenant_subject_class_status_idx")
+}
+
+/// Task 0045: immutable operational evidence produced every time the policy
+/// boundary is evaluated. It records structural policy/hold references and
+/// closed catalogue values only; no PHI payload or free-form reason is stored.
+model CompliancePolicyDecisionRecord {
+  id String @id @default(uuid()) @db.Uuid
+
+  tenantId String @db.Uuid
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+
+  subjectUserId       String           @db.Uuid
+  subjectUser         User             @relation("ComplianceDecisionSubject", fields: [subjectUserId], references: [id], onDelete: Restrict)
+  subjectMembershipId String           @db.Uuid
+  subjectMembership   TenantMembership @relation("ComplianceDecisionSubjectMembership", fields: [subjectMembershipId, subjectUserId, tenantId], references: [id, userId, tenantId], onDelete: Restrict, map: "CompliancePolicyDecisionRecord_subject_scope_fkey")
+
+  dataClass ComplianceDataClass
+  purpose   CompliancePurpose
+  context   ComplianceEvaluationContext
+
+  requestedDisposition ComplianceDisposition?
+  effectiveDisposition ComplianceDisposition
+
+  decision CompliancePolicyDecision
+
+  policyId String?           @db.Uuid
+  policy   CompliancePolicy? @relation(fields: [policyId], references: [id], onDelete: Restrict)
+
+  legalHoldId String?               @db.Uuid
+  legalHold   ComplianceLegalHold?  @relation(fields: [legalHoldId], references: [id], onDelete: Restrict)
+
+  evaluatedByPlatformUserId String? @db.Uuid
+  evaluatedByPlatformUser   User?   @relation("ComplianceDecisionEvaluator", fields: [evaluatedByPlatformUserId], references: [id], onDelete: Restrict)
+
+  evaluatedAt DateTime @default(now())
+
+  dispositionJob ComplianceDispositionJob?
+
+  @@index([tenantId, subjectMembershipId, evaluatedAt(sort: Desc)], map: "CompliancePolicyDecision_tenant_subject_evaluated_idx")
+  @@index([tenantId, dataClass, evaluatedAt(sort: Desc)], map: "CompliancePolicyDecision_tenant_class_evaluated_idx")
+  @@index([policyId], map: "CompliancePolicyDecision_policyId_idx")
+  @@index([legalHoldId], map: "CompliancePolicyDecision_legalHoldId_idx")
+}
+
+/// Task 0045: immutable operational evidence for an evaluated disposition
+/// request or retention execution. A row is written only after the policy
+/// decision and any permitted mutation complete in the same transaction.
+model ComplianceDispositionJob {
+  id String @id @default(uuid()) @db.Uuid
+
+  tenantId String @db.Uuid
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+
+  subjectUserId       String           @db.Uuid
+  subjectUser         User             @relation("ComplianceDispositionJobSubject", fields: [subjectUserId], references: [id], onDelete: Restrict)
+  subjectMembershipId String           @db.Uuid
+  subjectMembership   TenantMembership @relation("ComplianceDispositionJobSubjectMembership", fields: [subjectMembershipId, subjectUserId, tenantId], references: [id, userId, tenantId], onDelete: Restrict, map: "ComplianceDispositionJob_subject_scope_fkey")
+
+  dataClass ComplianceDataClass
+  purpose   CompliancePurpose
+  source    ComplianceDispositionJobSource
+
+  requestedDisposition ComplianceDisposition?
+  effectiveDisposition ComplianceDisposition
+
+  decision CompliancePolicyDecision
+  status   ComplianceDispositionJobStatus
+
+  policyId String?           @db.Uuid
+  policy   CompliancePolicy? @relation(fields: [policyId], references: [id], onDelete: Restrict)
+
+  legalHoldId String?              @db.Uuid
+  legalHold   ComplianceLegalHold? @relation(fields: [legalHoldId], references: [id], onDelete: Restrict)
+
+  decisionRecordId String                         @unique @db.Uuid
+  decisionRecord   CompliancePolicyDecisionRecord @relation(fields: [decisionRecordId], references: [id], onDelete: Restrict)
+
+  idempotencyKey String @db.VarChar(120)
+  commandHash    String @db.VarChar(64)
+
+  affectedRowCount Int @default(0)
+  cutoffAt         DateTime?
+
+  occurredAt DateTime @default(now())
+
+  @@unique([subjectMembershipId, idempotencyKey], map: "ComplianceDispositionJob_subject_idempotency_key")
+  @@index([tenantId, subjectMembershipId, occurredAt(sort: Desc)], map: "ComplianceDispositionJob_tenant_subject_occurred_idx")
+  @@index([subjectUserId, dataClass, occurredAt(sort: Desc)], map: "ComplianceDispositionJob_subject_class_occurred_idx")
+  @@index([policyId, source, occurredAt(sort: Desc)], map: "ComplianceDispositionJob_policy_source_occurred_idx")
+  @@index([legalHoldId], map: "ComplianceDispositionJob_legalHoldId_idx")
 }
 
 model AuditEvent {

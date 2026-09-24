@@ -7,8 +7,10 @@ import { AuditPersistenceModule } from '../audit/audit-persistence.module';
 import { UsersModule } from '../users/users.module';
 import { AuthModule } from '../auth/auth.module';
 import { OrganizationModule } from '../organization/organization.module';
+import { ComplianceModule } from '../compliance/compliance.module';
 
 import { PlatformController } from './platform.controller';
+import { PlatformComplianceController } from './platform-compliance.controller';
 import { PlatformAuthService } from './platform-auth.service';
 import { PlatformAdminService } from './platform-admin.service';
 import { PlatformInvitationService } from './platform-invitation.service';
@@ -25,11 +27,12 @@ import { PlatformPermissionsGuard } from './guards/platform-permissions.guard';
     AuditPersistenceModule,
     UsersModule,
     OrganizationModule,
+    ComplianceModule,
     AuthModule,
     PassportModule.register({ defaultStrategy: 'platform-jwt', session: false }),
     JwtModule.register({}),
   ],
-  controllers: [PlatformController],
+  controllers: [PlatformController, PlatformComplianceController],
   providers: [
     PlatformAuthService,
     PlatformAdminService,
