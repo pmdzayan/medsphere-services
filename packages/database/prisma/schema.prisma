@@ -1827,7 +1827,7 @@ model PharmacySaleLine {
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
 
   saleId String       @db.Uuid
-  sale   PharmacySale @relation(fields: [saleId, tenantId, providerId], references: [id, tenantId, providerId], onDelete: Restrict)
+  sale   PharmacySale @relation(fields: [saleId, tenantId, providerId], references: [id, tenantId, providerId], onDelete: Restrict, map: "MedicinePickupHandoff_sale_scope_fkey")
 
   providerId String   @db.Uuid
   provider   Provider @relation(fields: [providerId, tenantId], references: [id, tenantId], onDelete: Restrict)
@@ -3120,12 +3120,12 @@ model MedicinePickupToken {
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
 
   providerId String   @db.Uuid
-  provider   Provider @relation(fields: [providerId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  provider   Provider @relation(fields: [providerId, tenantId], references: [id, tenantId], onDelete: Restrict, map: "MedicinePickupToken_provider_scope_fkey")
 
   reservationId String @unique @db.Uuid
   subjectUserId String @db.Uuid
 
-  reservation MedicineReservation @relation(fields: [reservationId, tenantId, providerId, subjectUserId], references: [id, tenantId, providerId, subjectUserId], onDelete: Restrict)
+  reservation MedicineReservation @relation(fields: [reservationId, tenantId, providerId, subjectUserId], references: [id, tenantId, providerId, subjectUserId], onDelete: Restrict, map: "MedicinePickupToken_reservation_subject_scope_fkey")
   subjectUser User @relation("MedicinePickupTokenSubject", fields: [subjectUserId], references: [id], onDelete: Restrict)
 
   tokenHash    String @unique @db.VarChar(64)
@@ -3137,9 +3137,9 @@ model MedicinePickupToken {
 
   updatedAt DateTime @updatedAt
 
-  @@unique([reservationId, tenantId, providerId])
-  @@index([tenantId, providerId, expiresAt])
-  @@index([subjectUserId, consumedAt, expiresAt])
+  @@unique([reservationId, tenantId, providerId], map: "MedicinePickupToken_reservation_scope_key")
+  @@index([tenantId, providerId, expiresAt], map: "MedicinePickupToken_tenant_provider_expires_idx")
+  @@index([subjectUserId, consumedAt, expiresAt], map: "MedicinePickupToken_subject_consumed_expires_idx")
 }
 
 /// Task 0046: immutable evidence that the pharmacy verified pickup authority
@@ -3152,18 +3152,18 @@ model MedicinePickupHandoff {
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
 
   providerId String   @db.Uuid
-  provider   Provider @relation(fields: [providerId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  provider   Provider @relation(fields: [providerId, tenantId], references: [id, tenantId], onDelete: Restrict, map: "MedicinePickupHandoff_provider_scope_fkey")
 
   reservationId String @unique @db.Uuid
   subjectUserId String @db.Uuid
-  reservation   MedicineReservation @relation(fields: [reservationId, tenantId, providerId, subjectUserId], references: [id, tenantId, providerId, subjectUserId], onDelete: Restrict)
+  reservation   MedicineReservation @relation(fields: [reservationId, tenantId, providerId, subjectUserId], references: [id, tenantId, providerId, subjectUserId], onDelete: Restrict, map: "MedicinePickupHandoff_reservation_subject_scope_fkey")
   subjectUser   User @relation("MedicinePickupHandoffSubject", fields: [subjectUserId], references: [id], onDelete: Restrict)
 
   saleId String @unique @db.Uuid
   sale   PharmacySale @relation(fields: [saleId, tenantId, providerId], references: [id, tenantId, providerId], onDelete: Restrict)
 
   verifiedByMembershipId String @db.Uuid
-  verifiedByMembership   TenantMembership @relation("MedicinePickupHandoffVerifiedBy", fields: [verifiedByMembershipId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  verifiedByMembership   TenantMembership @relation("MedicinePickupHandoffVerifiedBy", fields: [verifiedByMembershipId, tenantId], references: [id, tenantId], onDelete: Restrict, map: "MedicinePickupHandoff_verified_membership_scope_fkey")
 
   verificationMethod MedicinePickupVerificationMethod @default(ONE_TIME_TOKEN)
   tokenVersion       Int
@@ -3171,9 +3171,9 @@ model MedicinePickupHandoff {
 
   createdAt DateTime @default(now())
 
-  @@unique([reservationId, tenantId, providerId])
-  @@index([tenantId, providerId, verifiedAt(sort: Desc)])
-  @@index([subjectUserId, verifiedAt(sort: Desc)])
+  @@unique([reservationId, tenantId, providerId], map: "MedicinePickupHandoff_reservation_scope_key")
+  @@index([tenantId, providerId, verifiedAt(sort: Desc)], map: "MedicinePickupHandoff_tenant_provider_verified_idx")
+  @@index([subjectUserId, verifiedAt(sort: Desc)], map: "MedicinePickupHandoff_subject_verified_idx")
 }
 
 model MedicineReservationCommand {
