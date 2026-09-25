@@ -225,6 +225,7 @@ describe('pharmacy verification state contract', () => {
       isPharmacyVerificationState({
         current: { ...record, licenseNumber: 'LIC-1' },
         openSubmission: null,
+        ...stateExtras,
       }),
     ).toBe(false);
   });
