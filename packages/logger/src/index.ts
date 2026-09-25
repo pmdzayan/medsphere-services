@@ -35,7 +35,24 @@ export function isSensitiveLogKey(key: string): boolean {
     normalized === 'redisurl' ||
     normalized === 'redisclusterurl' ||
     normalized === 'smtpurl' ||
-    normalized === 'connectionstring'
+    normalized === 'connectionstring' ||
+    normalized === 'email' ||
+    normalized === 'phone' ||
+    normalized === 'tenantid' ||
+    normalized === 'userid' ||
+    normalized === 'subjectuserid' ||
+    normalized === 'membershipid' ||
+    normalized === 'actormembershipid' ||
+    normalized === 'actoruserid' ||
+    normalized === 'platformactoruserid' ||
+    normalized === 'providerid' ||
+    normalized === 'patientid' ||
+    normalized === 'resourceid' ||
+    normalized === 'recipientname' ||
+    normalized === 'recipientaddress' ||
+    normalized === 'recipientgstin' ||
+    normalized === 'licensenumber' ||
+    normalized === 'governmentidevidencereference'
   ) {
     return true;
   }
@@ -57,7 +74,13 @@ export function sanitizeLogString(value: string): string {
     .replace(/\b(Bearer)\s+[A-Za-z0-9._~+/-]+={0,2}/gi, '$1 [REDACTED]')
     .replace(/\b(Basic)\s+[A-Za-z0-9+/]+={0,2}/gi, '$1 [REDACTED]')
     .replace(/\b([a-z][a-z0-9+.-]*:\/\/)[^/\s:@]+:[^@\s/]+@/gi, '$1[REDACTED]@')
-    .replace(/\b(password|passphrase|secret|token|api[_-]?key|otp)=([^&\s]+)/gi, '$1=[REDACTED]');
+    .replace(/\b(password|passphrase|secret|token|api[_-]?key|otp)=([^&\s]+)/gi, '$1=[REDACTED]')
+    .replace(/\b[^\s@]+@[^\s@]+\.[^\s@]+\b/g, LOG_REDACTED_VALUE)
+    .replace(
+      /\b[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b/gi,
+      LOG_REDACTED_VALUE,
+    )
+    .replace(/(?<!\d)\+?\d[\d\s().-]{8,}\d(?!\d)/g, LOG_REDACTED_VALUE);
 }
 
 export function redactLogValue(
