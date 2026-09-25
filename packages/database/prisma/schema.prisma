@@ -745,7 +745,6 @@ model TenantMembership {
   providerAccess                    MembershipProviderAccess[]
   providerLocationAccess            MembershipProviderLocationAccess[]
   providerDepartmentAccess          MembershipProviderDepartmentAccess[]
-  professionalProviderProfiles      ProviderProfessionalProfile[]
   batchQuarantineRecords            BatchQuarantineRecord[]
   outboxEvents                 OutboxEvent[]
   createdOrganizationJoinCodes OrganizationJoinCode[]                @relation("OrganizationJoinCodeCreatedBy")
@@ -1079,6 +1078,7 @@ model ProviderProfessionalProfile {
   provider Provider @relation(fields: [providerId, tenantId], references: [id, tenantId], onDelete: Restrict)
   user     User     @relation(fields: [userId], references: [id], onDelete: Restrict)
 
+  @@unique([providerId, tenantId])
   @@unique([tenantId, userId])
   @@index([tenantId, providerId])
 }
