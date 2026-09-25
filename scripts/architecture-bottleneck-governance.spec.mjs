@@ -61,7 +61,12 @@ function policy(overrides = {}) {
         'Implementation constraints',
         'Review triggers',
       ],
-      evidenceMustReference: ['measured bottleneck', 'baseline', 'expected improvement', 'rollback'],
+      evidenceMustReference: [
+        'measured bottleneck',
+        'baseline',
+        'expected improvement',
+        'rollback',
+      ],
     },
     ...overrides,
   };

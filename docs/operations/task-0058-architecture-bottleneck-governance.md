@@ -23,15 +23,15 @@ The gate deliberately reuses:
 The current repository baseline is bound directly to
 `scripts/v1-performance-certification.mjs`:
 
-| Measure | Current reproducible baseline |
-| --- | ---: |
-| Concurrent certification workers | 20 |
-| Certified read operations | 160 |
-| Certified mutation operations | 40 |
-| Total certified operations | 200 |
-| Maximum error rate | 1% |
-| Maximum p95 | 1500 ms |
-| Maximum p99 | 3000 ms |
+| Measure                          | Current reproducible baseline |
+| -------------------------------- | ----------------------------: |
+| Concurrent certification workers |                            20 |
+| Certified read operations        |                           160 |
+| Certified mutation operations    |                            40 |
+| Total certified operations       |                           200 |
+| Maximum error rate               |                            1% |
+| Maximum p95                      |                       1500 ms |
+| Maximum p99                      |                       3000 ms |
 
 These numbers are **CI evidence, not a production capacity promise**.
 

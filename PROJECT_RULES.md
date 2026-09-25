@@ -175,4 +175,3 @@ AIM follows ADR-030's **measure-before-complexity** rule.
 - Every task that changes production scaling architecture must pass `pnpm test:architecture-governance` in addition to the normal quality gate.
 
 The executable policy is `docs/architecture/bottleneck-governance.json`.
-

@@ -17,14 +17,7 @@ const TEXT_EXTENSIONS = new Set([
   '.yaml',
   '.yml',
 ]);
-const SKIP_DIRECTORIES = new Set([
-  '.git',
-  '.next',
-  '.turbo',
-  'coverage',
-  'dist',
-  'node_modules',
-]);
+const SKIP_DIRECTORIES = new Set(['.git', '.next', '.turbo', 'coverage', 'dist', 'node_modules']);
 
 function normalize(relativePath) {
   return relativePath.split(path.sep).join('/');
@@ -183,7 +176,9 @@ export function findComplexityViolations(repositoryRoot, policy) {
   for (const relativePath of productionFiles(repositoryRoot, policy)) {
     const source = readText(repositoryRoot, relativePath);
     for (const pattern of policy.complexityPatterns) {
-      const matchingMarkers = pattern.markers.filter((marker) => new RegExp(marker, 'i').test(source));
+      const matchingMarkers = pattern.markers.filter((marker) =>
+        new RegExp(marker, 'i').test(source),
+      );
       if (matchingMarkers.length === 0) continue;
 
       const exception = exceptionFor(policy, pattern.id, relativePath);

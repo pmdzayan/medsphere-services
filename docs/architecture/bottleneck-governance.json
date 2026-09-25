@@ -99,11 +99,7 @@
     {
       "id": "service-mesh",
       "rationale": "A service mesh is operationally expensive and is not justified for the accepted modular-monolith runtime.",
-      "markers": [
-        "\\bistio\\b",
-        "\\blinkerd\\b",
-        "\\bConsul Connect\\b"
-      ]
+      "markers": ["\\bistio\\b", "\\blinkerd\\b", "\\bConsul Connect\\b"]
     },
     {
       "id": "new-production-service-boundary",
@@ -125,11 +121,6 @@
       "Implementation constraints",
       "Review triggers"
     ],
-    "evidenceMustReference": [
-      "measured bottleneck",
-      "baseline",
-      "expected improvement",
-      "rollback"
-    ]
+    "evidenceMustReference": ["measured bottleneck", "baseline", "expected improvement", "rollback"]
   }
 }

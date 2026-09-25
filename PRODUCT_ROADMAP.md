@@ -6,7 +6,6 @@
 
 This roadmap preserves the AIM — All In Medico product vision while inserting the engineering stabilization dependency required by the 2026-07-20 CTO audit.
 
-
 ## Current release framing — 2026-09-25
 
 - **V1 — Pharmacy-first AIM:** complete through Task 0050. V1 feature development is closed; production activation remains subject to the Task 0050 external release evidence gate.
