@@ -1,0 +1,126 @@
+{
+  "schemaVersion": 1,
+  "task": "0058",
+  "principle": "measure-before-complexity",
+  "currentRuntime": {
+    "applicationPath": "web -> auth-service -> PostgreSQL + Redis",
+    "performanceEvidence": "scripts/v1-performance-certification.mjs",
+    "operationsEvidence": "docs/operations/v1-performance-reliability-certification.md",
+    "profile": {
+      "certificationWorkers": 20,
+      "readOperations": 160,
+      "mutationOperations": 40,
+      "totalCertifiedOperations": 200
+    },
+    "thresholds": {
+      "maxErrorRate": 0.01,
+      "maxP95Ms": 1500,
+      "maxP99Ms": 3000
+    }
+  },
+  "productionSurfaces": [
+    "package.json",
+    "apps/auth-service/package.json",
+    "apps/auth-service/src",
+    "apps/web/package.json",
+    "apps/web/src",
+    "packages",
+    "compose",
+    ".github/workflows",
+    "Dockerfile",
+    "helm",
+    "k8s",
+    "infra"
+  ],
+  "excludedSurfaces": [
+    "docs",
+    "patches",
+    "compose/docker-compose.services.yml",
+    "compose/docker-compose.database.yml",
+    "apps/api-gateway",
+    "apps/billing-service",
+    "apps/inventory-service",
+    "apps/notification-service",
+    "apps/reservation-service",
+    "apps/search-service"
+  ],
+  "complexityPatterns": [
+    {
+      "id": "message-broker",
+      "rationale": "Do not introduce a distributed broker until measured throughput, durability, fan-out, or isolation requirements exceed the accepted transactional outbox/worker model.",
+      "markers": [
+        "\\bkafkajs\\b",
+        "\\bKAFKA_BROKERS\\b",
+        "\\bamqplib\\b",
+        "\\brabbitmq\\b",
+        "\\bnats(?:\\.js)?\\b",
+        "@aws-sdk/client-sqs",
+        "@google-cloud/pubsub",
+        "\\bpulsar-client\\b",
+        "\\bbullmq\\b",
+        "\\bRedis Streams\\b"
+      ]
+    },
+    {
+      "id": "new-datastore-or-search-cluster",
+      "rationale": "A second persistence/search engine adds consistency, backup, privacy, and operational authority that must be justified by measured need.",
+      "markers": [
+        "\\bmongodb\\b",
+        "\\bmongoose\\b",
+        "\\bcassandra\\b",
+        "\\bdynamodb\\b",
+        "\\bneo4j\\b",
+        "\\belasticsearch\\b",
+        "\\bopensearch\\b",
+        "@elastic/elasticsearch",
+        "@opensearch-project/opensearch"
+      ]
+    },
+    {
+      "id": "database-distribution",
+      "rationale": "Read replicas and sharding change consistency and failure semantics and require production capacity evidence.",
+      "markers": [
+        "\\bread[ -]?replica(?:s)?\\b",
+        "\\bshard(?:ing|ed)?\\b",
+        "\\bpartition-router\\b",
+        "\\bpgpool\\b"
+      ]
+    },
+    {
+      "id": "automatic-horizontal-scaling",
+      "rationale": "Autoscaling requires a measured saturation signal, safe scale-out semantics, and rollback evidence.",
+      "markers": [
+        "\\bHorizontalPodAutoscaler\\b",
+        "\\bautoscaling/v[12]\\b",
+        "\\bKEDA\\b",
+        "\\bScaledObject\\b"
+      ]
+    },
+    {
+      "id": "service-mesh",
+      "rationale": "A service mesh is operationally expensive and is not justified for the accepted modular-monolith runtime.",
+      "markers": ["\\bistio\\b", "\\blinkerd\\b", "\\bConsul Connect\\b"]
+    },
+    {
+      "id": "new-production-service-boundary",
+      "rationale": "ADR-001 requires measured need before adding another accepted deployable service boundary.",
+      "markers": [
+        "ACCEPTED PRODUCTION-CAPABLE RUNTIME:.*(?:inventory|reservation|search|billing|notification|gateway)",
+        "production-service-boundary-approved"
+      ]
+    }
+  ],
+  "approvedExceptions": [],
+  "requiredDecisionEvidence": {
+    "adrStatus": "Accepted",
+    "requiredAdrSections": [
+      "Decision",
+      "Reason and context",
+      "Alternatives",
+      "Consequences",
+      "Implementation constraints",
+      "Review triggers"
+    ],
+    "evidenceMustReference": ["measured bottleneck", "baseline", "expected improvement", "rollback"]
+  }
+}

@@ -42,3 +42,4 @@ Every ADR includes decision, reason/context, alternatives, consequences, impleme
 | [ADR-027](0027-production-backup-recovery-foundation.md)             | Production backup/restore/recovery foundation          | Proposed | 2026-09-06 |
 | [ADR-028](0028-production-runtime-secrets-and-deployment-safety.md)  | Production runtime configuration and deployment safety | Accepted | 2026-09-07 |
 | [ADR-029](0029-medicine-availability-trust-freshness.md)             | Medicine availability trust and inventory freshness    | Proposed | 2026-09-09 |
+| [ADR-030](0030-evidence-before-scaling-bottleneck-governance.md)     | Evidence-before-scaling bottleneck governance          | Accepted | 2026-09-25 |

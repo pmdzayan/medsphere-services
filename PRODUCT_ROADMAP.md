@@ -6,6 +6,19 @@
 
 This roadmap preserves the AIM — All In Medico product vision while inserting the engineering stabilization dependency required by the 2026-07-20 CTO audit.
 
+## Current release framing — 2026-09-25
+
+- **V1 — Pharmacy-first AIM:** complete through Task 0050. V1 feature development is closed; production activation remains subject to the Task 0050 external release evidence gate.
+- **V2 — Connected Healthcare Network:** begins with Task 0051. Hospitals, clinics, doctors, laboratories and the broader connected-healthcare modules belong to V2.
+- Existing Tasks **0052–0057** remain reserved for the already-defined connected-healthcare expansion work; they are not renumbered.
+- Cross-cutting V2 engineering controls added after that reserved sequence:
+  - **0058 — Architecture & Bottleneck Governance** — measure before adding scaling complexity.
+  - **0059 — Network & Low-Bandwidth Efficiency** — payload/request budgets, compression/caching, slow-network/mobile certification.
+  - **0060 — Independent AI-Code Security & Data-Integrity Gate** — independent review of AI-generated/high-risk changes for client trust, authorization, tenant leakage, race/data-loss, injection, secrets and unsafe migrations.
+- **V3 — Intelligence & Automation:** forecasting, ML/recommendations, workflow assistance and other AI-driven intelligence after the required governance/evaluation controls.
+
+This version framing supersedes older labels that described Tasks 0051–0057 as remaining V1 work. It does not rewrite their already-defined technical scope.
+
 ## Milestone 0 — Architecture and Safety Stabilization
 
 **Status:** In progress

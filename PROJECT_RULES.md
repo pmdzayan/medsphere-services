@@ -161,3 +161,17 @@ No agent may self-approve a major architecture change or mark a milestone comple
 - Do not bypass required checks.
 - Do not combine unrelated modules.
 - Record major decisions in ADRs and update status, handoff, roadmap, and the relevant Development Bible volume in the same sprint.
+
+## 12. Scaling complexity governance
+
+AIM follows ADR-030's **measure-before-complexity** rule.
+
+- Do not add or activate a production broker, new datastore/search cluster, database sharding/read-replica layer, service mesh, autoscaling controller, or new independently deployed service boundary merely because it is a common scale pattern.
+- First reproduce and measure the bottleneck against the accepted runtime baseline.
+- Prefer the smallest safe change that addresses the measured constraint.
+- A production scaling primitive requires an Accepted ADR, measured bottleneck evidence, baseline, expected improvement, operational ownership, healthcare security/privacy consequences, rollout, and rollback.
+- Do not weaken latency/error thresholds merely to obtain a green build. Changes to the performance baseline require documented evidence and CTO review.
+- Prototype services and prototype infrastructure remain non-authoritative until separately accepted; repository presence is not production approval.
+- Every task that changes production scaling architecture must pass `pnpm test:architecture-governance` in addition to the normal quality gate.
+
+The executable policy is `docs/architecture/bottleneck-governance.json`.
