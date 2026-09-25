@@ -183,7 +183,7 @@ export function PharmacyProfileWorkspace() {
 
   const currentStatus = verification?.current?.status ?? null;
   const hasOpenReview =
-    verification?.openSubmission !== null ||
+    Boolean(verification?.openSubmission) ||
     currentStatus === 'PENDING' ||
     currentStatus === 'UNDER_REVIEW';
   const suspended = currentStatus === 'SUSPENDED';
