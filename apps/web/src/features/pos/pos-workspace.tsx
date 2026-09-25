@@ -3,7 +3,7 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 
 import { useLanguage } from '@/components/language-provider';
-import { Badge, Button, Card, EmptyState, Input } from '@/components/platform/primitives';
+import { Badge, Button, Card, Checkbox, EmptyState, Input, Select } from '@/components/platform/primitives';
 import {
   checkoutPosSale,
   configurePosFiscalProfile,
@@ -559,13 +559,13 @@ export function PosWorkspace() {
       </header>
 
       <Card>
-        <label className="block max-w-xl">
-          <span className="mb-2 block text-xs font-bold text-canvas-700">{t('pos.provider')}</span>
-          <select
+        <div className="max-w-xl">
+          <Select
+            name="pos-provider"
+            label={t('pos.provider')}
             value={providerId}
             disabled={bootLoading || providers.length === 0}
             onChange={(event) => setProviderId(event.target.value)}
-            className="organization-theme-focus h-11 w-full rounded-xl border border-ink-900/[.11] bg-white px-3 text-sm font-semibold text-ink-900 disabled:opacity-60"
           >
             {providers.length === 0 ? (
               <option value="">{t('inventory.common.noProvider')}</option>
@@ -575,8 +575,8 @@ export function PosWorkspace() {
                 {provider.businessName}
               </option>
             ))}
-          </select>
-        </label>
+          </Select>
+        </div>
         {bootError ? <p className="mt-3 text-sm text-rose-700">{bootError}</p> : null}
         {selectedProvider ? (
           <p className="mt-3 text-xs font-semibold text-[#71817c]">
@@ -608,25 +608,21 @@ export function PosWorkspace() {
               <p className="mt-5 text-sm text-[#60736c]">{t('common.loading')}</p>
             ) : (
               <form onSubmit={saveFiscal} className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                <label className="block">
-                  <span className="mb-2 block text-xs font-bold text-canvas-700">
-                    {t('pos.fiscal.registration')}
-                  </span>
-                  <select
-                    value={registrationType}
-                    disabled={!canConfigure || fiscalSaving}
-                    onChange={(event) =>
-                      setRegistrationType(
-                        event.target.value as 'GST_REGULAR' | 'GST_COMPOSITION' | 'UNREGISTERED',
-                      )
-                    }
-                    className="organization-theme-focus h-[3.15rem] w-full rounded-xl border border-ink-900/[.11] bg-canvas-50 px-3 text-sm"
-                  >
-                    <option value="GST_REGULAR">{t('pos.fiscal.regular')}</option>
-                    <option value="GST_COMPOSITION">{t('pos.fiscal.composition')}</option>
-                    <option value="UNREGISTERED">{t('pos.fiscal.unregistered')}</option>
-                  </select>
-                </label>
+                <Select
+                  name="pos-registration-type"
+                  label={t('pos.fiscal.registration')}
+                  value={registrationType}
+                  disabled={!canConfigure || fiscalSaving}
+                  onChange={(event) =>
+                    setRegistrationType(
+                      event.target.value as 'GST_REGULAR' | 'GST_COMPOSITION' | 'UNREGISTERED',
+                    )
+                  }
+                >
+                  <option value="GST_REGULAR">{t('pos.fiscal.regular')}</option>
+                  <option value="GST_COMPOSITION">{t('pos.fiscal.composition')}</option>
+                  <option value="UNREGISTERED">{t('pos.fiscal.unregistered')}</option>
+                </Select>
                 <Input
                   name="pos-legal-name"
                   label={t('pos.fiscal.legalName')}
@@ -662,17 +658,13 @@ export function PosWorkspace() {
                   disabled={!canConfigure || fiscalSaving}
                   onChange={(event) => setInvoiceSeries(event.target.value.toUpperCase())}
                 />
-                <label className="flex min-h-[3.15rem] items-center gap-3 rounded-xl border border-ink-900/[.11] bg-canvas-50 px-4">
-                  <input
-                    type="checkbox"
-                    checked={pricesIncludeTax}
-                    disabled={!canConfigure || fiscalSaving}
-                    onChange={(event) => setPricesIncludeTax(event.target.checked)}
-                  />
-                  <span className="text-sm font-semibold text-[#29483f]">
-                    {t('pos.fiscal.inclusive')}
-                  </span>
-                </label>
+                <Checkbox
+                  name="pos-prices-include-tax"
+                  label={t('pos.fiscal.inclusive')}
+                  checked={pricesIncludeTax}
+                  disabled={!canConfigure || fiscalSaving}
+                  onChange={(event) => setPricesIncludeTax(event.target.checked)}
+                />
                 {canConfigure ? (
                   <div className="flex items-end">
                     <Button
@@ -953,24 +945,20 @@ export function PosWorkspace() {
                     }}
                   />
                 ) : null}
-                <label className="block">
-                  <span className="mb-2 block text-xs font-bold text-canvas-700">
-                    {t('pos.checkout.paymentMethod')}
-                  </span>
-                  <select
-                    value={paymentMethod}
-                    onChange={(event) => {
-                      setPaymentMethod(event.target.value as PosPaymentMethod);
-                      setCheckoutKey(null);
-                    }}
-                    className="organization-theme-focus h-[3.15rem] w-full rounded-xl border border-ink-900/[.11] bg-canvas-50 px-3 text-sm"
-                  >
-                    <option value="CASH">{t('pos.checkout.cash')}</option>
-                    <option value="CARD">{t('pos.checkout.card')}</option>
-                    <option value="UPI">{t('pos.checkout.upi')}</option>
-                    <option value="OTHER">{t('pos.checkout.other')}</option>
-                  </select>
-                </label>
+                <Select
+                  name="pos-payment-method"
+                  label={t('pos.checkout.paymentMethod')}
+                  value={paymentMethod}
+                  onChange={(event) => {
+                    setPaymentMethod(event.target.value as PosPaymentMethod);
+                    setCheckoutKey(null);
+                  }}
+                >
+                  <option value="CASH">{t('pos.checkout.cash')}</option>
+                  <option value="CARD">{t('pos.checkout.card')}</option>
+                  <option value="UPI">{t('pos.checkout.upi')}</option>
+                  <option value="OTHER">{t('pos.checkout.other')}</option>
+                </Select>
                 {paymentMethod === 'CASH' ? (
                   <Input
                     name="pos-cash-tendered"
