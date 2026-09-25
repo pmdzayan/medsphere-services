@@ -20,6 +20,7 @@ import { PlatformModule } from './platform/platform.module';
 import { PatientProfileModule } from './patient-profile/patient-profile.module';
 import { PatientNotificationModule } from './patient-notifications/patient-notification.module';
 import { PatientTimelineModule } from './patient-timeline/patient-timeline.module';
+import { ProviderDomainModule } from './provider-domain/provider-domain.module';
 import { AuthReadinessService } from './health/auth-readiness.service';
 
 @Module({
@@ -48,6 +49,7 @@ import { AuthReadinessService } from './health/auth-readiness.service';
     PatientProfileModule,
     PatientNotificationModule,
     PatientTimelineModule,
+    ProviderDomainModule,
     MetricsModule,
   ],
   providers: [
