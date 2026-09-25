@@ -39,6 +39,15 @@ export const pharmacyProfileEnglishMessages = {
   'pharmacyProfile.verification.title': 'Verification',
   'pharmacyProfile.verification.description':
     'AIM verification records the platform review state for this pharmacy. It is not a government certification.',
+  'pharmacyProfile.verification.sources.title': 'Official verification sources',
+  'pharmacyProfile.verification.sources.description':
+    'Use these official authority sites to check the submitted evidence. AIM does not treat supporting business or registry records as a substitute for a statutory licence.',
+  'pharmacyProfile.verification.sources.jurisdictionReview':
+    'A platform reviewer must confirm the correct statutory authority for this jurisdiction before approval.',
+  'pharmacyProfile.verification.sources.primary': 'Primary',
+  'pharmacyProfile.verification.sources.supporting': 'Supporting',
+  'pharmacyProfile.verification.sources.conditional': 'Conditional',
+  'pharmacyProfile.verification.sources.open': 'Open official source',
   'pharmacyProfile.verification.current': 'Current state',
   'pharmacyProfile.verification.renewal': 'Open renewal',
   'pharmacyProfile.verification.none': 'No verification submission yet.',
@@ -115,6 +124,15 @@ export const pharmacyProfileTamilMessages: Record<
   'pharmacyProfile.verification.title': 'சரிபார்ப்பு',
   'pharmacyProfile.verification.description':
     'AIM சரிபார்ப்பு இந்த மருந்தகத்தின் தள மதிப்பாய்வு நிலையை பதிவு செய்கிறது. இது அரசு சான்றிதழ் அல்ல.',
+  'pharmacyProfile.verification.sources.title': 'அதிகாரப்பூர்வ சரிபார்ப்பு ஆதாரங்கள்',
+  'pharmacyProfile.verification.sources.description':
+    'சமர்ப்பிக்கப்பட்ட ஆதாரத்தை சரிபார்க்க இந்த அதிகாரப்பூர்வ தளங்களைப் பயன்படுத்தவும். சட்டப்பூர்வ உரிமத்திற்கு பதிலாக துணை வணிக அல்லது பதிவக ஆதாரங்களை AIM ஏற்காது.',
+  'pharmacyProfile.verification.sources.jurisdictionReview':
+    'அங்கீகாரத்திற்கு முன் இந்த அதிகார வரம்பிற்கான சரியான சட்டப்பூர்வ அதிகாரியை தள மதிப்பாய்வாளர் உறுதிப்படுத்த வேண்டும்.',
+  'pharmacyProfile.verification.sources.primary': 'முதன்மை',
+  'pharmacyProfile.verification.sources.supporting': 'துணை',
+  'pharmacyProfile.verification.sources.conditional': 'நிபந்தனை',
+  'pharmacyProfile.verification.sources.open': 'அதிகாரப்பூர்வ தளத்தைத் திறக்க',
   'pharmacyProfile.verification.current': 'தற்போதைய நிலை',
   'pharmacyProfile.verification.renewal': 'திறந்த புதுப்பிப்பு',
   'pharmacyProfile.verification.none': 'இன்னும் சரிபார்ப்பு சமர்ப்பிப்பு இல்லை.',
@@ -191,6 +209,15 @@ export const pharmacyProfileUrduMessages: Record<
   'pharmacyProfile.verification.title': 'تصدیق',
   'pharmacyProfile.verification.description':
     'AIM تصدیق اس فارمیسی کی پلیٹ فارم جائزہ حالت ریکارڈ کرتی ہے۔ یہ سرکاری سرٹیفیکیشن نہیں ہے۔',
+  'pharmacyProfile.verification.sources.title': 'سرکاری تصدیقی ذرائع',
+  'pharmacyProfile.verification.sources.description':
+    'جمع شدہ ثبوت چیک کرنے کے لیے ان سرکاری اتھارٹی سائٹس کا استعمال کریں۔ AIM معاون کاروباری یا رجسٹری ریکارڈ کو قانونی لائسنس کا متبادل نہیں سمجھتا۔',
+  'pharmacyProfile.verification.sources.jurisdictionReview':
+    'منظوری سے پہلے پلیٹ فارم جائزہ کار کو اس دائرہ اختیار کے لیے درست قانونی اتھارٹی کی تصدیق کرنی ہوگی۔',
+  'pharmacyProfile.verification.sources.primary': 'بنیادی',
+  'pharmacyProfile.verification.sources.supporting': 'معاون',
+  'pharmacyProfile.verification.sources.conditional': 'مشروط',
+  'pharmacyProfile.verification.sources.open': 'سرکاری ذریعہ کھولیں',
   'pharmacyProfile.verification.current': 'موجودہ حالت',
   'pharmacyProfile.verification.renewal': 'کھلی تجدید',
   'pharmacyProfile.verification.none': 'ابھی کوئی تصدیقی درخواست نہیں ہے۔',
