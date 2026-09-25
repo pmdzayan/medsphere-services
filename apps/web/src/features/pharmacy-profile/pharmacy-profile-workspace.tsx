@@ -246,9 +246,7 @@ export function PharmacyProfileWorkspace() {
       setProfileForm(toProfileForm(refreshed));
       setProfileSaved(true);
     } catch (error) {
-      setProfileError(
-        error instanceof ApiError ? error.message : t('pharmacyProfile.error.save'),
-      );
+      setProfileError(error instanceof ApiError ? error.message : t('pharmacyProfile.error.save'));
     } finally {
       setProfileSaving(false);
     }
@@ -326,7 +324,9 @@ export function PharmacyProfileWorkspace() {
             <dt className="text-xs font-semibold text-[#6c7b74]">
               {t('pharmacyProfile.verification.submittedAt')}
             </dt>
-            <dd className="mt-1 text-[#16281f]">{new Date(record.submittedAt).toLocaleDateString()}</dd>
+            <dd className="mt-1 text-[#16281f]">
+              {new Date(record.submittedAt).toLocaleDateString()}
+            </dd>
           </div>
           <div>
             <dt className="text-xs font-semibold text-[#6c7b74]">
@@ -349,9 +349,7 @@ export function PharmacyProfileWorkspace() {
     );
   }
 
-  const minimumExpiryDate = new Date(Date.now() + 24 * 60 * 60 * 1000)
-    .toISOString()
-    .slice(0, 10);
+  const minimumExpiryDate = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
   return (
     <div className="space-y-6">
@@ -594,16 +592,13 @@ export function PharmacyProfileWorkspace() {
             </p>
 
             <div className="mt-5 space-y-4">
-              {verification?.current
-                ? verificationCard(
-                    verification.current,
-                    t('pharmacyProfile.verification.current'),
-                  )
-                : (
-                    <p className="rounded-xl border border-dashed border-[#d5ded9] p-4 text-sm text-[#5a6b62]">
-                      {t('pharmacyProfile.verification.none')}
-                    </p>
-                  )}
+              {verification?.current ? (
+                verificationCard(verification.current, t('pharmacyProfile.verification.current'))
+              ) : (
+                <p className="rounded-xl border border-dashed border-[#d5ded9] p-4 text-sm text-[#5a6b62]">
+                  {t('pharmacyProfile.verification.none')}
+                </p>
+              )}
               {verification?.openSubmission
                 ? verificationCard(
                     verification.openSubmission,
@@ -618,7 +613,10 @@ export function PharmacyProfileWorkspace() {
               </p>
             ) : null}
             {suspended ? (
-              <p role="alert" className="mt-5 rounded-xl border border-[#f0cbc7] bg-[#fff5f4] p-4 text-sm text-[#8c241d]">
+              <p
+                role="alert"
+                className="mt-5 rounded-xl border border-[#f0cbc7] bg-[#fff5f4] p-4 text-sm text-[#8c241d]"
+              >
                 {t('pharmacyProfile.verification.suspendedBlocked')}
               </p>
             ) : null}
