@@ -87,42 +87,21 @@ export function validateNetworkBudget(policy) {
 }
 
 function containsCacheValue(nextConfig, source, cacheValue, alias) {
-  const escapedSource = source.replace(/[.*+?^$()|[\]\\]/g, '\\function containsCacheValue(nextConfig, source, cacheValue) {
-  const escapedSource = source.replace(/[.*+?^$()|[\]\\]/g, '\\$&');
-  const escapedValue = cacheValue.replace(/[.*+?^$()|[\]\\]/g, '\\$&');
-  const sourcePattern = new RegExp(
-    `source\\s*:\\s*['"]${escapedSource}['"][\\s\\S]{0,500}Cache-Control[\\s\\S]{0,300}${escapedValue}`,
-    'i',
-  );
-  return sourcePattern.test(nextConfig);
-}');
-  const escapedValue = cacheValue.replace(/[.*+?^$()|[\]\\]/g, '\\function containsCacheValue(nextConfig, source, cacheValue) {
-  const escapedSource = source.replace(/[.*+?^$()|[\]\\]/g, '\\$&');
-  const escapedValue = cacheValue.replace(/[.*+?^$()|[\]\\]/g, '\\$&');
-  const sourcePattern = new RegExp(
-    `source\\s*:\\s*['"]${escapedSource}['"][\\s\\S]{0,500}Cache-Control[\\s\\S]{0,300}${escapedValue}`,
-    'i',
-  );
-  return sourcePattern.test(nextConfig);
-}');
-  const escapedAlias = alias.replace(/[.*+?^$()|[\]\\]/g, '\\function containsCacheValue(nextConfig, source, cacheValue) {
-  const escapedSource = source.replace(/[.*+?^$()|[\]\\]/g, '\\$&');
-  const escapedValue = cacheValue.replace(/[.*+?^$()|[\]\\]/g, '\\$&');
-  const sourcePattern = new RegExp(
-    `source\\s*:\\s*['"]${escapedSource}['"][\\s\\S]{0,500}Cache-Control[\\s\\S]{0,300}${escapedValue}`,
-    'i',
-  );
-  return sourcePattern.test(nextConfig);
-}');
-  const declaredValue = new RegExp(
-    `const\\s+${escapedAlias}\\s*=\\s*['"]${escapedValue}['"]`,
-    'i',
-  );
-  const sourcePattern = new RegExp(
-    `source\\s*:\\s*['"]${escapedSource}['"][\\s\\S]{0,500}Cache-Control[\\s\\S]{0,300}value\\s*:\\s*${escapedAlias}\\b`,
-    'i',
-  );
-  return declaredValue.test(nextConfig) && sourcePattern.test(nextConfig);
+  const singleDeclaration = `const ${alias} = '${cacheValue}'`;
+  const doubleDeclaration = `const ${alias} = "${cacheValue}"`;
+  if (!nextConfig.includes(singleDeclaration) && !nextConfig.includes(doubleDeclaration)) {
+    return false;
+  }
+
+  const singleSource = `source: '${source}'`;
+  const doubleSource = `source: "${source}"`;
+  const singleIndex = nextConfig.indexOf(singleSource);
+  const doubleIndex = nextConfig.indexOf(doubleSource);
+  const sourceIndex = singleIndex >= 0 ? singleIndex : doubleIndex;
+  if (sourceIndex < 0) return false;
+
+  const block = nextConfig.slice(sourceIndex, sourceIndex + 600);
+  return /Cache-Control/i.test(block) && block.includes(`value: ${alias}`);
 }
 
 export function findUnsafeApiCacheMarkers(repositoryRoot, policy) {
