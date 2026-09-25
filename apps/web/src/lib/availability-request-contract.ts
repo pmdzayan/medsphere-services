@@ -139,7 +139,7 @@ function isObject(value: unknown): value is Record<string, unknown> {
 }
 function hasOnlyKeys(value: Record<string, unknown>, keys: readonly string[]): boolean {
   const allowed = new Set(keys);
-  return Object.keys(value).every((key) => allowed.has(key)) && keys.every((key) => key in value);
+  return Object.keys(value).every((key) => allowed.has(key));
 }
 function integer(value: unknown, min: number, max: number): value is number {
   return Number.isSafeInteger(value) && Number(value) >= min && Number(value) <= max;
