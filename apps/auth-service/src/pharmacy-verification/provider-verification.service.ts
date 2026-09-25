@@ -11,7 +11,7 @@ import { PlatformRepository } from '../platform/platform.repository';
 import { PLATFORM_PERMISSIONS } from '../platform/platform.constants';
 import { requireActiveTenantActorWithProvider } from '@medsphere/security';
 import type { TrustedTenantActor } from '@medsphere/security';
-import type { Prisma } from '@medsphere/database';
+import type { AuditEventType, Prisma } from '@medsphere/database';
 
 /**
  * Candidate Task 0039 (PROVISIONAL). See
@@ -72,7 +72,7 @@ export interface SubmitVerificationInput {
   readonly providerId: string;
   readonly licenseNumber: string;
   readonly licenseExpiryDate: Date;
-  readonly businessRegistrationNumber: string;
+  readonly businessRegistrationNumber?: string;
   readonly governmentIdReference: string;
   readonly now?: Date;
 }
@@ -115,6 +115,30 @@ export interface SuspendActionInput extends ReviewActionInput {
 }
 
 const OPEN_STATUSES = new Set(['PENDING', 'UNDER_REVIEW']);
+const VERIFIABLE_PROVIDER_TYPES = new Set([
+  'PHARMACY',
+  'HOSPITAL',
+  'CLINIC',
+  'LABORATORY',
+  'DOCTOR',
+]);
+
+type VerificationAuditAction =
+  | 'submitted'
+  | 'resubmitted'
+  | 'review-started'
+  | 'approved'
+  | 'rejected'
+  | 'suspended'
+  | 'expired';
+
+function verificationAuditEvent(
+  providerType: string,
+  action: VerificationAuditAction,
+): AuditEventType {
+  const domain = providerType === 'PHARMACY' ? 'pharmacy' : 'provider';
+  return `${domain}.verification.${action}` as AuditEventType;
+}
 
 @Injectable()
 export class ProviderVerificationService {
@@ -187,8 +211,8 @@ export class ProviderVerificationService {
       if (!provider) {
         throw new NotFoundException('Provider not found');
       }
-      if (provider.providerType !== 'PHARMACY') {
-        throw new ForbiddenException('Only PHARMACY providers may submit pharmacy verification');
+      if (!VERIFIABLE_PROVIDER_TYPES.has(provider.providerType)) {
+        throw new ForbiddenException('Provider type is not eligible for verification');
       }
 
       // Serialize against every other consequential transition for
@@ -243,7 +267,7 @@ export class ProviderVerificationService {
             status: 'PENDING',
             licenseNumber: input.licenseNumber,
             licenseExpiryDate: input.licenseExpiryDate,
-            businessRegistrationNumber: input.businessRegistrationNumber,
+            businessRegistrationNumber: input.businessRegistrationNumber ?? null,
             governmentIdReference: input.governmentIdReference,
             isCurrent: makeNewRowCurrent,
           },
@@ -260,9 +284,10 @@ export class ProviderVerificationService {
         tenantId: input.actor.tenantId,
         actorMembershipId: input.actor.membershipId,
         actorUserId: input.actor.userId,
-        eventType: existingCurrent
-          ? 'pharmacy.verification.resubmitted'
-          : 'pharmacy.verification.submitted',
+        eventType: verificationAuditEvent(
+          provider.providerType,
+          existingCurrent ? 'resubmitted' : 'submitted',
+        ),
         outcome: 'SUCCEEDED',
         resourceType: 'ProviderVerification',
         resourceId: created.id,
@@ -436,7 +461,7 @@ export class ProviderVerificationService {
     await this.prisma.client.$transaction(async (tx) => {
       const submission = await tx.providerVerification.findUnique({
         where: { id: input.verificationId },
-        select: { tenantId: true, providerId: true },
+        select: { tenantId: true, providerId: true, providerType: true },
       });
       if (!submission?.providerId) {
         throw new ProviderVerificationConflictError('STALE_VERSION');
@@ -452,7 +477,7 @@ export class ProviderVerificationService {
       }
       await this.audit.appendPlatformUser(tx, {
         platformActorUserId: input.reviewerActor.platformUserId,
-        eventType: 'pharmacy.verification.review-started',
+        eventType: verificationAuditEvent(submission.providerType, 'review-started'),
         outcome: 'SUCCEEDED',
         resourceType: 'ProviderVerification',
         resourceId: input.verificationId,
@@ -519,14 +544,12 @@ export class ProviderVerificationService {
           id: submission.providerId,
           tenantId: submission.tenantId,
           deletedAt: null,
-          providerType: 'PHARMACY',
+          providerType: submission.providerType,
         },
         select: { id: true, providerType: true },
       });
-      if (!provider) {
-        throw new NotFoundException(
-          'Provider no longer eligible (deleted, missing, or not a pharmacy)',
-        );
+      if (!provider || !VERIFIABLE_PROVIDER_TYPES.has(provider.providerType)) {
+        throw new NotFoundException('Provider no longer eligible for verification');
       }
       if (submission.providerType !== provider.providerType) {
         throw new ForbiddenException(
@@ -576,7 +599,7 @@ export class ProviderVerificationService {
 
       await this.audit.appendPlatformUser(tx, {
         platformActorUserId: input.reviewerActor.platformUserId,
-        eventType: 'pharmacy.verification.approved',
+        eventType: verificationAuditEvent(submission.providerType, 'approved'),
         outcome: 'SUCCEEDED',
         resourceType: 'ProviderVerification',
         resourceId: input.verificationId,
@@ -613,7 +636,13 @@ export class ProviderVerificationService {
 
       const submission = await tx.providerVerification.findUnique({
         where: { id: input.verificationId },
-        select: { tenantId: true, providerId: true, status: true, isCurrent: true },
+        select: {
+          tenantId: true,
+          providerId: true,
+          providerType: true,
+          status: true,
+          isCurrent: true,
+        },
       });
       if (!submission) {
         throw new ProviderVerificationConflictError('STALE_VERSION');
@@ -647,7 +676,7 @@ export class ProviderVerificationService {
       }
       await this.audit.appendPlatformUser(tx, {
         platformActorUserId: input.reviewerActor.platformUserId,
-        eventType: 'pharmacy.verification.rejected',
+        eventType: verificationAuditEvent(submission.providerType, 'rejected'),
         outcome: 'SUCCEEDED',
         resourceType: 'ProviderVerification',
         resourceId: input.verificationId,
@@ -688,7 +717,13 @@ export class ProviderVerificationService {
 
       const current = await tx.providerVerification.findUnique({
         where: { id: input.verificationId },
-        select: { tenantId: true, providerId: true, status: true, isCurrent: true },
+        select: {
+          tenantId: true,
+          providerId: true,
+          providerType: true,
+          status: true,
+          isCurrent: true,
+        },
       });
       if (!current || !current.isCurrent) {
         throw new ProviderVerificationConflictError('STALE_VERSION');
@@ -720,7 +755,7 @@ export class ProviderVerificationService {
       }
       await this.audit.appendPlatformUser(tx, {
         platformActorUserId: input.reviewerActor.platformUserId,
-        eventType: 'pharmacy.verification.suspended',
+        eventType: verificationAuditEvent(current.providerType, 'suspended'),
         outcome: 'SUCCEEDED',
         resourceType: 'ProviderVerification',
         resourceId: input.verificationId,
@@ -748,7 +783,6 @@ export class ProviderVerificationService {
         id: providerId,
         tenantId: actor.tenantId,
         deletedAt: null,
-        providerType: 'PHARMACY',
       },
       select: {
         businessName: true,
@@ -792,7 +826,6 @@ export class ProviderVerificationService {
         id: providerId,
         tenantId: actor.tenantId,
         deletedAt: null,
-        providerType: 'PHARMACY',
       },
       select: { id: true },
     });
