@@ -60,6 +60,11 @@ export function checkAnalyticsBoundary(
     failures.push('Analytics migration grants access to OLTP public-schema tables.');
   }
 
+  const executableGrants = grants
+    .split('\n')
+    .map((line) => line.replace(/--.*$/, ''))
+    .join('\n');
+
   const grantRequirements = [
     'ALTER ROLE aim_bi_reader SET default_transaction_read_only = on',
     'REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM aim_bi_reader',
@@ -69,9 +74,13 @@ export function checkAnalyticsBoundary(
     'GRANT SELECT ON aim_analytics.daily_audit_activity TO aim_bi_reader',
   ];
   for (const value of grantRequirements) {
-    if (!grants.includes(value)) failures.push(`Missing BI least-privilege invariant: ${value}`);
+    if (!executableGrants.includes(value)) {
+      failures.push(`Missing BI least-privilege invariant: ${value}`);
+    }
   }
-  if (/CREATE\s+ROLE|PASSWORD|GRANT\s+(?:INSERT|UPDATE|DELETE|ALL)\b/i.test(grants)) {
+  if (
+    /CREATE\s+ROLE|PASSWORD|GRANT\s+(?:INSERT|UPDATE|DELETE|ALL)\b/i.test(executableGrants)
+  ) {
     failures.push('BI grant script creates credentials or grants write-capable privileges.');
   }
 
