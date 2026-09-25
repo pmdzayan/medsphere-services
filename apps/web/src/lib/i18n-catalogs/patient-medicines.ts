@@ -51,7 +51,8 @@ export const patientMedicinesEnglishMessages = {
   'patientMedicines.pickupLoading': 'Creating pickup proof...',
   'patientMedicines.pickupError': 'Pickup proof could not be created. Refresh and try again.',
   'patientMedicines.pickupLabel': 'One-time pickup proof',
-  'patientMedicines.pickupHint': 'Show this short-lived proof to the pharmacy. A new proof replaces the previous one.',
+  'patientMedicines.pickupHint':
+    'Show this short-lived proof to the pharmacy. A new proof replaces the previous one.',
   'patientMedicines.cancelSuccess': 'Reservation cancelled and the held medicine released.',
   'patientMedicines.cancelError': 'This reservation could not be cancelled right now.',
   'patientMedicines.expiresOn': 'Held until {date}',
@@ -112,9 +113,11 @@ export const patientMedicinesTamilMessages: Record<PatientMedicinesTranslationKe
   'patientMedicines.cancelLoading': 'ரத்து செய்யப்படுகிறது',
   'patientMedicines.pickupAction': 'பெறுதல் சான்றை உருவாக்கு',
   'patientMedicines.pickupLoading': 'பெறுதல் சான்று உருவாக்கப்படுகிறது…',
-  'patientMedicines.pickupError': 'பெறுதல் சான்றை உருவாக்க முடியவில்லை. புதுப்பித்து மீண்டும் முயலவும்.',
+  'patientMedicines.pickupError':
+    'பெறுதல் சான்றை உருவாக்க முடியவில்லை. புதுப்பித்து மீண்டும் முயலவும்.',
   'patientMedicines.pickupLabel': 'ஒருமுறை பயன்படுத்தும் பெறுதல் சான்று',
-  'patientMedicines.pickupHint': 'இந்த குறுகிய கால சான்றை மருந்தகத்தில் காட்டுங்கள். புதிய சான்று பழையதை மாற்றும்.',
+  'patientMedicines.pickupHint':
+    'இந்த குறுகிய கால சான்றை மருந்தகத்தில் காட்டுங்கள். புதிய சான்று பழையதை மாற்றும்.',
   'patientMedicines.cancelSuccess': 'முன்பதிவு ரத்து செய்யப்பட்டு மருந்து விடுவிக்கப்பட்டது.',
   'patientMedicines.cancelError': 'இப்போது இந்த முன்பதிவை ரத்து செய்ய முடியவில்லை.',
   'patientMedicines.expiresOn': '{date} வரை வைத்திருக்கப்படும்',
@@ -174,7 +177,8 @@ export const patientMedicinesUrduMessages: Record<PatientMedicinesTranslationKey
   'patientMedicines.pickupLoading': 'پک اپ ثبوت بنایا جا رہا ہے…',
   'patientMedicines.pickupError': 'پک اپ ثبوت نہیں بن سکا۔ تازہ کریں اور دوبارہ کوشش کریں۔',
   'patientMedicines.pickupLabel': 'ایک بار استعمال ہونے والا پک اپ ثبوت',
-  'patientMedicines.pickupHint': 'یہ مختصر مدت کا ثبوت فارمیسی کو دکھائیں۔ نیا ثبوت پچھلے ثبوت کی جگہ لے گا۔',
+  'patientMedicines.pickupHint':
+    'یہ مختصر مدت کا ثبوت فارمیسی کو دکھائیں۔ نیا ثبوت پچھلے ثبوت کی جگہ لے گا۔',
   'patientMedicines.cancelSuccess': 'ریزرویشن منسوخ ہو گئی اور دوا جاری کر دی گئی۔',
   'patientMedicines.cancelError': 'ابھی یہ ریزرویشن منسوخ نہیں ہو سکی۔',
   'patientMedicines.expiresOn': '{date} تک محفوظ',
