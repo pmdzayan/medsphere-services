@@ -104,9 +104,11 @@ export const reservationsEnglishMessages = {
   'reservations.availability.noProvider': 'No assigned pharmacy',
   'reservations.availability.refresh': 'Refresh',
   'reservations.availability.errorProviders': 'Unable to load assigned pharmacies.',
-  'reservations.availability.errorDenied': 'Live availability requests are not assigned to this membership.',
+  'reservations.availability.errorDenied':
+    'Live availability requests are not assigned to this membership.',
   'reservations.availability.errorLoad': 'Unable to load live availability requests.',
-  'reservations.availability.errorRespond': 'The response was not saved. Refresh the queue and try again.',
+  'reservations.availability.errorRespond':
+    'The response was not saved. Refresh the queue and try again.',
   'reservations.availability.loading': 'Loading live requests…',
   'reservations.availability.tableMedicine': 'Medicine',
   'reservations.availability.tableRequested': 'Requested',
@@ -230,9 +232,11 @@ export const reservationsTamilMessages: Record<keyof typeof reservationsEnglishM
   'reservations.availability.noProvider': 'ஒதுக்கப்பட்ட மருந்தகம் இல்லை',
   'reservations.availability.refresh': 'புதுப்பி',
   'reservations.availability.errorProviders': 'ஒதுக்கப்பட்ட மருந்தகங்களை ஏற்ற முடியவில்லை.',
-  'reservations.availability.errorDenied': 'இந்த உறுப்பினர் பதிவுக்கு நேரடி கிடைப்புக் கோரிக்கைகள் ஒதுக்கப்படவில்லை.',
+  'reservations.availability.errorDenied':
+    'இந்த உறுப்பினர் பதிவுக்கு நேரடி கிடைப்புக் கோரிக்கைகள் ஒதுக்கப்படவில்லை.',
   'reservations.availability.errorLoad': 'நேரடி கிடைப்புக் கோரிக்கைகளை ஏற்ற முடியவில்லை.',
-  'reservations.availability.errorRespond': 'பதில் சேமிக்கப்படவில்லை. வரிசையைப் புதுப்பித்து மீண்டும் முயலவும்.',
+  'reservations.availability.errorRespond':
+    'பதில் சேமிக்கப்படவில்லை. வரிசையைப் புதுப்பித்து மீண்டும் முயலவும்.',
   'reservations.availability.loading': 'நேரடி கோரிக்கைகள் ஏற்றப்படுகின்றன…',
   'reservations.availability.tableMedicine': 'மருந்து',
   'reservations.availability.tableRequested': 'கோரப்பட்டது',
@@ -357,7 +361,8 @@ export const reservationsUrduMessages: Record<keyof typeof reservationsEnglishMe
   'reservations.availability.errorProviders': 'تفویض شدہ فارمیسیاں لوڈ نہیں ہو سکیں۔',
   'reservations.availability.errorDenied': 'اس رکنیت کو لائیو دستیابی کی درخواستیں تفویض نہیں ہیں۔',
   'reservations.availability.errorLoad': 'لائیو دستیابی کی درخواستیں لوڈ نہیں ہو سکیں۔',
-  'reservations.availability.errorRespond': 'جواب محفوظ نہیں ہوا۔ قطار تازہ کریں اور دوبارہ کوشش کریں۔',
+  'reservations.availability.errorRespond':
+    'جواب محفوظ نہیں ہوا۔ قطار تازہ کریں اور دوبارہ کوشش کریں۔',
   'reservations.availability.loading': 'لائیو درخواستیں لوڈ ہو رہی ہیں…',
   'reservations.availability.tableMedicine': 'دوا',
   'reservations.availability.tableRequested': 'درخواست کا وقت',
