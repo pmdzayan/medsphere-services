@@ -263,7 +263,7 @@ The reference collector:
 - exposes a Prometheus-compatible collector endpoint on host
   `127.0.0.1:9464` only;
 - exposes collector health on host `127.0.0.1:13133` only;
-- filters output to `medsphere_.*` application metrics plus target `up` health;
+- filters output to AIM application metrics plus target `up` health;
 - has no debug exporter, log receiver, or trace receiver in the Task 0049 production-reference configuration;
 - runs outside AIM's business-request path, so collector failure cannot alter
   authentication, inventory, reservations, or patient workflows.
