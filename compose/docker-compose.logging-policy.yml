@@ -1,0 +1,30 @@
+# Task 0049 bounded local log fallback.
+#
+# Use this as the final Compose override with the accepted application and
+# observability files. The Docker local driver rotates/compresses logs and keeps
+# disk use bounded without introducing a centralized log processor that could
+# receive healthcare data. Production platforms may enforce a shorter reviewed
+# retention period, but must not remove the privacy rules in @medsphere/logger.
+
+x-aim-bounded-logging: &aim-bounded-logging
+  driver: local
+  options:
+    max-size: 20m
+    max-file: '10'
+    compress: 'true'
+
+services:
+  auth-service:
+    logging: *aim-bounded-logging
+
+  notification-worker:
+    logging: *aim-bounded-logging
+
+  aim-otel-collector:
+    logging: *aim-bounded-logging
+
+  aim-prometheus:
+    logging: *aim-bounded-logging
+
+  aim-alertmanager:
+    logging: *aim-bounded-logging
