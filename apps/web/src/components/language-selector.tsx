@@ -10,10 +10,11 @@ export function LanguageSelector() {
     <label className="inline-flex items-center gap-3 rounded-xl border border-[#10201c]/[.09] bg-white/80 px-3 py-2 text-xs font-bold text-[#43524e] shadow-sm">
       <span>{t('language.label')}</span>
       <select
+        id="language-selector"
         value={locale}
         onChange={(event) => setLocale(event.target.value as Locale)}
         aria-label={t('language.label')}
-        className="max-w-44 rounded-lg border border-[#10201c]/[.1] bg-[#fbfaf5] px-2.5 py-1.5 text-xs font-bold text-[#10201c] outline-none focus:border-emerald-600"
+        className="min-h-11 max-w-44 touch-manipulation rounded-lg border border-[#10201c]/[.1] bg-[#fbfaf5] px-2.5 text-xs font-bold text-[#10201c] outline-none focus:border-emerald-600"
       >
         {enabledLocaleOptions.map((option) => (
           <option key={option.code} value={option.code}>
