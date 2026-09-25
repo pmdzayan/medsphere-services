@@ -216,8 +216,8 @@ describe('Task 0060 independent AI-code security/data-integrity gate', () => {
       },
       {
         state: 'APPROVED',
-        submited_at: '2026-09-25T12:00:00Z',
-        user: { login: 'author", type: 'User' },
+        submitted_at: '2026-09-25T12:00:00Z',
+        user: { login: 'author', type: 'User' },
       },
     ];
     assert.deepEqual(evaluateIndependentReviews(reviews, 'author'), {
