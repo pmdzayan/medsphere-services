@@ -40,7 +40,9 @@ export interface AvailabilityResponseReceipt {
   replayed: boolean;
 }
 
-export function isAvailabilityRequestQueuePage(value: unknown): value is AvailabilityRequestQueuePage {
+export function isAvailabilityRequestQueuePage(
+  value: unknown,
+): value is AvailabilityRequestQueuePage {
   if (!isObject(value) || !hasOnlyKeys(value, ['data', 'total', 'limit', 'offset'])) return false;
   return (
     Array.isArray(value.data) &&
@@ -52,31 +54,50 @@ export function isAvailabilityRequestQueuePage(value: unknown): value is Availab
   );
 }
 
-export function isAvailabilityResponseRequest(value: unknown): value is AvailabilityResponseRequest {
+export function isAvailabilityResponseRequest(
+  value: unknown,
+): value is AvailabilityResponseRequest {
   if (
     !isObject(value) ||
     !hasOnlyKeys(value, ['outcome', 'idempotencyKey', 'expectedVersion', 'retryAfterMinutes'])
-  ) return false;
+  )
+    return false;
   if (
-    !(value.outcome === 'AVAILABLE' || value.outcome === 'UNAVAILABLE' || value.outcome === 'CHECK_LATER') ||
+    !(
+      value.outcome === 'AVAILABLE' ||
+      value.outcome === 'UNAVAILABLE' ||
+      value.outcome === 'CHECK_LATER'
+    ) ||
     typeof value.idempotencyKey !== 'string' ||
     value.idempotencyKey.trim() !== value.idempotencyKey ||
     value.idempotencyKey.length < 1 ||
     value.idempotencyKey.length > 120 ||
     !integer(value.expectedVersion, 1, 2_147_483_647)
-  ) return false;
+  )
+    return false;
   if (value.outcome === 'CHECK_LATER') {
     return integer(value.retryAfterMinutes, 5, 1440);
   }
   return value.retryAfterMinutes === undefined;
 }
 
-export function isAvailabilityResponseReceipt(value: unknown): value is AvailabilityResponseReceipt {
+export function isAvailabilityResponseReceipt(
+  value: unknown,
+): value is AvailabilityResponseReceipt {
   return (
     isObject(value) &&
-    hasOnlyKeys(value, ['requestId','outcome','confirmedAt','validUntil','retryAfterAt','replayed']) &&
+    hasOnlyKeys(value, [
+      'requestId',
+      'outcome',
+      'confirmedAt',
+      'validUntil',
+      'retryAfterAt',
+      'replayed',
+    ]) &&
     isCanonicalUuid(value.requestId) &&
-    (value.outcome === 'AVAILABLE' || value.outcome === 'UNAVAILABLE' || value.outcome === 'CHECK_LATER') &&
+    (value.outcome === 'AVAILABLE' ||
+      value.outcome === 'UNAVAILABLE' ||
+      value.outcome === 'CHECK_LATER') &&
     iso(value.confirmedAt) &&
     (value.validUntil === null || iso(value.validUntil)) &&
     (value.retryAfterAt === null || iso(value.retryAfterAt)) &&
@@ -88,8 +109,17 @@ function isQueueRow(value: unknown): value is AvailabilityRequestQueueRow {
   return (
     isObject(value) &&
     hasOnlyKeys(value, [
-      'requestId','productId','productName','genericName','brand','strength','dosageForm',
-      'status','requestedAt','expiresAt','version'
+      'requestId',
+      'productId',
+      'productName',
+      'genericName',
+      'brand',
+      'strength',
+      'dosageForm',
+      'status',
+      'requestedAt',
+      'expiresAt',
+      'version',
     ]) &&
     isCanonicalUuid(value.requestId) &&
     isCanonicalUuid(value.productId) &&
