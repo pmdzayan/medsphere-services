@@ -4,6 +4,10 @@ export const AUDIT_EVENT_TYPES = [
   'authorization.role.deleted',
   'authorization.assignment.added',
   'authorization.assignment.removed',
+  'authorization.provider-location-access.added',
+  'authorization.provider-location-access.removed',
+  'authorization.provider-department-access.added',
+  'authorization.provider-department-access.removed',
   'authorization.permission.denied',
   'authentication.session.created',
   'authentication.session.refresh.succeeded',
@@ -22,6 +26,16 @@ export const AUDIT_EVENT_TYPES = [
   'inventory.reservation.completed',
   'inventory.reservation.cancelled',
   'inventory.reservation.expired',
+  'provider.domain.created',
+  'provider.location.created',
+  'provider.department.created',
+  'provider.verification.submitted',
+  'provider.verification.resubmitted',
+  'provider.verification.review-started',
+  'provider.verification.approved',
+  'provider.verification.rejected',
+  'provider.verification.suspended',
+  'provider.verification.expired',
 ] as const;
 
 export const AUDIT_OUTCOMES = ['SUCCEEDED', 'DENIED', 'FAILED'] as const;
@@ -36,6 +50,22 @@ const AUDIT_METADATA_KEYS: Readonly<Record<AuditEventType, readonly string[]>> =
   'authorization.role.deleted': ['roleName', 'roleVersion'],
   'authorization.assignment.added': ['targetMembershipId', 'roleName'],
   'authorization.assignment.removed': ['targetMembershipId', 'roleName'],
+  'authorization.provider-location-access.added': ['targetMembershipId', 'providerId', 'locationId'],
+  'authorization.provider-location-access.removed': [
+    'targetMembershipId',
+    'providerId',
+    'locationId',
+  ],
+  'authorization.provider-department-access.added': [
+    'targetMembershipId',
+    'providerId',
+    'departmentId',
+  ],
+  'authorization.provider-department-access.removed': [
+    'targetMembershipId',
+    'providerId',
+    'departmentId',
+  ],
   'authorization.permission.denied': ['requiredPermissions'],
   'authentication.session.created': [],
   'authentication.session.refresh.succeeded': ['previousSessionId'],
@@ -67,6 +97,16 @@ const AUDIT_METADATA_KEYS: Readonly<Record<AuditEventType, readonly string[]>> =
   'inventory.reservation.completed': ['previousStatus', 'version', 'totalQuantity'],
   'inventory.reservation.cancelled': ['previousStatus', 'version', 'totalQuantity', 'cause'],
   'inventory.reservation.expired': ['previousStatus', 'version', 'totalQuantity', 'cause'],
+  'provider.domain.created': ['providerId', 'providerType', 'locationId'],
+  'provider.location.created': ['providerId', 'locationId'],
+  'provider.department.created': ['providerId', 'locationId', 'departmentId'],
+  'provider.verification.submitted': ['verificationId', 'providerId'],
+  'provider.verification.resubmitted': ['verificationId', 'providerId', 'previousVerificationId'],
+  'provider.verification.review-started': ['verificationId', 'providerId', 'previousStatus'],
+  'provider.verification.approved': ['verificationId', 'providerId', 'previousStatus'],
+  'provider.verification.rejected': ['verificationId', 'providerId', 'previousStatus'],
+  'provider.verification.suspended': ['verificationId', 'providerId', 'previousStatus'],
+  'provider.verification.expired': ['verificationId', 'providerId', 'previousStatus'],
 };
 
 export interface AuditEvent {
