@@ -38,6 +38,8 @@ CREATE UNIQUE INDEX "MedicinePickupToken_tokenHash_key"
   ON "MedicinePickupToken" ("tokenHash");
 CREATE UNIQUE INDEX "MedicinePickupToken_reservation_scope_key"
   ON "MedicinePickupToken" ("reservationId", "tenantId", "providerId");
+CREATE UNIQUE INDEX "MedicinePickupToken_reservation_subject_scope_key"
+  ON "MedicinePickupToken" ("reservationId", "tenantId", "providerId", "subjectUserId");
 CREATE INDEX "MedicinePickupToken_tenant_provider_expires_idx"
   ON "MedicinePickupToken" ("tenantId", "providerId", "expiresAt");
 CREATE INDEX "MedicinePickupToken_subject_consumed_expires_idx"
@@ -66,6 +68,10 @@ CREATE UNIQUE INDEX "MedicinePickupHandoff_saleId_key"
   ON "MedicinePickupHandoff" ("saleId");
 CREATE UNIQUE INDEX "MedicinePickupHandoff_reservation_scope_key"
   ON "MedicinePickupHandoff" ("reservationId", "tenantId", "providerId");
+CREATE UNIQUE INDEX "MedicinePickupHandoff_reservation_subject_scope_key"
+  ON "MedicinePickupHandoff" ("reservationId", "tenantId", "providerId", "subjectUserId");
+CREATE UNIQUE INDEX "MedicinePickupHandoff_sale_scope_key"
+  ON "MedicinePickupHandoff" ("saleId", "tenantId", "providerId");
 CREATE INDEX "MedicinePickupHandoff_tenant_provider_verified_idx"
   ON "MedicinePickupHandoff" ("tenantId", "providerId", "verifiedAt" DESC);
 CREATE INDEX "MedicinePickupHandoff_subject_verified_idx"
