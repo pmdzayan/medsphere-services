@@ -1,0 +1,55 @@
+name: Task 0060 One-Shot Formatting Repair
+
+on:
+  push:
+    branches:
+      - cto/0060-independent-ai-code-security-data-integrity
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+        with:
+          ref: cto/0060-independent-ai-code-security-data-integrity
+          fetch-depth: 0
+
+      - name: Install PNPM
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+          run_install: false
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.12.0
+          cache: pnpm
+
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Format Task 0060 files
+        run: >-
+          pnpm exec prettier --write
+          docs/adr/README.md
+          docs/architecture/ai-code-security-data-integrity-policy.json
+          scripts/ai-code-security-data-integrity-gate.mjs
+
+      - name: Commit formatting only when needed
+        run: |
+          if git diff --quiet; then
+            echo "No formatting changes required."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/adr/README.md docs/architecture/ai-code-security-data-integrity-policy.json scripts/ai-code-security-data-integrity-gate.mjs
+          git commit -m "style: format Task 0060 files"
+          git push origin HEAD:cto/0060-independent-ai-code-security-data-integrity

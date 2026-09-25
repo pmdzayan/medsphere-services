@@ -5,22 +5,40 @@
   "reviewRequired": [
     {
       "id": "backend-healthcare-authority",
-      "prefixes": ["apps/auth-service/src/"],
-      "excludeSuffixes": [".spec.ts", ".test.ts"]
+      "prefixes": [
+        "apps/auth-service/src/"
+      ],
+      "excludeSuffixes": [
+        ".spec.ts",
+        ".test.ts"
+      ]
     },
     {
       "id": "browser-bff-trust-boundary",
-      "prefixes": ["apps/web/src/app/api/"],
-      "excludeSuffixes": [".spec.ts", ".test.ts"]
+      "prefixes": [
+        "apps/web/src/app/api/"
+      ],
+      "excludeSuffixes": [
+        ".spec.ts",
+        ".test.ts"
+      ]
     },
     {
       "id": "shared-security-boundary",
-      "prefixes": ["packages/security/"],
-      "excludeSuffixes": [".spec.ts", ".test.ts"]
+      "prefixes": [
+        "packages/security/"
+      ],
+      "excludeSuffixes": [
+        ".spec.ts",
+        ".test.ts"
+      ]
     },
     {
       "id": "database-schema-and-migrations",
-      "prefixes": ["packages/database/prisma/schema.prisma", "packages/database/prisma/migrations/"]
+      "prefixes": [
+        "packages/database/prisma/schema.prisma",
+        "packages/database/prisma/migrations/"
+      ]
     },
     {
       "id": "gate-integrity",
@@ -139,7 +157,8 @@
       "docs/sprints/Task-0060-ai-code-security-data-integrity.md",
       "PROJECT_RULES.md",
       "PRODUCT_ROADMAP.md",
-      "package.json"
+      "package.json",
+      ".github/workflows/task-0060-format-repair.yml"
     ]
   }
 }
