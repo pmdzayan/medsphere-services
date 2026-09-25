@@ -131,7 +131,10 @@ describe('Task 0059 network efficiency boundary', () => {
   it('fails when production compression is disabled', () => {
     const root = validRepository();
     const configPath = path.join(root, 'apps/web/next.config.ts');
-    fs.writeFileSync(fs.readFileSync(configPath, 'utf8').replace('compress: true', 'compress: false'));
+    fs.writeFileSync(
+      configPath,
+      fs.readFileSync(configPath, 'utf8').replace('compress: true', 'compress: false'),
+    );
     assert.ok(
       checkNetworkEfficiencyBoundary(root).some((failure) =>
         failure.includes('compression is not explicitly enabled'),
@@ -143,6 +146,7 @@ describe('Task 0059 network efficiency boundary', () => {
     const root = validRepository();
     const configPath = path.join(root, 'apps/web/next.config.ts');
     fs.writeFileSync(
+      configPath,
       fs.readFileSync(configPath, 'utf8').replace(
         'no-cache, no-store, must-revalidate',
         'public, max-age=604800',
