@@ -99,10 +99,13 @@ export class PharmacyVerificationController {
     @CurrentIdentity() identity: AuthenticatedIdentity,
     @Param('providerId', new ParseUUIDPipe({ version: '4' })) providerId: string,
   ): Promise<PharmacyVerificationStateResponseDto> {
-    const { current, openSubmission } = await this.verification.getCurrentState(
-      identity,
-      providerId,
-    );
+    const {
+      current,
+      openSubmission,
+      verificationSources,
+      jurisdictionReviewRequired,
+      jurisdictionNote,
+    } = await this.verification.getCurrentState(identity, providerId);
     const toRecord = (row: typeof current) =>
       row
         ? {
@@ -114,7 +117,13 @@ export class PharmacyVerificationController {
             version: row.version,
           }
         : null;
-    return { current: toRecord(current), openSubmission: toRecord(openSubmission) };
+    return {
+      current: toRecord(current),
+      openSubmission: toRecord(openSubmission),
+      verificationSources: [...verificationSources],
+      jurisdictionReviewRequired,
+      jurisdictionNote,
+    };
   }
 
   @Post('verification')
