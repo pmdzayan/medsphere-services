@@ -1,0 +1,139 @@
+name: AIM Pharmacy-First Release Certification
+
+on:
+  workflow_dispatch: {}
+  pull_request:
+    branches:
+      - feature/database-architecture
+  push:
+    branches:
+      - feature/database-architecture
+
+concurrency:
+  group: pharmacy-release-cert-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  release-candidate:
+    name: Exact artifact and fail-closed release gate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      DATABASE_URL: postgresql://medsphere_ci:medsphere_ci@localhost:5432/medsphere_ci?schema=public
+      REDIS_CLUSTER_URL: redis://localhost:6379
+      RUN_AUTH_INFRASTRUCTURE_TESTS: 'true'
+      RELEASE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: medsphere_ci
+          POSTGRES_PASSWORD: medsphere_ci
+          POSTGRES_DB: medsphere_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U medsphere_ci -d medsphere_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+
+    steps:
+      - name: Checkout exact release candidate SHA
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Verify exact release identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual_sha="$(git rev-parse HEAD)"
+          if [ "$actual_sha" != "$RELEASE_SHA" ]; then
+            echo "Checked-out SHA does not match the release candidate."
+            exit 1
+          fi
+
+      - name: Install PNPM
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+          run_install: false
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.12.0
+          cache: pnpm
+
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Audit production dependencies
+        run: pnpm audit:prod
+
+      - name: Verify release-gate logic
+        run: pnpm test:pharmacy-release-certification
+
+      - name: Verify security, privacy and architecture boundaries
+        run: pnpm test:architecture
+
+      - name: Verify clean migration and drift
+        run: pnpm db:verify
+
+      - name: Verify populated upgrade safety
+        run: pnpm db:verify-upgrade
+
+      - name: Build exact auth-service container candidate
+        run: docker build --build-arg TARGET_SERVICE=auth-service -t aim-auth-service:task0050 .
+
+      - name: Capture immutable candidate identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          image_id="$(docker image inspect --format '{{.Id}}' aim-auth-service:task0050)"
+          case "$image_id" in
+            sha256:[0-9a-f][0-9a-f]*) ;;
+            *)
+              echo "Container image ID is not a sha256 identifier."
+              exit 1
+              ;;
+          esac
+
+          short_sha="${RELEASE_SHA:0:12}"
+          echo "TASK_0050_CONTAINER_IMAGE_ID=$image_id" >> "$GITHUB_ENV"
+          echo "TASK_0050_APP_VERSION=pharmacy-v1-$short_sha" >> "$GITHUB_ENV"
+
+      - name: Generate exact release candidate ledger
+        run: |
+          node scripts/pharmacy-release-certification.mjs candidate /tmp/task-0050-candidate.json
+          node scripts/pharmacy-release-certification.mjs template /tmp/task-0050-candidate.json /tmp/task-0050-evidence-template.json
+
+      - name: Prove incomplete evidence fails closed
+        run: node scripts/pharmacy-release-certification.mjs contract /tmp/task-0050-evidence-template.json "$RELEASE_SHA"
+
+      - name: Upload bounded release evidence template
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: task-0050-pharmacy-release-candidate
+          path: |
+            /tmp/task-0050-candidate.json
+            /tmp/task-0050-evidence-template.json
+          if-no-files-found: error
+          retention-days: 30
