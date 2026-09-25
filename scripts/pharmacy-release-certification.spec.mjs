@@ -96,7 +96,9 @@ describe('Task 0050 release candidate contract', () => {
     const result = evaluateEvidence(evidence, sha);
     assert.equal(result.repositoryReady, true);
     assert.equal(result.productionGo, false);
-    assert.ok(result.productionFailures.some((failure) => failure.includes('openCriticalFindings')));
+    assert.ok(
+      result.productionFailures.some((failure) => failure.includes('openCriticalFindings')),
+    );
   });
 
   it('returns GO only when exact artifact, repository, external and approval evidence are all complete', () => {

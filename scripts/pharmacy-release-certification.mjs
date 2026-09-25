@@ -75,15 +75,24 @@ export function hashDirectory(directory, base = directory) {
 
 export function validateCandidate(candidate, expectedSha = candidate?.releaseSha) {
   const failures = [];
-  if (!candidate || candidate.schemaVersion !== 1) failures.push('candidate schemaVersion must be 1');
-  if (!SHA_RE.test(candidate?.releaseSha ?? '')) failures.push('candidate releaseSha must be a full lowercase 40-character Git SHA');
-  if (expectedSha && candidate?.releaseSha !== expectedSha) failures.push('candidate releaseSha does not match the expected exact release SHA');
-  if (!SHA_RE.test(candidate?.gitTreeSha ?? '')) failures.push('candidate gitTreeSha must be a full lowercase 40-character Git tree SHA');
-  if (!SHA256_RE.test(candidate?.sourceArchiveSha256 ?? '')) failures.push('candidate sourceArchiveSha256 must be a SHA-256 hex digest');
-  if (!SHA256_RE.test(candidate?.lockfileSha256 ?? '')) failures.push('candidate lockfileSha256 must be a SHA-256 hex digest');
-  if (!SHA256_RE.test(candidate?.migrationsSha256 ?? '')) failures.push('candidate migrationsSha256 must be a SHA-256 hex digest');
-  if (!IMAGE_DIGEST_RE.test(candidate?.containerImageId ?? '')) failures.push('candidate containerImageId must be a sha256 image identifier');
-  if (!APP_VERSION_RE.test(candidate?.appVersion ?? '')) failures.push('candidate appVersion is missing or invalid');
+  if (!candidate || candidate.schemaVersion !== 1)
+    failures.push('candidate schemaVersion must be 1');
+  if (!SHA_RE.test(candidate?.releaseSha ?? ''))
+    failures.push('candidate releaseSha must be a full lowercase 40-character Git SHA');
+  if (expectedSha && candidate?.releaseSha !== expectedSha)
+    failures.push('candidate releaseSha does not match the expected exact release SHA');
+  if (!SHA_RE.test(candidate?.gitTreeSha ?? ''))
+    failures.push('candidate gitTreeSha must be a full lowercase 40-character Git tree SHA');
+  if (!SHA256_RE.test(candidate?.sourceArchiveSha256 ?? ''))
+    failures.push('candidate sourceArchiveSha256 must be a SHA-256 hex digest');
+  if (!SHA256_RE.test(candidate?.lockfileSha256 ?? ''))
+    failures.push('candidate lockfileSha256 must be a SHA-256 hex digest');
+  if (!SHA256_RE.test(candidate?.migrationsSha256 ?? ''))
+    failures.push('candidate migrationsSha256 must be a SHA-256 hex digest');
+  if (!IMAGE_DIGEST_RE.test(candidate?.containerImageId ?? ''))
+    failures.push('candidate containerImageId must be a sha256 image identifier');
+  if (!APP_VERSION_RE.test(candidate?.appVersion ?? ''))
+    failures.push('candidate appVersion is missing or invalid');
   return failures;
 }
 
@@ -96,7 +105,9 @@ function rejectUnknownKeys(value, allowed, label, failures) {
 
 function checkEvidenceRef(value, label, failures) {
   if (typeof value !== 'string' || !EVIDENCE_REF_RE.test(value)) {
-    failures.push(`${label} evidenceRef must be an opaque bounded reference without query strings, credentials or free text`);
+    failures.push(
+      `${label} evidenceRef must be an opaque bounded reference without query strings, credentials or free text`,
+    );
   }
 }
 
@@ -161,10 +172,14 @@ export function evaluateEvidence(evidence, expectedSha = evidence?.releaseSha) {
   );
   const productionFailures = [];
 
-  if (!evidence || evidence.schemaVersion !== 1) repositoryFailures.push('evidence schemaVersion must be 1');
-  if (evidence?.releaseSha !== evidence?.candidate?.releaseSha) repositoryFailures.push('evidence releaseSha must match candidate releaseSha');
-  if (!APP_VERSION_RE.test(evidence?.appVersion ?? '')) repositoryFailures.push('evidence appVersion is missing or invalid');
-  if (evidence?.appVersion !== evidence?.candidate?.appVersion) repositoryFailures.push('evidence appVersion must match candidate appVersion');
+  if (!evidence || evidence.schemaVersion !== 1)
+    repositoryFailures.push('evidence schemaVersion must be 1');
+  if (evidence?.releaseSha !== evidence?.candidate?.releaseSha)
+    repositoryFailures.push('evidence releaseSha must match candidate releaseSha');
+  if (!APP_VERSION_RE.test(evidence?.appVersion ?? ''))
+    repositoryFailures.push('evidence appVersion is missing or invalid');
+  if (evidence?.appVersion !== evidence?.candidate?.appVersion)
+    repositoryFailures.push('evidence appVersion must match candidate appVersion');
 
   validateCheckGroup(
     evidence?.repositoryChecks,
@@ -190,8 +205,14 @@ export function evaluateEvidence(evidence, expectedSha = evidence?.releaseSha) {
   if (!Number.isInteger(evidence?.openCriticalFindings) || evidence.openCriticalFindings !== 0) {
     productionFailures.push('openCriticalFindings must be exactly 0');
   }
-  rejectUnknownKeys(evidence?.decision, ['approved', 'approvalRef'], 'decision', productionFailures);
-  if (evidence?.decision?.approved !== true) productionFailures.push('decision.approved must be true');
+  rejectUnknownKeys(
+    evidence?.decision,
+    ['approved', 'approvalRef'],
+    'decision',
+    productionFailures,
+  );
+  if (evidence?.decision?.approved !== true)
+    productionFailures.push('decision.approved must be true');
   checkEvidenceRef(evidence?.decision?.approvalRef, 'decision', productionFailures);
 
   return {
@@ -207,7 +228,10 @@ export function createEvidenceTemplate(candidate) {
   if (candidateFailures.length > 0) throw new Error(candidateFailures.join('; '));
 
   const repositoryChecks = Object.fromEntries(
-    REPOSITORY_CHECKS.map((key) => [key, { status: 'PENDING', sha: candidate.releaseSha, evidenceRef: '' }]),
+    REPOSITORY_CHECKS.map((key) => [
+      key,
+      { status: 'PENDING', sha: candidate.releaseSha, evidenceRef: '' },
+    ]),
   );
   const externalChecks = Object.fromEntries(
     EXTERNAL_CHECKS.map((key) => [key, { status: 'PENDING', evidenceRef: '' }]),
@@ -230,11 +254,17 @@ export function createEvidenceTemplate(candidate) {
 }
 
 export function generateCandidate({ cwd = root, appVersion, containerImageId }) {
-  if (!APP_VERSION_RE.test(appVersion ?? '')) throw new Error('TASK_0050_APP_VERSION is missing or invalid');
-  if (!IMAGE_DIGEST_RE.test(containerImageId ?? '')) throw new Error('TASK_0050_CONTAINER_IMAGE_ID must be a sha256 image identifier');
+  if (!APP_VERSION_RE.test(appVersion ?? ''))
+    throw new Error('TASK_0050_APP_VERSION is missing or invalid');
+  if (!IMAGE_DIGEST_RE.test(containerImageId ?? ''))
+    throw new Error('TASK_0050_CONTAINER_IMAGE_ID must be a sha256 image identifier');
 
-  const releaseSha = execFileSync('git', ['rev-parse', 'HEAD'], { cwd, encoding: 'utf8' }).trim().toLowerCase();
-  const gitTreeSha = execFileSync('git', ['rev-parse', 'HEAD^{tree}'], { cwd, encoding: 'utf8' }).trim().toLowerCase();
+  const releaseSha = execFileSync('git', ['rev-parse', 'HEAD'], { cwd, encoding: 'utf8' })
+    .trim()
+    .toLowerCase();
+  const gitTreeSha = execFileSync('git', ['rev-parse', 'HEAD^{tree}'], { cwd, encoding: 'utf8' })
+    .trim()
+    .toLowerCase();
   const sourceArchive = execFileSync('git', ['archive', '--format=tar', 'HEAD'], {
     cwd,
     encoding: null,
@@ -285,7 +315,9 @@ export function run(argv = process.argv.slice(2)) {
     const candidate = readJson(first);
     const template = createEvidenceTemplate(candidate);
     writeJson(second, template);
-    console.log('TASK 0050 EVIDENCE TEMPLATE: PASS (production decision remains NO-GO until evidence is completed)');
+    console.log(
+      'TASK 0050 EVIDENCE TEMPLATE: PASS (production decision remains NO-GO until evidence is completed)',
+    );
     return 0;
   }
 
@@ -299,14 +331,18 @@ export function run(argv = process.argv.slice(2)) {
       for (const reason of result.repositoryFailures) console.error(`[REPOSITORY] ${reason}`);
     }
     if (!result.productionGo) {
-      for (const reason of result.productionFailures.filter((reason) => !result.repositoryFailures.includes(reason))) {
+      for (const reason of result.productionFailures.filter(
+        (reason) => !result.repositoryFailures.includes(reason),
+      )) {
         console.error(`[PRODUCTION] ${reason}`);
       }
     }
 
     if (command === 'contract') {
       if (result.productionGo) {
-        console.error('Contract check expected the generated template to fail closed, but it produced GO.');
+        console.error(
+          'Contract check expected the generated template to fail closed, but it produced GO.',
+        );
         return 1;
       }
       console.log('TASK 0050 FAIL-CLOSED CONTRACT: PASS');
@@ -329,7 +365,9 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   try {
     process.exitCode = run();
   } catch (error) {
-    console.error(`TASK 0050 CERTIFICATION ERROR: ${error instanceof Error ? error.message : String(error)}`);
+    console.error(
+      `TASK 0050 CERTIFICATION ERROR: ${error instanceof Error ? error.message : String(error)}`,
+    );
     process.exitCode = 1;
   }
 }
