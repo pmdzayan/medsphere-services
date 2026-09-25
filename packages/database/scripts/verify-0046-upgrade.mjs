@@ -135,7 +135,7 @@ VALUES
 INSERT INTO "MedicineReservation"
   ("id","tenantId","providerId","subjectUserId","status","expiresAt","confirmedAt","readyAt","idempotencyKey","creationHash","version","createdAt","updatedAt")
 VALUES
-  ('${reservationId}','${tenantId}','${providerId}','${userId}','READY',CURRENT_TIMESTAMP + INTERVAL '1 day',CURRENT_TIMESTAMP - INTERVAL '2 minutes',CURRENT_TIMESTAMP - INTERVAL '1 minute','task-0046-upgrade-reservation',repeat('a',64),7,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP);
+  ('${reservationId}','${tenantId}','${providerId}','${userId}','READY',CURRENT_TIMESTAMP + INTERVAL '1 day',CURRENT_TIMESTAMP - INTERVAL '2 minutes',CURRENT_TIMESTAMP - INTERVAL '1 minute','task-0046-upgrade-reservation',repeat('a',64),7,CURRENT_TIMESTAMP - INTERVAL '3 minutes',CURRENT_TIMESTAMP);
 `;
 
 function verify() {
