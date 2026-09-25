@@ -186,7 +186,9 @@ function checkNotificationWorkerDeploymentInvariants() {
   }
 
   if (compose.includes('build:')) {
-    throw new Error('Task 0046 production notification worker must use an immutable prebuilt image');
+    throw new Error(
+      'Task 0046 production notification worker must use an immutable prebuilt image',
+    );
   }
   if (!daemon.includes('assertAuthProductionRuntimePolicy(process.env)')) {
     throw new Error('Notification daemon must reuse the accepted production runtime policy');
@@ -291,9 +293,13 @@ function runCertification() {
 
   console.log('--- 2B. TASK 0046 NOTIFICATION DEPLOYMENT INVARIANTS ---');
   checkNotificationWorkerDeploymentInvariants();
-  console.log('✓ Production notification daemon uses immutable artifact + runtime secret injection');
+  console.log(
+    '✓ Production notification daemon uses immutable artifact + runtime secret injection',
+  );
   console.log('✓ Notification daemon reuses fail-closed production runtime validation');
-  console.log('✓ No singleton container name; leased SKIP LOCKED claims remain overlap authority\n');
+  console.log(
+    '✓ No singleton container name; leased SKIP LOCKED claims remain overlap authority\n',
+  );
 
   console.log('--- 3. CONTAINER & RUNTIME SAFETY INVARIANTS ---');
   checkContainerInvariants();
