@@ -621,10 +621,8 @@ export function PatientMedicinesWorkspace() {
                       {pickupProofs[reservation.id].pickupToken}
                     </code>
                     <p className="mt-2 text-xs text-emerald-800">
-                      {t('patientMedicines.pickupHint')} · {formatDateTime(
-                        pickupProofs[reservation.id].expiresAt,
-                        locale,
-                      )}
+                      {t('patientMedicines.pickupHint')} {'·'}{' '}
+                      {formatDateTime(pickupProofs[reservation.id].expiresAt, locale)}
                     </p>
                   </div>
                 ) : null}
