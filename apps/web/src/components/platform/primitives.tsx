@@ -1,6 +1,6 @@
 'use client';
 
-import type { InputHTMLAttributes, ReactNode } from 'react';
+import type { InputHTMLAttributes, ReactNode, SelectHTMLAttributes } from 'react';
 import { useLanguage } from '@/components/language-provider';
 
 /**
@@ -155,7 +155,7 @@ export function Select({
   hint,
   children,
   ...select
-}: React.SelectHTMLAttributes<HTMLSelectElement> & {
+}: SelectHTMLAttributes<HTMLSelectElement> & {
   label: string;
   error?: string;
   hint?: string;
