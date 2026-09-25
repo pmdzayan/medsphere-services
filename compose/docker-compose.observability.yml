@@ -9,12 +9,22 @@ networks:
   medsphere-apps:
     external: true
     name: medsphere-apps-network
+  aim-observability:
+    internal: true
 
 volumes:
   aim-prometheus-data:
   aim-alertmanager-data:
 
 services:
+  # The collector is defined by docker-compose.services.yml. This override is
+  # the only bridge between the application network and the monitoring-only
+  # network; application containers never join aim-observability.
+  aim-otel-collector:
+    networks:
+      - medsphere-apps
+      - aim-observability
+
   aim-prometheus:
     image: prom/prometheus:v3.14.0
     container_name: aim-prometheus
@@ -32,7 +42,7 @@ services:
     expose:
       - '9090'
     networks:
-      - medsphere-apps
+      - aim-observability
     depends_on:
       - aim-alertmanager
     deploy:
@@ -56,7 +66,7 @@ services:
     expose:
       - '9093'
     networks:
-      - medsphere-apps
+      - aim-observability
     deploy:
       resources:
         limits:
