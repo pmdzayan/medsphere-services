@@ -71,6 +71,11 @@ import {
   pharmacyStaffTamilMessages,
   pharmacyStaffUrduMessages,
 } from './i18n-catalogs/pharmacy-staff';
+import {
+  pharmacyProfileEnglishMessages,
+  pharmacyProfileTamilMessages,
+  pharmacyProfileUrduMessages,
+} from './i18n-catalogs/pharmacy-profile';
 import { posEnglishMessages, posTamilMessages, posUrduMessages } from './i18n-catalogs/pos';
 import {
   task0044EnglishMessages,
@@ -127,6 +132,7 @@ const englishMessages = {
   ...permissionsEnglishMessages,
   ...patientMedicinesEnglishMessages,
   ...pharmacyStaffEnglishMessages,
+  ...pharmacyProfileEnglishMessages,
   ...posEnglishMessages,
   ...task0044EnglishMessages,
   'language.label': 'Language',
@@ -290,6 +296,7 @@ const tamilMessages: MessageOverrides = {
   ...permissionsTamilMessages,
   ...patientMedicinesTamilMessages,
   ...pharmacyStaffTamilMessages,
+  ...pharmacyProfileTamilMessages,
   ...posTamilMessages,
   ...task0044TamilMessages,
   'language.label': 'மொழி',
@@ -483,6 +490,7 @@ const urduMessages: MessageOverrides = {
   ...permissionsUrduMessages,
   ...patientMedicinesUrduMessages,
   ...pharmacyStaffUrduMessages,
+  ...pharmacyProfileUrduMessages,
   ...posUrduMessages,
   ...task0044UrduMessages,
   'language.label': 'زبان',

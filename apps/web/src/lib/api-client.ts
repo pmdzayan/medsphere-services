@@ -16,6 +16,12 @@ import type {
 import { toAuditSearchParams, type AuditEventFilters, type AuditEventPage } from './audit-contract';
 import type { PharmacyStaffCatalogue } from './pharmacy-staff-contract';
 import type {
+  PharmacyProfile,
+  PharmacyVerificationState,
+  SubmitPharmacyVerificationRequest,
+  UpdatePharmacyProfileRequest,
+} from './pharmacy-verification-contract';
+import type {
   PublicMedicineSearchResponse,
   PublicNearbyMedicineSearchRequest,
   PublicNearbyMedicineSearchResponse,
@@ -832,6 +838,48 @@ export async function getPatientLiveAvailabilityStatus(
 ): Promise<PatientLiveAvailabilityRequestResponse> {
   return requestJson<PatientLiveAvailabilityRequestResponse>(
     `/api/public/medicine-discovery/availability-requests/${requestId}`,
+  );
+}
+
+export async function getPharmacyProfile(providerId: string): Promise<PharmacyProfile> {
+  return requestJson<PharmacyProfile>(
+    `/api/pharmacy/providers/${encodeURIComponent(providerId)}/profile`,
+  );
+}
+
+export async function updatePharmacyProfile(
+  providerId: string,
+  request: UpdatePharmacyProfileRequest,
+): Promise<{ updated: true }> {
+  return requestJson<{ updated: true }>(
+    `/api/pharmacy/providers/${encodeURIComponent(providerId)}/profile`,
+    {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(request),
+    },
+  );
+}
+
+export async function getPharmacyVerificationState(
+  providerId: string,
+): Promise<PharmacyVerificationState> {
+  return requestJson<PharmacyVerificationState>(
+    `/api/pharmacy/providers/${encodeURIComponent(providerId)}/verification`,
+  );
+}
+
+export async function submitPharmacyVerification(
+  providerId: string,
+  request: SubmitPharmacyVerificationRequest,
+): Promise<{ verificationId: string }> {
+  return requestJson<{ verificationId: string }>(
+    `/api/pharmacy/providers/${encodeURIComponent(providerId)}/verification`,
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(request),
+    },
   );
 }
 
