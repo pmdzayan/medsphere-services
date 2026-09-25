@@ -92,8 +92,7 @@ export const pharmacyProfileTamilMessages: Record<
   'pharmacyProfile.access.denied':
     'இந்த மருந்தகத்தின் தொடக்க அமைப்பை நிர்வகிக்க உங்களுக்கு அனுமதி இல்லை.',
   'pharmacyProfile.noProvider.title': 'ஒதுக்கப்பட்ட மருந்தகம் இல்லை',
-  'pharmacyProfile.noProvider.detail':
-    'சுயவிவரத்தை நிர்வகிக்க முதலில் ஒரு மருந்தக அணுகல் தேவை.',
+  'pharmacyProfile.noProvider.detail': 'சுயவிவரத்தை நிர்வகிக்க முதலில் ஒரு மருந்தக அணுகல் தேவை.',
   'pharmacyProfile.links.staff': 'மருந்தகப் பணியாளர்கள்',
   'pharmacyProfile.links.team': 'குழு அணுகல்',
   'pharmacyProfile.profile.title': 'வணிக சுயவிவரம்',
@@ -166,8 +165,7 @@ export const pharmacyProfileUrduMessages: Record<
   'pharmacyProfile.error.submit': 'تصدیقی ثبوت جمع نہیں ہو سکا۔',
   'pharmacyProfile.error.invalidProfile': 'پروفائل کے خانے جانچ کر دوبارہ کوشش کریں۔',
   'pharmacyProfile.error.invalidVerification': 'تصدیقی خانے جانچ کر دوبارہ کوشش کریں۔',
-  'pharmacyProfile.access.denied':
-    'آپ کو اس فارمیسی کی آن بورڈنگ منظم کرنے کی اجازت نہیں ہے۔',
+  'pharmacyProfile.access.denied': 'آپ کو اس فارمیسی کی آن بورڈنگ منظم کرنے کی اجازت نہیں ہے۔',
   'pharmacyProfile.noProvider.title': 'کوئی تفویض کردہ فارمیسی نہیں',
   'pharmacyProfile.noProvider.detail':
     'پروفائل منظم کرنے سے پہلے آپ کو کسی فارمیسی تک رسائی درکار ہے۔',
