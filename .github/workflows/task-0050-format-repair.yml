@@ -1,0 +1,57 @@
+name: Task 0050 Formatting Repair
+
+on:
+  push:
+    branches:
+      - cto/0050-pharmacy-first-release-certification
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout task branch
+        uses: actions/checkout@v4
+        with:
+          ref: cto/0050-pharmacy-first-release-certification
+          fetch-depth: 0
+
+      - name: Install PNPM
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+          run_install: false
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.12.0
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Format Task 0050 scripts
+        run: |
+          pnpm exec prettier --write \
+            scripts/pharmacy-release-certification.mjs \
+            scripts/pharmacy-release-certification.spec.mjs
+          git diff --check
+
+      - name: Commit formatting repair
+        run: |
+          if git diff --quiet; then
+            echo "No formatting changes required."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            scripts/pharmacy-release-certification.mjs \
+            scripts/pharmacy-release-certification.spec.mjs
+          git commit -m "style: format Task 0050 release certification"
+          git push origin HEAD:cto/0050-pharmacy-first-release-certification
