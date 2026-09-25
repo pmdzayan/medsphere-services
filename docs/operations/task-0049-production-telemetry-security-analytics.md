@@ -34,10 +34,7 @@ SigNoz, Wazuh and Superset are **not activated** by Task 0049. Their license, se
 
 The collector still scrapes only `auth-service:3000/metrics`.
 
-Before export it now applies an explicit metric-name allowlist:
-
-- `medsphere_.*`;
-- `up`.
+Before export it now applies an explicit metric-name allowlist for AIM application metrics plus target-health `up`. The legacy-compatible metric prefix remains an internal stable identifier and is not user-facing branding.
 
 The collector has no log or trace receiver and no debug exporter. It cannot receive request bodies, cookies, authorization headers, patient searches, medicine names, tenant IDs, user IDs, phone numbers or emails through this configuration.
 
