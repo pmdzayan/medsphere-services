@@ -50,8 +50,8 @@ jobs:
       - name: Verify static network/privacy boundary
         run: pnpm test:network-efficiency-boundary
 
-      - name: Build production frontend
-        run: pnpm --filter @medsphere/web build
+      - name: Build production frontend and workspace dependencies
+        run: pnpm exec turbo run build --filter=@medsphere/web...
 
       - name: Start production frontend
         run: |
