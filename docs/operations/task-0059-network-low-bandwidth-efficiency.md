@@ -11,11 +11,11 @@ The task does not cache healthcare data, introduce a CDN, add a new transport, o
 The exact-authoritative Task 0058 post-merge quality-gate build (run `36160336434`) reported:
 
 | Public route | Build-reported first-load JS |
-| --- | ---: |
-| `/` | 190 KB |
-| `/login` | 209 KB |
-| `/register` | 198 KB |
-| `/search` | 200 KB |
+| ------------ | ---------------------------: |
+| `/`          |                       190 KB |
+| `/login`     |                       209 KB |
+| `/register`  |                       198 KB |
+| `/search`    |                       200 KB |
 
 The runtime certification uses a separate wire-transfer budget because build-reported JavaScript size and actual compressed transfer bytes are not the same measurement.
 

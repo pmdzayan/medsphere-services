@@ -75,17 +75,8 @@
   },
   "compressionPolicy": {
     "requireNextCompression": true,
-    "acceptedEncodings": [
-      "gzip",
-      "br",
-      "zstd"
-    ],
-    "routes": [
-      "/",
-      "/login",
-      "/register",
-      "/search"
-    ]
+    "acceptedEncodings": ["gzip", "br", "zstd"],
+    "routes": ["/", "/login", "/register", "/search"]
   },
   "requestPolicy": {
     "browserApiDefault": "no-store",

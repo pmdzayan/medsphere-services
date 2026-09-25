@@ -147,10 +147,9 @@ describe('Task 0059 network efficiency boundary', () => {
     const configPath = path.join(root, 'apps/web/next.config.ts');
     fs.writeFileSync(
       configPath,
-      fs.readFileSync(configPath, 'utf8').replace(
-        'no-cache, no-store, must-revalidate',
-        'public, max-age=604800',
-      ),
+      fs
+        .readFileSync(configPath, 'utf8')
+        .replace('no-cache, no-store, must-revalidate', 'public, max-age=604800'),
     );
     assert.ok(
       checkNetworkEfficiencyBoundary(root).some((failure) =>

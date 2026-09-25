@@ -189,4 +189,3 @@ AIM follows ADR-031's privacy-safe network-efficiency boundary.
 - Every task that changes browser caching, compression, PWA network behavior or public-route bundle/request shape must pass `pnpm test:network-efficiency-boundary` and the applicable real-browser network certification.
 
 The executable budget is `docs/architecture/network-efficiency-budget.json`.
-
