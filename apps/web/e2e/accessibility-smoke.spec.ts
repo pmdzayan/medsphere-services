@@ -115,7 +115,6 @@ test('PWA runtime registers the static-only AIM service worker on localhost', as
   expect(registered).toBe(true);
 });
 
-
 test('Urdu switches the real document into RTL without mixed-direction shell state', async ({
   page,
   baseURL,
@@ -141,7 +140,9 @@ test('dark workstation appearance is applied before interactive use', async ({ p
   await page.goto('/login');
 
   await expect(page.locator('html')).toHaveAttribute('data-appearance', 'dark');
-  const colorScheme = await page.locator('html').evaluate((element) => getComputedStyle(element).colorScheme);
+  const colorScheme = await page
+    .locator('html')
+    .evaluate((element) => getComputedStyle(element).colorScheme);
   expect(colorScheme).toContain('dark');
 });
 
@@ -163,7 +164,9 @@ test('mobile public journeys avoid horizontal overflow and expose touch-sized fo
       if (rect.width === 0 || rect.height === 0) continue;
       if (rect.height < 44) {
         undersized.push(
-          `${control.tagName.toLowerCase()}#${control.id || '(no-id)'}:${Math.round(rect.height)}px`,
+          `${control.tagName.toLowerCase()}#${control.id || '(no-id)'}:${Math.round(
+            rect.height,
+          )}px`,
         );
       }
     }
@@ -198,9 +201,11 @@ test('service-worker Cache Storage contains public assets only', async ({ page }
   expect(cacheEvidence.registered).toBe(true);
   expect(cacheEvidence.urls.length).toBeGreaterThan(0);
   for (const pathname of cacheEvidence.urls) {
-    expect(pathname.startsWith('/_next/static/') || pathname === '/manifest.webmanifest' || pathname === '/icon.svg').toBe(
-      true,
-    );
+    expect(
+      pathname.startsWith('/_next/static/') ||
+        pathname === '/manifest.webmanifest' ||
+        pathname === '/icon.svg',
+    ).toBe(true);
     expect(pathname.startsWith('/api/')).toBe(false);
     expect(
       /^\/(?:dashboard|patient|inventory|reservations|billing|audit|team|pharmacy)/.test(pathname),
