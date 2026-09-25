@@ -73,6 +73,26 @@ describe('Task 0049 production metrics and alerting boundary', () => {
     assert.doesNotMatch(productionCompose, /(?:^|\n)\s*ports:\s*\n/);
   });
 
+  it('isolates monitoring from application containers and gives egress only to Alertmanager', () => {
+    assert.match(productionCompose, /aim-observability:\n\s+internal:\s+true/);
+    assert.match(
+      productionCompose,
+      /aim-otel-collector:[\s\S]*networks:[\s\S]*medsphere-apps[\s\S]*aim-observability/,
+    );
+    assert.match(
+      productionCompose,
+      /aim-prometheus:[\s\S]*networks:\n\s+- aim-observability/,
+    );
+    assert.match(
+      productionCompose,
+      /aim-alertmanager:[\s\S]*networks:[\s\S]*aim-observability[\s\S]*aim-alert-egress/,
+    );
+    assert.doesNotMatch(
+      productionCompose,
+      /aim-prometheus:[\s\S]*networks:[\s\S]*medsphere-apps/,
+    );
+  });
+
   it('scrapes the collector instead of the application database or protected routes', () => {
     assert.match(prometheus, /aim-otel-collector:9464/);
     assert.match(prometheus, /metric_relabel_configs:/);
