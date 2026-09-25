@@ -32,14 +32,14 @@ Each selected public route starts from a fresh browser context with service-work
 
 Initial per-route ceilings:
 
-- total cold transfer: <= 450,000 bytes;
-- navigation + resource entries: <= 28 requests;
-- network-idle readiness: <= 10,000 ms;
+- total cold transfer: <= 300,000 bytes;
+- navigation + resource entries: <= 20 requests;
+- network-idle readiness: <= 5,000 ms;
 - no horizontal overflow;
 - no unexpected third-party origins;
 - HTML response must use an accepted compression encoding.
 
-These values provide bounded headroom over the current build. They are regression budgets, not customer SLAs.
+These values were tightened after the first successful real-browser certification (run `36164971346`) measured 217,925–237,164 bytes, 10–14 requests and 1,947–2,206 ms across the selected routes. They retain bounded regression headroom and are not customer SLAs.
 
 ## Cache contract
 
