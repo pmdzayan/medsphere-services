@@ -126,13 +126,30 @@ describe('pharmacy verification state contract', () => {
     version: 3,
   };
 
+  const officialSource = {
+    id: 'INDIA_TN_DRUGS_CONTROL',
+    authority: 'Tamil Nadu Drugs Control',
+    label: 'Tamil Nadu Drugs Control — drug sales licensing',
+    officialUrl: 'https://drugscontrol.tn.gov.in/sales_services.html',
+    requirement: 'PRIMARY' as const,
+    mode: 'PORTAL_LOOKUP' as const,
+    purpose: 'PREMISES_LICENCE',
+    limitation: 'Primary statutory source.',
+  };
+
+  const stateExtras = {
+    verificationSources: [officialSource],
+    jurisdictionReviewRequired: false,
+    jurisdictionNote: null,
+  };
+
   it('accepts current-only state (no open renewal)', () => {
-    expect(isPharmacyVerificationState({ current: record, openSubmission: null })).toBe(true);
+    expect(isPharmacyVerificationState({ current: record, openSubmission: null, ...stateExtras })).toBe(true);
   });
 
   it('accepts an initial PENDING submission with no current state', () => {
     const pending = { ...record, status: 'PENDING' as const };
-    expect(isPharmacyVerificationState({ current: pending, openSubmission: null })).toBe(true);
+    expect(isPharmacyVerificationState({ current: pending, openSubmission: null, ...stateExtras })).toBe(true);
   });
 
   it('preserves valid approval + pending renewal as TWO distinct states', () => {
@@ -141,7 +158,7 @@ describe('pharmacy verification state contract', () => {
       verificationId: '22222222-2222-4222-8222-222222222222',
       status: 'UNDER_REVIEW' as const,
     };
-    const result = { current: record, openSubmission: renewal };
+    const result = { current: record, openSubmission: renewal, ...stateExtras };
     expect(isPharmacyVerificationState(result)).toBe(true);
     expect(result.current.status).toBe('APPROVED');
     expect(result.openSubmission.status).toBe('UNDER_REVIEW');
@@ -149,17 +166,51 @@ describe('pharmacy verification state contract', () => {
 
   it('preserves a rejection applicantMessage', () => {
     const rejected = { ...record, status: 'REJECTED' as const, applicantMessage: 'Please retry.' };
-    expect(isPharmacyVerificationState({ current: rejected, openSubmission: null })).toBe(true);
+    expect(isPharmacyVerificationState({ current: rejected, openSubmission: null, ...stateExtras })).toBe(true);
   });
 
   it('rejects a record containing internal "verificationNotes"', () => {
     const tampered = { ...record, verificationNotes: 'internal reasoning' };
-    expect(isPharmacyVerificationState({ current: tampered, openSubmission: null })).toBe(false);
+    expect(isPharmacyVerificationState({ current: tampered, openSubmission: null, ...stateExtras })).toBe(false);
   });
 
   it('rejects a record containing "verifiedBy" (reviewer identity)', () => {
     const tampered = { ...record, verifiedBy: 'platform-user-id' };
-    expect(isPharmacyVerificationState({ current: tampered, openSubmission: null })).toBe(false);
+    expect(isPharmacyVerificationState({ current: tampered, openSubmission: null, ...stateExtras })).toBe(false);
+  });
+
+
+  it('accepts controlled HTTPS official verification sources', () => {
+    expect(
+      isPharmacyVerificationState({
+        current: record,
+        openSubmission: null,
+        ...stateExtras,
+      }),
+    ).toBe(true);
+  });
+
+  it('rejects a non-HTTPS verification source URL', () => {
+    expect(
+      isPharmacyVerificationState({
+        current: record,
+        openSubmission: null,
+        ...stateExtras,
+        verificationSources: [{ ...officialSource, officialUrl: 'http://example.test' }],
+      }),
+    ).toBe(false);
+  });
+
+  it('requires jurisdiction review metadata even when there are no configured sources', () => {
+    expect(
+      isPharmacyVerificationState({
+        current: null,
+        openSubmission: null,
+        verificationSources: [],
+        jurisdictionReviewRequired: true,
+        jurisdictionNote: 'Manual authority review required.',
+      }),
+    ).toBe(true);
   });
 
   it('rejects a record containing "governmentIdReference" or "licenseNumber"', () => {
@@ -167,6 +218,7 @@ describe('pharmacy verification state contract', () => {
       isPharmacyVerificationState({
         current: { ...record, governmentIdReference: 'GOV-1' },
         openSubmission: null,
+        ...stateExtras,
       }),
     ).toBe(false);
     expect(
