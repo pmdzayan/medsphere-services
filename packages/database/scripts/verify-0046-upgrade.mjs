@@ -14,7 +14,8 @@ import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 
 const databaseUrlValue = process.env.DATABASE_URL;
-if (!databaseUrlValue) throw new Error('DATABASE_URL is required for Task 0046 upgrade verification');
+if (!databaseUrlValue)
+  throw new Error('DATABASE_URL is required for Task 0046 upgrade verification');
 
 const databaseUrl = new URL(databaseUrlValue);
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -80,7 +81,9 @@ function sqlMustFail(schemaFile, url, statement, expected) {
   );
   const output = `${result.stdout ?? ''}\n${result.stderr ?? ''}`;
   if (result.status === 0 || !output.includes(expected)) {
-    throw new Error(`Expected SQL failure containing "${expected}" but received:\n${output.slice(-5000)}`);
+    throw new Error(
+      `Expected SQL failure containing "${expected}" but received:\n${output.slice(-5000)}`,
+    );
   }
 }
 
@@ -91,7 +94,9 @@ function migrationProject() {
   mkdirSync(migrations);
   writeFileSync(
     schema,
-    ['datasource db {', '  provider = "postgresql"', '  url = env("DATABASE_URL")', '}', ''].join('\n'),
+    ['datasource db {', '  provider = "postgresql"', '  url = env("DATABASE_URL")', '}', ''].join(
+      '\n',
+    ),
     'utf8',
   );
   cpSync(join(sourceMigrations, 'migration_lock.toml'), join(migrations, 'migration_lock.toml'));
@@ -142,11 +147,9 @@ function verify() {
     runPrisma(['migrate', 'deploy', '--schema', project.schema], url);
     sql(project.schema, url, seed);
 
-    cpSync(
-      join(sourceMigrations, upgradeMigration),
-      join(project.migrations, upgradeMigration),
-      { recursive: true },
-    );
+    cpSync(join(sourceMigrations, upgradeMigration), join(project.migrations, upgradeMigration), {
+      recursive: true,
+    });
     runPrisma(['migrate', 'deploy', '--schema', project.schema], url);
 
     sql(
@@ -210,7 +213,11 @@ $task0046$;
     process.stdout.write('Task 0046 populated upgrade verification passed.\n');
   } finally {
     try {
-      sql(project.schema, databaseUrl.toString(), `DROP DATABASE IF EXISTS "${name}" WITH (FORCE);`);
+      sql(
+        project.schema,
+        databaseUrl.toString(),
+        `DROP DATABASE IF EXISTS "${name}" WITH (FORCE);`,
+      );
     } finally {
       rmSync(project.root, { recursive: true, force: true });
     }
