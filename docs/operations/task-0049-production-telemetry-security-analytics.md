@@ -105,7 +105,7 @@ The shared logger now redacts direct identity/contact keys and identifier-like f
 
 ## Security monitoring
 
-Security telemetry is derived from AIM's accepted durable `AuditEvent` path **after** the audit write succeeds.
+Security telemetry is derived from AIM's accepted `AuditEvent` catalogue only after the corresponding audit create succeeds. The durable database audit trail remains authoritative; the in-memory metric is operational telemetry and does not replace commit evidence.
 
 `medsphere_security_event_total{category,outcome}` exposes only bounded categories such as:
 
@@ -217,7 +217,7 @@ Engineering acceptance requires:
 
 - collector config/privacy architecture tests;
 - logger identifier/credential redaction tests;
-- security-event metric classification and post-audit-commit tests;
+- security-event metric classification and post-audit-create-success tests;
 - Prometheus/Alertmanager retention and routing static tests;
 - HTTPS alert-secret validator tests;
 - synthetic incident-drill payload/transport tests;
