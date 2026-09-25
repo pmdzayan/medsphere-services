@@ -71,6 +71,28 @@ jobs:
       - name: Audit production dependencies
         run: pnpm audit:prod
 
+      - name: Task 0046 exact formatting diagnostic
+        run: |
+          pnpm exec prettier --write \
+            'apps/auth-service/src/inventory/dto/patient-pickup-proof-response.dto.ts' \
+            'apps/auth-service/src/inventory/pickup-handoff.service.ts' \
+            'apps/auth-service/src/inventory/reservation-lifecycle.service.ts' \
+            'apps/auth-service/src/pos/pos-checkout.service.ts' \
+            'apps/web/src/app/api/inventory/providers/[providerId]/availability-requests/[requestId]/responses/route.ts' \
+            'apps/web/src/app/api/inventory/providers/[providerId]/availability-requests/route.ts' \
+            'apps/web/src/app/api/patient/medicine-reservations/[reservationId]/pickup-proof/route.ts' \
+            'apps/web/src/lib/availability-request-contract.ts' \
+            'apps/web/src/lib/i18n-catalogs/patient-medicines.ts' \
+            'apps/web/src/lib/i18n-catalogs/reservations.ts' \
+            'apps/web/src/lib/patient-reservation-contract.ts' \
+            'packages/database/scripts/verify-0046-upgrade.mjs' \
+            'packages/database/src/audit.ts' \
+            'scripts/production-runtime-certification.mjs'
+          git diff -- 'apps/auth-service/src/inventory/dto/patient-pickup-proof-response.dto.ts' 'apps/auth-service/src/inventory/pickup-handoff.service.ts' 'apps/auth-service/src/inventory/reservation-lifecycle.service.ts' 'apps/auth-service/src/pos/pos-checkout.service.ts' 'apps/web/src/app/api/inventory/providers/[providerId]/availability-requests/[requestId]/responses/route.ts' 'apps/web/src/app/api/inventory/providers/[providerId]/availability-requests/route.ts' 'apps/web/src/app/api/patient/medicine-reservations/[reservationId]/pickup-proof/route.ts' 'apps/web/src/lib/availability-request-contract.ts' 'apps/web/src/lib/i18n-catalogs/patient-medicines.ts' 'apps/web/src/lib/i18n-catalogs/reservations.ts' 'apps/web/src/lib/patient-reservation-contract.ts' 'packages/database/scripts/verify-0046-upgrade.mjs' 'packages/database/src/audit.ts' 'scripts/production-runtime-certification.mjs'
+          if ! git diff --quiet -- 'apps/auth-service/src/inventory/dto/patient-pickup-proof-response.dto.ts' 'apps/auth-service/src/inventory/pickup-handoff.service.ts' 'apps/auth-service/src/inventory/reservation-lifecycle.service.ts' 'apps/auth-service/src/pos/pos-checkout.service.ts' 'apps/web/src/app/api/inventory/providers/[providerId]/availability-requests/[requestId]/responses/route.ts' 'apps/web/src/app/api/inventory/providers/[providerId]/availability-requests/route.ts' 'apps/web/src/app/api/patient/medicine-reservations/[reservationId]/pickup-proof/route.ts' 'apps/web/src/lib/availability-request-contract.ts' 'apps/web/src/lib/i18n-catalogs/patient-medicines.ts' 'apps/web/src/lib/i18n-catalogs/reservations.ts' 'apps/web/src/lib/patient-reservation-contract.ts' 'packages/database/scripts/verify-0046-upgrade.mjs' 'packages/database/src/audit.ts' 'scripts/production-runtime-certification.mjs'; then
+            exit 1
+          fi
+
       - name: Verify clean database migration and drift
         run: pnpm db:verify
 
