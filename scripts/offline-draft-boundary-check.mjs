@@ -33,7 +33,7 @@ export function checkOfflineDraftBoundary(
   }
 
   const inputMatch = draftSource.match(
-    /export interface OfflinePosDraftInput\s*\{([\s\S]*?)\n\}/,
+    /export interface OfflinePosDraftInput\s*\{([\s\S]*?)\n\s*\}/,
   );
   if (!inputMatch) {
     failures.push('OfflinePosDraftInput interface is missing.');
