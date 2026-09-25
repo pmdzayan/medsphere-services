@@ -198,7 +198,8 @@ export function isCancelPatientReservationResponse(
 }
 
 export function isPatientPickupProof(value: unknown): value is PatientPickupProof {
-  if (!hasExactKeys(value, ['reservationId', 'pickupToken', 'expiresAt', 'proofVersion'])) return false;
+  if (!hasExactKeys(value, ['reservationId', 'pickupToken', 'expiresAt', 'proofVersion']))
+    return false;
   const proof = value as Partial<PatientPickupProof>;
   return (
     isCanonicalUuid(proof.reservationId) &&
