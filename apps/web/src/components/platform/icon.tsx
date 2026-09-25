@@ -38,6 +38,7 @@ export function Icon({ name, ...props }: { name: IconName } & SVGProps<SVGSVGEle
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden="true"
+      focusable="false"
       {...props}
     >
       {iconPaths[name]}
