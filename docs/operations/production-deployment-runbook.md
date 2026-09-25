@@ -13,6 +13,23 @@ This runbook documents the provider-neutral production deployment procedure for 
 > - **IMPLEMENTED**: Repository-owned fail-closed runtime configuration contract, component classification, secret isolation policy, container security baseline, and release identity validation.
 > - **NOT IMPLEMENTED**: Real cloud accounts, DNS/TLS certificates, cloud secret manager bindings, production databases/Redis instances, or active production deployments.
 
+## 1A. Task 0050 Pharmacy-First Release Gate
+
+For the pharmacy-first release boundary, no production deployment sequence may begin until the exact authoritative release SHA has a completed Task 0050 evidence record and:
+
+```bash
+node scripts/pharmacy-release-certification.mjs \
+  decide <task-0050-evidence.json> <full-release-sha>
+```
+
+returns `TASK 0050 PHARMACY-FIRST PRODUCTION GO/NO-GO: GO`.
+
+A green repository build or pull request is not equivalent to production approval. The Task 0050 record must bind the exact SHA to the immutable registry image digest, all repository certifications, independent security/privacy/compliance review, real-environment monitoring and alert evidence, production backup/PITR evidence, measured recovery, canary/rollback and incident drills, zero open critical findings, and the controlled release approval reference.
+
+The evidence JSON is an index only. Do not place secrets, PHI, customer data, raw review findings, alert destinations or private notes in it.
+
+If Task 0050 returns `NO-GO`, the production delivery freeze remains in force.
+
 ## 2. Environment & Secret Injection Contract
 
 Production environment variables must be injected at runtime by the deployment orchestration platform (e.g. secret manager, container environment injection).

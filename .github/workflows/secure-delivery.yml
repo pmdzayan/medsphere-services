@@ -1,7 +1,9 @@
-name: MedSphere Production Delivery — Intentionally Blocked
+name: AIM Production Delivery — Controlled Freeze
 
-# Production delivery remains disabled until Milestone 11 is accepted. This
-# manual workflow performs no deployment and exists to make the freeze visible.
+# Task 0050 adds the pharmacy-first release evidence and go/no-go contract.
+# This workflow intentionally performs no deployment. Provider-specific
+# production infrastructure, credentials and deploy automation are not
+# repository-owned or activated by Task 0050.
 on:
   workflow_dispatch:
 
@@ -10,10 +12,12 @@ permissions:
 
 jobs:
   deployment-freeze:
-    name: Production release gate is closed
+    name: Production deployment remains controlled and side-effect free
     runs-on: ubuntu-24.04
     steps:
       - name: Explain release status
         run: |
-          echo "Production deployment is intentionally disabled."
-          echo "Complete the dependency-ordered roadmap and production-release acceptance gate first."
+          echo "Production deployment is intentionally disabled in this repository workflow."
+          echo "A Task 0050 GO decision must be bound to the exact authoritative SHA and immutable registry digest."
+          echo "Real-environment security/privacy/compliance, monitoring, recovery, PITR, canary/rollback and incident evidence are required."
+          echo "This workflow has no deployment credentials and performs no production mutation."
