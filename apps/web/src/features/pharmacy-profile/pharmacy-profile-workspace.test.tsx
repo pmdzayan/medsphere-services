@@ -166,7 +166,9 @@ describe('PharmacyProfileWorkspace', () => {
       }),
     );
     expect(
-      screen.getByText(/Do not paste a URL, file path, document contents, or upload a document here/),
+      screen.getByText(
+        /Do not paste a URL, file path, document contents, or upload a document here/,
+      ),
     ).toBeInTheDocument();
   });
 
