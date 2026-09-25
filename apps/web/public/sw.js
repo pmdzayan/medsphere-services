@@ -40,7 +40,9 @@ self.addEventListener('message', (event) => {
       caches
         .keys()
         .then((keys) =>
-          Promise.all(keys.filter((key) => key.startsWith(CACHE_PREFIX)).map((key) => caches.delete(key))),
+          Promise.all(
+            keys.filter((key) => key.startsWith(CACHE_PREFIX)).map((key) => caches.delete(key)),
+          ),
         ),
     );
   }
