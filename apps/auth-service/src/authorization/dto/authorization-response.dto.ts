@@ -74,8 +74,8 @@ export class ProviderAccessResponseDto {
   @ApiProperty()
   businessName!: string;
 
-  @ApiProperty({ enum: ['PHARMACY', 'HOSPITAL'] })
-  providerType!: 'PHARMACY' | 'HOSPITAL';
+  @ApiProperty({ enum: ['PHARMACY', 'HOSPITAL', 'CLINIC', 'LABORATORY', 'DOCTOR'] })
+  providerType!: 'PHARMACY' | 'HOSPITAL' | 'CLINIC' | 'LABORATORY' | 'DOCTOR';
 
   @ApiProperty()
   isActive!: boolean;
@@ -158,4 +158,66 @@ export class ProviderStaffListResponseDto {
 
   @ApiProperty()
   offset!: number;
+}
+
+
+export class ProviderLocationScopeResponseDto {
+  @ApiProperty({ format: 'uuid' })
+  locationId!: string;
+
+  @ApiProperty()
+  code!: string;
+
+  @ApiProperty()
+  name!: string;
+}
+
+export class ProviderDepartmentScopeResponseDto {
+  @ApiProperty({ format: 'uuid' })
+  departmentId!: string;
+
+  @ApiProperty({ format: 'uuid' })
+  locationId!: string;
+
+  @ApiProperty()
+  code!: string;
+
+  @ApiProperty()
+  name!: string;
+}
+
+export class ProviderScopeResponseDto {
+  @ApiProperty({ format: 'uuid' })
+  membershipId!: string;
+
+  @ApiProperty({ format: 'uuid' })
+  providerId!: string;
+
+  @ApiProperty({ type: [ProviderLocationScopeResponseDto] })
+  locations!: ProviderLocationScopeResponseDto[];
+
+  @ApiProperty({ type: [ProviderDepartmentScopeResponseDto] })
+  departments!: ProviderDepartmentScopeResponseDto[];
+}
+
+export class ProviderLocationAccessResponseDto {
+  @ApiProperty({ format: 'uuid' })
+  membershipId!: string;
+
+  @ApiProperty({ format: 'uuid' })
+  providerId!: string;
+
+  @ApiProperty({ format: 'uuid' })
+  locationId!: string;
+}
+
+export class ProviderDepartmentAccessResponseDto {
+  @ApiProperty({ format: 'uuid' })
+  membershipId!: string;
+
+  @ApiProperty({ format: 'uuid' })
+  providerId!: string;
+
+  @ApiProperty({ format: 'uuid' })
+  departmentId!: string;
 }
