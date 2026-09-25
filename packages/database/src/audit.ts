@@ -225,7 +225,12 @@ export const AUDIT_METADATA_KEYS = {
   'inventory.reservation.completed': ['previousStatus', 'version', 'totalQuantity'],
   'inventory.reservation.cancelled': ['previousStatus', 'version', 'totalQuantity', 'cause'],
   'inventory.reservation.expired': ['previousStatus', 'version', 'totalQuantity', 'cause'],
-  'inventory.pickup.proof.issued': ['providerId', 'reservationVersion', 'proofVersion', 'expiresAt'],
+  'inventory.pickup.proof.issued': [
+    'providerId',
+    'reservationVersion',
+    'proofVersion',
+    'expiresAt',
+  ],
   'inventory.pickup.handoff.completed': [
     'providerId',
     'saleId',
