@@ -14,11 +14,7 @@ describe('classifySecurityAuditEvent', () => {
   });
 
   it('does not project routine business or successful session creation events', () => {
-    expect(
-      classifySecurityAuditEvent('billing.pos.sale.completed', 'SUCCEEDED'),
-    ).toBeNull();
-    expect(
-      classifySecurityAuditEvent('authentication.session.created', 'SUCCEEDED'),
-    ).toBeNull();
+    expect(classifySecurityAuditEvent('billing.pos.sale.completed', 'SUCCEEDED')).toBeNull();
+    expect(classifySecurityAuditEvent('authentication.session.created', 'SUCCEEDED')).toBeNull();
   });
 });

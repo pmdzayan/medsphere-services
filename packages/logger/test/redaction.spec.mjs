@@ -97,8 +97,7 @@ test('sanitizes bearer/basic credentials and credential-bearing URLs in free tex
 });
 
 test('redacts direct identifiers from free-text telemetry while preserving safe correlation metadata', () => {
-  const input =
-    'patient@example.test +91 98765 43210 123e4567-e89b-42d3-a456-426614174000';
+  const input = 'patient@example.test +91 98765 43210 123e4567-e89b-42d3-a456-426614174000';
 
   const output = sanitizeLogString(input);
 

@@ -14,10 +14,7 @@ const config = fs.readFileSync(
   path.join(root, 'compose/observability/otel-collector-config.yml'),
   'utf8',
 );
-const prometheus = fs.readFileSync(
-  path.join(root, 'compose/observability/prometheus.yml'),
-  'utf8',
-);
+const prometheus = fs.readFileSync(path.join(root, 'compose/observability/prometheus.yml'), 'utf8');
 const alertmanager = fs.readFileSync(
   path.join(root, 'compose/observability/alertmanager.yml'),
   'utf8',
@@ -52,10 +49,7 @@ describe('AIM OpenTelemetry Collector boundary', () => {
     assert.match(config, /filter\/aim_metrics:/);
     assert.match(config, /\^medsphere_\.\*/);
     assert.match(config, /\^up\$/);
-    assert.match(
-      config,
-      /processors:[\s\S]*memory_limiter[\s\S]*filter\/aim_metrics[\s\S]*batch/,
-    );
+    assert.match(config, /processors:[\s\S]*memory_limiter[\s\S]*filter\/aim_metrics[\s\S]*batch/);
     assert.doesNotMatch(config, /namespace:\s*aim/);
     assert.doesNotMatch(config, /debug:/);
   });
@@ -83,18 +77,12 @@ describe('Task 0049 production metrics and alerting boundary', () => {
       productionCompose,
       /aim-otel-collector:[\s\S]*networks:[\s\S]*medsphere-apps[\s\S]*aim-observability/,
     );
-    assert.match(
-      productionCompose,
-      /aim-prometheus:[\s\S]*networks:\n\s+- aim-observability/,
-    );
+    assert.match(productionCompose, /aim-prometheus:[\s\S]*networks:\n\s+- aim-observability/);
     assert.match(
       productionCompose,
       /aim-alertmanager:[\s\S]*networks:[\s\S]*aim-observability[\s\S]*aim-alert-egress/,
     );
-    assert.doesNotMatch(
-      productionCompose,
-      /aim-prometheus:[\s\S]*networks:[\s\S]*medsphere-apps/,
-    );
+    assert.doesNotMatch(productionCompose, /aim-prometheus:[\s\S]*networks:[\s\S]*medsphere-apps/);
   });
 
   it('scrapes the collector instead of the application database or protected routes', () => {

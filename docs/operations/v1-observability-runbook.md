@@ -126,7 +126,7 @@ This section extends the runbook above with the V1 metrics, centralized telemetr
 | `medsphere_notification_delivery_total`     | counter   | `channel`, `outcome`                         | Notification worker delivery attempts           |
 | `medsphere_otp_dispatch_total`              | counter   | `outcome`                                    | OTP provider dispatch attempts                  |
 | `medsphere_metrics_exporter_failures_total` | counter   | (none)                                       | OTLP export failures                            |
-| `medsphere_security_event_total`            | counter   | `category`, `outcome`                    | Bounded security signals derived from audit     |
+| `medsphere_security_event_total`            | counter   | `category`, `outcome`                        | Bounded security signals derived from audit     |
 
 `route` is always the framework route template (e.g. `/api/inventory/providers/:providerId/reservations`), never a raw URL. Every label key is drawn from a fixed allowlist enforced in code (`service`, `method`, `route`, `status_class`, `dependency`, `outcome`, `channel`, `provider`, `category`) -- recording a metric with any other label key throws immediately, so a future call site cannot silently introduce a tenant ID, phone number, request ID, medicine name, or other high-cardinality/sensitive value as a label.
 

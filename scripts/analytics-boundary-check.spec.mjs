@@ -22,9 +22,7 @@ describe('Task 0049 de-identified analytics boundary', () => {
       REVOKE ALL ON aim_analytics.daily_audit_activity FROM PUBLIC;
       COMMENT ON SCHEMA aim_analytics IS 'test';
     `;
-    assert.ok(
-      checkAnalyticsBoundary(unsafe).some((failure) => failure.includes('tenantId')),
-    );
+    assert.ok(checkAnalyticsBoundary(unsafe).some((failure) => failure.includes('tenantId')));
   });
 
   it('rejects write-capable analytics grants', () => {
@@ -42,8 +40,6 @@ describe('Task 0049 de-identified analytics boundary', () => {
       GRANT UPDATE ON aim_analytics.daily_audit_activity TO aim_bi_reader;
       COMMENT ON SCHEMA aim_analytics IS 'test';
     `;
-    assert.ok(
-      checkAnalyticsBoundary(unsafe).some((failure) => failure.includes('write-capable')),
-    );
+    assert.ok(checkAnalyticsBoundary(unsafe).some((failure) => failure.includes('write-capable')));
   });
 });

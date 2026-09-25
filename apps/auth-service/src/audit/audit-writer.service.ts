@@ -37,7 +37,10 @@ export class AuditWriter extends SharedAuditWriter {
     this.recordSecuritySignal(input.eventType, input.outcome);
   }
 
-  override async appendSystem(database: AuditDatabase, input: SystemAuditEventInput): Promise<void> {
+  override async appendSystem(
+    database: AuditDatabase,
+    input: SystemAuditEventInput,
+  ): Promise<void> {
     await super.appendSystem(database, input);
     this.recordSecuritySignal(input.eventType, input.outcome);
   }

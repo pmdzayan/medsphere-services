@@ -32,7 +32,5 @@ export function classifySecurityAuditEvent(
   // Security-control actions are useful as operational evidence even when
   // successful. Rejections/replays/denials keep their existing audit outcome;
   // no identity or free-form metadata is projected into monitoring.
-  return outcome === 'SUCCEEDED' || outcome === 'DENIED' || outcome === 'FAILED'
-    ? category
-    : null;
+  return outcome === 'SUCCEEDED' || outcome === 'DENIED' || outcome === 'FAILED' ? category : null;
 }

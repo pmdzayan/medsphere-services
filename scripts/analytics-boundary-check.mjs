@@ -7,10 +7,7 @@ const migrationPath = path.join(
   root,
   'packages/database/prisma/migrations/20260925123000_task_0049_telemetry_security_analytics_boundary/migration.sql',
 );
-const grantPath = path.join(
-  root,
-  'packages/database/scripts/task-0049-bi-reader-grants.sql',
-);
+const grantPath = path.join(root, 'packages/database/scripts/task-0049-bi-reader-grants.sql');
 
 export function checkAnalyticsBoundary(
   source = fs.readFileSync(migrationPath, 'utf8'),
@@ -32,8 +29,9 @@ export function checkAnalyticsBoundary(
   }
 
   const viewBody =
-    source.match(/CREATE OR REPLACE VIEW aim_analytics\.daily_audit_activity[\s\S]*?COMMENT ON SCHEMA/)?.[0] ??
-    source;
+    source.match(
+      /CREATE OR REPLACE VIEW aim_analytics\.daily_audit_activity[\s\S]*?COMMENT ON SCHEMA/,
+    )?.[0] ?? source;
 
   for (const forbidden of [
     'tenantId',
@@ -49,7 +47,9 @@ export function checkAnalyticsBoundary(
     'metadata',
   ]) {
     if (viewBody.includes(forbidden)) {
-      failures.push(`Analytics read model exposes or references forbidden identifier field: ${forbidden}`);
+      failures.push(
+        `Analytics read model exposes or references forbidden identifier field: ${forbidden}`,
+      );
     }
   }
 
@@ -78,9 +78,7 @@ export function checkAnalyticsBoundary(
       failures.push(`Missing BI least-privilege invariant: ${value}`);
     }
   }
-  if (
-    /CREATE\s+ROLE|PASSWORD|GRANT\s+(?:INSERT|UPDATE|DELETE|ALL)\b/i.test(executableGrants)
-  ) {
+  if (/CREATE\s+ROLE|PASSWORD|GRANT\s+(?:INSERT|UPDATE|DELETE|ALL)\b/i.test(executableGrants)) {
     failures.push('BI grant script creates credentials or grants write-capable privileges.');
   }
 

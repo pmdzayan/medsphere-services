@@ -156,8 +156,7 @@ describe('AuditWriter', () => {
         .samples()
         .find(
           (sample) =>
-            sample.labels.category === 'credential_replay' &&
-            sample.labels.outcome === 'DENIED',
+            sample.labels.category === 'credential_replay' && sample.labels.outcome === 'DENIED',
         )?.value ?? 0;
 
     await writer.appendSystem(database, {
@@ -171,8 +170,7 @@ describe('AuditWriter', () => {
         .samples()
         .find(
           (sample) =>
-            sample.labels.category === 'credential_replay' &&
-            sample.labels.outcome === 'DENIED',
+            sample.labels.category === 'credential_replay' && sample.labels.outcome === 'DENIED',
         )?.value ?? 0;
 
     expect(after).toBe(before + 1);
@@ -184,8 +182,7 @@ describe('AuditWriter', () => {
         .samples()
         .find(
           (sample) =>
-            sample.labels.category === 'credential_replay' &&
-            sample.labels.outcome === 'DENIED',
+            sample.labels.category === 'credential_replay' && sample.labels.outcome === 'DENIED',
         )?.value ?? 0;
     create.mockRejectedValueOnce(new Error('database unavailable'));
 
@@ -202,8 +199,7 @@ describe('AuditWriter', () => {
         .samples()
         .find(
           (sample) =>
-            sample.labels.category === 'credential_replay' &&
-            sample.labels.outcome === 'DENIED',
+            sample.labels.category === 'credential_replay' && sample.labels.outcome === 'DENIED',
         )?.value ?? 0;
 
     expect(after).toBe(before);
