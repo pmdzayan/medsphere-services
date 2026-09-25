@@ -44,3 +44,4 @@ Every ADR includes decision, reason/context, alternatives, consequences, impleme
 | [ADR-029](0029-medicine-availability-trust-freshness.md)             | Medicine availability trust and inventory freshness    | Proposed | 2026-09-09 |
 | [ADR-030](0030-evidence-before-scaling-bottleneck-governance.md)     | Evidence-before-scaling bottleneck governance          | Accepted | 2026-09-25 |
 | [ADR-031](0031-privacy-safe-network-efficiency-low-bandwidth.md)     | Privacy-safe network efficiency and low-bandwidth      | Accepted | 2026-09-25 |
+| [ADR-032](0032-independent-ai-code-security-data-integrity-gate.md)       | Independent AI-code security and data-integrity gate       | Accepted | 2026-09-25 |

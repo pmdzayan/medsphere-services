@@ -1,0 +1,57 @@
+name: AIM Independent AI-Code Security & Data-Integrity Gate
+
+on:
+  pull_request:
+  pull_request_review:
+    types:
+      - submitted
+      - edited
+      - dismissed
+
+concurrency:
+  group: ai-security-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  independent-security-review:
+    name: Independent high-risk change gate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout exact pull-request head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.12.0
+
+      - name: Fetch independent review evidence
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPOSITORY: ${{ github.repository }}
+        run: gh api --paginate "repos/${REPOSITORY}/pulls/${PR_NUMBER}/reviews" > "$RUNNER_TEMP/reviews.json"
+
+      - name: Run Task 0060 repository boundary
+        run: node scripts/ai-code-security-data-integrity-gate.mjs boundary
+
+      - name: Run Task 0060 change-aware security gate
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+        run: >-
+          node scripts/ai-code-security-data-integrity-gate.mjs diff
+          --base "$BASE_SHA"
+          --head "$HEAD_SHA"
+          --author "$PR_AUTHOR"
+          --reviews "$RUNNER_TEMP/reviews.json"

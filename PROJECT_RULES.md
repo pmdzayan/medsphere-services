@@ -189,3 +189,19 @@ AIM follows ADR-031's privacy-safe network-efficiency boundary.
 - Every task that changes browser caching, compression, PWA network behavior or public-route bundle/request shape must pass `pnpm test:network-efficiency-boundary` and the applicable real-browser network certification.
 
 The executable budget is `docs/architecture/network-efficiency-budget.json`.
+
+## 14. AI-code security and data-integrity governance
+
+AIM follows ADR-032's independent high-risk change rule.
+
+- AI-assisted code is untrusted until it passes normal AIM tests and Task 0060.
+- Changes to auth-service production code, web BFF/API routes, shared security code, Prisma schema/migrations, or Task 0060 enforcement require independent approval from a reviewer other than the PR author.
+- Bot/self approvals do not count; the reviewer's latest submitted state must be `APPROVED`.
+- Never accept client-supplied tenant, organization, provider, membership, role, or authorization context as authority.
+- Never bypass tenant-qualified authorization, transactions/locking/idempotency, audit, or populated-upgrade safety to satisfy a generated implementation.
+- Configured hard-fail secret, unsafe raw-SQL, runtime-execution, TLS, and destructive-migration findings cannot be waived by ordinary PR approval.
+- Destructive migration exceptions must be exact-path, exact-rule, expiring, backed by an existing Accepted ADR, and independently reviewed.
+- Do not weaken the Task 0060 policy, scanner, workflow, or tests merely to make CI green.
+- High-risk changes must pass `pnpm test:ai-code-security-gate` and the dedicated `AIM Independent AI-Code Security & Data-Integrity Gate` workflow.
+
+The executable policy is `docs/architecture/ai-code-security-data-integrity-policy.json`.

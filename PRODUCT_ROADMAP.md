@@ -14,7 +14,7 @@ This roadmap preserves the AIM — All In Medico product vision while inserting 
 - Cross-cutting V2 engineering controls added after that reserved sequence:
   - **0058 — Architecture & Bottleneck Governance** — measure before adding scaling complexity.
   - **0059 — Network & Low-Bandwidth Efficiency** — payload/request budgets, compression/caching, slow-network/mobile certification.
-  - **0060 — Independent AI-Code Security & Data-Integrity Gate** — independent review of AI-generated/high-risk changes for client trust, authorization, tenant leakage, race/data-loss, injection, secrets and unsafe migrations.
+  - **0060 — Independent AI-Code Security & Data-Integrity Gate** — repository-native hard-fail scanning plus independent approval for high-risk healthcare, authorization, tenancy, migration and gate-integrity changes.
 - **V3 — Intelligence & Automation:** forecasting, ML/recommendations, workflow assistance and other AI-driven intelligence after the required governance/evaluation controls.
 
 This version framing supersedes older labels that described Tasks 0051–0057 as remaining V1 work. It does not rewrite their already-defined technical scope.
