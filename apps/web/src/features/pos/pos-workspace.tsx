@@ -3,7 +3,15 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 
 import { useLanguage } from '@/components/language-provider';
-import { Badge, Button, Card, Checkbox, EmptyState, Input, Select } from '@/components/platform/primitives';
+import {
+  Badge,
+  Button,
+  Card,
+  Checkbox,
+  EmptyState,
+  Input,
+  Select,
+} from '@/components/platform/primitives';
 import {
   checkoutPosSale,
   configurePosFiscalProfile,
