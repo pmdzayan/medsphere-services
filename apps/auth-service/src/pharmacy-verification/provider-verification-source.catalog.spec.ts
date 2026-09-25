@@ -1,4 +1,3 @@
-import { describe, expect, it } from '@jest/globals';
 import { resolveProviderVerificationSources } from './provider-verification-source.catalog';
 
 describe('provider verification official-source catalogue', () => {
