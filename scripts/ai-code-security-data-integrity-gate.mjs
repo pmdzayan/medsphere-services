@@ -345,7 +345,7 @@ export function checkRepositoryBoundary(repositoryRoot = DEFAULT_ROOT) {
   }
 
   const workflow = readRequired(repositoryRoot, '.github/workflows/ai-code-security-data-integrity.yml');
-  for (const marker of ['pull_request_review:', 'pull-requests: read', 'gh api', 'diff --base']) {
+  for (const marker of ['pull_request_review:', 'pull-requests: read', 'gh api', 'ai-code-security-data-integrity-gate.mjs diff', '--base']) {
     if (!workflow.includes(marker)) {
       failures.push(`Task 0060 workflow is missing required marker: ${marker}`);
     }
