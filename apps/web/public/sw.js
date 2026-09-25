@@ -7,7 +7,7 @@
  * - cache only versioned Next static assets plus public manifest/icon assets.
  */
 const CACHE_PREFIX = 'aim-public-static-';
-const CACHE_NAME = `${CACHE_PREFIX}v1`;
+const CACHE_NAME = `${CACHE_PREFIX}v2`;
 const PUBLIC_SHELL_ASSETS = new Set(['/manifest.webmanifest', '/icon.svg']);
 
 self.addEventListener('install', (event) => {
@@ -27,6 +27,25 @@ self.addEventListener('activate', (event) => {
       )
       .then(() => self.clients.claim()),
   );
+});
+
+self.addEventListener('message', (event) => {
+  if (event.data?.type === 'SKIP_WAITING') {
+    void self.skipWaiting();
+    return;
+  }
+
+  if (event.data?.type === 'PURGE_PUBLIC_CACHE') {
+    event.waitUntil(
+      caches
+        .keys()
+        .then((keys) =>
+          Promise.all(
+            keys.filter((key) => key.startsWith(CACHE_PREFIX)).map((key) => caches.delete(key)),
+          ),
+        ),
+    );
+  }
 });
 
 self.addEventListener('fetch', (event) => {

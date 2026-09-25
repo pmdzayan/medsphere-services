@@ -1,7 +1,9 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import type { ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { BRAND } from '@medsphere/brand';
 import { LanguageProvider } from '@/components/language-provider';
+import { WorkstationAppearanceProvider } from './workstation-appearance';
 import type { SessionProfile } from '@/lib/session-profile';
 import { AppShell } from './app-shell';
 
@@ -42,20 +44,26 @@ const session: SessionProfile = {
   expiresIn: 3600,
 };
 
-function renderShell() {
-  const utils = render(
+function renderWithProviders(children: ReactNode) {
+  return render(
     <LanguageProvider>
-      <AppShell
-        session={session}
-        initialWorkstationState={{
-          locked: false,
-          lockedAt: null,
-          securityVersion: 1,
-        }}
-      >
-        <p>Workspace content</p>
-      </AppShell>
+      <WorkstationAppearanceProvider>{children}</WorkstationAppearanceProvider>
     </LanguageProvider>,
+  );
+}
+
+function renderShell() {
+  const utils = renderWithProviders(
+    <AppShell
+      session={session}
+      initialWorkstationState={{
+        locked: false,
+        lockedAt: null,
+        securityVersion: 1,
+      }}
+    >
+      <p>Workspace content</p>
+    </AppShell>,
   );
   function getDrawerCloseButton() {
     const aside = utils.container.querySelector('aside:not([class*="fixed inset-y-0"])');
@@ -67,19 +75,17 @@ function renderShell() {
 
 describe('AppShell workstation lock boundary', () => {
   it('never mounts protected workspace content while the server says the session is locked', () => {
-    render(
-      <LanguageProvider>
-        <AppShell
-          session={session}
-          initialWorkstationState={{
-            locked: true,
-            lockedAt: '2026-09-02T09:00:00.000Z',
-            securityVersion: 2,
-          }}
-        >
-          <p>Highly protected workspace content</p>
-        </AppShell>
-      </LanguageProvider>,
+    renderWithProviders(
+      <AppShell
+        session={session}
+        initialWorkstationState={{
+          locked: true,
+          lockedAt: '2026-09-02T09:00:00.000Z',
+          securityVersion: 2,
+        }}
+      >
+        <p>Highly protected workspace content</p>
+      </AppShell>,
     );
 
     expect(screen.queryByText('Highly protected workspace content')).not.toBeInTheDocument();
@@ -123,19 +129,17 @@ describe('AppShell workstation interaction security', () => {
         ),
     );
 
-    render(
-      <LanguageProvider>
-        <AppShell
-          session={session}
-          initialWorkstationState={{
-            locked: true,
-            lockedAt: '2026-09-02T09:00:00.000Z',
-            securityVersion: 2,
-          }}
-        >
-          <p>Protected patient workspace</p>
-        </AppShell>
-      </LanguageProvider>,
+    renderWithProviders(
+      <AppShell
+        session={session}
+        initialWorkstationState={{
+          locked: true,
+          lockedAt: '2026-09-02T09:00:00.000Z',
+          securityVersion: 2,
+        }}
+      >
+        <p>Protected patient workspace</p>
+      </AppShell>,
     );
 
     fireEvent.change(screen.getByLabelText('Password'), {
@@ -166,19 +170,17 @@ describe('AppShell workstation interaction security', () => {
 
     vi.stubGlobal('fetch', fetchMock);
 
-    render(
-      <LanguageProvider>
-        <AppShell
-          session={session}
-          initialWorkstationState={{
-            locked: true,
-            lockedAt: '2026-09-02T09:00:00.000Z',
-            securityVersion: 2,
-          }}
-        >
-          <p>Protected patient workspace</p>
-        </AppShell>
-      </LanguageProvider>,
+    renderWithProviders(
+      <AppShell
+        session={session}
+        initialWorkstationState={{
+          locked: true,
+          lockedAt: '2026-09-02T09:00:00.000Z',
+          securityVersion: 2,
+        }}
+      >
+        <p>Protected patient workspace</p>
+      </AppShell>,
     );
 
     fireEvent.change(screen.getByLabelText('Password'), {
@@ -266,19 +268,17 @@ describe('AppShell Google workstation unlock security', () => {
 
     vi.stubGlobal('fetch', fetchMock);
 
-    render(
-      <LanguageProvider>
-        <AppShell
-          session={session}
-          initialWorkstationState={{
-            locked: true,
-            lockedAt: '2026-09-02T09:00:00.000Z',
-            securityVersion: 2,
-          }}
-        >
-          <p>Protected patient workspace</p>
-        </AppShell>
-      </LanguageProvider>,
+    renderWithProviders(
+      <AppShell
+        session={session}
+        initialWorkstationState={{
+          locked: true,
+          lockedAt: '2026-09-02T09:00:00.000Z',
+          securityVersion: 2,
+        }}
+      >
+        <p>Protected patient workspace</p>
+      </AppShell>,
     );
 
     const script = screen.queryByText('load-google-script');

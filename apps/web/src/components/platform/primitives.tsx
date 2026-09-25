@@ -1,6 +1,6 @@
 'use client';
 
-import type { InputHTMLAttributes, ReactNode } from 'react';
+import type { InputHTMLAttributes, ReactNode, SelectHTMLAttributes } from 'react';
 import { useLanguage } from '@/components/language-provider';
 
 /**
@@ -30,7 +30,7 @@ export function Card({
 }) {
   return (
     <div
-      className={`overflow-hidden rounded-[1.35rem] border border-canvas-400 bg-white shadow-card ${
+      className={`workstation-surface overflow-hidden rounded-[1.35rem] border border-canvas-400 bg-white shadow-card ${
         padded ? 'p-5 sm:p-6' : ''
       } ${className}`}
     >
@@ -101,7 +101,7 @@ export function Button({
       type={type}
       disabled={disabled || loading}
       aria-busy={loading || undefined}
-      className={`inline-flex items-center justify-center gap-2 rounded-xl px-5 py-3.5 text-sm font-bold transition disabled:cursor-wait disabled:opacity-60 disabled:hover:translate-y-0 ${buttonVariants[variant]} ${className}`}
+      className={`organization-theme-focus inline-flex min-h-11 touch-manipulation items-center justify-center gap-2 rounded-xl px-5 py-3.5 text-sm font-bold transition disabled:cursor-wait disabled:opacity-60 disabled:hover:translate-y-0 ${buttonVariants[variant]} ${className}`}
     >
       {loading ? (loadingLabel ?? t('common.working')) : children}
     </button>
@@ -134,7 +134,7 @@ export function Input({
         id={id}
         aria-invalid={Boolean(error)}
         aria-describedby={describedBy}
-        className="organization-theme-focus w-full rounded-xl border border-ink-900/[.11] bg-canvas-50 px-4 py-3.5 text-sm text-ink-900 shadow-[0_1px_0_rgba(255,255,255,.8)_inset] transition placeholder:text-canvas-500 hover:border-ink-900/25 focus:bg-white"
+        className="organization-theme-focus min-h-11 w-full touch-manipulation rounded-xl border border-ink-900/[.11] bg-canvas-50 px-4 py-3.5 text-sm text-ink-900 shadow-[0_1px_0_rgba(255,255,255,.8)_inset] transition placeholder:text-canvas-500 hover:border-ink-900/25 focus:bg-white"
       />
       {error ? (
         <span id={`${id}-error`} className="mt-2 block text-xs text-rose-700" role="alert">
@@ -145,6 +145,81 @@ export function Input({
           {hint}
         </span>
       ) : null}
+    </label>
+  );
+}
+
+export function Select({
+  label,
+  error,
+  hint,
+  children,
+  ...select
+}: SelectHTMLAttributes<HTMLSelectElement> & {
+  label: string;
+  error?: string;
+  hint?: string;
+  children: ReactNode;
+}) {
+  const id = `field-${select.name ?? label.toLowerCase().replace(/\s+/g, '-')}`;
+  const describedBy = error ? `${id}-error` : hint ? `${id}-hint` : undefined;
+  return (
+    <label className="block" htmlFor={id}>
+      <span className="mb-2 block text-xs font-bold text-canvas-700">{label}</span>
+      <select
+        {...select}
+        id={id}
+        aria-invalid={Boolean(error)}
+        aria-describedby={describedBy}
+        className="organization-theme-focus min-h-11 w-full touch-manipulation rounded-xl border border-ink-900/[.11] bg-canvas-50 px-3 text-sm text-ink-900 transition hover:border-ink-900/25 focus:bg-white"
+      >
+        {children}
+      </select>
+      {error ? (
+        <span id={`${id}-error`} className="mt-2 block text-xs text-rose-700" role="alert">
+          {error}
+        </span>
+      ) : hint ? (
+        <span id={`${id}-hint`} className="mt-2 block text-xs text-canvas-600">
+          {hint}
+        </span>
+      ) : null}
+    </label>
+  );
+}
+
+export function Checkbox({
+  label,
+  description,
+  className = '',
+  ...input
+}: Omit<InputHTMLAttributes<HTMLInputElement>, 'type'> & {
+  label: string;
+  description?: string;
+  className?: string;
+}) {
+  const id = `field-${input.name ?? label.toLowerCase().replace(/\s+/g, '-')}`;
+  const descriptionId = description ? `${id}-description` : undefined;
+  return (
+    <label
+      htmlFor={id}
+      className={`flex min-h-11 touch-manipulation items-center gap-3 rounded-xl border border-ink-900/[.11] bg-canvas-50 px-4 py-2.5 ${className}`}
+    >
+      <input
+        {...input}
+        id={id}
+        type="checkbox"
+        aria-describedby={descriptionId}
+        className="organization-theme-focus size-5 shrink-0"
+      />
+      <span className="min-w-0">
+        <span className="block text-sm font-semibold text-ink-900">{label}</span>
+        {description ? (
+          <span id={descriptionId} className="mt-0.5 block text-xs text-canvas-600">
+            {description}
+          </span>
+        ) : null}
+      </span>
     </label>
   );
 }

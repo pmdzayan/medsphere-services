@@ -114,3 +114,101 @@ test('PWA runtime registers the static-only AIM service worker on localhost', as
 
   expect(registered).toBe(true);
 });
+
+test('Urdu switches the real document into RTL without mixed-direction shell state', async ({
+  page,
+  baseURL,
+}) => {
+  const origin = new URL(baseURL ?? 'http://localhost:3001').origin;
+  await page.context().addCookies([
+    {
+      name: 'medsphere_locale',
+      value: 'ur',
+      url: origin,
+    },
+  ]);
+
+  await page.goto('/login');
+  await expect(page.locator('html')).toHaveAttribute('lang', 'ur');
+  await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
+});
+
+test('dark workstation appearance is applied before interactive use', async ({ page }) => {
+  await page.addInitScript(() => {
+    window.localStorage.setItem('aim.workstation.appearance', 'dark');
+  });
+  await page.goto('/login');
+
+  await expect(page.locator('html')).toHaveAttribute('data-appearance', 'dark');
+  const colorScheme = await page
+    .locator('html')
+    .evaluate((element) => getComputedStyle(element).colorScheme);
+  expect(colorScheme).toContain('dark');
+});
+
+test('mobile public journeys avoid horizontal overflow and expose touch-sized form controls', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/login');
+
+  const result = await page.evaluate(() => {
+    const root = document.documentElement;
+    const undersized: string[] = [];
+
+    for (const control of document.querySelectorAll<HTMLElement>(
+      'button, input:not([type="hidden"]), select, textarea',
+    )) {
+      if (control.hasAttribute('disabled')) continue;
+      const rect = control.getBoundingClientRect();
+      if (rect.width === 0 || rect.height === 0) continue;
+      if (rect.height < 44) {
+        undersized.push(
+          `${control.tagName.toLowerCase()}#${control.id || '(no-id)'}:${Math.round(
+            rect.height,
+          )}px`,
+        );
+      }
+    }
+
+    return {
+      overflow: root.scrollWidth > root.clientWidth + 1,
+      undersized,
+    };
+  });
+
+  expect(result.overflow).toBe(false);
+  expect(result.undersized).toEqual([]);
+});
+
+test('service-worker Cache Storage contains public assets only', async ({ page }) => {
+  await page.goto('/');
+
+  const cacheEvidence = await page.evaluate(async () => {
+    if (!('serviceWorker' in navigator)) return { registered: false, urls: [] as string[] };
+    await navigator.serviceWorker.ready;
+
+    const urls: string[] = [];
+    for (const cacheName of await caches.keys()) {
+      if (!cacheName.startsWith('aim-public-static-')) continue;
+      const cache = await caches.open(cacheName);
+      for (const request of await cache.keys()) urls.push(new URL(request.url).pathname);
+    }
+
+    return { registered: true, urls };
+  });
+
+  expect(cacheEvidence.registered).toBe(true);
+  expect(cacheEvidence.urls.length).toBeGreaterThan(0);
+  for (const pathname of cacheEvidence.urls) {
+    expect(
+      pathname.startsWith('/_next/static/') ||
+        pathname === '/manifest.webmanifest' ||
+        pathname === '/icon.svg',
+    ).toBe(true);
+    expect(pathname.startsWith('/api/')).toBe(false);
+    expect(
+      /^\/(?:dashboard|patient|inventory|reservations|billing|audit|team|pharmacy)/.test(pathname),
+    ).toBe(false);
+  }
+});

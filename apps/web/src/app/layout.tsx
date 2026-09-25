@@ -3,6 +3,7 @@ import { BRAND } from '@medsphere/brand';
 import { BrandStartup } from '@/components/brand/brand-startup';
 import { LanguageProvider } from '@/components/language-provider';
 import { PwaRuntime } from '@/components/platform/pwa-runtime';
+import { WorkstationAppearanceProvider } from '@/components/platform/workstation-appearance';
 import { getLocaleDirection } from '@/lib/i18n';
 import { getServerLocalePreference } from '@/lib/server-locale';
 import './globals.css';
@@ -35,9 +36,11 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
     <html lang={serverLocale} dir={getLocaleDirection(serverLocale)}>
       <body className="font-[var(--font-body)]">
         <LanguageProvider initialLocale={serverPreference}>
-          <BrandStartup />
-          <PwaRuntime />
-          {children}
+          <WorkstationAppearanceProvider>
+            <BrandStartup />
+            <PwaRuntime />
+            {children}
+          </WorkstationAppearanceProvider>
         </LanguageProvider>
       </body>
     </html>

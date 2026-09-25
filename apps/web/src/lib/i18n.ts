@@ -83,6 +83,11 @@ import {
   task0044UrduMessages,
 } from './i18n-catalogs/task-0044';
 import { workstationSecurityLocaleMessages } from './i18n-catalogs/workstation-security';
+import {
+  workstationResilienceEnglishMessages,
+  workstationResilienceTamilMessages,
+  workstationResilienceUrduMessages,
+} from './i18n-catalogs/workstation-resilience';
 
 export const localeOptions = [
   { code: 'en', label: 'English', dir: 'ltr' },
@@ -135,6 +140,7 @@ const englishMessages = {
   ...pharmacyProfileEnglishMessages,
   ...posEnglishMessages,
   ...task0044EnglishMessages,
+  ...workstationResilienceEnglishMessages,
   'language.label': 'Language',
   'meta.login.title': 'Sign in',
   'meta.register.title': 'Request access',
@@ -299,6 +305,7 @@ const tamilMessages: MessageOverrides = {
   ...pharmacyProfileTamilMessages,
   ...posTamilMessages,
   ...task0044TamilMessages,
+  ...workstationResilienceTamilMessages,
   'language.label': 'மொழி',
   'meta.login.title': 'உள்நுழைக',
   'meta.register.title': 'அணுகலைக் கோருங்கள்',
@@ -493,6 +500,7 @@ const urduMessages: MessageOverrides = {
   ...pharmacyProfileUrduMessages,
   ...posUrduMessages,
   ...task0044UrduMessages,
+  ...workstationResilienceUrduMessages,
   'language.label': 'زبان',
   'meta.login.title': 'سائن ان',
   'meta.register.title': 'رسائی کی درخواست',

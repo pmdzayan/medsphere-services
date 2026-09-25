@@ -13,6 +13,8 @@ export function checkPwaCachePolicy(source = fs.readFileSync(serviceWorkerPath, 
     "url.pathname.startsWith('/_next/static/')",
     'PUBLIC_SHELL_ASSETS.has(url.pathname)',
     "request.method !== 'GET'",
+    "event.data?.type === 'SKIP_WAITING'",
+    "event.data?.type === 'PURGE_PUBLIC_CACHE'",
   ];
 
   for (const snippet of requiredSnippets) {
@@ -25,6 +27,10 @@ export function checkPwaCachePolicy(source = fs.readFileSync(serviceWorkerPath, 
     /caches\.match\([^)]*navigate/i,
     /pathname\.startsWith\(['"]\/(?:dashboard|patient|inventory|reservations|audit)/i,
     /PUBLIC_SHELL_ASSETS[^;]*(?:dashboard|patient|inventory|reservation|api)/i,
+    /indexedDB/i,
+    /localStorage/i,
+    /sessionStorage/i,
+    /backgroundSync/i,
   ];
 
   for (const pattern of forbiddenPatterns) {

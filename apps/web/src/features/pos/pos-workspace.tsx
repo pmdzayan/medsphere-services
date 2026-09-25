@@ -3,7 +3,15 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 
 import { useLanguage } from '@/components/language-provider';
-import { Badge, Button, Card, EmptyState, Input } from '@/components/platform/primitives';
+import {
+  Badge,
+  Button,
+  Card,
+  Checkbox,
+  EmptyState,
+  Input,
+  Select,
+} from '@/components/platform/primitives';
 import {
   checkoutPosSale,
   configurePosFiscalProfile,
@@ -25,6 +33,12 @@ import type {
   PosProductQuote,
   PosSaleReceipt,
 } from '@/lib/pos-contract';
+import {
+  clearOfflinePosDraft,
+  enqueueOfflinePosDraft,
+  peekOfflinePosDraft,
+} from '@/lib/offline-pos-draft';
+import { revalidateOfflinePosDraft } from '@/lib/offline-pos-revalidation';
 import { calculatePosPreviewMoney, sumPosMoney } from '@/lib/pos-money';
 
 interface CartLine {
@@ -82,6 +96,10 @@ export function PosWorkspace() {
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const [checkoutKey, setCheckoutKey] = useState<{ signature: string; key: string } | null>(null);
+  const [online, setOnline] = useState(true);
+  const [offlineDraftState, setOfflineDraftState] = useState<
+    'idle' | 'saved' | 'revalidating' | 'ready' | 'conflict'
+  >('idle');
 
   const [receipt, setReceipt] = useState<PosSaleReceipt | null>(null);
   const [receiptActionLoading, setReceiptActionLoading] = useState(false);
@@ -153,6 +171,26 @@ export function PosWorkspace() {
     [permissions, t],
   );
 
+  const revalidateDraft = useCallback(async (selectedProviderId: string) => {
+    const draft = peekOfflinePosDraft(selectedProviderId);
+    if (!draft) return;
+
+    setOfflineDraftState('revalidating');
+    setCheckoutError(null);
+    try {
+      const refreshed = await revalidateOfflinePosDraft(draft, getPosProductQuote);
+      setCart(refreshed.lines);
+      setPlaceOfSupply(draft.placeOfSupplyStateCode);
+      setPaymentMethod(draft.paymentMethod);
+      setCheckoutKey(null);
+      clearOfflinePosDraft(selectedProviderId);
+      setOfflineDraftState(refreshed.hasConflict ? 'conflict' : 'ready');
+    } catch {
+      clearOfflinePosDraft(selectedProviderId);
+      setOfflineDraftState('conflict');
+    }
+  }, []);
+
   useEffect(() => void loadBoot(), [loadBoot]);
   useEffect(() => {
     if (!providerId) {
@@ -169,6 +207,28 @@ export function PosWorkspace() {
     setPickupToken('');
     void loadFiscal(providerId);
   }, [loadFiscal, providerId]);
+
+  useEffect(() => {
+    if (typeof navigator === 'undefined') return;
+
+    const handleOffline = () => setOnline(false);
+    const handleOnline = () => {
+      setOnline(true);
+      if (providerId) void revalidateDraft(providerId);
+    };
+
+    setOnline(navigator.onLine);
+    if (navigator.onLine && providerId && peekOfflinePosDraft(providerId)) {
+      void revalidateDraft(providerId);
+    }
+
+    window.addEventListener('offline', handleOffline);
+    window.addEventListener('online', handleOnline);
+    return () => {
+      window.removeEventListener('offline', handleOffline);
+      window.removeEventListener('online', handleOnline);
+    };
+  }, [providerId, revalidateDraft]);
 
   async function saveFiscal(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -357,6 +417,21 @@ export function PosWorkspace() {
     event.preventDefault();
     if (!providerId || !canCheckout || checkoutLoading || !preview || cart.length === 0) return;
 
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      const draft = enqueueOfflinePosDraft({
+        providerId,
+        lines: cart.map((line) => ({
+          productId: line.quote.productId,
+          quantity: line.quantity,
+        })),
+        placeOfSupplyStateCode: placeOfSupply.trim(),
+        paymentMethod,
+      });
+      setOfflineDraftState(draft ? 'saved' : 'conflict');
+      setCheckoutError(draft ? t('pos.offline.saved') : t('pos.offline.invalid'));
+      return;
+    }
+
     const commandWithoutKey = {
       lines: cart.map((line) => ({ productId: line.quote.productId, quantity: line.quantity })),
       payments: [
@@ -396,6 +471,8 @@ export function PosWorkspace() {
       setReceipt(completed);
       setCart([]);
       setProducts([]);
+      clearOfflinePosDraft(providerId);
+      setOfflineDraftState('idle');
       setCheckoutKey(null);
       setPaymentReference('');
       setCashTendered('');
@@ -452,6 +529,18 @@ export function PosWorkspace() {
 
   const selectedProvider = providers.find((provider) => provider.providerId === providerId);
   const fiscalProfile = fiscal?.fiscalProfile;
+  const resilienceMessage = !online
+    ? offlineDraftState === 'saved'
+      ? t('pos.offline.saved')
+      : t('pos.offline.banner')
+    : offlineDraftState === 'revalidating'
+      ? t('pos.offline.revalidating')
+      : offlineDraftState === 'ready'
+        ? t('pos.offline.ready')
+        : offlineDraftState === 'conflict'
+          ? t('pos.offline.conflict')
+          : null;
+
   const checkoutBlocked =
     !canCheckout ||
     checkoutLoading ||
@@ -478,13 +567,13 @@ export function PosWorkspace() {
       </header>
 
       <Card>
-        <label className="block max-w-xl">
-          <span className="mb-2 block text-xs font-bold text-canvas-700">{t('pos.provider')}</span>
-          <select
+        <div className="max-w-xl">
+          <Select
+            name="pos-provider"
+            label={t('pos.provider')}
             value={providerId}
             disabled={bootLoading || providers.length === 0}
             onChange={(event) => setProviderId(event.target.value)}
-            className="organization-theme-focus h-11 w-full rounded-xl border border-ink-900/[.11] bg-white px-3 text-sm font-semibold text-ink-900 disabled:opacity-60"
           >
             {providers.length === 0 ? (
               <option value="">{t('inventory.common.noProvider')}</option>
@@ -494,8 +583,8 @@ export function PosWorkspace() {
                 {provider.businessName}
               </option>
             ))}
-          </select>
-        </label>
+          </Select>
+        </div>
         {bootError ? <p className="mt-3 text-sm text-rose-700">{bootError}</p> : null}
         {selectedProvider ? (
           <p className="mt-3 text-xs font-semibold text-[#71817c]">
@@ -527,25 +616,21 @@ export function PosWorkspace() {
               <p className="mt-5 text-sm text-[#60736c]">{t('common.loading')}</p>
             ) : (
               <form onSubmit={saveFiscal} className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                <label className="block">
-                  <span className="mb-2 block text-xs font-bold text-canvas-700">
-                    {t('pos.fiscal.registration')}
-                  </span>
-                  <select
-                    value={registrationType}
-                    disabled={!canConfigure || fiscalSaving}
-                    onChange={(event) =>
-                      setRegistrationType(
-                        event.target.value as 'GST_REGULAR' | 'GST_COMPOSITION' | 'UNREGISTERED',
-                      )
-                    }
-                    className="organization-theme-focus h-[3.15rem] w-full rounded-xl border border-ink-900/[.11] bg-canvas-50 px-3 text-sm"
-                  >
-                    <option value="GST_REGULAR">{t('pos.fiscal.regular')}</option>
-                    <option value="GST_COMPOSITION">{t('pos.fiscal.composition')}</option>
-                    <option value="UNREGISTERED">{t('pos.fiscal.unregistered')}</option>
-                  </select>
-                </label>
+                <Select
+                  name="pos-registration-type"
+                  label={t('pos.fiscal.registration')}
+                  value={registrationType}
+                  disabled={!canConfigure || fiscalSaving}
+                  onChange={(event) =>
+                    setRegistrationType(
+                      event.target.value as 'GST_REGULAR' | 'GST_COMPOSITION' | 'UNREGISTERED',
+                    )
+                  }
+                >
+                  <option value="GST_REGULAR">{t('pos.fiscal.regular')}</option>
+                  <option value="GST_COMPOSITION">{t('pos.fiscal.composition')}</option>
+                  <option value="UNREGISTERED">{t('pos.fiscal.unregistered')}</option>
+                </Select>
                 <Input
                   name="pos-legal-name"
                   label={t('pos.fiscal.legalName')}
@@ -581,17 +666,13 @@ export function PosWorkspace() {
                   disabled={!canConfigure || fiscalSaving}
                   onChange={(event) => setInvoiceSeries(event.target.value.toUpperCase())}
                 />
-                <label className="flex min-h-[3.15rem] items-center gap-3 rounded-xl border border-ink-900/[.11] bg-canvas-50 px-4">
-                  <input
-                    type="checkbox"
-                    checked={pricesIncludeTax}
-                    disabled={!canConfigure || fiscalSaving}
-                    onChange={(event) => setPricesIncludeTax(event.target.checked)}
-                  />
-                  <span className="text-sm font-semibold text-[#29483f]">
-                    {t('pos.fiscal.inclusive')}
-                  </span>
-                </label>
+                <Checkbox
+                  name="pos-prices-include-tax"
+                  label={t('pos.fiscal.inclusive')}
+                  checked={pricesIncludeTax}
+                  disabled={!canConfigure || fiscalSaving}
+                  onChange={(event) => setPricesIncludeTax(event.target.checked)}
+                />
                 {canConfigure ? (
                   <div className="flex items-end">
                     <Button
@@ -823,6 +904,19 @@ export function PosWorkspace() {
           <form onSubmit={submitCheckout}>
             <Card>
               <h2 className="text-lg font-bold text-[#173128]">{t('pos.checkout.title')}</h2>
+              {resilienceMessage ? (
+                <div
+                  role="status"
+                  aria-live="polite"
+                  className={`mt-4 rounded-xl border p-3 text-sm font-semibold ${
+                    !online || offlineDraftState === 'conflict'
+                      ? 'border-amber-200 bg-amber-50 text-amber-800'
+                      : 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                  }`}
+                >
+                  {resilienceMessage}
+                </div>
+              ) : null}
               <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                 <Input
                   name="pos-place-of-supply"
@@ -859,24 +953,20 @@ export function PosWorkspace() {
                     }}
                   />
                 ) : null}
-                <label className="block">
-                  <span className="mb-2 block text-xs font-bold text-canvas-700">
-                    {t('pos.checkout.paymentMethod')}
-                  </span>
-                  <select
-                    value={paymentMethod}
-                    onChange={(event) => {
-                      setPaymentMethod(event.target.value as PosPaymentMethod);
-                      setCheckoutKey(null);
-                    }}
-                    className="organization-theme-focus h-[3.15rem] w-full rounded-xl border border-ink-900/[.11] bg-canvas-50 px-3 text-sm"
-                  >
-                    <option value="CASH">{t('pos.checkout.cash')}</option>
-                    <option value="CARD">{t('pos.checkout.card')}</option>
-                    <option value="UPI">{t('pos.checkout.upi')}</option>
-                    <option value="OTHER">{t('pos.checkout.other')}</option>
-                  </select>
-                </label>
+                <Select
+                  name="pos-payment-method"
+                  label={t('pos.checkout.paymentMethod')}
+                  value={paymentMethod}
+                  onChange={(event) => {
+                    setPaymentMethod(event.target.value as PosPaymentMethod);
+                    setCheckoutKey(null);
+                  }}
+                >
+                  <option value="CASH">{t('pos.checkout.cash')}</option>
+                  <option value="CARD">{t('pos.checkout.card')}</option>
+                  <option value="UPI">{t('pos.checkout.upi')}</option>
+                  <option value="OTHER">{t('pos.checkout.other')}</option>
+                </Select>
                 {paymentMethod === 'CASH' ? (
                   <Input
                     name="pos-cash-tendered"
@@ -969,7 +1059,7 @@ export function PosWorkspace() {
                   loadingLabel={t('pos.checkout.submitting')}
                   disabled={checkoutBlocked}
                 >
-                  {t('pos.checkout.submit')}
+                  {online ? t('pos.checkout.submit') : t('pos.offline.saveDraft')}
                 </Button>
               </div>
             </Card>

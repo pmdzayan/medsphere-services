@@ -13,7 +13,17 @@ import {
 } from '@/lib/auth-contract';
 import type { SessionProfile } from '@/lib/session-profile';
 import { PlatformBrand } from './brand';
+import { useWorkstationAppearance } from './workstation-appearance';
 import { Icon, type IconName } from './icon';
+
+const appearanceOptions = [
+  { value: 'system', labelKey: 'workstation.appearance.system' },
+  { value: 'light', labelKey: 'workstation.appearance.light' },
+  { value: 'dark', labelKey: 'workstation.appearance.dark' },
+] as const satisfies ReadonlyArray<{
+  value: 'system' | 'light' | 'dark';
+  labelKey: TranslationKey;
+}>;
 
 const primaryNavigation: NavigationItem[] = [
   { labelKey: 'shell.overview', href: '/dashboard', icon: 'dashboard' },
@@ -42,6 +52,8 @@ export function AppShell({
 }>) {
   const pathname = usePathname();
   const { t } = useLanguage();
+  const { preference: appearancePreference, setPreference: setAppearancePreference } =
+    useWorkstationAppearance();
   const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
@@ -468,6 +480,32 @@ export function AppShell({
                       <p className="mt-1 truncate text-[10px] text-[#75857f]">
                         {session.context.tenantName}
                       </p>
+                    </div>
+                    <div className="border-b border-[#edf1ef] px-3 py-3">
+                      <p className="text-[10px] font-bold uppercase tracking-[.16em] text-[#71817c]">
+                        {t('workstation.appearance.label')}
+                      </p>
+                      <div
+                        className="mt-2 grid grid-cols-3 gap-1"
+                        role="group"
+                        aria-label={t('workstation.appearance.label')}
+                      >
+                        {appearanceOptions.map((option) => (
+                          <button
+                            key={option.value}
+                            type="button"
+                            aria-pressed={appearancePreference === option.value}
+                            onClick={() => setAppearancePreference(option.value)}
+                            className={`min-h-11 rounded-lg px-2 text-[11px] font-bold transition ${
+                              appearancePreference === option.value
+                                ? 'organization-theme-soft'
+                                : 'text-[#52655e] hover:bg-[#f3f6f4]'
+                            }`}
+                          >
+                            {t(option.labelKey)}
+                          </button>
+                        ))}
+                      </div>
                     </div>
                     <button
                       type="button"
