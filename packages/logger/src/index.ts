@@ -21,6 +21,18 @@ function normalizeSensitiveKey(key: string): string {
 export function isSensitiveLogKey(key: string): boolean {
   const normalized = normalizeSensitiveKey(key);
 
+  // requestId is the one identifier intentionally retained for operational
+  // correlation. Every domain/session/resource identifier is redacted.
+  if (normalized === 'requestid' || normalized === 'correlationid') {
+    return false;
+  }
+  if (normalized === 'id' || normalized.endsWith('id')) {
+    return true;
+  }
+  if (normalized.endsWith('email') || normalized.endsWith('phone')) {
+    return true;
+  }
+
   if (
     normalized === 'authorization' ||
     normalized === 'cookie' ||
@@ -38,6 +50,8 @@ export function isSensitiveLogKey(key: string): boolean {
     normalized === 'connectionstring' ||
     normalized === 'email' ||
     normalized === 'phone' ||
+    normalized === 'ipaddress' ||
+    normalized === 'useragent' ||
     normalized === 'tenantid' ||
     normalized === 'userid' ||
     normalized === 'subjectuserid' ||
