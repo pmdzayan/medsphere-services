@@ -62,6 +62,8 @@ function buildService(
       providerType: string;
       deletedAt: Date | null;
       isVerified?: boolean;
+      country?: string;
+      state?: string;
     } | null;
     verifications?: VerificationRow[];
     reviewerStillAuthorized?: boolean;
@@ -78,6 +80,8 @@ function buildService(
           providerType: 'PHARMACY',
           deletedAt: null,
           isVerified: false,
+          country: 'India',
+          state: 'Tamil Nadu',
         }
       : options.provider;
   const verifications: VerificationRow[] = options.verifications ?? [];
@@ -142,7 +146,14 @@ function buildService(
           row
             ? {
                 ...row,
-                provider: row.providerId === provider?.id ? { businessName: 'Pharmacy A' } : null,
+                provider:
+                  row.providerId === provider?.id
+                    ? {
+                        businessName: 'Pharmacy A',
+                        country: provider.country ?? 'India',
+                        state: provider.state ?? 'Tamil Nadu',
+                      }
+                    : null,
               }
             : null,
         );
