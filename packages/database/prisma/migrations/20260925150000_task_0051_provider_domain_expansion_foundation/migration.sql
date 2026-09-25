@@ -127,6 +127,8 @@ CREATE TABLE "ProviderProfessionalProfile" (
 
 CREATE UNIQUE INDEX "ProviderProfessionalProfile_providerId_key"
   ON "ProviderProfessionalProfile" ("providerId");
+CREATE UNIQUE INDEX "ProviderProfessionalProfile_providerId_tenantId_key"
+  ON "ProviderProfessionalProfile" ("providerId", "tenantId");
 CREATE UNIQUE INDEX "ProviderProfessionalProfile_tenantId_userId_key"
   ON "ProviderProfessionalProfile" ("tenantId", "userId");
 CREATE INDEX "ProviderProfessionalProfile_tenantId_providerId_idx"
