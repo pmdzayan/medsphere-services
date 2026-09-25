@@ -3138,6 +3138,7 @@ model MedicinePickupToken {
   updatedAt DateTime @updatedAt
 
   @@unique([reservationId, tenantId, providerId], map: "MedicinePickupToken_reservation_scope_key")
+  @@unique([reservationId, tenantId, providerId, subjectUserId], map: "MedicinePickupToken_reservation_subject_scope_key")
   @@index([tenantId, providerId, expiresAt], map: "MedicinePickupToken_tenant_provider_expires_idx")
   @@index([subjectUserId, consumedAt, expiresAt], map: "MedicinePickupToken_subject_consumed_expires_idx")
 }
@@ -3172,6 +3173,8 @@ model MedicinePickupHandoff {
   createdAt DateTime @default(now())
 
   @@unique([reservationId, tenantId, providerId], map: "MedicinePickupHandoff_reservation_scope_key")
+  @@unique([reservationId, tenantId, providerId, subjectUserId], map: "MedicinePickupHandoff_reservation_subject_scope_key")
+  @@unique([saleId, tenantId, providerId], map: "MedicinePickupHandoff_sale_scope_key")
   @@index([tenantId, providerId, verifiedAt(sort: Desc)], map: "MedicinePickupHandoff_tenant_provider_verified_idx")
   @@index([subjectUserId, verifiedAt(sort: Desc)], map: "MedicinePickupHandoff_subject_verified_idx")
 }
