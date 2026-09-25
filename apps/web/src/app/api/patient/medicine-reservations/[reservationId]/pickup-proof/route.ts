@@ -14,11 +14,14 @@ export const dynamic = 'force-dynamic';
 type Context = { params: Promise<{ reservationId: string }> };
 
 export async function POST(request: NextRequest, context: Context): Promise<NextResponse> {
-  if (!isSameOriginMutation(request)) return noStoreJson({ message: 'Cross-origin request rejected.' }, 403);
+  if (!isSameOriginMutation(request))
+    return noStoreJson({ message: 'Cross-origin request rejected.' }, 403);
   const { reservationId } = await context.params;
-  if (!isCanonicalUuid(reservationId)) return noStoreJson({ message: 'A valid reservation is required.' }, 400);
+  if (!isCanonicalUuid(reservationId))
+    return noStoreJson({ message: 'A valid reservation is required.' }, 400);
   const accessToken = request.cookies.get(ACCESS_COOKIE)?.value;
-  if (!accessToken) return noStoreJson({ message: 'Your session has expired. Sign in again.' }, 401);
+  if (!accessToken)
+    return noStoreJson({ message: 'Your session has expired. Sign in again.' }, 401);
 
   try {
     const upstream = await fetch(
@@ -28,7 +31,11 @@ export async function POST(request: NextRequest, context: Context): Promise<Next
     if (!upstream.ok) {
       return noStoreJson(
         { message: await boundedUpstreamMessage(upstream, 'Unable to issue pickup proof.') },
-        [401,403,404,409].includes(upstream.status) ? upstream.status : upstream.status >= 500 ? 502 : 400,
+        [401, 403, 404, 409].includes(upstream.status)
+          ? upstream.status
+          : upstream.status >= 500
+            ? 502
+            : 400,
       );
     }
     const payload: unknown = await upstream.json();
