@@ -18,7 +18,9 @@ describe('provider verification official-source catalogue', () => {
       'INDIA_MCA_MASTER_DATA',
     ]);
     expect(
-      result.sources.filter((source) => source.requirement === 'PRIMARY').map((source) => source.id),
+      result.sources
+        .filter((source) => source.requirement === 'PRIMARY')
+        .map((source) => source.id),
     ).toEqual(['INDIA_TN_DRUGS_CONTROL', 'INDIA_TN_PHARMACY_COUNCIL']);
   });
 
@@ -55,7 +57,9 @@ describe('provider verification official-source catalogue', () => {
         expect.objectContaining({ id: 'INDIA_ABDM_HFR', requirement: 'SUPPORTING' }),
       ]),
     );
-    expect(result.sources.some((source) => source.id === 'INDIA_CEA_NATIONAL_REGISTER')).toBe(false);
+    expect(result.sources.some((source) => source.id === 'INDIA_CEA_NATIONAL_REGISTER')).toBe(
+      false,
+    );
   });
 
   it('adds NABL as supporting accreditation evidence for laboratories, never as the statutory licence', () => {
@@ -73,8 +77,7 @@ describe('provider verification official-source catalogue', () => {
     expect(
       result.sources.some(
         (source) =>
-          source.id === 'INDIA_TN_CLINICAL_ESTABLISHMENTS' &&
-          source.requirement === 'PRIMARY',
+          source.id === 'INDIA_TN_CLINICAL_ESTABLISHMENTS' && source.requirement === 'PRIMARY',
       ),
     ).toBe(true);
   });

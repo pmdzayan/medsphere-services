@@ -144,12 +144,16 @@ describe('pharmacy verification state contract', () => {
   };
 
   it('accepts current-only state (no open renewal)', () => {
-    expect(isPharmacyVerificationState({ current: record, openSubmission: null, ...stateExtras })).toBe(true);
+    expect(
+      isPharmacyVerificationState({ current: record, openSubmission: null, ...stateExtras }),
+    ).toBe(true);
   });
 
   it('accepts an initial PENDING submission with no current state', () => {
     const pending = { ...record, status: 'PENDING' as const };
-    expect(isPharmacyVerificationState({ current: pending, openSubmission: null, ...stateExtras })).toBe(true);
+    expect(
+      isPharmacyVerificationState({ current: pending, openSubmission: null, ...stateExtras }),
+    ).toBe(true);
   });
 
   it('preserves valid approval + pending renewal as TWO distinct states', () => {
@@ -166,19 +170,24 @@ describe('pharmacy verification state contract', () => {
 
   it('preserves a rejection applicantMessage', () => {
     const rejected = { ...record, status: 'REJECTED' as const, applicantMessage: 'Please retry.' };
-    expect(isPharmacyVerificationState({ current: rejected, openSubmission: null, ...stateExtras })).toBe(true);
+    expect(
+      isPharmacyVerificationState({ current: rejected, openSubmission: null, ...stateExtras }),
+    ).toBe(true);
   });
 
   it('rejects a record containing internal "verificationNotes"', () => {
     const tampered = { ...record, verificationNotes: 'internal reasoning' };
-    expect(isPharmacyVerificationState({ current: tampered, openSubmission: null, ...stateExtras })).toBe(false);
+    expect(
+      isPharmacyVerificationState({ current: tampered, openSubmission: null, ...stateExtras }),
+    ).toBe(false);
   });
 
   it('rejects a record containing "verifiedBy" (reviewer identity)', () => {
     const tampered = { ...record, verifiedBy: 'platform-user-id' };
-    expect(isPharmacyVerificationState({ current: tampered, openSubmission: null, ...stateExtras })).toBe(false);
+    expect(
+      isPharmacyVerificationState({ current: tampered, openSubmission: null, ...stateExtras }),
+    ).toBe(false);
   });
-
 
   it('accepts controlled HTTPS official verification sources', () => {
     expect(

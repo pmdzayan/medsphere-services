@@ -23,18 +23,18 @@ Multiple sources are expected when different authorities prove different facts.
 
 ## India / Tamil Nadu accepted source catalogue
 
-| Provider | Requirement | Authority / source | Purpose |
-| --- | --- | --- | --- |
-| Pharmacy in Tamil Nadu | PRIMARY | Tamil Nadu Drugs Control — https://drugscontrol.tn.gov.in/sales_services.html | Pharmacy premises / drug-sale licence |
-| Pharmacy in Tamil Nadu | PRIMARY | Tamil Nadu Pharmacy Council — https://tnpc.ac.in/ | Pharmacist professional registration |
-| Pharmacy / hospital / clinic / lab | SUPPORTING | ABDM Health Facility Registry — https://facility.abdm.gov.in/ | Facility identity in the digital-health ecosystem |
-| Doctor | PRIMARY | National Medical Commission Indian Medical Register — https://www.nmc.org.in/information-desk/indian-medical-register/ | Doctor registration |
-| Doctor | SUPPORTING | ABDM Healthcare Professionals Registry — https://hpr.abdm.gov.in/ | Digital-health professional identity |
-| Hospital / clinic / lab in Tamil Nadu | PRIMARY | Tamil Nadu Clinical Establishments — https://www.tnhealth.org/dms/tncea/Others_upload.php | State clinical-establishment registration |
-| Hospital / clinic / lab outside configured State-specific rules | CONDITIONAL | Central Clinical Establishments National Register — https://clinicalestablishments.mohfw.gov.in/portal/cerrs/national-register | Use only where the Central Act applies |
-| Laboratory | SUPPORTING | NABL — https://nabl-india.org/ | Laboratory accreditation / quality evidence |
-| Applicable business | CONDITIONAL | GST Search Taxpayer — https://services.gst.gov.in/services/quicklinks/searchtxp | Tax/business identity |
-| Company / LLP | CONDITIONAL | Ministry of Corporate Affairs — https://www.mca.gov.in/ | Legal-entity identity |
+| Provider                                                        | Requirement | Authority / source                                                                                                             | Purpose                                           |
+| --------------------------------------------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------- |
+| Pharmacy in Tamil Nadu                                          | PRIMARY     | Tamil Nadu Drugs Control — https://drugscontrol.tn.gov.in/sales_services.html                                                  | Pharmacy premises / drug-sale licence             |
+| Pharmacy in Tamil Nadu                                          | PRIMARY     | Tamil Nadu Pharmacy Council — https://tnpc.ac.in/                                                                              | Pharmacist professional registration              |
+| Pharmacy / hospital / clinic / lab                              | SUPPORTING  | ABDM Health Facility Registry — https://facility.abdm.gov.in/                                                                  | Facility identity in the digital-health ecosystem |
+| Doctor                                                          | PRIMARY     | National Medical Commission Indian Medical Register — https://www.nmc.org.in/information-desk/indian-medical-register/         | Doctor registration                               |
+| Doctor                                                          | SUPPORTING  | ABDM Healthcare Professionals Registry — https://hpr.abdm.gov.in/                                                              | Digital-health professional identity              |
+| Hospital / clinic / lab in Tamil Nadu                           | PRIMARY     | Tamil Nadu Clinical Establishments — https://www.tnhealth.org/dms/tncea/Others_upload.php                                      | State clinical-establishment registration         |
+| Hospital / clinic / lab outside configured State-specific rules | CONDITIONAL | Central Clinical Establishments National Register — https://clinicalestablishments.mohfw.gov.in/portal/cerrs/national-register | Use only where the Central Act applies            |
+| Laboratory                                                      | SUPPORTING  | NABL — https://nabl-india.org/                                                                                                 | Laboratory accreditation / quality evidence       |
+| Applicable business                                             | CONDITIONAL | GST Search Taxpayer — https://services.gst.gov.in/services/quicklinks/searchtxp                                                | Tax/business identity                             |
+| Company / LLP                                                   | CONDITIONAL | Ministry of Corporate Affairs — https://www.mca.gov.in/                                                                        | Legal-entity identity                             |
 
 For pharmacies outside Tamil Nadu, AIM links to the official national directories
 that identify the competent State authorities:

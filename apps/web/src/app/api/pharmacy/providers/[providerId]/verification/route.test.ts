@@ -64,7 +64,9 @@ describe('GET /api/pharmacy/providers/[providerId]/verification', () => {
     const pending = { ...currentApproved, status: 'PENDING' };
     const fetchMock = vi
       .fn()
-      .mockResolvedValue(Response.json({ current: pending, openSubmission: null, ...verificationStateExtras }));
+      .mockResolvedValue(
+        Response.json({ current: pending, openSubmission: null, ...verificationStateExtras }),
+      );
     vi.stubGlobal('fetch', fetchMock);
 
     const response = await GET(createRequest({ cookie: 'medsphere_access=token' }), context);
@@ -80,13 +82,13 @@ describe('GET /api/pharmacy/providers/[providerId]/verification', () => {
       verificationId: '33333333-3333-4333-8333-333333333333',
       status: 'UNDER_REVIEW',
     };
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValue(Response.json({
+    const fetchMock = vi.fn().mockResolvedValue(
+      Response.json({
         current: currentApproved,
         openSubmission: renewal,
         ...verificationStateExtras,
-      }));
+      }),
+    );
     vi.stubGlobal('fetch', fetchMock);
 
     const response = await GET(createRequest({ cookie: 'medsphere_access=token' }), context);
@@ -126,7 +128,9 @@ describe('GET /api/pharmacy/providers/[providerId]/verification', () => {
     const rejected = { ...currentApproved, status: 'REJECTED', applicantMessage: 'Please retry.' };
     const fetchMock = vi
       .fn()
-      .mockResolvedValue(Response.json({ current: rejected, openSubmission: null, ...verificationStateExtras }));
+      .mockResolvedValue(
+        Response.json({ current: rejected, openSubmission: null, ...verificationStateExtras }),
+      );
     vi.stubGlobal('fetch', fetchMock);
 
     const response = await GET(createRequest({ cookie: 'medsphere_access=token' }), context);
@@ -138,7 +142,9 @@ describe('GET /api/pharmacy/providers/[providerId]/verification', () => {
     const tampered = { ...currentApproved, verificationNotes: 'internal reasoning' };
     const fetchMock = vi
       .fn()
-      .mockResolvedValue(Response.json({ current: tampered, openSubmission: null, ...verificationStateExtras }));
+      .mockResolvedValue(
+        Response.json({ current: tampered, openSubmission: null, ...verificationStateExtras }),
+      );
     vi.stubGlobal('fetch', fetchMock);
 
     const response = await GET(createRequest({ cookie: 'medsphere_access=token' }), context);

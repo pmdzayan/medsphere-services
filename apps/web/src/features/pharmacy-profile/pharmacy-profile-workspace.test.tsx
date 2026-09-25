@@ -146,9 +146,7 @@ describe('PharmacyProfileWorkspace', () => {
 
     const officialLinks = screen.getAllByRole('link', { name: 'Open official source' });
     expect(officialLinks[0]).toHaveAttribute('target', '_blank');
-    expect(
-      screen.getByText('Tamil Nadu Drugs Control — drug sales licensing'),
-    ).toBeInTheDocument();
+    expect(screen.getByText('Tamil Nadu Drugs Control — drug sales licensing')).toBeInTheDocument();
     expect(screen.getByText('Tamil Nadu Pharmacy Council')).toBeInTheDocument();
 
     expect(officialLinks.map((link) => link.getAttribute('href'))).toEqual([
