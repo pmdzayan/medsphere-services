@@ -1,0 +1,142 @@
+{
+  "schemaVersion": 1,
+  "task": "0060",
+  "principle": "independent-review-for-high-risk-healthcare-changes",
+  "reviewRequired": [
+    {
+      "id": "backend-healthcare-authority",
+      "prefixes": ["apps/auth-service/src/"],
+      "excludeSuffixes": [".spec.ts", ".test.ts"]
+    },
+    {
+      "id": "browser-bff-trust-boundary",
+      "prefixes": ["apps/web/src/app/api/"],
+      "excludeSuffixes": [".spec.ts", ".test.ts"]
+    },
+    {
+      "id": "shared-security-boundary",
+      "prefixes": ["packages/security/"],
+      "excludeSuffixes": [".spec.ts", ".test.ts"]
+    },
+    {
+      "id": "database-schema-and-migrations",
+      "prefixes": ["packages/database/prisma/schema.prisma", "packages/database/prisma/migrations/"]
+    },
+    {
+      "id": "gate-integrity",
+      "prefixes": [
+        "scripts/ai-code-security-data-integrity-gate.mjs",
+        "scripts/ai-code-security-data-integrity-gate.spec.mjs",
+        "docs/architecture/ai-code-security-data-integrity-policy.json",
+        ".github/workflows/ai-code-security-data-integrity.yml",
+        ".github/workflows/quality-gates.yml",
+        "PROJECT_RULES.md",
+        "package.json"
+      ]
+    }
+  ],
+  "reviewSignals": [
+    {
+      "id": "client-supplied-trust-context",
+      "pattern": "x-(tenant|organization|provider|membership)-id",
+      "flags": "i"
+    },
+    {
+      "id": "raw-html-injection-surface",
+      "pattern": "dangerouslySetInnerHTML",
+      "flags": ""
+    },
+    {
+      "id": "transaction-or-lock-removal",
+      "removedPattern": "(\\$transaction|FOR\\s+UPDATE|Serializable|tenantId|organizationId|providerId)",
+      "flags": "i"
+    }
+  ],
+  "hardFailRules": [
+    {
+      "id": "private-key-material",
+      "pattern": "-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY-----",
+      "flags": "i",
+      "scope": "sensitive-source"
+    },
+    {
+      "id": "aws-access-key",
+      "pattern": "AKIA[0-9A-Z]{16}",
+      "flags": "",
+      "scope": "sensitive-source"
+    },
+    {
+      "id": "live-api-secret",
+      "pattern": "sk-(live|proj)-[A-Za-z0-9_-]{20,}",
+      "flags": "i",
+      "scope": "sensitive-source"
+    },
+    {
+      "id": "unsafe-prisma-raw-query",
+      "pattern": "\\$(queryRawUnsafe|executeRawUnsafe)\\b",
+      "flags": "",
+      "scope": "production-code"
+    },
+    {
+      "id": "runtime-eval",
+      "pattern": "\\beval\\s*\\(|new\\s+Function\\s*\\(",
+      "flags": "",
+      "scope": "production-code"
+    },
+    {
+      "id": "production-child-process",
+      "pattern": "(node:child_process|from ['\"]child_process['\"]|require\\(['\"]child_process['\"]\\))",
+      "flags": "",
+      "scope": "production-code"
+    },
+    {
+      "id": "tls-verification-disabled",
+      "pattern": "(rejectUnauthorized\\s*:\\s*false|NODE_TLS_REJECT_UNAUTHORIZED\\s*=\\s*['\"]?0)",
+      "flags": "i",
+      "scope": "production-code"
+    }
+  ],
+  "destructiveMigrationRules": [
+    {
+      "id": "drop-database-object",
+      "pattern": "\\bDROP\\s+(TABLE|SCHEMA|DATABASE|TYPE)\\b",
+      "flags": "i"
+    },
+    {
+      "id": "drop-column",
+      "pattern": "\\bALTER\\s+TABLE[\\s\\S]*\\bDROP\\s+COLUMN\\b",
+      "flags": "i"
+    },
+    {
+      "id": "truncate-data",
+      "pattern": "\\bTRUNCATE\\b",
+      "flags": "i"
+    },
+    {
+      "id": "bulk-delete-data",
+      "pattern": "\\bDELETE\\s+FROM\\b",
+      "flags": "i"
+    }
+  ],
+  "forbiddenTrackedFiles": ["(^|/)\\.env$", "\\.(pem|key|p12|pfx)$"],
+  "exceptions": [],
+  "bootstrap": {
+    "baseSha": "ce836f12d20d30351678b19ea525d7dd34f28bce",
+    "expiresAt": "2026-09-27T00:00:00.000Z",
+    "reason": "One-time bounded installation of Task 0060. Static hard-fail checks remain active; only the independent-review requirement is waived for this exact bootstrap base and allowlist.",
+    "allowedPaths": [
+      "docs/architecture/ai-code-security-data-integrity-policy.json",
+      "scripts/ai-code-security-data-integrity-gate.mjs",
+      "scripts/ai-code-security-data-integrity-gate.spec.mjs",
+      ".github/workflows/ai-code-security-data-integrity.yml",
+      ".github/workflows/quality-gates.yml",
+      "docs/adr/0032-independent-ai-code-security-data-integrity-gate.md",
+      "docs/adr/README.md",
+      "docs/operations/task-0060-ai-code-security-data-integrity.md",
+      "docs/sprints/Task-0060-ai-code-security-data-integrity.md",
+      "PROJECT_RULES.md",
+      "PRODUCT_ROADMAP.md",
+      "package.json"
+    ]
+  }
+}
