@@ -332,7 +332,7 @@ export class PlatformVerificationDetailResponseDto {
   possibleDuplicateLicenseCount!: number;
 
   @ApiProperty({ type: [VerificationSourceDto] })
-  verificationSources!: VerificationSourceDto[];
+  verificationSources!: readonly VerificationSourceDto[];
 
   @ApiProperty()
   jurisdictionReviewRequired!: boolean;
@@ -437,7 +437,7 @@ export class PharmacyVerificationStateResponseDto {
   openSubmission!: PharmacyVerificationRecordDto | null;
 
   @ApiProperty({ type: [VerificationSourceDto] })
-  verificationSources!: VerificationSourceDto[];
+  verificationSources!: readonly VerificationSourceDto[];
 
   @ApiProperty()
   jurisdictionReviewRequired!: boolean;
