@@ -86,7 +86,8 @@ export function validateNetworkBudget(policy) {
   }
 }
 
-function containsCacheValue(nextConfig, source, cacheValue) {
+function containsCacheValue(nextConfig, source, cacheValue, alias) {
+  const escapedSource = source.replace(/[.*+?^$()|[\]\\]/g, '\\function containsCacheValue(nextConfig, source, cacheValue) {
   const escapedSource = source.replace(/[.*+?^$()|[\]\\]/g, '\\$&');
   const escapedValue = cacheValue.replace(/[.*+?^$()|[\]\\]/g, '\\$&');
   const sourcePattern = new RegExp(
@@ -94,6 +95,34 @@ function containsCacheValue(nextConfig, source, cacheValue) {
     'i',
   );
   return sourcePattern.test(nextConfig);
+}');
+  const escapedValue = cacheValue.replace(/[.*+?^$()|[\]\\]/g, '\\function containsCacheValue(nextConfig, source, cacheValue) {
+  const escapedSource = source.replace(/[.*+?^$()|[\]\\]/g, '\\$&');
+  const escapedValue = cacheValue.replace(/[.*+?^$()|[\]\\]/g, '\\$&');
+  const sourcePattern = new RegExp(
+    `source\\s*:\\s*['"]${escapedSource}['"][\\s\\S]{0,500}Cache-Control[\\s\\S]{0,300}${escapedValue}`,
+    'i',
+  );
+  return sourcePattern.test(nextConfig);
+}');
+  const escapedAlias = alias.replace(/[.*+?^$()|[\]\\]/g, '\\function containsCacheValue(nextConfig, source, cacheValue) {
+  const escapedSource = source.replace(/[.*+?^$()|[\]\\]/g, '\\$&');
+  const escapedValue = cacheValue.replace(/[.*+?^$()|[\]\\]/g, '\\$&');
+  const sourcePattern = new RegExp(
+    `source\\s*:\\s*['"]${escapedSource}['"][\\s\\S]{0,500}Cache-Control[\\s\\S]{0,300}${escapedValue}`,
+    'i',
+  );
+  return sourcePattern.test(nextConfig);
+}');
+  const declaredValue = new RegExp(
+    `const\\s+${escapedAlias}\\s*=\\s*['"]${escapedValue}['"]`,
+    'i',
+  );
+  const sourcePattern = new RegExp(
+    `source\\s*:\\s*['"]${escapedSource}['"][\\s\\S]{0,500}Cache-Control[\\s\\S]{0,300}value\\s*:\\s*${escapedAlias}\\b`,
+    'i',
+  );
+  return declaredValue.test(nextConfig) && sourcePattern.test(nextConfig);
 }
 
 export function findUnsafeApiCacheMarkers(repositoryRoot, policy) {
@@ -127,12 +156,19 @@ export function checkNetworkEfficiencyBoundary(repositoryRoot = DEFAULT_ROOT) {
 
   const publicStatic = policy.cachePolicy.publicStatic;
   for (const source of ['/manifest.webmanifest', '/icon.svg']) {
-    if (!containsCacheValue(nextConfig, source, publicStatic)) {
+    if (!containsCacheValue(nextConfig, source, publicStatic, 'PUBLIC_STATIC_CACHE')) {
       failures.push(`Public static cache policy missing for ${source}.`);
     }
   }
 
-  if (!containsCacheValue(nextConfig, '/sw.js', policy.cachePolicy.serviceWorker)) {
+  if (
+    !containsCacheValue(
+      nextConfig,
+      '/sw.js',
+      policy.cachePolicy.serviceWorker,
+      'SERVICE_WORKER_CACHE',
+    )
+  ) {
     failures.push('Service-worker update cache policy is missing or unsafe.');
   }
 
