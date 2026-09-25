@@ -21,6 +21,7 @@ on:
   workflow_dispatch: {}
   push:
     branches:
+      - feature/database-architecture
       - cto/v1-core-runtime-regression
   pull_request:
     branches:
