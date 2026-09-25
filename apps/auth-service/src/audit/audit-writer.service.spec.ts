@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { appMetrics } from '@medsphere/common';
 import { AuditWriter } from './audit-writer.service';
 import { AuditDatabase, AuditMetadata } from './audit.types';
 
@@ -147,6 +148,65 @@ describe('AuditWriter', () => {
     ).rejects.toThrow('bounded scalars');
 
     expect(create).not.toHaveBeenCalled();
+  });
+
+  it('emits a bounded security metric only after audit persistence succeeds', async () => {
+    const before =
+      appMetrics.securityEventTotal
+        .samples()
+        .find(
+          (sample) =>
+            sample.labels.category === 'credential_replay' &&
+            sample.labels.outcome === 'DENIED',
+        )?.value ?? 0;
+
+    await writer.appendSystem(database, {
+      eventType: 'authentication.session.refresh.replayed',
+      outcome: 'DENIED',
+      metadata: { revokedCount: 1 },
+    });
+
+    const after =
+      appMetrics.securityEventTotal
+        .samples()
+        .find(
+          (sample) =>
+            sample.labels.category === 'credential_replay' &&
+            sample.labels.outcome === 'DENIED',
+        )?.value ?? 0;
+
+    expect(after).toBe(before + 1);
+  });
+
+  it('does not emit security telemetry when durable audit persistence fails', async () => {
+    const before =
+      appMetrics.securityEventTotal
+        .samples()
+        .find(
+          (sample) =>
+            sample.labels.category === 'credential_replay' &&
+            sample.labels.outcome === 'DENIED',
+        )?.value ?? 0;
+    create.mockRejectedValueOnce(new Error('database unavailable'));
+
+    await expect(
+      writer.appendSystem(database, {
+        eventType: 'authentication.session.refresh.replayed',
+        outcome: 'DENIED',
+        metadata: { revokedCount: 1 },
+      }),
+    ).rejects.toThrow('database unavailable');
+
+    const after =
+      appMetrics.securityEventTotal
+        .samples()
+        .find(
+          (sample) =>
+            sample.labels.category === 'credential_replay' &&
+            sample.labels.outcome === 'DENIED',
+        )?.value ?? 0;
+
+    expect(after).toBe(before);
   });
 
   it('writes platform-user evidence without assigning a tenant scope', async () => {
