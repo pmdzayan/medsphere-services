@@ -96,6 +96,13 @@ export interface CancelPatientReservationResponse {
   readonly replayed: boolean;
 }
 
+export interface PatientPickupProof {
+  readonly reservationId: string;
+  readonly pickupToken: string;
+  readonly expiresAt: string;
+  readonly proofVersion: number;
+}
+
 export function toPatientReservationSearchParams(
   filters: PatientReservationFilters,
 ): URLSearchParams {
@@ -187,6 +194,19 @@ export function isCancelPatientReservationResponse(
     isIntegerBetween(response.version, 1, Number.MAX_SAFE_INTEGER) &&
     isIntegerBetween(response.totalQuantity, 1, Number.MAX_SAFE_INTEGER) &&
     typeof response.replayed === 'boolean'
+  );
+}
+
+export function isPatientPickupProof(value: unknown): value is PatientPickupProof {
+  if (!hasExactKeys(value, ['reservationId', 'pickupToken', 'expiresAt', 'proofVersion']))
+    return false;
+  const proof = value as Partial<PatientPickupProof>;
+  return (
+    isCanonicalUuid(proof.reservationId) &&
+    typeof proof.pickupToken === 'string' &&
+    /^[A-Za-z0-9_-]{32}$/.test(proof.pickupToken) &&
+    isIsoDateTime(proof.expiresAt) &&
+    isIntegerBetween(proof.proofVersion, 1, Number.MAX_SAFE_INTEGER)
   );
 }
 

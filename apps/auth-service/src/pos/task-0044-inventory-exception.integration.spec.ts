@@ -4,6 +4,7 @@ import { AuditWriter } from '../audit/audit-writer.service';
 import { isInfrastructureTestEnabled, requireEnv } from '../auth/testing/infrastructure-test-gate';
 import { InventoryEventWriter } from '../inventory/inventory-event-writer';
 import { InventoryExceptionService } from '../inventory/inventory-exception.service';
+import { PickupHandoffService } from '../inventory/pickup-handoff.service';
 import { PharmacyVerificationEligibilityEvaluator } from '../pharmacy-verification/pharmacy-verification-eligibility.evaluator';
 import { PrismaService } from '../prisma/prisma.service';
 import { PosCheckoutService } from './pos-checkout.service';
@@ -18,11 +19,13 @@ infra('Task 0044 PostgreSQL return, recall and disposition integrity', () => {
   const audit = new AuditWriter();
   const inventoryEvents = new InventoryEventWriter();
   const posEvents = new PosEventWriter();
+  const pickupHandoff = new PickupHandoffService(prisma, audit);
   const checkout = new PosCheckoutService(
     prisma,
     audit,
     posEvents,
     inventoryEvents,
+    pickupHandoff,
     new PharmacyVerificationEligibilityEvaluator(prisma),
   );
   const returns = new PosReturnService(prisma, audit, posEvents);

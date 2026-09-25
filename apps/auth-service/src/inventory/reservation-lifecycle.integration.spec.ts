@@ -109,44 +109,51 @@ describeReservationInfrastructure('G3.3 PostgreSQL reservation lifecycle integri
 
   afterAll(async () => prisma.client.$disconnect());
 
-  it('atomically consumes held stock and conceals the durable replay from unassigned staff', async () => {
+  it('rejects direct READY completion without mutating stock or durable evidence', async () => {
     const fixture = await createReservation('READY');
     const idempotencyKey = `complete-${randomUUID()}`;
-    const completed = await service.transition({
-      actor: identity,
-      providerId,
-      reservationId: fixture.reservationId,
-      transition: 'COMPLETE',
-      expectedVersion: 1,
-      idempotencyKey,
-    });
 
-    expect(completed).toMatchObject({ status: 'COMPLETED', version: 2, replayed: false });
-    const [batch, allocation, movement, audit, receipt] = await Promise.all([
-      prisma.client.batch.findUniqueOrThrow({ where: { id: fixture.batchId } }),
-      prisma.client.medicineReservationAllocation.findUniqueOrThrow({
-        where: { id: fixture.allocationId },
+    await expect(
+      service.transition({
+        actor: identity,
+        providerId,
+        reservationId: fixture.reservationId,
+        transition: 'COMPLETE',
+        expectedVersion: 1,
+        idempotencyKey,
       }),
-      prisma.client.stockMovement.findFirstOrThrow({
-        where: { tenantId, referenceId: fixture.reservationId },
-      }),
-      prisma.client.auditEvent.findFirstOrThrow({
-        where: {
-          tenantId,
-          resourceId: fixture.reservationId,
-          eventType: 'inventory.reservation.completed',
-        },
-      }),
-      prisma.client.medicineReservationCommand.findUniqueOrThrow({
-        where: { tenantId_idempotencyKey: { tenantId, idempotencyKey } },
-      }),
-    ]);
-    expect(batch).toMatchObject({ onHandQuantity: 6, heldQuantity: 0, version: 2 });
-    expect(allocation).toMatchObject({ status: 'CONSUMED' });
-    expect(movement).toMatchObject({ delta: -4, onHandBefore: 10, onHandAfter: 6 });
-    expect(movement.commandHash).toMatch(/^[0-9a-f]{64}$/);
-    expect(audit.actorMembershipId).toBe(membershipId);
-    expect(receipt.commandHash).toBe(movement.commandHash);
+    ).rejects.toThrow('Reservation completion requires pickup-authorized POS checkout');
+
+    const [reservation, batch, allocation, movementCount, auditCount, receiptCount] =
+      await Promise.all([
+        prisma.client.medicineReservation.findUniqueOrThrow({
+          where: { id: fixture.reservationId },
+        }),
+        prisma.client.batch.findUniqueOrThrow({ where: { id: fixture.batchId } }),
+        prisma.client.medicineReservationAllocation.findUniqueOrThrow({
+          where: { id: fixture.allocationId },
+        }),
+        prisma.client.stockMovement.count({
+          where: { tenantId, referenceId: fixture.reservationId },
+        }),
+        prisma.client.auditEvent.count({
+          where: {
+            tenantId,
+            resourceId: fixture.reservationId,
+            eventType: 'inventory.reservation.completed',
+          },
+        }),
+        prisma.client.medicineReservationCommand.count({
+          where: { tenantId, idempotencyKey },
+        }),
+      ]);
+
+    expect(reservation).toMatchObject({ status: 'READY', version: 1 });
+    expect(batch).toMatchObject({ onHandQuantity: 10, heldQuantity: 4, version: 1 });
+    expect(allocation).toMatchObject({ status: 'HELD' });
+    expect(movementCount).toBe(0);
+    expect(auditCount).toBe(0);
+    expect(receiptCount).toBe(0);
 
     await expect(
       service.transition({
@@ -157,7 +164,7 @@ describeReservationInfrastructure('G3.3 PostgreSQL reservation lifecycle integri
         expectedVersion: 1,
         idempotencyKey,
       }),
-    ).rejects.toThrow('Provider inventory not found');
+    ).rejects.toThrow('Reservation completion requires pickup-authorized POS checkout');
   });
 
   it('allows exactly one winner for concurrent transitions at one expected version', async () => {

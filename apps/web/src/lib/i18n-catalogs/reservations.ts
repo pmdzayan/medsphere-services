@@ -96,6 +96,32 @@ export const reservationsEnglishMessages = {
   'reservations.details.close': 'Close reservation details',
   'reservations.details.genericUnavailable': 'Generic name unavailable',
   'reservations.details.units': '{quantity} unit(s)',
+  'reservations.availability.eyebrow': 'Pharmacy operations',
+  'reservations.availability.title': 'Live availability requests',
+  'reservations.availability.description':
+    'Patient-free product requests awaiting a pharmacy confirmation. No patient identity, contact information, notes, or prescription data are exposed here.',
+  'reservations.availability.providerAria': 'Assigned pharmacy',
+  'reservations.availability.noProvider': 'No assigned pharmacy',
+  'reservations.availability.refresh': 'Refresh',
+  'reservations.availability.errorProviders': 'Unable to load assigned pharmacies.',
+  'reservations.availability.errorDenied':
+    'Live availability requests are not assigned to this membership.',
+  'reservations.availability.errorLoad': 'Unable to load live availability requests.',
+  'reservations.availability.errorRespond':
+    'The response was not saved. Refresh the queue and try again.',
+  'reservations.availability.loading': 'Loading live requests…',
+  'reservations.availability.tableMedicine': 'Medicine',
+  'reservations.availability.tableRequested': 'Requested',
+  'reservations.availability.tableExpires': 'Expires',
+  'reservations.availability.tableStatus': 'Status',
+  'reservations.availability.tableResponse': 'Response',
+  'reservations.availability.available': 'Available',
+  'reservations.availability.unavailable': 'Unavailable',
+  'reservations.availability.checkLater': 'Check in 15 min',
+  'reservations.availability.closed': 'Closed',
+  'reservations.availability.empty': 'No live requests',
+  'reservations.availability.emptyDetail':
+    'New product-confirmation requests will appear here without patient identity data.',
   'reservations.range': '{start}–{end} of {total} reservations',
 } as const;
 
@@ -198,6 +224,32 @@ export const reservationsTamilMessages: Record<keyof typeof reservationsEnglishM
   'reservations.details.close': 'முன்பதிவு விவரங்களை மூடு',
   'reservations.details.genericUnavailable': 'பொதுப்பெயர் கிடைக்கவில்லை',
   'reservations.details.units': '{quantity} அலகு(கள்)',
+  'reservations.availability.eyebrow': 'மருந்தக செயல்பாடுகள்',
+  'reservations.availability.title': 'நேரடி கிடைப்புக் கோரிக்கைகள்',
+  'reservations.availability.description':
+    'மருந்தக உறுதிப்படுத்தலைக் காத்திருக்கும் நோயாளர் அடையாளமற்ற தயாரிப்பு கோரிக்கைகள். நோயாளர் அடையாளம், தொடர்பு தகவல், குறிப்புகள் அல்லது மருந்துச்சீட்டு தரவு இங்கே காட்டப்படாது.',
+  'reservations.availability.providerAria': 'ஒதுக்கப்பட்ட மருந்தகம்',
+  'reservations.availability.noProvider': 'ஒதுக்கப்பட்ட மருந்தகம் இல்லை',
+  'reservations.availability.refresh': 'புதுப்பி',
+  'reservations.availability.errorProviders': 'ஒதுக்கப்பட்ட மருந்தகங்களை ஏற்ற முடியவில்லை.',
+  'reservations.availability.errorDenied':
+    'இந்த உறுப்பினர் பதிவுக்கு நேரடி கிடைப்புக் கோரிக்கைகள் ஒதுக்கப்படவில்லை.',
+  'reservations.availability.errorLoad': 'நேரடி கிடைப்புக் கோரிக்கைகளை ஏற்ற முடியவில்லை.',
+  'reservations.availability.errorRespond':
+    'பதில் சேமிக்கப்படவில்லை. வரிசையைப் புதுப்பித்து மீண்டும் முயலவும்.',
+  'reservations.availability.loading': 'நேரடி கோரிக்கைகள் ஏற்றப்படுகின்றன…',
+  'reservations.availability.tableMedicine': 'மருந்து',
+  'reservations.availability.tableRequested': 'கோரப்பட்டது',
+  'reservations.availability.tableExpires': 'காலாவதி',
+  'reservations.availability.tableStatus': 'நிலை',
+  'reservations.availability.tableResponse': 'பதில்',
+  'reservations.availability.available': 'கிடைக்கிறது',
+  'reservations.availability.unavailable': 'கிடைக்கவில்லை',
+  'reservations.availability.checkLater': '15 நிமிடத்தில் பார்க்கவும்',
+  'reservations.availability.closed': 'மூடப்பட்டது',
+  'reservations.availability.empty': 'நேரடி கோரிக்கைகள் இல்லை',
+  'reservations.availability.emptyDetail':
+    'புதிய தயாரிப்பு உறுதிப்படுத்தல் கோரிக்கைகள் நோயாளர் அடையாளத் தரவு இல்லாமல் இங்கே தோன்றும்.',
   'reservations.range': '{total} முன்பதிவுகளில் {start}–{end}',
 };
 
@@ -299,5 +351,30 @@ export const reservationsUrduMessages: Record<keyof typeof reservationsEnglishMe
   'reservations.details.close': 'ریزرویشن تفصیل بند کریں',
   'reservations.details.genericUnavailable': 'عام نام دستیاب نہیں',
   'reservations.details.units': '{quantity} یونٹس',
+  'reservations.availability.eyebrow': 'فارمیسی آپریشنز',
+  'reservations.availability.title': 'لائیو دستیابی کی درخواستیں',
+  'reservations.availability.description':
+    'مریض کی شناخت کے بغیر مصنوعات کی درخواستیں جو فارمیسی کی تصدیق کی منتظر ہیں۔ مریض کی شناخت، رابطہ معلومات، نوٹس یا نسخے کا ڈیٹا یہاں ظاہر نہیں ہوتا۔',
+  'reservations.availability.providerAria': 'تفویض شدہ فارمیسی',
+  'reservations.availability.noProvider': 'کوئی تفویض شدہ فارمیسی نہیں',
+  'reservations.availability.refresh': 'تازہ کریں',
+  'reservations.availability.errorProviders': 'تفویض شدہ فارمیسیاں لوڈ نہیں ہو سکیں۔',
+  'reservations.availability.errorDenied': 'اس رکنیت کو لائیو دستیابی کی درخواستیں تفویض نہیں ہیں۔',
+  'reservations.availability.errorLoad': 'لائیو دستیابی کی درخواستیں لوڈ نہیں ہو سکیں۔',
+  'reservations.availability.errorRespond':
+    'جواب محفوظ نہیں ہوا۔ قطار تازہ کریں اور دوبارہ کوشش کریں۔',
+  'reservations.availability.loading': 'لائیو درخواستیں لوڈ ہو رہی ہیں…',
+  'reservations.availability.tableMedicine': 'دوا',
+  'reservations.availability.tableRequested': 'درخواست کا وقت',
+  'reservations.availability.tableExpires': 'میعاد',
+  'reservations.availability.tableStatus': 'حالت',
+  'reservations.availability.tableResponse': 'جواب',
+  'reservations.availability.available': 'دستیاب',
+  'reservations.availability.unavailable': 'دستیاب نہیں',
+  'reservations.availability.checkLater': '15 منٹ بعد چیک کریں',
+  'reservations.availability.closed': 'بند',
+  'reservations.availability.empty': 'کوئی لائیو درخواست نہیں',
+  'reservations.availability.emptyDetail':
+    'نئی مصنوعات کی تصدیقی درخواستیں مریض کی شناخت کے بغیر یہاں نظر آئیں گی۔',
   'reservations.range': '{total} ریزرویشنز میں سے {start}–{end}',
 };

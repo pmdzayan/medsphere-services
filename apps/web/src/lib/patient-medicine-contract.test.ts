@@ -7,6 +7,7 @@ import {
   isCancelPatientReservationRequest,
   isCreatePatientReservationRequest,
   isCreatePatientReservationResponse,
+  isPatientPickupProof,
   isPatientReservation,
   isPatientReservationPage,
 } from './patient-reservation-contract';
@@ -148,6 +149,18 @@ describe('Task 0034 patient web contracts', () => {
       expect(isCancelPatientReservationRequest({ expectedVersion: 1, idempotencyKey })).toBe(false);
     },
   );
+
+  it('strictly validates short-lived pickup proof responses', () => {
+    const proof = {
+      reservationId: uuid('3'),
+      pickupToken: 'abcdefghijklmnopqrstuvwxYZ012345',
+      expiresAt: '2026-09-24T12:10:00.000Z',
+      proofVersion: 1,
+    };
+    expect(isPatientPickupProof(proof)).toBe(true);
+    expect(isPatientPickupProof({ ...proof, subjectUserId: uuid('9') })).toBe(false);
+    expect(isPatientPickupProof({ ...proof, pickupToken: 'too-short' })).toBe(false);
+  });
 
   it('rejects unexpected or internally inconsistent reservation success payloads', () => {
     const row = reservation();

@@ -38,6 +38,7 @@ export interface PharmacyCheckoutCommand {
     readonly externalReference?: string;
   }[];
   readonly reservationId?: string;
+  readonly pickupToken?: string;
   readonly placeOfSupplyStateCode: string;
   readonly recipientName?: string;
   readonly recipientAddress?: string;

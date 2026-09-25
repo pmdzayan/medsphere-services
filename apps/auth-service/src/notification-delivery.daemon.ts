@@ -1,6 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { createServiceLogger } from '@medsphere/logger';
 import { AppModule } from './app.module';
+import { assertAuthProductionRuntimePolicy } from './auth-production-runtime';
 import { parseNotificationWorkerEnvironment } from './notifications/notification-worker.config';
 import {
   parseNotificationWorkerPollInterval,
@@ -17,6 +18,10 @@ async function bootstrap(): Promise<void> {
 
   let application: Awaited<ReturnType<typeof NestFactory.createApplicationContext>> | undefined;
   try {
+    // Task 0046: production notification delivery runs from the same immutable
+    // auth-service artifact and therefore reuses its fail-closed release,
+    // secret, database, Redis and authentication configuration boundary.
+    assertAuthProductionRuntimePolicy(process.env);
     const config = parseNotificationWorkerEnvironment(process.env);
     const pollIntervalMs = parseNotificationWorkerPollInterval(process.env);
     application = await NestFactory.createApplicationContext(AppModule, { bufferLogs: true });

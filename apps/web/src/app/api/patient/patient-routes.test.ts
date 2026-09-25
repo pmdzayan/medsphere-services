@@ -6,6 +6,7 @@ import { GET as search } from './medicine-discovery/search/route';
 import { GET as listReservations, POST as createReservation } from './medicine-reservations/route';
 import { GET as getReservation } from './medicine-reservations/[reservationId]/route';
 import { POST as cancelReservation } from './medicine-reservations/[reservationId]/cancel/route';
+import { POST as issuePickupProof } from './medicine-reservations/[reservationId]/pickup-proof/route';
 import { POST as requestLiveAvailability } from '../public/medicine-discovery/providers/[providerId]/products/[productId]/availability-requests/route';
 import { GET as getLiveAvailability } from '../public/medicine-discovery/availability-requests/[requestId]/route';
 
@@ -255,6 +256,47 @@ describe('Task 0034 patient BFF boundaries', () => {
       { params: Promise.resolve({ reservationId: uuid('3') }) },
     );
     expect(cancel.status).toBe(502);
+  });
+
+  it('keeps pickup proof self-scoped and rejects cross-origin or malformed success', async () => {
+    const proof = {
+      reservationId: uuid('3'),
+      pickupToken: 'abcdefghijklmnopqrstuvwxYZ012345',
+      expiresAt: '2026-09-24T12:10:00.000Z',
+      proofVersion: 1,
+    };
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(Response.json(proof))
+      .mockResolvedValueOnce(Response.json({ ...proof, subjectUserId: uuid('9') }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const crossOrigin = await issuePickupProof(
+      postRequest(
+        `/api/patient/medicine-reservations/${uuid('3')}/pickup-proof`,
+        {},
+        true,
+        'https://attacker.example',
+      ),
+      { params: Promise.resolve({ reservationId: uuid('3') }) },
+    );
+    expect(crossOrigin.status).toBe(403);
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    const ok = await issuePickupProof(
+      postRequest(`/api/patient/medicine-reservations/${uuid('3')}/pickup-proof`, {}, true),
+      { params: Promise.resolve({ reservationId: uuid('3') }) },
+    );
+    expect(ok.status).toBe(200);
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(new Headers(init.headers).get('authorization')).toBe('Bearer access-secret');
+    expect(init.body).toBeUndefined();
+
+    const malformed = await issuePickupProof(
+      postRequest(`/api/patient/medicine-reservations/${uuid('3')}/pickup-proof`, {}, true),
+      { params: Promise.resolve({ reservationId: uuid('3') }) },
+    );
+    expect(malformed.status).toBe(502);
   });
 
   it('keeps live availability requests payload-free and rejects malformed references', async () => {

@@ -15,6 +15,7 @@ import {
 import { AuditWriter } from '../audit/audit-writer.service';
 import { assertTrustedProviderAccess } from '../inventory/inventory-access';
 import { InventoryEventWriter } from '../inventory/inventory-event-writer';
+import { PickupHandoffService } from '../inventory/pickup-handoff.service';
 import {
   InsufficientReservationStockError,
   planReservationFefo,
@@ -103,6 +104,7 @@ export class PosCheckoutService {
     private readonly audit: AuditWriter,
     private readonly events: PosEventWriter,
     private readonly inventoryEvents: InventoryEventWriter,
+    private readonly pickupHandoff: PickupHandoffService,
     private readonly pharmacyEligibility: PharmacyVerificationEligibilityEvaluator,
   ) {}
 
@@ -314,6 +316,16 @@ export class PosCheckoutService {
           const reservation = command.reservationId
             ? await this.loadReadyReservation(transaction, command, normalized.lines, now)
             : null;
+          const pickupAuthority = reservation
+            ? await this.pickupHandoff.verifyForCheckout(transaction, {
+                tenantId: command.actor.tenantId,
+                providerId: command.providerId,
+                reservationId: reservation.id,
+                subjectUserId: reservation.subjectUserId,
+                pickupToken: command.pickupToken!,
+                occurredAt: now,
+              })
+            : null;
 
           const saleId = randomUUID();
           const financialYear = indianFinancialYear(now);
@@ -406,6 +418,16 @@ export class PosCheckoutService {
               commandHash,
               now,
             );
+            await this.pickupHandoff.recordCompletedHandoff(transaction, {
+              actor: command.actor,
+              providerId: command.providerId,
+              reservationId: reservation.id,
+              subjectUserId: reservation.subjectUserId,
+              saleId,
+              authority: pickupAuthority!,
+              occurredAt: now,
+              request: command.request,
+            });
           } else {
             await this.commitWalkInStock(
               transaction,
@@ -874,6 +896,13 @@ export class PosCheckoutService {
     ) {
       throw new BadRequestException('Idempotency key must contain 8 to 120 trimmed characters');
     }
+    if (command.reservationId && !command.pickupToken) {
+      throw new BadRequestException('Reservation checkout requires the patient pickup proof');
+    }
+    if (!command.reservationId && command.pickupToken !== undefined) {
+      throw new BadRequestException('Pickup proof can be used only with a reservation checkout');
+    }
+
     if (
       !Array.isArray(command.lines) ||
       command.lines.length < 1 ||
@@ -965,6 +994,9 @@ export class PosCheckoutService {
           lines,
           payments,
           reservationId: command.reservationId ?? null,
+          pickupProofHash: command.pickupToken
+            ? createHash('sha256').update(command.pickupToken).digest('hex')
+            : null,
           placeOfSupplyStateCode: command.placeOfSupplyStateCode,
           recipientName: command.recipientName ?? null,
           recipientAddress: command.recipientAddress ?? null,

@@ -72,6 +72,7 @@ export function PosWorkspace() {
 
   const [placeOfSupply, setPlaceOfSupply] = useState('');
   const [reservationId, setReservationId] = useState('');
+  const [pickupToken, setPickupToken] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<PosPaymentMethod>('CASH');
   const [paymentReference, setPaymentReference] = useState('');
   const [cashTendered, setCashTendered] = useState('');
@@ -164,6 +165,8 @@ export function PosWorkspace() {
     setCheckoutError(null);
     setCheckoutKey(null);
     setPlaceOfSupply('');
+    setReservationId('');
+    setPickupToken('');
     void loadFiscal(providerId);
   }, [loadFiscal, providerId]);
 
@@ -363,7 +366,12 @@ export function PosWorkspace() {
           ...(paymentReference.trim() ? { externalReference: paymentReference.trim() } : {}),
         },
       ],
-      ...(reservationId.trim() ? { reservationId: reservationId.trim() } : {}),
+      ...(reservationId.trim()
+        ? {
+            reservationId: reservationId.trim(),
+            pickupToken: pickupToken.trim(),
+          }
+        : {}),
       placeOfSupplyStateCode: placeOfSupply.trim(),
       ...(recipientName.trim() ? { recipientName: recipientName.trim() } : {}),
       ...(recipientAddress.trim() ? { recipientAddress: recipientAddress.trim() } : {}),
@@ -392,6 +400,7 @@ export function PosWorkspace() {
       setPaymentReference('');
       setCashTendered('');
       setReservationId('');
+      setPickupToken('');
     } catch (error) {
       setCheckoutError(publicMessage(error, t('pos.error.checkout')));
     } finally {
@@ -451,6 +460,7 @@ export function PosWorkspace() {
     cart.length === 0 ||
     cart.some((line) => !line.quote.fiscalProfile) ||
     !/^\d{2}$/.test(placeOfSupply) ||
+    (reservationId.trim().length > 0 && !/^[A-Za-z0-9_-]{32}$/.test(pickupToken.trim())) ||
     (paymentMethod === 'CASH' &&
       cashTendered.trim().length > 0 &&
       (changePreview === null || changePreview.startsWith('-')));
@@ -831,9 +841,24 @@ export function PosWorkspace() {
                   value={reservationId}
                   onChange={(event) => {
                     setReservationId(event.target.value);
+                    if (!event.target.value.trim()) setPickupToken('');
                     setCheckoutKey(null);
                   }}
                 />
+                {reservationId.trim() ? (
+                  <Input
+                    name="pos-pickup-proof"
+                    label={t('pos.checkout.pickupProof')}
+                    value={pickupToken}
+                    type="password"
+                    autoComplete="off"
+                    maxLength={32}
+                    onChange={(event) => {
+                      setPickupToken(event.target.value);
+                      setCheckoutKey(null);
+                    }}
+                  />
+                ) : null}
                 <label className="block">
                   <span className="mb-2 block text-xs font-bold text-canvas-700">
                     {t('pos.checkout.paymentMethod')}

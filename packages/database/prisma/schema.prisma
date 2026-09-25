@@ -198,6 +198,10 @@ enum MedicineAllocationStatus {
   RELEASED
 }
 
+enum MedicinePickupVerificationMethod {
+  ONE_TIME_TOKEN
+}
+
 enum MedicineReservationCommandType {
   CONFIRM
   READY
@@ -527,6 +531,8 @@ model Tenant {
   complianceLegalHolds                  ComplianceLegalHold[]
   compliancePolicyDecisions             CompliancePolicyDecisionRecord[]
   complianceDispositionJobs             ComplianceDispositionJob[]
+  medicinePickupTokens                   MedicinePickupToken[]
+  medicinePickupHandoffs                 MedicinePickupHandoff[]
 
   @@index([slug])
 }
@@ -623,6 +629,8 @@ model User {
   complianceDecisionsSubject     CompliancePolicyDecisionRecord[] @relation("ComplianceDecisionSubject")
   complianceDecisionsEvaluated   CompliancePolicyDecisionRecord[] @relation("ComplianceDecisionEvaluator")
   complianceDispositionJobsSubject ComplianceDispositionJob[]      @relation("ComplianceDispositionJobSubject")
+  medicinePickupTokensSubject       MedicinePickupToken[]            @relation("MedicinePickupTokenSubject")
+  medicinePickupHandoffsSubject     MedicinePickupHandoff[]          @relation("MedicinePickupHandoffSubject")
 }
 
 model ExternalAuthIdentity {
@@ -743,6 +751,7 @@ model TenantMembership {
   complianceLegalHoldsSubject     ComplianceLegalHold[]            @relation("ComplianceLegalHoldSubjectMembership")
   complianceDecisionsSubject      CompliancePolicyDecisionRecord[] @relation("ComplianceDecisionSubjectMembership")
   complianceDispositionJobsSubject ComplianceDispositionJob[]      @relation("ComplianceDispositionJobSubjectMembership")
+  verifiedMedicinePickupHandoffs   MedicinePickupHandoff[]          @relation("MedicinePickupHandoffVerifiedBy")
 
   @@unique([tenantId, userId])
   @@unique([id, tenantId])
@@ -1448,6 +1457,8 @@ model Provider {
   pharmacyInventoryFiscalProfiles      InventoryFiscalProfile[]
   pharmacySaleAllocations              PharmacySaleAllocation[]
   pharmacyInvoiceReprints              PharmacyInvoiceReprint[]
+  medicinePickupTokens                 MedicinePickupToken[]
+  medicinePickupHandoffs               MedicinePickupHandoff[]
 
   version Int @default(1)
 
@@ -1800,6 +1811,7 @@ model PharmacySale {
   commands    PharmacySaleCommand[]
   voidRecord  PharmacySaleVoid?
   returns     PharmacySaleReturn[]
+  pickupHandoff MedicinePickupHandoff?
 
   @@unique([tenantId, idempotencyKey])
   @@unique([reservationId, tenantId, providerId])
@@ -3084,14 +3096,87 @@ model MedicineReservation {
 
   items       MedicineReservationItem[]
   allocations MedicineReservationAllocation[]
-  commands    MedicineReservationCommand[]
-  sale        PharmacySale?
+  commands      MedicineReservationCommand[]
+  sale          PharmacySale?
+  pickupToken   MedicinePickupToken?
+  pickupHandoff MedicinePickupHandoff?
 
   @@unique([tenantId, idempotencyKey])
   @@unique([id, tenantId, providerId])
+  @@unique([id, tenantId, providerId, subjectUserId])
   @@index([tenantId, providerId, status, expiresAt, id])
   @@index([subjectUserId, createdAt(sort: Desc), id(sort: Desc)])
   @@index([tenantId, status, expiresAt, id])
+}
+
+/// Task 0046: mutable one-time pickup proof state. The plaintext pickup token
+/// is returned only to the authenticated patient and is never persisted.
+/// Only its SHA-256 digest is stored. Issuing a newer token rotates this row;
+/// successful handoff consumes it atomically with the linked POS sale.
+model MedicinePickupToken {
+  id String @id @default(uuid()) @db.Uuid
+
+  tenantId String @db.Uuid
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+
+  providerId String   @db.Uuid
+  provider   Provider @relation(fields: [providerId, tenantId], references: [id, tenantId], onDelete: Restrict, map: "MedicinePickupToken_provider_scope_fkey")
+
+  reservationId String @unique @db.Uuid
+  subjectUserId String @db.Uuid
+
+  reservation MedicineReservation @relation(fields: [reservationId, tenantId, providerId, subjectUserId], references: [id, tenantId, providerId, subjectUserId], onDelete: Restrict, map: "MedicinePickupToken_reservation_subject_scope_fkey")
+  subjectUser User @relation("MedicinePickupTokenSubject", fields: [subjectUserId], references: [id], onDelete: Restrict)
+
+  tokenHash    String @unique @db.VarChar(64)
+  tokenVersion Int    @default(1)
+
+  issuedAt   DateTime @default(now())
+  expiresAt  DateTime
+  consumedAt DateTime?
+
+  updatedAt DateTime @updatedAt
+
+  @@unique([reservationId, tenantId, providerId], map: "MedicinePickupToken_reservation_scope_key")
+  @@unique([reservationId, tenantId, providerId, subjectUserId], map: "MedicinePickupToken_reservation_subject_scope_key")
+  @@index([tenantId, providerId, expiresAt], map: "MedicinePickupToken_tenant_provider_expires_idx")
+  @@index([subjectUserId, consumedAt, expiresAt], map: "MedicinePickupToken_subject_consumed_expires_idx")
+}
+
+/// Task 0046: immutable evidence that the pharmacy verified pickup authority
+/// before completing a reservation-linked POS sale. This row stores no token,
+/// contact address, medicine names, or free-form patient text.
+model MedicinePickupHandoff {
+  id String @id @default(uuid()) @db.Uuid
+
+  tenantId String @db.Uuid
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+
+  providerId String   @db.Uuid
+  provider   Provider @relation(fields: [providerId, tenantId], references: [id, tenantId], onDelete: Restrict, map: "MedicinePickupHandoff_provider_scope_fkey")
+
+  reservationId String @unique @db.Uuid
+  subjectUserId String @db.Uuid
+  reservation   MedicineReservation @relation(fields: [reservationId, tenantId, providerId, subjectUserId], references: [id, tenantId, providerId, subjectUserId], onDelete: Restrict, map: "MedicinePickupHandoff_reservation_subject_scope_fkey")
+  subjectUser   User @relation("MedicinePickupHandoffSubject", fields: [subjectUserId], references: [id], onDelete: Restrict)
+
+  saleId String @unique @db.Uuid
+  sale   PharmacySale @relation(fields: [saleId, tenantId, providerId], references: [id, tenantId, providerId], onDelete: Restrict, map: "MedicinePickupHandoff_sale_scope_fkey")
+
+  verifiedByMembershipId String @db.Uuid
+  verifiedByMembership   TenantMembership @relation("MedicinePickupHandoffVerifiedBy", fields: [verifiedByMembershipId, tenantId], references: [id, tenantId], onDelete: Restrict, map: "MedicinePickupHandoff_verified_membership_scope_fkey")
+
+  verificationMethod MedicinePickupVerificationMethod @default(ONE_TIME_TOKEN)
+  tokenVersion       Int
+  verifiedAt         DateTime
+
+  createdAt DateTime @default(now())
+
+  @@unique([reservationId, tenantId, providerId], map: "MedicinePickupHandoff_reservation_scope_key")
+  @@unique([reservationId, tenantId, providerId, subjectUserId], map: "MedicinePickupHandoff_reservation_subject_scope_key")
+  @@unique([saleId, tenantId, providerId], map: "MedicinePickupHandoff_sale_scope_key")
+  @@index([tenantId, providerId, verifiedAt(sort: Desc)], map: "MedicinePickupHandoff_tenant_provider_verified_idx")
+  @@index([subjectUserId, verifiedAt(sort: Desc)], map: "MedicinePickupHandoff_subject_verified_idx")
 }
 
 model MedicineReservationCommand {

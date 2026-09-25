@@ -132,6 +132,16 @@ export class PharmacyCheckoutDto {
   @IsUUID('4')
   reservationId?: string;
 
+  @ApiPropertyOptional({
+    description: 'Short-lived one-time pickup proof issued to the reservation owner',
+    minLength: 32,
+    maxLength: 32,
+  })
+  @IsOptional()
+  @IsString()
+  @Matches(/^[A-Za-z0-9_-]{32}$/)
+  pickupToken?: string;
+
   @ApiProperty({ pattern: '^\\d{2}$' })
   @Matches(/^\d{2}$/)
   placeOfSupplyStateCode!: string;

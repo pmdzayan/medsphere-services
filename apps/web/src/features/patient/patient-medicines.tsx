@@ -8,6 +8,7 @@ import {
   cancelPatientReservation,
   createPatientReservation,
   getPatientLiveAvailabilityStatus,
+  issuePatientPickupProof,
   listPatientReservations,
   recordConsent,
   requestPatientLiveAvailability,
@@ -18,7 +19,7 @@ import type {
   PatientLiveAvailabilityRequestResponse,
   PatientMedicineSearchResult,
 } from '@/lib/patient-medicine-search-contract';
-import type { PatientReservation } from '@/lib/patient-reservation-contract';
+import type { PatientPickupProof, PatientReservation } from '@/lib/patient-reservation-contract';
 
 const CANCELLABLE_STATUSES = new Set(['PENDING', 'CONFIRMED', 'READY']);
 const SEARCH_LIMIT = 20;
@@ -95,6 +96,8 @@ export function PatientMedicinesWorkspace() {
   const [reservationsLoading, setReservationsLoading] = useState(true);
   const [reservationsError, setReservationsError] = useState<string | null>(null);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const [pickupLoadingId, setPickupLoadingId] = useState<string | null>(null);
+  const [pickupProofs, setPickupProofs] = useState<Record<string, PatientPickupProof>>({});
 
   const searchGeneration = useRef(0);
   const reservationGeneration = useRef(0);
@@ -364,6 +367,20 @@ export function PatientMedicinesWorkspace() {
       setCancellingId(null);
     }
   }
+
+  async function handlePickupProof(reservation: PatientReservation) {
+    if (pickupLoadingId || reservation.status !== 'READY') return;
+    setPickupLoadingId(reservation.id);
+    setNotice(null);
+    try {
+      const proof = await issuePatientPickupProof(reservation.id);
+      setPickupProofs((current) => ({ ...current, [reservation.id]: proof }));
+    } catch {
+      setNotice({ kind: 'error', text: t('patientMedicines.pickupError') });
+    } finally {
+      setPickupLoadingId(null);
+    }
+  }
   return (
     <main className="mx-auto max-w-3xl px-4 py-8 sm:px-6 sm:py-10">
       <h1 className="font-[var(--font-display)] text-2xl font-bold tracking-[-.03em] text-[#10201c] sm:text-3xl">
@@ -572,6 +589,17 @@ export function PatientMedicinesWorkspace() {
                   <Badge tone={statusBadgeTone(reservation.status)}>
                     {statusLabel(reservation.status, t)}
                   </Badge>
+                  {reservation.status === 'READY' ? (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      loading={pickupLoadingId === reservation.id}
+                      loadingLabel={t('patientMedicines.pickupLoading')}
+                      onClick={() => void handlePickupProof(reservation)}
+                    >
+                      {t('patientMedicines.pickupAction')}
+                    </Button>
+                  ) : null}
                   {CANCELLABLE_STATUSES.has(reservation.status) ? (
                     <Button
                       type="button"
@@ -584,6 +612,20 @@ export function PatientMedicinesWorkspace() {
                     </Button>
                   ) : null}
                 </div>
+                {pickupProofs[reservation.id] ? (
+                  <div className="basis-full rounded-xl border border-emerald-200 bg-emerald-50 p-3">
+                    <p className="text-xs font-bold text-emerald-900">
+                      {t('patientMedicines.pickupLabel')}
+                    </p>
+                    <code className="mt-2 block break-all rounded-lg bg-white px-3 py-2 text-sm font-bold tracking-[.08em] text-[#173128]">
+                      {pickupProofs[reservation.id].pickupToken}
+                    </code>
+                    <p className="mt-2 text-xs text-emerald-800">
+                      {t('patientMedicines.pickupHint')} {'·'}{' '}
+                      {formatDateTime(pickupProofs[reservation.id].expiresAt, locale)}
+                    </p>
+                  </div>
+                ) : null}
               </li>
             ))}
           </ul>

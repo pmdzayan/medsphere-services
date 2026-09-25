@@ -1,0 +1,58 @@
+networks:
+  medsphere-infra:
+    external: true
+    name: medsphere-infra-network
+
+services:
+  notification-worker:
+    # Task 0046: production scheduling/deployment contract for the already
+    # accepted daemon. The orchestrator must supply an immutable image ref
+    # (preferably registry/repository@sha256:digest). This file never builds.
+    image: ${AIM_AUTH_IMAGE:?AIM_AUTH_IMAGE immutable auth-service image is required}
+    restart: unless-stopped
+    command: ['dist/notification-delivery.daemon.js']
+    environment:
+      NODE_ENV: production
+      RELEASE_SHA: ${RELEASE_SHA:?RELEASE_SHA is required}
+      APP_VERSION: ${APP_VERSION:?APP_VERSION is required}
+
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
+      REDIS_CLUSTER_URL: ${REDIS_CLUSTER_URL:?REDIS_CLUSTER_URL is required}
+
+      AUTH_JWT_PRIVATE_KEY_BASE64: ${AUTH_JWT_PRIVATE_KEY_BASE64:?AUTH_JWT_PRIVATE_KEY_BASE64 is required}
+      AUTH_JWT_PUBLIC_KEY_BASE64: ${AUTH_JWT_PUBLIC_KEY_BASE64:?AUTH_JWT_PUBLIC_KEY_BASE64 is required}
+      AUTH_JWT_ISSUER: ${AUTH_JWT_ISSUER:?AUTH_JWT_ISSUER is required}
+      AUTH_JWT_AUDIENCE: ${AUTH_JWT_AUDIENCE:?AUTH_JWT_AUDIENCE is required}
+      AUTH_JWT_KEY_ID: ${AUTH_JWT_KEY_ID:?AUTH_JWT_KEY_ID is required}
+      AUTH_ACCESS_TOKEN_TTL_SECONDS: ${AUTH_ACCESS_TOKEN_TTL_SECONDS:-900}
+      AUTH_REFRESH_IDLE_TTL_SECONDS: ${AUTH_REFRESH_IDLE_TTL_SECONDS:-604800}
+      AUTH_REFRESH_ABSOLUTE_TTL_SECONDS: ${AUTH_REFRESH_ABSOLUTE_TTL_SECONDS:-2592000}
+      AUTH_RECENT_AUTH_TTL_SECONDS: ${AUTH_RECENT_AUTH_TTL_SECONDS:-300}
+      AUTH_REFRESH_TOKEN_PEPPER: ${AUTH_REFRESH_TOKEN_PEPPER:?AUTH_REFRESH_TOKEN_PEPPER is required}
+      AUTH_OTP_PEPPER: ${AUTH_OTP_PEPPER:?AUTH_OTP_PEPPER is required}
+      ORG_JOIN_CODE_PEPPER: ${ORG_JOIN_CODE_PEPPER:?ORG_JOIN_CODE_PEPPER is required}
+      AUTH_ARGON2_MEMORY_KIB: ${AUTH_ARGON2_MEMORY_KIB:-19456}
+      AUTH_ARGON2_TIME_COST: ${AUTH_ARGON2_TIME_COST:-2}
+      AUTH_ARGON2_PARALLELISM: ${AUTH_ARGON2_PARALLELISM:-1}
+
+      NOTIFICATION_WORKER_LIMIT: ${NOTIFICATION_WORKER_LIMIT:-25}
+      NOTIFICATION_WORKER_LEASE_MS: ${NOTIFICATION_WORKER_LEASE_MS:-30000}
+      NOTIFICATION_WORKER_MAX_ATTEMPTS: ${NOTIFICATION_WORKER_MAX_ATTEMPTS:-5}
+      NOTIFICATION_WORKER_POLL_INTERVAL_MS: ${NOTIFICATION_WORKER_POLL_INTERVAL_MS:-5000}
+
+      # Disabled is a valid fail-closed production state. When enabled, the
+      # provider factory requires the referenced secret and from-address.
+      NOTIFICATION_EMAIL_PROVIDER_ENABLED: ${NOTIFICATION_EMAIL_PROVIDER_ENABLED:-false}
+      NOTIFICATION_EMAIL_PROVIDER_KEY: ${NOTIFICATION_EMAIL_PROVIDER_KEY:-}
+      NOTIFICATION_EMAIL_PROVIDER_CREDENTIAL_REFERENCE: ${NOTIFICATION_EMAIL_PROVIDER_CREDENTIAL_REFERENCE:-MEDSPHERE_NOTIFICATION_SMTP_URL}
+      NOTIFICATION_EMAIL_PROVIDER_TIMEOUT_MS: ${NOTIFICATION_EMAIL_PROVIDER_TIMEOUT_MS:-5000}
+      NOTIFICATION_EMAIL_FROM_ADDRESS: ${NOTIFICATION_EMAIL_FROM_ADDRESS:-}
+      MEDSPHERE_NOTIFICATION_SMTP_URL: ${MEDSPHERE_NOTIFICATION_SMTP_URL:-}
+
+    networks:
+      - medsphere-infra
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 256M

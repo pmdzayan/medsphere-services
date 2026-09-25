@@ -94,6 +94,7 @@ import {
   type PatientReservation,
   type PatientReservationFilters,
   type PatientReservationPage,
+  type PatientPickupProof,
 } from './patient-reservation-contract';
 import type {
   ListPatientNotificationsResponse,
@@ -110,6 +111,11 @@ import type {
   PosVoidRequest,
 } from './pos-contract';
 import type { PosReturnReceipt, PosReturnRequest } from './pos-return-contract';
+import type {
+  AvailabilityRequestQueuePage,
+  AvailabilityResponseReceipt,
+  AvailabilityResponseRequest,
+} from './availability-request-contract';
 
 export class ApiError extends Error {
   constructor(
@@ -591,6 +597,32 @@ export async function createProviderReservation(
   );
 }
 
+export async function getProviderAvailabilityRequests(
+  providerId: string,
+  limit = 25,
+  offset = 0,
+): Promise<AvailabilityRequestQueuePage> {
+  const search = new URLSearchParams({ limit: String(limit), offset: String(offset) });
+  return requestJson<AvailabilityRequestQueuePage>(
+    `/api/inventory/providers/${encodeURIComponent(providerId)}/availability-requests?${search.toString()}`,
+  );
+}
+
+export async function respondProviderAvailabilityRequest(
+  providerId: string,
+  requestId: string,
+  request: AvailabilityResponseRequest,
+): Promise<AvailabilityResponseReceipt> {
+  return requestJson<AvailabilityResponseReceipt>(
+    `/api/inventory/providers/${encodeURIComponent(providerId)}/availability-requests/${encodeURIComponent(requestId)}/responses`,
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(request),
+    },
+  );
+}
+
 export async function getPrivacyPreferences(): Promise<PrivacyPreferences> {
   return requestJson<PrivacyPreferences>('/api/settings/privacy');
 }
@@ -748,6 +780,13 @@ export async function listPatientReservations(
 
 export async function getPatientReservation(reservationId: string): Promise<PatientReservation> {
   return requestJson<PatientReservation>(`/api/patient/medicine-reservations/${reservationId}`);
+}
+
+export async function issuePatientPickupProof(reservationId: string): Promise<PatientPickupProof> {
+  return requestJson<PatientPickupProof>(
+    `/api/patient/medicine-reservations/${encodeURIComponent(reservationId)}/pickup-proof`,
+    { method: 'POST' },
+  );
 }
 
 export async function createPatientReservation(
