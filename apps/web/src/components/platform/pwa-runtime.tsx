@@ -67,7 +67,6 @@ export function PwaRuntime() {
     }
 
     let cancelled = false;
-    let activeRegistration: ServiceWorkerRegistration | null = null;
 
     const observeInstallingWorker = (worker: ServiceWorker | null) => {
       if (!worker) return;
@@ -90,7 +89,6 @@ export function PwaRuntime() {
       })
       .then((nextRegistration) => {
         if (cancelled) return;
-        activeRegistration = nextRegistration;
         setRegistration(nextRegistration);
         setUpdateReady(Boolean(nextRegistration.waiting));
 
@@ -106,7 +104,6 @@ export function PwaRuntime() {
 
     return () => {
       cancelled = true;
-      activeRegistration = null;
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
       window.removeEventListener('beforeinstallprompt', handleInstallPrompt);
