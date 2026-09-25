@@ -38,6 +38,47 @@
   --font-display: var(--font-body);
 }
 
+[data-appearance='dark'] {
+  --ivory: #0b1411;
+  --paper: #101c18;
+  --ink: #e5efe9;
+  --muted: #9aaba4;
+  --line: rgba(226, 239, 232, 0.13);
+}
+
+[data-appearance='dark'] [data-organization-theme] {
+  --org-canvas: #0b1411;
+  --org-ink: #e5efe9;
+  --org-border: rgba(226, 239, 232, 0.13);
+}
+
+.workstation-surface {
+  color: var(--ink);
+  background-color: var(--paper);
+  border-color: var(--line);
+}
+
+[data-appearance='dark'] .workstation-surface {
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.22);
+}
+
+[data-appearance='dark'] .organization-theme-header {
+  background-color: color-mix(in srgb, var(--org-canvas) 93%, transparent);
+}
+
+[data-appearance='dark'] input,
+[data-appearance='dark'] select,
+[data-appearance='dark'] textarea {
+  color: #e5efe9;
+  background-color: #111f1a;
+  border-color: rgba(226, 239, 232, 0.16);
+}
+
+[data-appearance='dark'] input::placeholder,
+[data-appearance='dark'] textarea::placeholder {
+  color: #879991;
+}
+
 * {
   box-sizing: border-box;
 }
