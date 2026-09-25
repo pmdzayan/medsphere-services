@@ -133,9 +133,9 @@ VALUES
   ('${providerId}','${tenantId}','PHARMACY','Task 0046 Pharmacy','Fixture Owner','provider-0046@medsphere.test','0000000046','46 Test Street','Chennai','Tamil Nadu','India','600001',13.0827,80.2707,true,true,1,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP);
 
 INSERT INTO "MedicineReservation"
-  ("id","tenantId","providerId","subjectUserId","status","expiresAt","idempotencyKey","creationHash","version","createdAt","updatedAt")
+  ("id","tenantId","providerId","subjectUserId","status","expiresAt","confirmedAt","readyAt","idempotencyKey","creationHash","version","createdAt","updatedAt")
 VALUES
-  ('${reservationId}','${tenantId}','${providerId}','${userId}','READY',CURRENT_TIMESTAMP + INTERVAL '1 day','task-0046-upgrade-reservation',repeat('a',64),7,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP);
+  ('${reservationId}','${tenantId}','${providerId}','${userId}','READY',CURRENT_TIMESTAMP + INTERVAL '1 day',CURRENT_TIMESTAMP - INTERVAL '2 minutes',CURRENT_TIMESTAMP - INTERVAL '1 minute','task-0046-upgrade-reservation',repeat('a',64),7,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP);
 `;
 
 function verify() {
