@@ -255,6 +255,32 @@ export class ListVerificationQueueDto {
   businessNameSearch?: string;
 }
 
+export class VerificationSourceDto {
+  @ApiProperty()
+  id!: string;
+
+  @ApiProperty()
+  authority!: string;
+
+  @ApiProperty()
+  label!: string;
+
+  @ApiProperty({ format: 'uri' })
+  officialUrl!: string;
+
+  @ApiProperty({ enum: ['PRIMARY', 'SUPPORTING', 'CONDITIONAL'] })
+  requirement!: 'PRIMARY' | 'SUPPORTING' | 'CONDITIONAL';
+
+  @ApiProperty({ enum: ['PORTAL_LOOKUP', 'OFFICIAL_DIRECTORY'] })
+  mode!: 'PORTAL_LOOKUP' | 'OFFICIAL_DIRECTORY';
+
+  @ApiProperty()
+  purpose!: string;
+
+  @ApiProperty()
+  limitation!: string;
+}
+
 /** Platform reviewer detail view -- includes internal notes, unlike the pharmacy-facing response. */
 export class PlatformVerificationDetailResponseDto {
   @ApiProperty({ format: 'uuid' })
@@ -304,6 +330,15 @@ export class PlatformVerificationDetailResponseDto {
   /** Conservative review-time duplicate signal (§31) -- never an automatic rejection. */
   @ApiProperty()
   possibleDuplicateLicenseCount!: number;
+
+  @ApiProperty({ type: [VerificationSourceDto] })
+  verificationSources!: VerificationSourceDto[];
+
+  @ApiProperty()
+  jurisdictionReviewRequired!: boolean;
+
+  @ApiPropertyOptional({ nullable: true })
+  jurisdictionNote!: string | null;
 }
 
 export class ApproveVerificationDto {
@@ -400,4 +435,13 @@ export class PharmacyVerificationStateResponseDto {
 
   @ApiPropertyOptional({ type: PharmacyVerificationRecordDto, nullable: true })
   openSubmission!: PharmacyVerificationRecordDto | null;
+
+  @ApiProperty({ type: [VerificationSourceDto] })
+  verificationSources!: VerificationSourceDto[];
+
+  @ApiProperty()
+  jurisdictionReviewRequired!: boolean;
+
+  @ApiPropertyOptional({ nullable: true })
+  jurisdictionNote!: string | null;
 }
