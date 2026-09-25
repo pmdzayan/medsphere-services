@@ -175,3 +175,17 @@ AIM follows ADR-030's **measure-before-complexity** rule.
 - Every task that changes production scaling architecture must pass `pnpm test:architecture-governance` in addition to the normal quality gate.
 
 The executable policy is `docs/architecture/bottleneck-governance.json`.
+
+## 13. Network and low-bandwidth governance
+
+AIM follows ADR-031's privacy-safe network-efficiency boundary.
+
+- Keep browser-facing production compression enabled unless an accepted replacement provides equivalent or better measured transfer behavior.
+- Only versioned/static public assets may use shared/service-worker caching by default. Healthcare/API responses, navigations, authenticated pages, patient data, inventory state, reservations, billing, authorization and audit data remain outside shared caches.
+- Keep service-worker code revalidated so privacy/security policy updates are discoverable.
+- Public-route transfer, request-count and constrained-network readiness budgets are release gates. Do not raise a budget merely to obtain a green build; identify the regression and record evidence for any reviewed threshold change.
+- Prefer bounded responses, pagination, request cancellation/deduplication, compression and existing static caching before adding new network infrastructure.
+- Selected public routes must not introduce a third-party browser dependency without explicit privacy, security, availability and bandwidth review.
+- Every task that changes browser caching, compression, PWA network behavior or public-route bundle/request shape must pass `pnpm test:network-efficiency-boundary` and the applicable real-browser network certification.
+
+The executable budget is `docs/architecture/network-efficiency-budget.json`.

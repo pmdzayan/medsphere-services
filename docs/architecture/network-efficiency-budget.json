@@ -1,0 +1,94 @@
+{
+  "schemaVersion": 1,
+  "task": "0059",
+  "principle": "privacy-safe-low-bandwidth-by-default",
+  "baseline": {
+    "sourceRun": 36160336434,
+    "observedFirstLoadJsBytes": {
+      "/": 190000,
+      "/login": 209000,
+      "/register": 198000,
+      "/search": 200000
+    },
+    "note": "Observed from the exact-authoritative Task 0058 post-merge quality-gate production build. These are build-reported first-load JS sizes, not wire-transfer bytes.",
+    "measuredWireRun": 36164971346,
+    "measuredWireBytes": {
+      "/": 217925,
+      "/login": 237164,
+      "/register": 227000,
+      "/search": 225399
+    },
+    "measuredRequests": {
+      "/": 12,
+      "/login": 14,
+      "/register": 13,
+      "/search": 10
+    },
+    "measuredReadyMs": {
+      "/": 2105,
+      "/login": 2206,
+      "/register": 2164,
+      "/search": 1947
+    }
+  },
+  "slowNetworkProfile": {
+    "name": "constrained-mobile",
+    "latencyMs": 150,
+    "downloadKbps": 1600,
+    "uploadKbps": 750
+  },
+  "publicRouteBudgets": [
+    {
+      "path": "/",
+      "maxColdTransferBytes": 300000,
+      "maxRequests": 20,
+      "maxReadyMs": 5000
+    },
+    {
+      "path": "/login",
+      "maxColdTransferBytes": 300000,
+      "maxRequests": 20,
+      "maxReadyMs": 5000
+    },
+    {
+      "path": "/register",
+      "maxColdTransferBytes": 300000,
+      "maxRequests": 20,
+      "maxReadyMs": 5000
+    },
+    {
+      "path": "/search",
+      "maxColdTransferBytes": 300000,
+      "maxRequests": 20,
+      "maxReadyMs": 5000
+    }
+  ],
+  "cachePolicy": {
+    "publicStatic": "public, max-age=86400, stale-while-revalidate=604800",
+    "serviceWorker": "no-cache, no-store, must-revalidate",
+    "healthcareApi": "private, no-store",
+    "rules": [
+      "Only versioned Next static assets plus explicitly public manifest/icon assets may be service-worker cached.",
+      "API responses, navigations, authenticated pages and healthcare records must never enter shared browser/service-worker cache.",
+      "Service-worker code must not be long-lived cached so updates can be discovered."
+    ]
+  },
+  "compressionPolicy": {
+    "requireNextCompression": true,
+    "acceptedEncodings": ["gzip", "br", "zstd"],
+    "routes": ["/", "/login", "/register", "/search"]
+  },
+  "requestPolicy": {
+    "browserApiDefault": "no-store",
+    "forbidSharedApiCaching": true,
+    "forbiddenApiMarkers": [
+      "cache: 'force-cache'",
+      "cache: \"force-cache\"",
+      "s-maxage",
+      "stale-while-revalidate",
+      "Cache-Control', 'public",
+      "cache-control': 'public",
+      "revalidate:"
+    ]
+  }
+}
