@@ -68,90 +68,28 @@ describe('ReservationLifecycleService', () => {
     expect(harness.transaction.medicineReservationCommand.findUnique).not.toHaveBeenCalled();
   });
 
-  it('completes a ready reservation with exact stock, movement hash, audit, and receipt', async () => {
+  it('rejects direct READY completion so pickup verification cannot be bypassed', async () => {
     const harness = createHarness();
     harness.transaction.membershipProviderAccess.findFirst.mockResolvedValue({ id: 'access-1' });
-    harness.transaction.medicineReservationCommand.findUnique.mockResolvedValue(null);
-    harness.transaction.medicineReservation.findFirst.mockResolvedValue({
-      id: 'reservation-1',
-      status: 'READY',
-      version: 3,
-      expiresAt: new Date('2026-08-01T00:00:00.000Z'),
-      items: [{ quantity: 4 }],
-      allocations: [allocation],
-    });
-    harness.transaction.batch.updateMany.mockResolvedValue({ count: 1 });
-    harness.transaction.medicineReservationAllocation.updateMany.mockResolvedValue({ count: 1 });
-    harness.transaction.stockMovement.create.mockResolvedValue({ id: 'movement-1' });
-    harness.transaction.medicineReservation.updateMany.mockResolvedValue({ count: 1 });
-    harness.transaction.medicineReservationCommand.create.mockResolvedValue({ id: 'command-1' });
 
-    const result = await harness.service.transition({
-      actor,
-      providerId: 'provider-1',
-      reservationId: 'reservation-1',
-      transition: 'COMPLETE',
-      expectedVersion: 3,
-      idempotencyKey: 'complete-1',
-    });
+    await expect(
+      harness.service.transition({
+        actor,
+        providerId: 'provider-1',
+        reservationId: 'reservation-1',
+        transition: 'COMPLETE',
+        expectedVersion: 3,
+        idempotencyKey: 'complete-1',
+      }),
+    ).rejects.toThrow('Reservation completion requires pickup-authorized POS checkout');
 
-    expect(harness.transaction.batch.updateMany).toHaveBeenCalledWith({
-      where: expect.objectContaining({
-        id: 'batch-1',
-        tenantId: actor.tenantId,
-        onHandQuantity: 10,
-        heldQuantity: 4,
-        version: 6,
-      }),
-      data: {
-        onHandQuantity: { decrement: 4 },
-        heldQuantity: { decrement: 4 },
-        status: 'ACTIVE',
-        version: { increment: 1 },
-      },
-    });
-    expect(harness.transaction.stockMovement.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          type: 'STOCK_OUT',
-          delta: -4,
-          onHandBefore: 10,
-          onHandAfter: 6,
-          commandHash: expect.stringMatching(/^[0-9a-f]{64}$/),
-          actorMembershipId: actor.membershipId,
-          idempotencyKey: expect.stringMatching(/^reservation:[0-9a-f]{64}$/),
-        }),
-      }),
-    );
-    expect(harness.events.appendTenantUser).toHaveBeenCalledWith(
-      harness.transaction,
-      actor,
-      expect.objectContaining({
-        eventType: 'inventory.reservation.completed',
-        payload: expect.objectContaining({ status: 'COMPLETED', totalQuantity: 4, version: 4 }),
-      }),
-    );
-    expect(harness.audit.appendTenantUser).toHaveBeenCalledWith(
-      harness.transaction,
-      expect.objectContaining({
-        eventType: 'inventory.reservation.completed',
-        metadata: { previousStatus: 'READY', version: 4, totalQuantity: 4 },
-      }),
-    );
-    expect(result).toEqual({
-      reservationId: 'reservation-1',
-      status: 'COMPLETED',
-      version: 4,
-      totalQuantity: 4,
-      replayed: false,
-    });
-    expect(harness.transaction.patientNotification.create).not.toHaveBeenCalled();
-    expect(harness.transaction.patientTimelineEvent.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({
-        sourceEventId: 'reservation-1:4',
-        title: 'Reservation completed',
-      }),
-    });
+    expect(harness.transaction.medicineReservationCommand.findUnique).not.toHaveBeenCalled();
+    expect(harness.transaction.medicineReservation.findFirst).not.toHaveBeenCalled();
+    expect(harness.transaction.batch.updateMany).not.toHaveBeenCalled();
+    expect(harness.transaction.medicineReservationAllocation.updateMany).not.toHaveBeenCalled();
+    expect(harness.transaction.stockMovement.create).not.toHaveBeenCalled();
+    expect(harness.audit.appendTenantUser).not.toHaveBeenCalled();
+    expect(harness.events.appendTenantUser).not.toHaveBeenCalled();
   });
 
   it('writes a single patient inbox entry in the successful READY transition transaction', async () => {
