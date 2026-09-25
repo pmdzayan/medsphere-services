@@ -47,6 +47,29 @@ const profile = {
   longitude: 80.2707,
 };
 
+const officialSources = [
+  {
+    id: 'INDIA_TN_DRUGS_CONTROL',
+    authority: 'Tamil Nadu Food Safety & Drugs Administration — Drugs Control',
+    label: 'Tamil Nadu Drugs Control — drug sales licensing',
+    officialUrl: 'https://drugscontrol.tn.gov.in/sales_services.html',
+    requirement: 'PRIMARY' as const,
+    mode: 'PORTAL_LOOKUP' as const,
+    purpose: 'PREMISES_LICENCE',
+    limitation: 'Primary Tamil Nadu source for retail/wholesale drug-sale licensing.',
+  },
+  {
+    id: 'INDIA_TN_PHARMACY_COUNCIL',
+    authority: 'Tamil Nadu Pharmacy Council',
+    label: 'Tamil Nadu Pharmacy Council',
+    officialUrl: 'https://tnpc.ac.in/',
+    requirement: 'PRIMARY' as const,
+    mode: 'PORTAL_LOOKUP' as const,
+    purpose: 'PROFESSIONAL_REGISTRATION',
+    limitation: 'Use for Tamil Nadu pharmacist registration evidence.',
+  },
+];
+
 const approvedState: PharmacyVerificationState = {
   current: {
     verificationId: '33333333-3333-4333-8333-333333333333',
@@ -57,6 +80,9 @@ const approvedState: PharmacyVerificationState = {
     version: 2,
   },
   openSubmission: null,
+  verificationSources: officialSources,
+  jurisdictionReviewRequired: false,
+  jurisdictionNote: null,
 };
 
 function renderWorkspace() {
@@ -111,6 +137,29 @@ describe('PharmacyProfileWorkspace', () => {
     expect(screen.queryByText('SECRET-LICENSE')).not.toBeInTheDocument();
   });
 
+  it('links only server-controlled official verification authority sites', async () => {
+    renderWorkspace();
+
+    await waitFor(() =>
+      expect(screen.getByText('Official verification sources')).toBeInTheDocument(),
+    );
+
+    const drugsControl = screen.getByRole('link', {
+      name: 'Open official source',
+    });
+    expect(drugsControl).toHaveAttribute('target', '_blank');
+    expect(
+      screen.getByText('Tamil Nadu Drugs Control — drug sales licensing'),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Tamil Nadu Pharmacy Council')).toBeInTheDocument();
+
+    const links = screen.getAllByRole('link', { name: 'Open official source' });
+    expect(links.map((link) => link.getAttribute('href'))).toEqual([
+      'https://drugscontrol.tn.gov.in/sales_services.html',
+      'https://tnpc.ac.in/',
+    ]);
+  });
+
   it('saves only the reviewed pharmacy profile fields', async () => {
     renderWorkspace();
     await waitFor(() => expect(screen.getByDisplayValue('City Pharmacy')).toBeInTheDocument());
@@ -136,6 +185,9 @@ describe('PharmacyProfileWorkspace', () => {
     vi.mocked(getPharmacyVerificationState).mockResolvedValue({
       current: null,
       openSubmission: null,
+      verificationSources: officialSources,
+      jurisdictionReviewRequired: false,
+      jurisdictionNote: null,
     });
 
     renderWorkspace();
@@ -183,6 +235,9 @@ describe('PharmacyProfileWorkspace', () => {
         applicantMessage: null,
         version: 1,
       },
+      verificationSources: officialSources,
+      jurisdictionReviewRequired: false,
+      jurisdictionNote: null,
     });
 
     renderWorkspace();
