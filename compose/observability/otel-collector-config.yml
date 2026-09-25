@@ -18,6 +18,13 @@ processors:
     check_interval: 5s
     limit_mib: 192
     spike_limit_mib: 48
+  filter/aim_metrics:
+    metrics:
+      include:
+        match_type: regexp
+        metric_names:
+          - ^medsphere_.*
+          - ^up$
   batch:
     timeout: 5s
     send_batch_size: 1024
@@ -25,11 +32,6 @@ processors:
 exporters:
   prometheus:
     endpoint: 0.0.0.0:9464
-    namespace: aim
-  debug:
-    verbosity: basic
-    sampling_initial: 2
-    sampling_thereafter: 500
 
 service:
   extensions:
@@ -43,7 +45,7 @@ service:
         - prometheus
       processors:
         - memory_limiter
+        - filter/aim_metrics
         - batch
       exporters:
         - prometheus
-        - debug

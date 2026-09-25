@@ -122,6 +122,33 @@ test('renderPrometheusText emits correct cumulative histogram buckets exactly on
   assert.match(text, /le="\+Inf"\} 3/);
 });
 
+test('security metrics accept only bounded category/outcome labels and reject identifiers', () => {
+  const registry = new MetricsRegistry();
+  registry.securityEventTotal.increment({
+    category: 'credential_replay',
+    outcome: 'DENIED',
+  });
+
+  assert.throws(() =>
+    registry.securityEventTotal.increment({
+      category: 'user@example.com',
+      outcome: 'DENIED',
+    }),
+  );
+  assert.throws(() =>
+    registry.securityEventTotal.increment({
+      category: 'authorization_denied',
+      outcome: 'DENIED',
+      tenantId: 'tenant-1',
+    }),
+  );
+
+  const text = registry.renderPrometheusText();
+  assert.match(text, /medsphere_security_event_total/);
+  assert.match(text, /category="credential_replay"/);
+  assert.doesNotMatch(text, /tenantId/);
+});
+
 test('renderPrometheusText never contains a raw tenant/phone/UUID -- no code path could add one', () => {
   const registry = new MetricsRegistry();
   registry.httpRequestsTotal.increment({

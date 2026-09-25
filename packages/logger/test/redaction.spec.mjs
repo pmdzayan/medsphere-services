@@ -25,8 +25,18 @@ test('recognizes sensitive metadata keys without treating ordinary fields as sec
   assert.equal(isSensitiveLogKey('REDIS_CLUSTER_URL'), true);
   assert.equal(isSensitiveLogKey('apiKey'), true);
 
+  assert.equal(isSensitiveLogKey('tenantId'), true);
+  assert.equal(isSensitiveLogKey('userId'), true);
+  assert.equal(isSensitiveLogKey('providerId'), true);
+  assert.equal(isSensitiveLogKey('reservationId'), true);
+  assert.equal(isSensitiveLogKey('saleId'), true);
+  assert.equal(isSensitiveLogKey('email'), true);
+  assert.equal(isSensitiveLogKey('phone'), true);
+  assert.equal(isSensitiveLogKey('ipAddress'), true);
+  assert.equal(isSensitiveLogKey('userAgent'), true);
+
   assert.equal(isSensitiveLogKey('requestId'), false);
-  assert.equal(isSensitiveLogKey('tenantId'), false);
+  assert.equal(isSensitiveLogKey('correlationId'), false);
   assert.equal(isSensitiveLogKey('statusCode'), false);
   assert.equal(isSensitiveLogKey('durationMs'), false);
   assert.equal(isSensitiveLogKey('tokenCount'), false);
@@ -36,6 +46,7 @@ test('redacts nested credentials while preserving safe operational metadata', ()
   const input = {
     requestId: 'request-123',
     tenantId: 'tenant-123',
+    email: 'patient@example.test',
     statusCode: 200,
     auth: {
       accessToken: 'secret-access-token',
@@ -52,7 +63,8 @@ test('redacts nested credentials while preserving safe operational metadata', ()
 
   assert.deepEqual(output, {
     requestId: 'request-123',
-    tenantId: 'tenant-123',
+    tenantId: LOG_REDACTED_VALUE,
+    email: LOG_REDACTED_VALUE,
     statusCode: 200,
     auth: {
       accessToken: LOG_REDACTED_VALUE,
@@ -61,7 +73,7 @@ test('redacts nested credentials while preserving safe operational metadata', ()
     },
     headers: {
       authorization: LOG_REDACTED_VALUE,
-      'user-agent': 'synthetic-test-agent',
+      'user-agent': LOG_REDACTED_VALUE,
     },
   });
 });
@@ -80,8 +92,19 @@ test('sanitizes bearer/basic credentials and credential-bearing URLs in free tex
 
   assert.match(output, /Bearer \[REDACTED\]/);
   assert.match(output, /Basic \[REDACTED\]/);
-  assert.match(output, /postgresql:\/\/\[REDACTED\]@db\.internal:5432\/medsphere/);
+  assert.equal(output.includes('db.internal'), false);
   assert.match(output, /token=\[REDACTED\]/);
+});
+
+test('redacts direct identifiers from free-text telemetry while preserving safe correlation metadata', () => {
+  const input = 'patient@example.test +91 98765 43210 123e4567-e89b-42d3-a456-426614174000';
+
+  const output = sanitizeLogString(input);
+
+  assert.equal(output.includes('patient@example.test'), false);
+  assert.equal(output.includes('98765'), false);
+  assert.equal(output.includes('123e4567'), false);
+  assert.match(output, /\[REDACTED\]/);
 });
 
 test('redacts sensitive fields from the exact object passed through the Winston format', () => {
