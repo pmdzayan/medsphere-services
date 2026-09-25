@@ -136,8 +136,7 @@
       "docs/sprints/Task-0060-ai-code-security-data-integrity.md",
       "PROJECT_RULES.md",
       "PRODUCT_ROADMAP.md",
-      "package.json",
-      ".github/workflows/task-0060-format-repair.yml"
+      "package.json"
     ]
   }
 }
