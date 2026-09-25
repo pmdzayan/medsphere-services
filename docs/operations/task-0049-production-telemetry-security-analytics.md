@@ -63,7 +63,7 @@ Alertmanager:
 - reads the delivery destination from `/run/secrets/aim-alert-webhook-url`;
 - stores no alert destination in source control.
 
-Prometheus and Alertmanager use Compose `expose`, not host `ports`. Human/API access must be added only through an operator-owned authenticated TLS ingress. Direct public port exposure is prohibited.
+Prometheus and Alertmanager use Compose `expose`, not host `ports`. They share an internal-only `aim-observability` network; only the Collector bridges the application network into it. Alertmanager alone also joins `aim-alert-egress` so it can make the approved outbound HTTPS webhook call. Human/API access must be added only through an operator-owned authenticated TLS ingress. Direct public port exposure is prohibited.
 
 ## Alert secret activation
 
@@ -174,16 +174,7 @@ The view is a reporting read model, not an operational source of truth.
 
 A deployment DBA may create a separate read-only principal out of band. Credentials must never be committed.
 
-Example privilege shape:
-
-```sql
-CREATE ROLE aim_bi_reader LOGIN NOINHERIT;
-ALTER ROLE aim_bi_reader SET default_transaction_read_only = on;
-
-GRANT CONNECT ON DATABASE <aim_database> TO aim_bi_reader;
-GRANT USAGE ON SCHEMA aim_analytics TO aim_bi_reader;
-GRANT SELECT ON aim_analytics.daily_audit_activity TO aim_bi_reader;
-```
+The deployment DBA creates the `aim_bi_reader` LOGIN/credential out of band, then applies `packages/database/scripts/task-0049-bi-reader-grants.sql`. The script sets `default_transaction_read_only`, revokes table/sequence privileges in `public`, removes `CREATE` on the public schema, and grants only `USAGE` on `aim_analytics` plus `SELECT` on the approved view. It deliberately does not create a role or password.
 
 Do **not** grant the BI principal broad `SELECT` on the `public` schema or AIM OLTP tables. Do not grant INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER, CREATE or ownership privileges.
 
