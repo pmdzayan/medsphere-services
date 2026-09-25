@@ -11,6 +11,9 @@ networks:
     name: medsphere-apps-network
   aim-observability:
     internal: true
+  # Alertmanager alone receives outbound network access for the operator HTTPS
+  # webhook. No application service joins this network.
+  aim-alert-egress: {}
 
 volumes:
   aim-prometheus-data:
@@ -67,6 +70,7 @@ services:
       - '9093'
     networks:
       - aim-observability
+      - aim-alert-egress
     deploy:
       resources:
         limits:
