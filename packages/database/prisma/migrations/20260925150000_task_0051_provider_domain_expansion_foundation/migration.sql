@@ -35,7 +35,7 @@ CREATE TABLE "ProviderLocation" (
   "isActive" BOOLEAN NOT NULL DEFAULT true,
   "version" INTEGER NOT NULL DEFAULT 1,
   "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" TIMESTAMP(3) NOT NULL,
   "deletedAt" TIMESTAMP(3),
 
   CONSTRAINT "ProviderLocation_pkey" PRIMARY KEY ("id"),
@@ -83,7 +83,7 @@ CREATE TABLE "ProviderDepartment" (
   "isActive" BOOLEAN NOT NULL DEFAULT true,
   "version" INTEGER NOT NULL DEFAULT 1,
   "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" TIMESTAMP(3) NOT NULL,
   "deletedAt" TIMESTAMP(3),
 
   CONSTRAINT "ProviderDepartment_pkey" PRIMARY KEY ("id"),
@@ -114,7 +114,7 @@ CREATE TABLE "ProviderProfessionalProfile" (
   "primarySpecialty" VARCHAR(160),
   "version" INTEGER NOT NULL DEFAULT 1,
   "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" TIMESTAMP(3) NOT NULL,
 
   CONSTRAINT "ProviderProfessionalProfile_pkey" PRIMARY KEY ("id"),
   CONSTRAINT "ProviderProfessionalProfile_tenantId_fkey"
