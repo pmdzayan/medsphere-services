@@ -105,20 +105,14 @@ export function enqueueOfflinePosDraft(
   return { ...draft, lines: draft.lines.map((line) => ({ ...line })) };
 }
 
-export function peekOfflinePosDraft(
-  providerId: string,
-  now = Date.now(),
-): OfflinePosDraft | null {
+export function peekOfflinePosDraft(providerId: string, now = Date.now()): OfflinePosDraft | null {
   purgeExpired(now);
   const draft = drafts.get(providerId);
   if (!draft) return null;
   return { ...draft, lines: draft.lines.map((line) => ({ ...line })) };
 }
 
-export function takeOfflinePosDraft(
-  providerId: string,
-  now = Date.now(),
-): OfflinePosDraft | null {
+export function takeOfflinePosDraft(providerId: string, now = Date.now()): OfflinePosDraft | null {
   const draft = peekOfflinePosDraft(providerId, now);
   if (!draft) return null;
   drafts.delete(providerId);
