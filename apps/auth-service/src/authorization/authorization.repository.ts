@@ -7,9 +7,13 @@ import { PermissionKey, TENANT_ADMINISTRATOR_ROLE } from './permission.constants
 type AuthorizationDatabase = Pick<
   Prisma.TransactionClient,
   | 'membershipProviderAccess'
+  | 'membershipProviderLocationAccess'
+  | 'membershipProviderDepartmentAccess'
   | 'membershipRole'
   | 'permission'
   | 'provider'
+  | 'providerLocation'
+  | 'providerDepartment'
   | 'role'
   | 'rolePermission'
   | 'tenant'
@@ -410,6 +414,150 @@ export class AuthorizationRepository {
   ) {
     return database.membershipProviderAccess.deleteMany({
       where: { tenantId, membershipId, providerId },
+    });
+  }
+
+  async listProviderScopes(tenantId: string, membershipId: string, providerId: string) {
+    const [locations, departments] = await Promise.all([
+      this.prisma.client.membershipProviderLocationAccess.findMany({
+        where: {
+          tenantId,
+          membershipId,
+          providerId,
+          location: { deletedAt: null, isActive: true },
+        },
+        select: {
+          locationId: true,
+          location: { select: { code: true, name: true } },
+        },
+        orderBy: [{ location: { name: 'asc' } }, { locationId: 'asc' }],
+      }),
+      this.prisma.client.membershipProviderDepartmentAccess.findMany({
+        where: {
+          tenantId,
+          membershipId,
+          providerId,
+          department: { deletedAt: null, isActive: true },
+        },
+        select: {
+          departmentId: true,
+          department: { select: { locationId: true, code: true, name: true } },
+        },
+        orderBy: [{ department: { name: 'asc' } }, { departmentId: 'asc' }],
+      }),
+    ]);
+    return { locations, departments };
+  }
+
+  async findActiveProviderLocation(
+    database: AuthorizationDatabase,
+    tenantId: string,
+    providerId: string,
+    locationId: string,
+  ) {
+    return database.providerLocation.findFirst({
+      where: {
+        id: locationId,
+        tenantId,
+        providerId,
+        isActive: true,
+        deletedAt: null,
+      },
+      select: { id: true },
+    });
+  }
+
+  async findActiveProviderDepartment(
+    database: AuthorizationDatabase,
+    tenantId: string,
+    providerId: string,
+    departmentId: string,
+  ) {
+    return database.providerDepartment.findFirst({
+      where: {
+        id: departmentId,
+        tenantId,
+        providerId,
+        isActive: true,
+        deletedAt: null,
+      },
+      select: { id: true, locationId: true },
+    });
+  }
+
+  async findProviderLocationAccess(
+    database: AuthorizationDatabase,
+    tenantId: string,
+    membershipId: string,
+    providerId: string,
+    locationId: string,
+  ) {
+    return database.membershipProviderLocationAccess.findFirst({
+      where: { tenantId, membershipId, providerId, locationId },
+      select: { id: true },
+    });
+  }
+
+  async createProviderLocationAccess(
+    database: AuthorizationDatabase,
+    tenantId: string,
+    membershipId: string,
+    providerId: string,
+    locationId: string,
+  ) {
+    return database.membershipProviderLocationAccess.createMany({
+      data: [{ tenantId, membershipId, providerId, locationId }],
+      skipDuplicates: true,
+    });
+  }
+
+  async removeProviderLocationAccess(
+    database: AuthorizationDatabase,
+    tenantId: string,
+    membershipId: string,
+    providerId: string,
+    locationId: string,
+  ) {
+    return database.membershipProviderLocationAccess.deleteMany({
+      where: { tenantId, membershipId, providerId, locationId },
+    });
+  }
+
+  async findProviderDepartmentAccess(
+    database: AuthorizationDatabase,
+    tenantId: string,
+    membershipId: string,
+    providerId: string,
+    departmentId: string,
+  ) {
+    return database.membershipProviderDepartmentAccess.findFirst({
+      where: { tenantId, membershipId, providerId, departmentId },
+      select: { id: true },
+    });
+  }
+
+  async createProviderDepartmentAccess(
+    database: AuthorizationDatabase,
+    tenantId: string,
+    membershipId: string,
+    providerId: string,
+    departmentId: string,
+  ) {
+    return database.membershipProviderDepartmentAccess.createMany({
+      data: [{ tenantId, membershipId, providerId, departmentId }],
+      skipDuplicates: true,
+    });
+  }
+
+  async removeProviderDepartmentAccess(
+    database: AuthorizationDatabase,
+    tenantId: string,
+    membershipId: string,
+    providerId: string,
+    departmentId: string,
+  ) {
+    return database.membershipProviderDepartmentAccess.deleteMany({
+      where: { tenantId, membershipId, providerId, departmentId },
     });
   }
 

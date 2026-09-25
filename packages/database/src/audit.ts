@@ -9,6 +9,10 @@ export const AUDIT_EVENT_TYPES = [
   'authorization.assignment.removed',
   'authorization.provider-access.added',
   'authorization.provider-access.removed',
+  'authorization.provider-location-access.added',
+  'authorization.provider-location-access.removed',
+  'authorization.provider-department-access.added',
+  'authorization.provider-department-access.removed',
   'authorization.permission.denied',
   'authorization.membership.suspended',
   'authorization.membership.revoked',
@@ -87,6 +91,19 @@ export const AUDIT_EVENT_TYPES = [
   'billing.pos.invoice.reprinted',
   'billing.pos.sale.voided',
   'billing.pos.return.completed',
+  // Task 0051: provider-domain foundation. These events carry only bounded
+  // structural identifiers/types; no professional registration numbers or
+  // verification evidence are written to audit metadata.
+  'provider.domain.created',
+  'provider.location.created',
+  'provider.department.created',
+  'provider.verification.submitted',
+  'provider.verification.resubmitted',
+  'provider.verification.review-started',
+  'provider.verification.approved',
+  'provider.verification.rejected',
+  'provider.verification.suspended',
+  'provider.verification.expired',
   // Task 0039 (PROVISIONAL): pharmacy onboarding & verification closure.
   'pharmacy.verification.submitted',
   'pharmacy.verification.resubmitted',
@@ -111,6 +128,26 @@ export const AUDIT_METADATA_KEYS = {
   'authorization.assignment.removed': ['targetMembershipId', 'roleName'],
   'authorization.provider-access.added': ['targetMembershipId', 'providerId'],
   'authorization.provider-access.removed': ['targetMembershipId', 'providerId'],
+  'authorization.provider-location-access.added': [
+    'targetMembershipId',
+    'providerId',
+    'locationId',
+  ],
+  'authorization.provider-location-access.removed': [
+    'targetMembershipId',
+    'providerId',
+    'locationId',
+  ],
+  'authorization.provider-department-access.added': [
+    'targetMembershipId',
+    'providerId',
+    'departmentId',
+  ],
+  'authorization.provider-department-access.removed': [
+    'targetMembershipId',
+    'providerId',
+    'departmentId',
+  ],
   'authorization.permission.denied': ['requiredPermissions'],
   'authorization.membership.suspended': ['targetMembershipId', 'previousStatus', 'resultingStatus'],
   'authorization.membership.revoked': ['targetMembershipId', 'previousStatus', 'resultingStatus'],
@@ -271,6 +308,16 @@ export const AUDIT_METADATA_KEYS = {
     'totalQuantity',
     'refundTotal',
   ],
+  'provider.domain.created': ['providerId', 'providerType', 'locationId'],
+  'provider.location.created': ['providerId', 'locationId'],
+  'provider.department.created': ['providerId', 'locationId', 'departmentId'],
+  'provider.verification.submitted': ['verificationId', 'providerId'],
+  'provider.verification.resubmitted': ['verificationId', 'providerId', 'previousVerificationId'],
+  'provider.verification.review-started': ['verificationId', 'providerId', 'previousStatus'],
+  'provider.verification.approved': ['verificationId', 'providerId', 'previousStatus'],
+  'provider.verification.rejected': ['verificationId', 'providerId', 'previousStatus'],
+  'provider.verification.suspended': ['verificationId', 'providerId', 'previousStatus'],
+  'provider.verification.expired': ['verificationId', 'providerId', 'previousStatus'],
   // Task 0039 (PROVISIONAL): no document/evidence content, license
   // numbers, government references, or reviewer notes are ever
   // included -- only bounded structural identifiers and status

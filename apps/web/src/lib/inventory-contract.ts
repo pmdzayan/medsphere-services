@@ -2,7 +2,7 @@ export interface ProviderAccess {
   membershipId: string;
   providerId: string;
   businessName: string;
-  providerType: 'PHARMACY' | 'HOSPITAL';
+  providerType: 'PHARMACY' | 'HOSPITAL' | 'CLINIC' | 'LABORATORY' | 'DOCTOR';
   isActive: boolean;
 }
 
@@ -423,7 +423,9 @@ function isProviderAccess(value: unknown): value is ProviderAccess {
     isCanonicalUuid(provider.membershipId) &&
     isCanonicalUuid(provider.providerId) &&
     isBoundedString(provider.businessName, 200) &&
-    (provider.providerType === 'PHARMACY' || provider.providerType === 'HOSPITAL') &&
+    (['PHARMACY', 'HOSPITAL', 'CLINIC', 'LABORATORY', 'DOCTOR'] as const).includes(
+      provider.providerType as never,
+    ) &&
     typeof provider.isActive === 'boolean'
   );
 }

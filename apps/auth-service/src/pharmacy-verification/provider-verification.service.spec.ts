@@ -304,8 +304,8 @@ describe('ProviderVerificationService.submitVerification (candidate Task 0039)',
     ).rejects.toThrow();
   });
 
-  it('rejects submission for a non-PHARMACY provider', async () => {
-    const { service } = buildService({
+  it('Task 0051 accepts hospital verification through the shared state machine and generic audit event', async () => {
+    const { service, auditEvents, verifications } = buildService({
       provider: { id: PROVIDER_A, tenantId: TENANT_A, providerType: 'HOSPITAL', deletedAt: null },
     });
     await expect(
@@ -317,7 +317,11 @@ describe('ProviderVerificationService.submitVerification (candidate Task 0039)',
         businessRegistrationNumber: 'REG-1',
         governmentIdReference: 'GOV-1',
       }),
-    ).rejects.toThrow();
+    ).resolves.toEqual(expect.objectContaining({ verificationId: expect.any(String) }));
+    expect(verifications[0]?.providerType).toBe('HOSPITAL');
+    expect(auditEvents).toContainEqual(
+      expect.objectContaining({ eventType: 'provider.verification.submitted' }),
+    );
   });
 
   it('rejects submission for a soft-deleted provider', async () => {
@@ -1024,7 +1028,7 @@ describe('ProviderVerificationService.suspend (candidate Task 0039)', () => {
   });
 });
 
-describe('ProviderVerificationService.getProfile / updateProfile (candidate Task 0039, pharmacy profile API)', () => {
+describe('ProviderVerificationService.getProfile / updateProfile (Task 0039 compatibility + Task 0051 provider expansion)', () => {
   it('returns the safe profile fields for the assigned PHARMACY provider', async () => {
     const { service, client } = buildService({
       provider: {
@@ -1063,11 +1067,11 @@ describe('ProviderVerificationService.getProfile / updateProfile (candidate Task
     expect(profile).toBeDefined();
   });
 
-  it('getProfile throws for a non-PHARMACY provider', async () => {
+  it('Task 0051 returns the same safe profile projection for an assigned HOSPITAL provider', async () => {
     const { service } = buildService({
       provider: { id: PROVIDER_A, tenantId: TENANT_A, providerType: 'HOSPITAL', deletedAt: null },
     });
-    await expect(service.getProfile(tenantActor, PROVIDER_A)).rejects.toThrow();
+    await expect(service.getProfile(tenantActor, PROVIDER_A)).resolves.toBeDefined();
   });
 
   it('getProfile throws for a soft-deleted provider', async () => {
@@ -1104,13 +1108,17 @@ describe('ProviderVerificationService.getProfile / updateProfile (candidate Task
     expect(provider!.deletedAt).toBe(null);
   });
 
-  it('updateProfile throws (fails closed) for a non-PHARMACY provider', async () => {
-    const { service } = buildService({
+  it('Task 0051 updates common safe profile fields for an assigned HOSPITAL provider', async () => {
+    const { service, provider } = buildService({
       provider: { id: PROVIDER_A, tenantId: TENANT_A, providerType: 'HOSPITAL', deletedAt: null },
     });
     await expect(
-      service.updateProfile(tenantActor, PROVIDER_A, { businessName: 'New Name' }),
-    ).rejects.toThrow();
+      service.updateProfile(tenantActor, PROVIDER_A, { businessName: 'New Hospital Name' }),
+    ).resolves.toBeUndefined();
+    expect((provider as unknown as { businessName: string }).businessName).toBe(
+      'New Hospital Name',
+    );
+    expect(provider?.providerType).toBe('HOSPITAL');
   });
 
   it('updateProfile throws for an unauthorized tenant user', async () => {

@@ -65,6 +65,38 @@ describe('audit event catalogue -- Task 0032/0039 coexistence (candidate Task 00
     }
   });
 
+  it('Task 0051 provider-domain and scoped-authorization event types are present with bounded metadata', () => {
+    const task0051Events = [
+      'authorization.provider-location-access.added',
+      'authorization.provider-location-access.removed',
+      'authorization.provider-department-access.added',
+      'authorization.provider-department-access.removed',
+      'provider.domain.created',
+      'provider.location.created',
+      'provider.department.created',
+      'provider.verification.submitted',
+      'provider.verification.resubmitted',
+      'provider.verification.review-started',
+      'provider.verification.approved',
+      'provider.verification.rejected',
+      'provider.verification.suspended',
+      'provider.verification.expired',
+    ] as const;
+
+    const sensitivePattern =
+      /(license|registration|government|document|password|credential|token|secret|clinical|patient)/i;
+
+    for (const eventType of task0051Events) {
+      expect(AUDIT_EVENT_TYPES).toContain(eventType);
+      const keys = AUDIT_METADATA_KEYS[eventType];
+      expect(keys).toBeDefined();
+      expect(keys.length).toBeLessThanOrEqual(3);
+      for (const key of keys) {
+        expect(key).not.toMatch(sensitivePattern);
+      }
+    }
+  });
+
   it('a bogus event type is not present in the catalogue', () => {
     expect(AUDIT_EVENT_TYPES).not.toContain('bogus.event.type');
   });

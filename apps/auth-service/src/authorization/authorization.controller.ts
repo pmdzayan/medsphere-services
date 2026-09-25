@@ -39,6 +39,9 @@ import {
   RoleResponseDto,
   ProviderAccessResponseDto,
   ProviderStaffListResponseDto,
+  ProviderScopeResponseDto,
+  ProviderLocationAccessResponseDto,
+  ProviderDepartmentAccessResponseDto,
 } from './dto/authorization-response.dto';
 import { CreateRoleDto } from './dto/create-role.dto';
 import { UpdateRoleDto } from './dto/update-role.dto';
@@ -217,7 +220,7 @@ export class AuthorizationController {
 
   @Get('providers/:providerId/memberships')
   @RequirePermissions(PERMISSIONS.providerAccessRead)
-  @ApiOperation({ summary: 'List bounded staff assignments for one pharmacy' })
+  @ApiOperation({ summary: 'List bounded staff assignments for one provider' })
   @ApiOkResponse({ type: ProviderStaffListResponseDto })
   listProviderMembers(
     @CurrentIdentity() identity: AuthenticatedIdentity,
@@ -260,6 +263,102 @@ export class AuthorizationController {
       identity,
       membershipId,
       providerId,
+      extractRequestMetadata(request),
+    );
+  }
+
+  @Get('memberships/:membershipId/provider-access/:providerId/scopes')
+  @RequirePermissions(PERMISSIONS.providerAccessRead)
+  @ApiOperation({
+    summary: 'List active location and department scopes for one provider assignment',
+  })
+  @ApiOkResponse({ type: ProviderScopeResponseDto })
+  listProviderScopes(
+    @CurrentIdentity() identity: AuthenticatedIdentity,
+    @Param('membershipId', uuid) membershipId: string,
+    @Param('providerId', uuid) providerId: string,
+  ) {
+    return this.authorizationService.listProviderScopes(identity, membershipId, providerId);
+  }
+
+  @Put('memberships/:membershipId/provider-access/:providerId/locations/:locationId')
+  @RequirePermissions(PERMISSIONS.providerAccessManage)
+  @ApiOperation({ summary: 'Idempotently assign an active provider location scope' })
+  @ApiOkResponse({ type: ProviderLocationAccessResponseDto })
+  addProviderLocationAccess(
+    @CurrentIdentity() identity: AuthenticatedIdentity,
+    @Param('membershipId', uuid) membershipId: string,
+    @Param('providerId', uuid) providerId: string,
+    @Param('locationId', uuid) locationId: string,
+    @Req() request: MetadataHttpRequest,
+  ) {
+    return this.authorizationService.addProviderLocationAccess(
+      identity,
+      membershipId,
+      providerId,
+      locationId,
+      extractRequestMetadata(request),
+    );
+  }
+
+  @Delete('memberships/:membershipId/provider-access/:providerId/locations/:locationId')
+  @RequirePermissions(PERMISSIONS.providerAccessManage)
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Remove a provider location scope' })
+  @ApiNoContentResponse()
+  async removeProviderLocationAccess(
+    @CurrentIdentity() identity: AuthenticatedIdentity,
+    @Param('membershipId', uuid) membershipId: string,
+    @Param('providerId', uuid) providerId: string,
+    @Param('locationId', uuid) locationId: string,
+    @Req() request: MetadataHttpRequest,
+  ): Promise<void> {
+    await this.authorizationService.removeProviderLocationAccess(
+      identity,
+      membershipId,
+      providerId,
+      locationId,
+      extractRequestMetadata(request),
+    );
+  }
+
+  @Put('memberships/:membershipId/provider-access/:providerId/departments/:departmentId')
+  @RequirePermissions(PERMISSIONS.providerAccessManage)
+  @ApiOperation({ summary: 'Idempotently assign an active provider department scope' })
+  @ApiOkResponse({ type: ProviderDepartmentAccessResponseDto })
+  addProviderDepartmentAccess(
+    @CurrentIdentity() identity: AuthenticatedIdentity,
+    @Param('membershipId', uuid) membershipId: string,
+    @Param('providerId', uuid) providerId: string,
+    @Param('departmentId', uuid) departmentId: string,
+    @Req() request: MetadataHttpRequest,
+  ) {
+    return this.authorizationService.addProviderDepartmentAccess(
+      identity,
+      membershipId,
+      providerId,
+      departmentId,
+      extractRequestMetadata(request),
+    );
+  }
+
+  @Delete('memberships/:membershipId/provider-access/:providerId/departments/:departmentId')
+  @RequirePermissions(PERMISSIONS.providerAccessManage)
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Remove a provider department scope' })
+  @ApiNoContentResponse()
+  async removeProviderDepartmentAccess(
+    @CurrentIdentity() identity: AuthenticatedIdentity,
+    @Param('membershipId', uuid) membershipId: string,
+    @Param('providerId', uuid) providerId: string,
+    @Param('departmentId', uuid) departmentId: string,
+    @Req() request: MetadataHttpRequest,
+  ): Promise<void> {
+    await this.authorizationService.removeProviderDepartmentAccess(
+      identity,
+      membershipId,
+      providerId,
+      departmentId,
       extractRequestMetadata(request),
     );
   }

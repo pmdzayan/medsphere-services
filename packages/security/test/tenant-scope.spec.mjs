@@ -12,6 +12,8 @@ const {
 } = require('../dist/tenant-scope.js');
 const {
   assertTrustedProviderAccess,
+  assertTrustedProviderLocationAccess,
+  assertTrustedProviderDepartmentAccess,
   requireActiveTenantActorWithProvider,
 } = require('../dist/provider-access.js');
 
@@ -82,5 +84,51 @@ test('requireActiveTenantActorWithProvider composes membership and provider boun
   await assert.rejects(
     () => requireActiveTenantActorWithProvider(failTx, actor, providerId),
     /Active tenant membership required/,
+  );
+});
+
+test('Task 0051 location scope requires both coarse provider access and explicit active location access', async () => {
+  const db = {
+    membershipProviderAccess: { findFirst: async () => ({ id: 'provider-access-1' }) },
+    membershipProviderLocationAccess: { findFirst: async () => ({ id: 'location-access-1' }) },
+  };
+  await assertTrustedProviderLocationAccess(db, actor, providerId, 'location-1');
+
+  await assert.rejects(
+    () =>
+      assertTrustedProviderLocationAccess(
+        {
+          membershipProviderAccess: { findFirst: async () => ({ id: 'provider-access-1' }) },
+          membershipProviderLocationAccess: { findFirst: async () => undefined },
+        },
+        actor,
+        providerId,
+        'location-other',
+      ),
+    /Provider location not found/,
+  );
+});
+
+test('Task 0051 department scope requires both coarse provider access and explicit active department access', async () => {
+  const db = {
+    membershipProviderAccess: { findFirst: async () => ({ id: 'provider-access-1' }) },
+    membershipProviderDepartmentAccess: { findFirst: async () => ({ id: 'department-access-1' }) },
+  };
+  await assertTrustedProviderDepartmentAccess(db, actor, providerId, 'department-1');
+
+  await assert.rejects(
+    () =>
+      assertTrustedProviderDepartmentAccess(
+        {
+          membershipProviderAccess: { findFirst: async () => undefined },
+          membershipProviderDepartmentAccess: {
+            findFirst: async () => ({ id: 'department-access-1' }),
+          },
+        },
+        actor,
+        providerId,
+        'department-1',
+      ),
+    /Provider not found/,
   );
 });
