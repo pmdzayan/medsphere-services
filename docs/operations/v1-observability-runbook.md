@@ -2,9 +2,9 @@
 
 ## Status
 
-This runbook documents the V1 application-level observability foundation.
+This runbook documents the V1 application-level observability foundation plus the Task 0049 production-reference metrics/security-monitoring boundary.
 
-It does not activate a production monitoring vendor, external log sink, alerting service, metrics backend, tracing backend, or real healthcare-data workflow.
+Task 0049 adds a pinned Prometheus/Alertmanager backend reference, bounded retention, security-event monitoring, synthetic alert-drill tooling, and a de-identified analytics read model. It does not authorize real healthcare production traffic; Task 0050 remains the pharmacy-first release-certification gate. A centralized external log vendor and distributed tracing remain disabled by default.
 
 ## Scope
 
@@ -97,7 +97,7 @@ Required validation for changes to this boundary:
 
 ## Operational boundaries
 
-This foundation does not yet claim centralized production log ingestion, production log retention policy, alert routing/on-call paging, SLO/SLA monitoring, metrics dashboards, distributed tracing, external APM activation, production incident-response approval, production traffic approval, or approval for real healthcare data.
+This foundation now includes repository-owned retention/routing policy and a production-reference Prometheus/Alertmanager path. It still does not claim that a real environment, authenticated TLS operator ingress, external on-call channel, production incident-response process, production traffic, or real healthcare data has been approved. Those are Task 0050 deployment/certification concerns.
 
 ---
 
@@ -126,8 +126,9 @@ This section extends the runbook above with the V1 metrics, centralized telemetr
 | `medsphere_notification_delivery_total`     | counter   | `channel`, `outcome`                         | Notification worker delivery attempts           |
 | `medsphere_otp_dispatch_total`              | counter   | `outcome`                                    | OTP provider dispatch attempts                  |
 | `medsphere_metrics_exporter_failures_total` | counter   | (none)                                       | OTLP export failures                            |
+| `medsphere_security_event_total`            | counter   | `category`, `outcome`                    | Bounded security signals derived from audit     |
 
-`route` is always the framework route template (e.g. `/api/inventory/providers/:providerId/reservations`), never a raw URL. Every label key is drawn from a fixed allowlist enforced in code (`service`, `method`, `route`, `status_class`, `dependency`, `outcome`, `channel`, `provider`) -- recording a metric with any other label key throws immediately, so a future call site cannot silently introduce a tenant ID, phone number, request ID, medicine name, or other high-cardinality/sensitive value as a label.
+`route` is always the framework route template (e.g. `/api/inventory/providers/:providerId/reservations`), never a raw URL. Every label key is drawn from a fixed allowlist enforced in code (`service`, `method`, `route`, `status_class`, `dependency`, `outcome`, `channel`, `provider`, `category`) -- recording a metric with any other label key throws immediately, so a future call site cannot silently introduce a tenant ID, phone number, request ID, medicine name, or other high-cardinality/sensitive value as a label.
 
 ## Privacy boundary (extends the rules above)
 
@@ -173,7 +174,7 @@ These mirror the thresholds already accepted for V1 CI performance certification
 
 Provider-neutral, executable Prometheus alerting rules are defined in `docs/operations/v1-alert-rules.prometheus.yml` (valid Prometheus rule-file YAML, importable into any Prometheus-compatible alerting system without modification). Every rule declares a warning threshold, a critical threshold, a bounded evaluation window (`for:`), and relies on Prometheus's built-in recovery semantics (an alert resolves once its expression is no longer true for the evaluation window) -- no rule fires on a single event.
 
-Covered conditions: service unavailable, repeated readiness failure, PostgreSQL unavailable, Redis unavailable, elevated 5xx rate, abnormal latency, notification worker repeatedly failing, and exporter/collector unhealthy.
+Covered conditions: service unavailable, repeated readiness failure, PostgreSQL unavailable, Redis unavailable, elevated 5xx rate, abnormal latency, notification worker repeatedly failing, exporter/collector unhealthy, credential replay, repeated workstation unlock failure, authorization-denial spikes, and organization join-code rejection spikes.
 
 ## Dashboard specification
 
@@ -262,7 +263,8 @@ The reference collector:
 - exposes a Prometheus-compatible collector endpoint on host
   `127.0.0.1:9464` only;
 - exposes collector health on host `127.0.0.1:13133` only;
-- emits only sampled/basic debug exporter output;
+- filters output to `medsphere_.*` application metrics plus target `up` health;
+- has no debug exporter, log receiver, or trace receiver in the Task 0049 production-reference configuration;
 - runs outside AIM's business-request path, so collector failure cannot alter
   authentication, inventory, reservations, or patient workflows.
 
@@ -271,21 +273,21 @@ networks exist. Operators may query `http://127.0.0.1:13133/` for collector
 health and `http://127.0.0.1:9464/metrics` for collector-exported metrics in a
 local or secured operator environment.
 
-This is **reference/local operational wiring**, not evidence that a production
-monitoring backend, retention policy, on-call route, or customer-facing SLA is
-live.
+Task 0049 adds a separate pinned Prometheus/Alertmanager production-reference
+layer in `compose/docker-compose.observability.yml` plus bounded local log
+rotation in `compose/docker-compose.logging-policy.yml`. Exact deployment,
+authenticated TLS ingress, real alert delivery, and customer-facing SLA claims
+still require Task 0050 evidence.
 
-## What still requires production deployment/vendor activation
+## Task 0049 deployment boundary
 
-This foundation does **not** claim centralized production monitoring is operational. The following remain external, deployment-only steps:
+The repository now contains the concrete Collector -> Prometheus -> Alertmanager reference stack and alert routing policy. Prometheus metrics are bounded to 30 days / 10 GB, Alertmanager state to 30 days, and local runtime logs use the bounded rotating Docker local driver when the Task 0049 logging override is applied.
 
-- deploying and operating an actual Prometheus-compatible collector/backend (or OTLP-compatible collector) to scrape `/metrics` or receive pushed exports;
-- configuring real alert routing/on-call paging (e.g. Alertmanager, PagerDuty, Opsgenie) to consume `docs/operations/v1-alert-rules.prometheus.yml`;
-- building and publishing the actual dashboard described above in a real visualization tool;
-- distributed tracing and external APM remain out of scope for this task, as stated in the original runbook;
-- converting the initial engineering SLO targets above into any customer-facing SLA is a separate business/legal decision, not a code change.
+The monitoring UIs/APIs intentionally have no host ports. Any operator access must be added through an authenticated TLS ingress. Alert delivery uses a secret-file HTTPS destination validated by `pnpm observability:validate-alert-secret`.
 
-Do not claim centralized production monitoring is operational until an actual collector/backend has been deployed and a real end-to-end scrape or export has been tested against it.
+Task 0050 must still provide real-environment evidence: deploy the stack, prove scrape/export and alert delivery, execute the synthetic incident drill, validate authenticated TLS access and outage behavior, and capture go/no-go evidence. Distributed tracing/external APM and any customer-facing SLA remain separate decisions.
+
+The canonical Task 0049 activation, security-monitoring, retention and de-identified analytics rules are documented in `docs/operations/task-0049-production-telemetry-security-analytics.md`.
 
 ## Validation (extends the section above)
 
