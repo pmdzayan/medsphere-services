@@ -10,7 +10,26 @@
       "/register": 198000,
       "/search": 200000
     },
-    "note": "Observed from the exact-authoritative Task 0058 post-merge quality-gate production build. These are build-reported first-load JS sizes, not wire-transfer bytes."
+    "note": "Observed from the exact-authoritative Task 0058 post-merge quality-gate production build. These are build-reported first-load JS sizes, not wire-transfer bytes.",
+    "measuredWireRun": 36164971346,
+    "measuredWireBytes": {
+      "/": 217925,
+      "/login": 237164,
+      "/register": 227000,
+      "/search": 225399
+    },
+    "measuredRequests": {
+      "/": 12,
+      "/login": 14,
+      "/register": 13,
+      "/search": 10
+    },
+    "measuredReadyMs": {
+      "/": 2105,
+      "/login": 2206,
+      "/register": 2164,
+      "/search": 1947
+    }
   },
   "slowNetworkProfile": {
     "name": "constrained-mobile",
@@ -21,27 +40,27 @@
   "publicRouteBudgets": [
     {
       "path": "/",
-      "maxColdTransferBytes": 450000,
-      "maxRequests": 28,
-      "maxReadyMs": 10000
+      "maxColdTransferBytes": 300000,
+      "maxRequests": 20,
+      "maxReadyMs": 5000
     },
     {
       "path": "/login",
-      "maxColdTransferBytes": 450000,
-      "maxRequests": 28,
-      "maxReadyMs": 10000
+      "maxColdTransferBytes": 300000,
+      "maxRequests": 20,
+      "maxReadyMs": 5000
     },
     {
       "path": "/register",
-      "maxColdTransferBytes": 450000,
-      "maxRequests": 28,
-      "maxReadyMs": 10000
+      "maxColdTransferBytes": 300000,
+      "maxRequests": 20,
+      "maxReadyMs": 5000
     },
     {
       "path": "/search",
-      "maxColdTransferBytes": 450000,
-      "maxRequests": 28,
-      "maxReadyMs": 10000
+      "maxColdTransferBytes": 300000,
+      "maxRequests": 20,
+      "maxReadyMs": 5000
     }
   ],
   "cachePolicy": {
