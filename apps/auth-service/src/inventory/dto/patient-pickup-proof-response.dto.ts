@@ -5,7 +5,8 @@ export class PatientPickupProofResponseDto {
   reservationId!: string;
 
   @ApiProperty({
-    description: 'One-time pickup proof. Returned only in this response and never persisted in plaintext.',
+    description:
+      'One-time pickup proof. Returned only in this response and never persisted in plaintext.',
     minLength: 32,
     maxLength: 32,
   })
