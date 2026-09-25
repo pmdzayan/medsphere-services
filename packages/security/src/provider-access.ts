@@ -65,3 +65,74 @@ export async function requireActiveTenantActorWithProvider(
   await assertActiveTenantMembership(transaction, actor);
   await assertTrustedProviderAccess(transaction, actor, providerId);
 }
+
+
+/**
+ * Task 0051 — explicit subordinate location scope.
+ *
+ * Provider access remains the required coarse authority. This helper is for
+ * workflows that additionally require a membership to be explicitly assigned
+ * to one active location; absence of a location-scope row is denied rather than
+ * interpreted as implicit access.
+ */
+export async function assertTrustedProviderLocationAccess(
+  database: Pick<
+    Prisma.TransactionClient,
+    'membershipProviderAccess' | 'membershipProviderLocationAccess'
+  >,
+  actor: TrustedTenantActor,
+  providerId: string,
+  locationId: string,
+  notFoundMessage = 'Provider location not found',
+): Promise<void> {
+  await assertTrustedProviderAccess(database, actor, providerId);
+  const access = await database.membershipProviderLocationAccess.findFirst({
+    where: {
+      tenantId: actor.tenantId,
+      membershipId: actor.membershipId,
+      providerId,
+      locationId,
+      location: {
+        isActive: true,
+        deletedAt: null,
+      },
+    },
+    select: { id: true },
+  });
+  if (!access) {
+    throw new NotFoundException(notFoundMessage);
+  }
+}
+
+/**
+ * Task 0051 — explicit subordinate department scope. Like location scope,
+ * this never replaces or broadens MembershipProviderAccess.
+ */
+export async function assertTrustedProviderDepartmentAccess(
+  database: Pick<
+    Prisma.TransactionClient,
+    'membershipProviderAccess' | 'membershipProviderDepartmentAccess'
+  >,
+  actor: TrustedTenantActor,
+  providerId: string,
+  departmentId: string,
+  notFoundMessage = 'Provider department not found',
+): Promise<void> {
+  await assertTrustedProviderAccess(database, actor, providerId);
+  const access = await database.membershipProviderDepartmentAccess.findFirst({
+    where: {
+      tenantId: actor.tenantId,
+      membershipId: actor.membershipId,
+      providerId,
+      departmentId,
+      department: {
+        isActive: true,
+        deletedAt: null,
+      },
+    },
+    select: { id: true },
+  });
+  if (!access) {
+    throw new NotFoundException(notFoundMessage);
+  }
+}
