@@ -12,6 +12,7 @@ on:
   workflow_dispatch: {}
   push:
     branches:
+      - feature/database-architecture
       - cto/v1-performance-reliability-certification
   pull_request:
     branches:
