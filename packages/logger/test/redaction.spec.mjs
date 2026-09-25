@@ -28,10 +28,15 @@ test('recognizes sensitive metadata keys without treating ordinary fields as sec
   assert.equal(isSensitiveLogKey('tenantId'), true);
   assert.equal(isSensitiveLogKey('userId'), true);
   assert.equal(isSensitiveLogKey('providerId'), true);
+  assert.equal(isSensitiveLogKey('reservationId'), true);
+  assert.equal(isSensitiveLogKey('saleId'), true);
   assert.equal(isSensitiveLogKey('email'), true);
   assert.equal(isSensitiveLogKey('phone'), true);
+  assert.equal(isSensitiveLogKey('ipAddress'), true);
+  assert.equal(isSensitiveLogKey('userAgent'), true);
 
   assert.equal(isSensitiveLogKey('requestId'), false);
+  assert.equal(isSensitiveLogKey('correlationId'), false);
   assert.equal(isSensitiveLogKey('statusCode'), false);
   assert.equal(isSensitiveLogKey('durationMs'), false);
   assert.equal(isSensitiveLogKey('tokenCount'), false);
@@ -68,7 +73,7 @@ test('redacts nested credentials while preserving safe operational metadata', ()
     },
     headers: {
       authorization: LOG_REDACTED_VALUE,
-      'user-agent': 'synthetic-test-agent',
+      'user-agent': LOG_REDACTED_VALUE,
     },
   });
 });
