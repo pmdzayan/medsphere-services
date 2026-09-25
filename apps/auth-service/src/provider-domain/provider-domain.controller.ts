@@ -2,7 +2,6 @@ import {
   Body,
   Controller,
   Get,
-  Header,
   Param,
   ParseUUIDPipe,
   Post,
@@ -33,7 +32,6 @@ const uuid = new ParseUUIDPipe({ version: '4' });
 @ApiTags('provider-domains')
 @Controller('provider-domains')
 @UseGuards(PermissionsGuard)
-@Header('Cache-Control', 'private, no-store')
 export class ProviderDomainController {
   constructor(private readonly providerDomains: ProviderDomainService) {}
 
