@@ -144,17 +144,14 @@ describe('PharmacyProfileWorkspace', () => {
       expect(screen.getByText('Official verification sources')).toBeInTheDocument(),
     );
 
-    const drugsControl = screen.getByRole('link', {
-      name: 'Open official source',
-    });
-    expect(drugsControl).toHaveAttribute('target', '_blank');
+    const officialLinks = screen.getAllByRole('link', { name: 'Open official source' });
+    expect(officialLinks[0]).toHaveAttribute('target', '_blank');
     expect(
       screen.getByText('Tamil Nadu Drugs Control — drug sales licensing'),
     ).toBeInTheDocument();
     expect(screen.getByText('Tamil Nadu Pharmacy Council')).toBeInTheDocument();
 
-    const links = screen.getAllByRole('link', { name: 'Open official source' });
-    expect(links.map((link) => link.getAttribute('href'))).toEqual([
+    expect(officialLinks.map((link) => link.getAttribute('href'))).toEqual([
       'https://drugscontrol.tn.gov.in/sales_services.html',
       'https://tnpc.ac.in/',
     ]);
