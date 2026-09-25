@@ -1,0 +1,50 @@
+name: Task 0059 Formatting Repair
+
+on:
+  push:
+    branches:
+      - cto/0059-network-low-bandwidth-efficiency
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: cto/0059-network-low-bandwidth-efficiency
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.12.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Format Task 0059 files
+        run: |
+          pnpm exec prettier --write \
+            docs/adr/README.md \
+            docs/architecture/network-efficiency-budget.json \
+            docs/operations/task-0059-network-low-bandwidth-efficiency.md \
+            PROJECT_RULES.md \
+            scripts/network-efficiency-boundary-check.spec.mjs
+          git diff --check
+      - name: Commit formatting
+        run: |
+          if git diff --quiet; then exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            docs/adr/README.md \
+            docs/architecture/network-efficiency-budget.json \
+            docs/operations/task-0059-network-low-bandwidth-efficiency.md \
+            PROJECT_RULES.md \
+            scripts/network-efficiency-boundary-check.spec.mjs
+          git commit -m "style: format Task 0059 files"
+          git push origin HEAD:cto/0059-network-low-bandwidth-efficiency
