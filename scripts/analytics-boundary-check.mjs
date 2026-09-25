@@ -7,9 +7,14 @@ const migrationPath = path.join(
   root,
   'packages/database/prisma/migrations/20260925123000_task_0049_telemetry_security_analytics_boundary/migration.sql',
 );
+const grantPath = path.join(
+  root,
+  'packages/database/scripts/task-0049-bi-reader-grants.sql',
+);
 
 export function checkAnalyticsBoundary(
   source = fs.readFileSync(migrationPath, 'utf8'),
+  grants = fs.readFileSync(grantPath, 'utf8'),
 ) {
   const failures = [];
 
@@ -53,6 +58,21 @@ export function checkAnalyticsBoundary(
   }
   if (/GRANT[\s\S]*ON\s+(?:TABLE\s+)?public\./i.test(source)) {
     failures.push('Analytics migration grants access to OLTP public-schema tables.');
+  }
+
+  const grantRequirements = [
+    'ALTER ROLE aim_bi_reader SET default_transaction_read_only = on',
+    'REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM aim_bi_reader',
+    'REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public FROM aim_bi_reader',
+    'REVOKE CREATE ON SCHEMA public FROM aim_bi_reader',
+    'GRANT USAGE ON SCHEMA aim_analytics TO aim_bi_reader',
+    'GRANT SELECT ON aim_analytics.daily_audit_activity TO aim_bi_reader',
+  ];
+  for (const value of grantRequirements) {
+    if (!grants.includes(value)) failures.push(`Missing BI least-privilege invariant: ${value}`);
+  }
+  if (/CREATE\s+ROLE|PASSWORD|GRANT\s+(?:INSERT|UPDATE|DELETE|ALL)\b/i.test(grants)) {
+    failures.push('BI grant script creates credentials or grants write-capable privileges.');
   }
 
   return failures;
