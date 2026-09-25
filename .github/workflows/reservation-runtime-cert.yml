@@ -4,6 +4,7 @@ on:
   workflow_dispatch: {}
   push:
     branches:
+      - feature/database-architecture
       - cto/runtime-cert-reservations
   pull_request:
     branches:
