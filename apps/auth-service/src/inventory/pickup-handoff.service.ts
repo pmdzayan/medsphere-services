@@ -80,7 +80,13 @@ export class PickupHandoffService {
         );
 
         const pickupToken = reservation.pickupToken
-          ? await this.rotateToken(transaction, reservation.pickupToken, tokenHash, occurredAt, expiresAt)
+          ? await this.rotateToken(
+              transaction,
+              reservation.pickupToken,
+              tokenHash,
+              occurredAt,
+              expiresAt,
+            )
           : await transaction.medicinePickupToken.create({
               data: {
                 id: randomUUID(),
@@ -270,7 +276,11 @@ export class PickupHandoffService {
 
   private async rotateToken(
     transaction: Prisma.TransactionClient,
-    current: { readonly id: string; readonly tokenVersion: number; readonly consumedAt: Date | null },
+    current: {
+      readonly id: string;
+      readonly tokenVersion: number;
+      readonly consumedAt: Date | null;
+    },
     tokenHash: string,
     issuedAt: Date,
     expiresAt: Date,
