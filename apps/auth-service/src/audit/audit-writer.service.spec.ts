@@ -150,7 +150,7 @@ describe('AuditWriter', () => {
     expect(create).not.toHaveBeenCalled();
   });
 
-  it('emits a bounded security metric only after audit persistence succeeds', async () => {
+  it('emits a bounded security metric only after the audit create succeeds', async () => {
     const before =
       appMetrics.securityEventTotal
         .samples()
