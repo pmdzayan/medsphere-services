@@ -423,7 +423,9 @@ function isProviderAccess(value: unknown): value is ProviderAccess {
     isCanonicalUuid(provider.membershipId) &&
     isCanonicalUuid(provider.providerId) &&
     isBoundedString(provider.businessName, 200) &&
-    (['PHARMACY', 'HOSPITAL', 'CLINIC', 'LABORATORY', 'DOCTOR'] as const).includes(provider.providerType as never) &&
+    (['PHARMACY', 'HOSPITAL', 'CLINIC', 'LABORATORY', 'DOCTOR'] as const).includes(
+      provider.providerType as never,
+    ) &&
     typeof provider.isActive === 'boolean'
   );
 }

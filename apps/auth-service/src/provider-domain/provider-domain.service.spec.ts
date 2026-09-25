@@ -120,10 +120,7 @@ function buildHarness(options?: {
   const audit = {
     appendTenantUser: jest.fn().mockResolvedValue(undefined),
   };
-  const service = new ProviderDomainService(
-    { client } as never,
-    audit as never,
-  );
+  const service = new ProviderDomainService({ client } as never, audit as never);
   return { service, transaction, client, audit, providerId, locationId, professionalMembershipId };
 }
 

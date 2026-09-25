@@ -115,7 +115,9 @@ export function isProviderAccessAssignment(value: unknown): value is ProviderAcc
     isCanonicalUuid(value.membershipId) &&
     isCanonicalUuid(value.providerId) &&
     isBoundedString(value.businessName, 240) &&
-    (['PHARMACY', 'HOSPITAL', 'CLINIC', 'LABORATORY', 'DOCTOR'] as const).includes(value.providerType as never) &&
+    (['PHARMACY', 'HOSPITAL', 'CLINIC', 'LABORATORY', 'DOCTOR'] as const).includes(
+      value.providerType as never,
+    ) &&
     typeof value.isActive === 'boolean'
   );
 }

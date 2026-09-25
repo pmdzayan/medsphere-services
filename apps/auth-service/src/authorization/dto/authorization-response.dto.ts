@@ -160,7 +160,6 @@ export class ProviderStaffListResponseDto {
   offset!: number;
 }
 
-
 export class ProviderLocationScopeResponseDto {
   @ApiProperty({ format: 'uuid' })
   locationId!: string;

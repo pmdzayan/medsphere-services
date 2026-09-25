@@ -123,7 +123,9 @@ export class ProviderDomainService {
         select: { id: true },
       });
       await tx.membershipProviderAccess.createMany({
-        data: [{ tenantId: actor.tenantId, membershipId: actor.membershipId, providerId: provider.id }],
+        data: [
+          { tenantId: actor.tenantId, membershipId: actor.membershipId, providerId: provider.id },
+        ],
         skipDuplicates: true,
       });
       await this.audit.appendTenantUser(tx, {

@@ -66,7 +66,6 @@ export async function requireActiveTenantActorWithProvider(
   await assertTrustedProviderAccess(transaction, actor, providerId);
 }
 
-
 /**
  * Task 0051 — explicit subordinate location scope.
  *

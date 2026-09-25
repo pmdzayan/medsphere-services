@@ -128,8 +128,16 @@ export const AUDIT_METADATA_KEYS = {
   'authorization.assignment.removed': ['targetMembershipId', 'roleName'],
   'authorization.provider-access.added': ['targetMembershipId', 'providerId'],
   'authorization.provider-access.removed': ['targetMembershipId', 'providerId'],
-  'authorization.provider-location-access.added': ['targetMembershipId', 'providerId', 'locationId'],
-  'authorization.provider-location-access.removed': ['targetMembershipId', 'providerId', 'locationId'],
+  'authorization.provider-location-access.added': [
+    'targetMembershipId',
+    'providerId',
+    'locationId',
+  ],
+  'authorization.provider-location-access.removed': [
+    'targetMembershipId',
+    'providerId',
+    'locationId',
+  ],
   'authorization.provider-department-access.added': [
     'targetMembershipId',
     'providerId',

@@ -50,7 +50,11 @@ const AUDIT_METADATA_KEYS: Readonly<Record<AuditEventType, readonly string[]>> =
   'authorization.role.deleted': ['roleName', 'roleVersion'],
   'authorization.assignment.added': ['targetMembershipId', 'roleName'],
   'authorization.assignment.removed': ['targetMembershipId', 'roleName'],
-  'authorization.provider-location-access.added': ['targetMembershipId', 'providerId', 'locationId'],
+  'authorization.provider-location-access.added': [
+    'targetMembershipId',
+    'providerId',
+    'locationId',
+  ],
   'authorization.provider-location-access.removed': [
     'targetMembershipId',
     'providerId',

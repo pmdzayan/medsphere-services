@@ -269,7 +269,9 @@ export class AuthorizationController {
 
   @Get('memberships/:membershipId/provider-access/:providerId/scopes')
   @RequirePermissions(PERMISSIONS.providerAccessRead)
-  @ApiOperation({ summary: 'List active location and department scopes for one provider assignment' })
+  @ApiOperation({
+    summary: 'List active location and department scopes for one provider assignment',
+  })
   @ApiOkResponse({ type: ProviderScopeResponseDto })
   listProviderScopes(
     @CurrentIdentity() identity: AuthenticatedIdentity,

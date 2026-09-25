@@ -87,7 +87,6 @@ test('requireActiveTenantActorWithProvider composes membership and provider boun
   );
 });
 
-
 test('Task 0051 location scope requires both coarse provider access and explicit active location access', async () => {
   const db = {
     membershipProviderAccess: { findFirst: async () => ({ id: 'provider-access-1' }) },
