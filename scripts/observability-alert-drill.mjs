@@ -30,8 +30,7 @@ export function buildSyntheticIncidentDrill(now = new Date()) {
       },
       annotations: {
         summary: 'AIM observability incident drill',
-        description:
-          'Synthetic operator-initiated alert. Contains no patient, tenant, provider, medicine, or user data.',
+        description: 'Synthetic operator-initiated alert using a fixed non-domain payload.',
       },
       startsAt: now.toISOString(),
       endsAt: endsAt.toISOString(),
