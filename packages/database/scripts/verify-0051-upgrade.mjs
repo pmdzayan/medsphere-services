@@ -236,7 +236,7 @@ BEGIN
   VALUES
     ('${professionalProfileId}','${tenantId}','${doctorProviderId}','${userId}','REG-0051','Task Medical Council',1,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP);
 
-  IF (SELECT "businessRegistrationNumber" IS_NULLABLE
+  IF (SELECT is_nullable
       FROM information_schema.columns
       WHERE table_schema='public'
         AND table_name='ProviderVerification'
