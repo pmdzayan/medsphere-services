@@ -99,7 +99,7 @@ export interface ProviderAccessAssignment {
   readonly membershipId: string;
   readonly providerId: string;
   readonly businessName: string;
-  readonly providerType: 'PHARMACY' | 'HOSPITAL';
+  readonly providerType: 'PHARMACY' | 'HOSPITAL' | 'CLINIC' | 'LABORATORY' | 'DOCTOR';
   readonly isActive: boolean;
 }
 
@@ -115,7 +115,7 @@ export function isProviderAccessAssignment(value: unknown): value is ProviderAcc
     isCanonicalUuid(value.membershipId) &&
     isCanonicalUuid(value.providerId) &&
     isBoundedString(value.businessName, 240) &&
-    (value.providerType === 'PHARMACY' || value.providerType === 'HOSPITAL') &&
+    (['PHARMACY', 'HOSPITAL', 'CLINIC', 'LABORATORY', 'DOCTOR'] as const).includes(value.providerType as never) &&
     typeof value.isActive === 'boolean'
   );
 }
