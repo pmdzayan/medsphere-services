@@ -288,7 +288,7 @@ describe('AuthorizationService', () => {
     );
   });
 
-  it('does not expose staff for a hospital or a provider outside the tenant', async () => {
+  it('Task 0051 exposes hospital staff through the shared provider boundary but still conceals out-of-tenant providers', async () => {
     const providerId = randomUUID();
     repository.findProvider
       .mockResolvedValueOnce({
@@ -298,10 +298,14 @@ describe('AuthorizationService', () => {
         isActive: true,
       })
       .mockResolvedValueOnce(null);
+    repository.listProviderMembers.mockResolvedValueOnce({
+      data: [],
+      total: 0,
+    } as never);
 
     await expect(
       service.listProviderMembers(identity, providerId, { limit: 50, offset: 0 }),
-    ).rejects.toBeInstanceOf(NotFoundException);
+    ).resolves.toEqual({ data: [], total: 0, limit: 50, offset: 0 });
     await expect(
       service.listProviderMembers(identity, providerId, { limit: 50, offset: 0 }),
     ).rejects.toBeInstanceOf(NotFoundException);
@@ -311,7 +315,7 @@ describe('AuthorizationService', () => {
       providerId,
       true,
     );
-    expect(repository.listProviderMembers).not.toHaveBeenCalled();
+    expect(repository.listProviderMembers).toHaveBeenCalledTimes(1);
   });
 
   it('removes provider access and its audit evidence atomically', async () => {
