@@ -6,8 +6,20 @@ import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const compose = fs.readFileSync(path.join(root, 'compose/docker-compose.services.yml'), 'utf8');
+const productionCompose = fs.readFileSync(
+  path.join(root, 'compose/docker-compose.observability.yml'),
+  'utf8',
+);
 const config = fs.readFileSync(
   path.join(root, 'compose/observability/otel-collector-config.yml'),
+  'utf8',
+);
+const prometheus = fs.readFileSync(
+  path.join(root, 'compose/observability/prometheus.yml'),
+  'utf8',
+);
+const alertmanager = fs.readFileSync(
+  path.join(root, 'compose/observability/alertmanager.yml'),
   'utf8',
 );
 
@@ -17,7 +29,7 @@ describe('AIM OpenTelemetry Collector boundary', () => {
     assert.doesNotMatch(compose, /otel\/opentelemetry-collector-contrib:latest/);
   });
 
-  it('binds operator endpoints to localhost only', () => {
+  it('binds collector operator endpoints to localhost only', () => {
     assert.match(compose, /127\.0\.0\.1:9464:9464/);
     assert.match(compose, /127\.0\.0\.1:13133:13133/);
   });
@@ -28,9 +40,47 @@ describe('AIM OpenTelemetry Collector boundary', () => {
     assert.doesNotMatch(config, /patient|medicine|email|phone|tenantId|userId/i);
   });
 
-  it('places memory limiting and batching before export', () => {
-    assert.match(config, /memory_limiter:/);
-    assert.match(config, /batch:/);
-    assert.match(config, /exporters:[\s\S]*prometheus:/);
+  it('filters collector output to AIM metrics and target health before export', () => {
+    assert.match(config, /filter\/aim_metrics:/);
+    assert.match(config, /\^medsphere_\.\*/);
+    assert.match(config, /\^up\$/);
+    assert.match(
+      config,
+      /processors:[\s\S]*memory_limiter[\s\S]*filter\/aim_metrics[\s\S]*batch/,
+    );
+    assert.doesNotMatch(config, /namespace:\s*aim/);
+    assert.doesNotMatch(config, /debug:/);
+  });
+});
+
+describe('Task 0049 production metrics and alerting boundary', () => {
+  it('pins stable Prometheus and Alertmanager images with explicit retention', () => {
+    assert.match(productionCompose, /prom\/prometheus:v3\.14\.0/);
+    assert.match(productionCompose, /prom\/alertmanager:v0\.34\.1/);
+    assert.match(productionCompose, /--storage\.tsdb\.retention\.time=30d/);
+    assert.match(productionCompose, /--storage\.tsdb\.retention\.size=10GB/);
+    assert.match(productionCompose, /--data\.retention=720h/);
+    assert.doesNotMatch(productionCompose, /:latest/);
+  });
+
+  it('keeps Prometheus and Alertmanager off host ports', () => {
+    assert.match(productionCompose, /aim-prometheus:[\s\S]*expose:[\s\S]*'9090'/);
+    assert.match(productionCompose, /aim-alertmanager:[\s\S]*expose:[\s\S]*'9093'/);
+    assert.doesNotMatch(productionCompose, /(?:^|\n)\s*ports:\s*\n/);
+  });
+
+  it('scrapes the collector instead of the application database or protected routes', () => {
+    assert.match(prometheus, /aim-otel-collector:9464/);
+    assert.match(prometheus, /metric_relabel_configs:/);
+    assert.match(prometheus, /\(medsphere_\.\+\|up\)/);
+    assert.doesNotMatch(prometheus, /postgres|database|patient|medicine|tenant|user/i);
+  });
+
+  it('routes alerts by severity using a secret-backed webhook URL', () => {
+    assert.match(alertmanager, /severity="critical"/);
+    assert.match(alertmanager, /receiver:\s*aim-critical/);
+    assert.match(alertmanager, /receiver:\s*aim-warning/);
+    assert.match(alertmanager, /url_file:\s*\/run\/secrets\/aim-alert-webhook-url/);
+    assert.doesNotMatch(alertmanager, /https?:\/\//);
   });
 });
