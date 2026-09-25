@@ -22,6 +22,10 @@ const alertmanager = fs.readFileSync(
   path.join(root, 'compose/observability/alertmanager.yml'),
   'utf8',
 );
+const loggingPolicy = fs.readFileSync(
+  path.join(root, 'compose/docker-compose.logging-policy.yml'),
+  'utf8',
+);
 
 describe('AIM OpenTelemetry Collector boundary', () => {
   it('pins the collector image rather than using latest', () => {
@@ -82,5 +86,20 @@ describe('Task 0049 production metrics and alerting boundary', () => {
     assert.match(alertmanager, /receiver:\s*aim-warning/);
     assert.match(alertmanager, /url_file:\s*\/run\/secrets\/aim-alert-webhook-url/);
     assert.doesNotMatch(alertmanager, /https?:\/\//);
+  });
+
+  it('bounds local logs for accepted runtime and monitoring services', () => {
+    assert.match(loggingPolicy, /driver:\s*local/);
+    assert.match(loggingPolicy, /max-size:\s*20m/);
+    assert.match(loggingPolicy, /max-file:\s*'10'/);
+    for (const service of [
+      'auth-service',
+      'notification-worker',
+      'aim-otel-collector',
+      'aim-prometheus',
+      'aim-alertmanager',
+    ]) {
+      assert.match(loggingPolicy, new RegExp(`\\n  ${service}:\\n    logging:`));
+    }
   });
 });
