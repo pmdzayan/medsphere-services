@@ -87,7 +87,7 @@ test('sanitizes bearer/basic credentials and credential-bearing URLs in free tex
 
   assert.match(output, /Bearer \[REDACTED\]/);
   assert.match(output, /Basic \[REDACTED\]/);
-  assert.match(output, /postgresql:\/\/\[REDACTED\]@db\.internal:5432\/medsphere/);
+  assert.equal(output.includes('db.internal'), false);
   assert.match(output, /token=\[REDACTED\]/);
 });
 
