@@ -43,6 +43,7 @@ const ALLOWED_LABEL_KEYS = new Set([
   'outcome',
   'channel',
   'provider',
+  'category',
 ]);
 
 export type MetricLabels = Readonly<Record<string, string>>;
@@ -240,6 +241,10 @@ export class MetricsRegistry {
     'medsphere_metrics_exporter_failures_total',
     'Total telemetry exporter failures',
   );
+  readonly securityEventTotal = new Counter(
+    'medsphere_security_event_total',
+    'Total security-relevant audit events by bounded category and outcome',
+  );
 
   private readonly counters: Counter[] = [
     this.httpRequestsTotal,
@@ -252,6 +257,7 @@ export class MetricsRegistry {
     this.availabilityResponseTotal,
     this.availabilityExpirationTotal,
     this.exporterFailuresTotal,
+    this.securityEventTotal,
   ];
 
   private readonly histograms: Histogram[] = [
