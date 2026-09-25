@@ -186,12 +186,13 @@ export class SubmitPharmacyVerificationDto {
   @IsDateString({ strict: true })
   licenseExpiryDate!: string;
 
-  @ApiProperty({ minLength: 1, maxLength: 120 })
+  @ApiPropertyOptional({ minLength: 1, maxLength: 120 })
+  @IsOptional()
   @Transform(trimString)
   @IsString()
   @MinLength(1)
   @MaxLength(120)
-  businessRegistrationNumber!: string;
+  businessRegistrationNumber?: string;
 
   /**
    * A bounded, opaque evidence reference -- NOT a document upload and
@@ -279,8 +280,8 @@ export class PlatformVerificationDetailResponseDto {
   @ApiProperty({ format: 'date-time' })
   licenseExpiryDate!: Date;
 
-  @ApiProperty()
-  businessRegistrationNumber!: string;
+  @ApiPropertyOptional({ nullable: true })
+  businessRegistrationNumber!: string | null;
 
   @ApiProperty()
   governmentIdReference!: string;
