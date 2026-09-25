@@ -66,10 +66,7 @@ export function WorkstationAppearanceProvider({
     window.localStorage.setItem(STORAGE_KEY, nextPreference);
   }
 
-  const value = useMemo(
-    () => ({ preference, resolved, setPreference }),
-    [preference, resolved],
-  );
+  const value = useMemo(() => ({ preference, resolved, setPreference }), [preference, resolved]);
 
   return (
     <WorkstationAppearanceContext.Provider value={value}>
@@ -81,9 +78,7 @@ export function WorkstationAppearanceProvider({
 export function useWorkstationAppearance(): WorkstationAppearanceContextValue {
   const value = useContext(WorkstationAppearanceContext);
   if (!value) {
-    throw new Error(
-      'useWorkstationAppearance must be used within WorkstationAppearanceProvider.',
-    );
+    throw new Error('useWorkstationAppearance must be used within WorkstationAppearanceProvider.');
   }
   return value;
 }
