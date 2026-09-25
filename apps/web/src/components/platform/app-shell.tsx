@@ -13,6 +13,7 @@ import {
 } from '@/lib/auth-contract';
 import type { SessionProfile } from '@/lib/session-profile';
 import { PlatformBrand } from './brand';
+import { useWorkstationAppearance } from './workstation-appearance';
 import { Icon, type IconName } from './icon';
 
 const primaryNavigation: NavigationItem[] = [
@@ -42,6 +43,8 @@ export function AppShell({
 }>) {
   const pathname = usePathname();
   const { t } = useLanguage();
+  const { preference: appearancePreference, setPreference: setAppearancePreference } =
+    useWorkstationAppearance();
   const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
@@ -468,6 +471,32 @@ export function AppShell({
                       <p className="mt-1 truncate text-[10px] text-[#75857f]">
                         {session.context.tenantName}
                       </p>
+                    </div>
+                    <div className="border-b border-[#edf1ef] px-3 py-3">
+                      <p className="text-[10px] font-bold uppercase tracking-[.16em] text-[#71817c]">
+                        {t('workstation.appearance.label')}
+                      </p>
+                      <div
+                        className="mt-2 grid grid-cols-3 gap-1"
+                        role="group"
+                        aria-label={t('workstation.appearance.label')}
+                      >
+                        {(['system', 'light', 'dark'] as const).map((option) => (
+                          <button
+                            key={option}
+                            type="button"
+                            aria-pressed={appearancePreference === option}
+                            onClick={() => setAppearancePreference(option)}
+                            className={`min-h-11 rounded-lg px-2 text-[11px] font-bold transition ${
+                              appearancePreference === option
+                                ? 'organization-theme-soft'
+                                : 'text-[#52655e] hover:bg-[#f3f6f4]'
+                            }`}
+                          >
+                            {t(`workstation.appearance.${option}`)}
+                          </button>
+                        ))}
+                      </div>
                     </div>
                     <button
                       type="button"
