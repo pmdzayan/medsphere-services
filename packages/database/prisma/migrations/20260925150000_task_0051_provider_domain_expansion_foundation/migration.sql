@@ -149,19 +149,19 @@ CREATE TABLE "MembershipProviderLocationAccess" (
     FOREIGN KEY ("membershipId", "tenantId") REFERENCES "TenantMembership"("id", "tenantId") ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT "MembershipProviderLocationAccess_providerId_tenantId_fkey"
     FOREIGN KEY ("providerId", "tenantId") REFERENCES "Provider"("id", "tenantId") ON DELETE RESTRICT ON UPDATE CASCADE,
-  CONSTRAINT "MembershipProviderLocationAccess_providerAccess_fkey"
+  CONSTRAINT "MembershipProviderLocationAccess_tenantId_membershipId_pro_fkey"
     FOREIGN KEY ("tenantId", "membershipId", "providerId")
     REFERENCES "MembershipProviderAccess"("tenantId", "membershipId", "providerId") ON DELETE CASCADE ON UPDATE CASCADE,
-  CONSTRAINT "MembershipProviderLocationAccess_location_fkey"
+  CONSTRAINT "MembershipProviderLocationAccess_locationId_tenantId_provi_fkey"
     FOREIGN KEY ("locationId", "tenantId", "providerId")
     REFERENCES "ProviderLocation"("id", "tenantId", "providerId") ON DELETE RESTRICT ON UPDATE CASCADE
 );
 
 CREATE UNIQUE INDEX "MembershipProviderLocationAccess_membershipId_locationId_key"
   ON "MembershipProviderLocationAccess" ("membershipId", "locationId");
-CREATE INDEX "MembershipProviderLocationAccess_tenantId_membershipId_providerId_idx"
+CREATE INDEX "MembershipProviderLocationAccess_tenantId_membershipId_prov_idx"
   ON "MembershipProviderLocationAccess" ("tenantId", "membershipId", "providerId");
-CREATE INDEX "MembershipProviderLocationAccess_tenantId_providerId_locationId_idx"
+CREATE INDEX "MembershipProviderLocationAccess_tenantId_providerId_locati_idx"
   ON "MembershipProviderLocationAccess" ("tenantId", "providerId", "locationId");
 
 CREATE TABLE "MembershipProviderDepartmentAccess" (
@@ -179,19 +179,19 @@ CREATE TABLE "MembershipProviderDepartmentAccess" (
     FOREIGN KEY ("membershipId", "tenantId") REFERENCES "TenantMembership"("id", "tenantId") ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT "MembershipProviderDepartmentAccess_providerId_tenantId_fkey"
     FOREIGN KEY ("providerId", "tenantId") REFERENCES "Provider"("id", "tenantId") ON DELETE RESTRICT ON UPDATE CASCADE,
-  CONSTRAINT "MembershipProviderDepartmentAccess_providerAccess_fkey"
+  CONSTRAINT "MembershipProviderDepartmentAccess_tenantId_membershipId_p_fkey"
     FOREIGN KEY ("tenantId", "membershipId", "providerId")
     REFERENCES "MembershipProviderAccess"("tenantId", "membershipId", "providerId") ON DELETE CASCADE ON UPDATE CASCADE,
-  CONSTRAINT "MembershipProviderDepartmentAccess_department_fkey"
+  CONSTRAINT "MembershipProviderDepartmentAccess_departmentId_tenantId_p_fkey"
     FOREIGN KEY ("departmentId", "tenantId", "providerId")
     REFERENCES "ProviderDepartment"("id", "tenantId", "providerId") ON DELETE RESTRICT ON UPDATE CASCADE
 );
 
-CREATE UNIQUE INDEX "MembershipProviderDepartmentAccess_membershipId_departmentId_key"
+CREATE UNIQUE INDEX "MembershipProviderDepartmentAccess_membershipId_departmentI_key"
   ON "MembershipProviderDepartmentAccess" ("membershipId", "departmentId");
-CREATE INDEX "MembershipProviderDepartmentAccess_tenantId_membershipId_providerId_idx"
+CREATE INDEX "MembershipProviderDepartmentAccess_tenantId_membershipId_pr_idx"
   ON "MembershipProviderDepartmentAccess" ("tenantId", "membershipId", "providerId");
-CREATE INDEX "MembershipProviderDepartmentAccess_tenantId_providerId_departmentId_idx"
+CREATE INDEX "MembershipProviderDepartmentAccess_tenantId_providerId_depa_idx"
   ON "MembershipProviderDepartmentAccess" ("tenantId", "providerId", "departmentId");
 
 -- Keep the durable AuditEvent SQL allowlist in lockstep with the shared
