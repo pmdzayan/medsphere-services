@@ -16,7 +16,7 @@ groups:
   - name: medsphere-v1-availability
     rules:
       - alert: MedSphereServiceUnavailable
-        expr: up{job="medsphere-auth-service"} == 0
+        expr: up{job="aim-auth-service"} == 0
         for: 2m
         labels:
           severity: critical
@@ -146,6 +146,48 @@ groups:
         annotations:
           summary: 'Metrics exporter/collector appears unhealthy'
           description: 'More than 5 consecutive telemetry export failures in 15 minutes. This reflects telemetry pipeline health only, not necessarily a business-impacting outage.'
+
+  - name: medsphere-v1-security
+    rules:
+      - alert: AimCredentialReplayDetected
+        expr: |
+          sum(increase(medsphere_security_event_total{category="credential_replay"}[5m])) > 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: 'Credential replay evidence detected'
+          description: 'A refresh-credential replay event was recorded. Follow the security incident runbook; telemetry contains no user or tenant identifiers.'
+
+      - alert: AimRepeatedWorkstationUnlockFailure
+        expr: |
+          sum(increase(medsphere_security_event_total{category="workstation_unlock_failed"}[10m])) >= 5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: 'Repeated workstation unlock failures'
+          description: 'At least five failed workstation unlock events were recorded within ten minutes.'
+
+      - alert: AimAuthorizationDenialSpike
+        expr: |
+          sum(increase(medsphere_security_event_total{category="authorization_denied"}[5m])) >= 20
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: 'Authorization denial rate increased'
+          description: 'At least twenty authorization denials were recorded within five minutes. Investigate using the durable audit trail, not telemetry identifiers.'
+
+      - alert: AimJoinCodeRejectionSpike
+        expr: |
+          sum(increase(medsphere_security_event_total{category="join_code_rejected"}[10m])) >= 10
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: 'Organization join-code rejection rate increased'
+          description: 'At least ten join-code rejections were recorded within ten minutes.'
 
   - name: medsphere-v1-backup-recovery
     rules:
