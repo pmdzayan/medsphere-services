@@ -25,6 +25,12 @@ import type {
   PosProductQuote,
   PosSaleReceipt,
 } from '@/lib/pos-contract';
+import {
+  clearOfflinePosDraft,
+  enqueueOfflinePosDraft,
+  peekOfflinePosDraft,
+} from '@/lib/offline-pos-draft';
+import { revalidateOfflinePosDraft } from '@/lib/offline-pos-revalidation';
 import { calculatePosPreviewMoney, sumPosMoney } from '@/lib/pos-money';
 
 interface CartLine {
@@ -82,6 +88,10 @@ export function PosWorkspace() {
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const [checkoutKey, setCheckoutKey] = useState<{ signature: string; key: string } | null>(null);
+  const [online, setOnline] = useState(true);
+  const [offlineDraftState, setOfflineDraftState] = useState<
+    'idle' | 'saved' | 'revalidating' | 'ready' | 'conflict'
+  >('idle');
 
   const [receipt, setReceipt] = useState<PosSaleReceipt | null>(null);
   const [receiptActionLoading, setReceiptActionLoading] = useState(false);
@@ -153,6 +163,26 @@ export function PosWorkspace() {
     [permissions, t],
   );
 
+  const revalidateDraft = useCallback(async (selectedProviderId: string) => {
+    const draft = peekOfflinePosDraft(selectedProviderId);
+    if (!draft) return;
+
+    setOfflineDraftState('revalidating');
+    setCheckoutError(null);
+    try {
+      const refreshed = await revalidateOfflinePosDraft(draft, getPosProductQuote);
+      setCart(refreshed.lines);
+      setPlaceOfSupply(draft.placeOfSupplyStateCode);
+      setPaymentMethod(draft.paymentMethod);
+      setCheckoutKey(null);
+      clearOfflinePosDraft(selectedProviderId);
+      setOfflineDraftState(refreshed.hasConflict ? 'conflict' : 'ready');
+    } catch {
+      clearOfflinePosDraft(selectedProviderId);
+      setOfflineDraftState('conflict');
+    }
+  }, []);
+
   useEffect(() => void loadBoot(), [loadBoot]);
   useEffect(() => {
     if (!providerId) {
@@ -169,6 +199,28 @@ export function PosWorkspace() {
     setPickupToken('');
     void loadFiscal(providerId);
   }, [loadFiscal, providerId]);
+
+  useEffect(() => {
+    if (typeof navigator === 'undefined') return;
+
+    const handleOffline = () => setOnline(false);
+    const handleOnline = () => {
+      setOnline(true);
+      if (providerId) void revalidateDraft(providerId);
+    };
+
+    setOnline(navigator.onLine);
+    if (navigator.onLine && providerId && peekOfflinePosDraft(providerId)) {
+      void revalidateDraft(providerId);
+    }
+
+    window.addEventListener('offline', handleOffline);
+    window.addEventListener('online', handleOnline);
+    return () => {
+      window.removeEventListener('offline', handleOffline);
+      window.removeEventListener('online', handleOnline);
+    };
+  }, [providerId, revalidateDraft]);
 
   async function saveFiscal(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -357,6 +409,21 @@ export function PosWorkspace() {
     event.preventDefault();
     if (!providerId || !canCheckout || checkoutLoading || !preview || cart.length === 0) return;
 
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      const draft = enqueueOfflinePosDraft({
+        providerId,
+        lines: cart.map((line) => ({
+          productId: line.quote.productId,
+          quantity: line.quantity,
+        })),
+        placeOfSupplyStateCode: placeOfSupply.trim(),
+        paymentMethod,
+      });
+      setOfflineDraftState(draft ? 'saved' : 'conflict');
+      setCheckoutError(draft ? t('pos.offline.saved') : t('pos.offline.invalid'));
+      return;
+    }
+
     const commandWithoutKey = {
       lines: cart.map((line) => ({ productId: line.quote.productId, quantity: line.quantity })),
       payments: [
@@ -396,6 +463,8 @@ export function PosWorkspace() {
       setReceipt(completed);
       setCart([]);
       setProducts([]);
+      clearOfflinePosDraft(providerId);
+      setOfflineDraftState('idle');
       setCheckoutKey(null);
       setPaymentReference('');
       setCashTendered('');
@@ -452,6 +521,18 @@ export function PosWorkspace() {
 
   const selectedProvider = providers.find((provider) => provider.providerId === providerId);
   const fiscalProfile = fiscal?.fiscalProfile;
+  const resilienceMessage = !online
+    ? offlineDraftState === 'saved'
+      ? t('pos.offline.saved')
+      : t('pos.offline.banner')
+    : offlineDraftState === 'revalidating'
+      ? t('pos.offline.revalidating')
+      : offlineDraftState === 'ready'
+        ? t('pos.offline.ready')
+        : offlineDraftState === 'conflict'
+          ? t('pos.offline.conflict')
+          : null;
+
   const checkoutBlocked =
     !canCheckout ||
     checkoutLoading ||
@@ -823,6 +904,19 @@ export function PosWorkspace() {
           <form onSubmit={submitCheckout}>
             <Card>
               <h2 className="text-lg font-bold text-[#173128]">{t('pos.checkout.title')}</h2>
+              {resilienceMessage ? (
+                <div
+                  role="status"
+                  aria-live="polite"
+                  className={`mt-4 rounded-xl border p-3 text-sm font-semibold ${
+                    !online || offlineDraftState === 'conflict'
+                      ? 'border-amber-200 bg-amber-50 text-amber-800'
+                      : 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                  }`}
+                >
+                  {resilienceMessage}
+                </div>
+              ) : null}
               <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                 <Input
                   name="pos-place-of-supply"
@@ -969,7 +1063,7 @@ export function PosWorkspace() {
                   loadingLabel={t('pos.checkout.submitting')}
                   disabled={checkoutBlocked}
                 >
-                  {t('pos.checkout.submit')}
+                  {online ? t('pos.checkout.submit') : t('pos.offline.saveDraft')}
                 </Button>
               </div>
             </Card>
