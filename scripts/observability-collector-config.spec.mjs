@@ -26,6 +26,10 @@ const loggingPolicy = fs.readFileSync(
   path.join(root, 'compose/docker-compose.logging-policy.yml'),
   'utf8',
 );
+const alertRules = fs.readFileSync(
+  path.join(root, 'docs/operations/v1-alert-rules.prometheus.yml'),
+  'utf8',
+);
 
 describe('AIM OpenTelemetry Collector boundary', () => {
   it('pins the collector image rather than using latest', () => {
@@ -95,9 +99,26 @@ describe('Task 0049 production metrics and alerting boundary', () => {
 
   it('scrapes the collector instead of the application database or protected routes', () => {
     assert.match(prometheus, /aim-otel-collector:9464/);
+    assert.match(prometheus, /honor_labels:\s*true/);
     assert.match(prometheus, /metric_relabel_configs:/);
     assert.match(prometheus, /\(medsphere_\.\+\|up\)/);
     assert.doesNotMatch(prometheus, /postgres|database|patient|medicine|tenant|user/i);
+  });
+
+  it('defines bounded security alerts without identity dimensions', () => {
+    for (const alertName of [
+      'AimCredentialReplayDetected',
+      'AimRepeatedWorkstationUnlockFailure',
+      'AimAuthorizationDenialSpike',
+      'AimJoinCodeRejectionSpike',
+    ]) {
+      assert.match(alertRules, new RegExp(`alert: ${alertName}`));
+    }
+    assert.match(alertRules, /medsphere_security_event_total/);
+    assert.doesNotMatch(
+      alertRules,
+      /tenantId|userId|providerId|membershipId|email|phone|requestId|ipAddress/i,
+    );
   });
 
   it('routes alerts by severity using a secret-backed webhook URL', () => {
