@@ -72,7 +72,9 @@ export function validatePolicy(policy) {
       try {
         new RegExp(signal.removedPattern, signal.flags ?? '');
       } catch (error) {
-        throw new Error(`Task 0060 review signal ${signal.id} has an invalid regex: ${error.message}`);
+        throw new Error(
+          `Task 0060 review signal ${signal.id} has an invalid regex: ${error.message}`,
+        );
       }
     }
   }
@@ -156,7 +158,9 @@ function isSensitiveSource(relativePath) {
 }
 
 function isMigrationFile(relativePath) {
-  return relativePath.startsWith('packages/database/prisma/migrations/') && relativePath.endsWith('.sql');
+  return (
+    relativePath.startsWith('packages/database/prisma/migrations/') && relativePath.endsWith('.sql')
+  );
 }
 
 export function parsePatch(patch) {
@@ -265,7 +269,11 @@ export function evaluateIndependentReviews(reviews, author) {
 
   for (const review of Array.isArray(reviews) ? reviews : []) {
     const login = review?.user?.login;
-    if (!login || String(login).toLowerCase() === normalizedAuthor || review?.user?.type === 'Bot') {
+    if (
+      !login ||
+      String(login).toLowerCase() === normalizedAuthor ||
+      review?.user?.type === 'Bot'
+    ) {
       continue;
     }
     const submittedAt = Date.parse(review.submitted_at ?? '') || 0;
@@ -296,7 +304,8 @@ function walkFiles(root, relative = '') {
   return fs.readdirSync(absolute, { withFileTypes: true }).flatMap((entry) => {
     const next = normalize(path.join(relative, entry.name));
     if (entry.isDirectory()) {
-      if (['.git', 'node_modules', '.next', 'coverage', 'dist', 'build'].includes(entry.name)) return [];
+      if (['.git', 'node_modules', '.next', 'coverage', 'dist', 'build'].includes(entry.name))
+        return [];
       return walkFiles(root, next);
     }
     return [next];
@@ -333,7 +342,11 @@ export function checkRepositoryBoundary(repositoryRoot = DEFAULT_ROOT) {
   for (const relativePath of requiredFiles) readRequired(repositoryRoot, relativePath);
 
   const packageJson = JSON.parse(readRequired(repositoryRoot, 'package.json'));
-  if (!String(packageJson.scripts?.['test:ai-code-security-gate'] ?? '').includes('ai-code-security-data-integrity-gate')) {
+  if (
+    !String(packageJson.scripts?.['test:ai-code-security-gate'] ?? '').includes(
+      'ai-code-security-data-integrity-gate',
+    )
+  ) {
     failures.push('package.json is missing the focused Task 0060 security-gate command.');
   }
   const architectureScript = String(packageJson.scripts?.['test:architecture'] ?? '');
@@ -344,8 +357,17 @@ export function checkRepositoryBoundary(repositoryRoot = DEFAULT_ROOT) {
     failures.push('Task 0060 is not included in the mandatory architecture quality gate.');
   }
 
-  const workflow = readRequired(repositoryRoot, '.github/workflows/ai-code-security-data-integrity.yml');
-  for (const marker of ['pull_request_review:', 'pull-requests: read', 'gh api', 'ai-code-security-data-integrity-gate.mjs diff', '--base']) {
+  const workflow = readRequired(
+    repositoryRoot,
+    '.github/workflows/ai-code-security-data-integrity.yml',
+  );
+  for (const marker of [
+    'pull_request_review:',
+    'pull-requests: read',
+    'gh api',
+    'ai-code-security-data-integrity-gate.mjs diff',
+    '--base',
+  ]) {
     if (!workflow.includes(marker)) {
       failures.push(`Task 0060 workflow is missing required marker: ${marker}`);
     }
@@ -391,7 +413,9 @@ export function runBoundary(repositoryRoot = DEFAULT_ROOT) {
       return 0;
     }
     failures.forEach(printFailure);
-    printFailure(`TASK 0060 AI-CODE SECURITY/DATA-INTEGRITY BOUNDARY: FAIL (${failures.length} violation(s))`);
+    printFailure(
+      `TASK 0060 AI-CODE SECURITY/DATA-INTEGRITY BOUNDARY: FAIL (${failures.length} violation(s))`,
+    );
     return 1;
   } catch (error) {
     printFailure(`TASK 0060 AI-CODE SECURITY/DATA-INTEGRITY BOUNDARY: ERROR: ${error.message}`);
@@ -411,7 +435,9 @@ export function runDiff({ repositoryRoot = DEFAULT_ROOT, base, head, author, rev
 
     if (result.hardFailures.length > 0) {
       for (const failure of result.hardFailures) {
-        printFailure(`Hard security failure [${failure.rule}] in ${failure.file}: ${failure.evidence}`);
+        printFailure(
+          `Hard security failure [${failure.rule}] in ${failure.file}: ${failure.evidence}`,
+        );
       }
       printFailure(`TASK 0060 CHANGE GATE: FAIL (${result.hardFailures.length} hard violation(s))`);
       return 1;
@@ -423,7 +449,9 @@ export function runDiff({ repositoryRoot = DEFAULT_ROOT, base, head, author, rev
     }
 
     if (isBootstrapReviewWaiver({ policy, base, files })) {
-      process.stdout.write('TASK 0060 CHANGE GATE: PASS (bounded Task 0060 bootstrap review waiver)\n');
+      process.stdout.write(
+        'TASK 0060 CHANGE GATE: PASS (bounded Task 0060 bootstrap review waiver)\n',
+      );
       return 0;
     }
 
@@ -436,7 +464,9 @@ export function runDiff({ repositoryRoot = DEFAULT_ROOT, base, head, author, rev
       printFailure(
         `Independent approval required for high-risk AIM change. Categories: ${categories.join(', ') || 'review-signal'}.`,
       );
-      printFailure('The approving reviewer must be different from the PR author and their latest review must be APPROVED.');
+      printFailure(
+        'The approving reviewer must be different from the PR author and their latest review must be APPROVED.',
+      );
       return 1;
     }
 
