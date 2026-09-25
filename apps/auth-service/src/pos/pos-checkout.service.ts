@@ -897,9 +897,7 @@ export class PosCheckoutService {
       throw new BadRequestException('Idempotency key must contain 8 to 120 trimmed characters');
     }
     if (command.reservationId && !command.pickupToken) {
-      throw new BadRequestException(
-        'Reservation checkout requires the patient pickup proof',
-      );
+      throw new BadRequestException('Reservation checkout requires the patient pickup proof');
     }
     if (!command.reservationId && command.pickupToken !== undefined) {
       throw new BadRequestException('Pickup proof can be used only with a reservation checkout');
