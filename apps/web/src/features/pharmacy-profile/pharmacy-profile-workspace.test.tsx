@@ -152,7 +152,7 @@ describe('PharmacyProfileWorkspace', () => {
     fireEvent.change(screen.getByLabelText('Business registration number'), {
       target: { value: 'REG-001' },
     });
-    fireEvent.change(screen.getByLabelText('Government ID evidence reference'), {
+    fireEvent.change(screen.getByLabelText(/^Government ID evidence reference/), {
       target: { value: 'GOV-REF-001' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Submit verification' }));
