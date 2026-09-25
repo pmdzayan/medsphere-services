@@ -40,13 +40,22 @@ export function WorkstationAppearanceProvider({
   const [systemDark, setSystemDark] = useState(false);
 
   useEffect(() => {
-    const media = window.matchMedia('(prefers-color-scheme: dark)');
     const stored = window.localStorage.getItem(STORAGE_KEY);
     const nextPreference = isPreference(stored) ? stored : 'system';
+    const media =
+      typeof window.matchMedia === 'function'
+        ? window.matchMedia('(prefers-color-scheme: dark)')
+        : null;
+    const initialSystemDark = media?.matches ?? false;
 
     setPreferenceState(nextPreference);
-    setSystemDark(media.matches);
-    applyAppearance(resolveWorkstationAppearance(nextPreference, media.matches), nextPreference);
+    setSystemDark(initialSystemDark);
+    applyAppearance(
+      resolveWorkstationAppearance(nextPreference, initialSystemDark),
+      nextPreference,
+    );
+
+    if (!media) return;
 
     const onChange = (event: MediaQueryListEvent) => {
       setSystemDark(event.matches);
