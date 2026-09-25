@@ -16,6 +16,15 @@ import { PlatformBrand } from './brand';
 import { useWorkstationAppearance } from './workstation-appearance';
 import { Icon, type IconName } from './icon';
 
+const appearanceOptions = [
+  { value: 'system', labelKey: 'workstation.appearance.system' },
+  { value: 'light', labelKey: 'workstation.appearance.light' },
+  { value: 'dark', labelKey: 'workstation.appearance.dark' },
+] as const satisfies ReadonlyArray<{
+  value: 'system' | 'light' | 'dark';
+  labelKey: TranslationKey;
+}>;
+
 const primaryNavigation: NavigationItem[] = [
   { labelKey: 'shell.overview', href: '/dashboard', icon: 'dashboard' },
   { labelKey: 'shell.inventory', href: '/inventory', icon: 'inventory' },
@@ -481,19 +490,19 @@ export function AppShell({
                         role="group"
                         aria-label={t('workstation.appearance.label')}
                       >
-                        {(['system', 'light', 'dark'] as const).map((option) => (
+                        {appearanceOptions.map((option) => (
                           <button
-                            key={option}
+                            key={option.value}
                             type="button"
-                            aria-pressed={appearancePreference === option}
-                            onClick={() => setAppearancePreference(option)}
+                            aria-pressed={appearancePreference === option.value}
+                            onClick={() => setAppearancePreference(option.value)}
                             className={`min-h-11 rounded-lg px-2 text-[11px] font-bold transition ${
-                              appearancePreference === option
+                              appearancePreference === option.value
                                 ? 'organization-theme-soft'
                                 : 'text-[#52655e] hover:bg-[#f3f6f4]'
                             }`}
                           >
-                            {t(`workstation.appearance.${option}`)}
+                            {t(option.labelKey)}
                           </button>
                         ))}
                       </div>
