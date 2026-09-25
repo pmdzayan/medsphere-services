@@ -87,6 +87,16 @@ export const posEnglishMessages = {
     'Prescription-required medicines are blocked here and must use the clinical dispensing workflow.',
   'pos.notice.taxReview':
     'GST behavior is deterministic software logic and still requires qualified India tax/legal release review.',
+  'pos.offline.banner': 'Offline — sales cannot be completed until the server is reachable.',
+  'pos.offline.saveDraft': 'Keep draft',
+  'pos.offline.saved':
+    'Draft kept only in this open tab. Reconnect to refresh stock before checkout. Reservation, pickup, recipient and payment-reference data were not stored.',
+  'pos.offline.revalidating': 'Revalidating the offline draft with current server stock…',
+  'pos.offline.ready':
+    'Draft revalidated with current server stock. Review it before completing the sale.',
+  'pos.offline.conflict':
+    'The draft changed or could not be fully revalidated. Review availability and quantities before checkout.',
+  'pos.offline.invalid': 'This counter state cannot be safely kept as an offline draft.',
 } as const;
 
 export const posTamilMessages = {
@@ -178,6 +188,18 @@ export const posTamilMessages = {
     'மருத்துவர் சீட்டு தேவைப்படும் மருந்துகள் இங்கே தடுக்கப்படுகின்றன; மருத்துவ விநியோக நடைமுறையைப் பயன்படுத்தவும்.',
   'pos.notice.taxReview':
     'GST கணக்கீடு நிர்ணயிக்கப்பட்ட மென்பொருள் விதியாகும்; வெளியீட்டிற்கு முன் இந்திய வரி/சட்ட நிபுணர் மதிப்பாய்வு தேவை.',
+  'pos.offline.banner':
+    'இணைய இணைப்பு இல்லை — சேவையகம் கிடைக்கும் வரை விற்பனையை முடிக்க முடியாது.',
+  'pos.offline.saveDraft': 'வரைவை வைத்திரு',
+  'pos.offline.saved':
+    'வரைவு இந்த திறந்த தாவலில் மட்டும் வைக்கப்பட்டுள்ளது. விற்பனையை முடிப்பதற்கு முன் தற்போதைய சரக்கை புதுப்பிக்க மீண்டும் இணைக்கவும். முன்பதிவு, பிக்கப், பெறுநர் மற்றும் பணம் செலுத்தல் குறிப்பு தகவல்கள் சேமிக்கப்படவில்லை.',
+  'pos.offline.revalidating':
+    'தற்போதைய சேவையக சரக்குடன் ஆஃப்லைன் வரைவு மீண்டும் சரிபார்க்கப்படுகிறது…',
+  'pos.offline.ready':
+    'வரைவு தற்போதைய சேவையக சரக்குடன் மீண்டும் சரிபார்க்கப்பட்டது. விற்பனையை முடிப்பதற்கு முன் மறுபரிசீலனை செய்யவும்.',
+  'pos.offline.conflict':
+    'வரைவு மாறியுள்ளது அல்லது முழுமையாக மீண்டும் சரிபார்க்க முடியவில்லை. கிடைப்பையும் அளவுகளையும் பரிசீலிக்கவும்.',
+  'pos.offline.invalid': 'இந்த கவுண்டர் நிலையை ஆஃப்லைன் வரைவாக பாதுகாப்பாக வைத்திருக்க முடியாது.',
 } as const;
 
 export const posUrduMessages = {
@@ -268,4 +290,14 @@ export const posUrduMessages = {
     'نسخہ درکار ادویات یہاں بلاک ہیں اور کلینیکل ڈسپنسنگ ورک فلو استعمال کرنا ہوگا۔',
   'pos.notice.taxReview':
     'GST منطق طے شدہ سافٹ ویئر حساب ہے اور ریلیز سے پہلے ہندوستانی ٹیکس/قانونی ماہر کی جانچ درکار ہے۔',
+  'pos.offline.banner': 'آف لائن — سرور دستیاب ہونے تک فروخت مکمل نہیں کی جا سکتی۔',
+  'pos.offline.saveDraft': 'مسودہ محفوظ رکھیں',
+  'pos.offline.saved':
+    'مسودہ صرف اس کھلے ٹیب میں رکھا گیا ہے۔ چیک آؤٹ سے پہلے موجودہ اسٹاک تازہ کرنے کے لیے دوبارہ منسلک ہوں۔ ریزرویشن، پک اپ، وصول کنندہ اور ادائیگی حوالہ معلومات محفوظ نہیں کی گئیں۔',
+  'pos.offline.revalidating': 'آف لائن مسودے کو موجودہ سرور اسٹاک سے دوبارہ جانچا جا رہا ہے…',
+  'pos.offline.ready':
+    'مسودہ موجودہ سرور اسٹاک سے دوبارہ جانچا گیا۔ فروخت مکمل کرنے سے پہلے اسے دوبارہ دیکھیں۔',
+  'pos.offline.conflict':
+    'مسودہ بدل گیا ہے یا مکمل طور پر دوبارہ جانچا نہیں جا سکا۔ دستیابی اور مقداریں دوبارہ دیکھیں۔',
+  'pos.offline.invalid': 'اس کاؤنٹر حالت کو آف لائن مسودے کے طور پر محفوظ رکھنا محفوظ نہیں ہے۔',
 } as const;
