@@ -21,8 +21,6 @@ import type {
 } from './dto/provider-domain.dto';
 
 const DOMAIN_PROVIDER_TYPES = ['HOSPITAL', 'CLINIC', 'LABORATORY', 'DOCTOR'] as const;
-type DomainProviderType = (typeof DOMAIN_PROVIDER_TYPES)[number];
-
 @Injectable()
 export class ProviderDomainService {
   constructor(
