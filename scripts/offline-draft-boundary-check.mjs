@@ -51,7 +51,9 @@ export function checkOfflineDraftBoundary(
       'idempotencyKey',
     ]) {
       if (input.includes(forbidden)) {
-        failures.push(`OfflinePosDraftInput contains forbidden sensitive/transaction field: ${forbidden}`);
+        failures.push(
+          `OfflinePosDraftInput contains forbidden sensitive/transaction field: ${forbidden}`,
+        );
       }
     }
   }
