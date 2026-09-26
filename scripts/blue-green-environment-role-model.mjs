@@ -182,13 +182,20 @@ export function validateState(state, policy) {
     if (environment.role !== 'CANDIDATE') continue;
 
     const sync = environment.synchronizedFrom;
-    rejectUnknownKeys(sync, ['environment', 'releaseSha', 'evidenceRef'], `${environment.name}.synchronizedFrom`, failures);
+    rejectUnknownKeys(
+      sync,
+      ['environment', 'releaseSha', 'evidenceRef'],
+      `${environment.name}.synchronizedFrom`,
+      failures,
+    );
     if (!sync || active.length !== 1) {
       failures.push(`${environment.name} CANDIDATE requires synchronizedFrom evidence`);
       continue;
     }
     if (sync.environment !== active[0].name || sync.releaseSha !== active[0].releaseSha) {
-      failures.push(`${environment.name} CANDIDATE must be synchronized from the current ACTIVE release`);
+      failures.push(
+        `${environment.name} CANDIDATE must be synchronized from the current ACTIVE release`,
+      );
     }
     validateIdentifier(
       sync.evidenceRef,
@@ -233,13 +240,17 @@ export function validateTransition(previous, next, policy) {
     const previousInactive = byName(previous, inactiveName);
     const nextInactive = byName(next, inactiveName);
     if (previousInactive.role !== 'ROLLBACK' || nextInactive.role !== 'CANDIDATE') {
-      failures.push('candidate preparation must transition the inactive environment from ROLLBACK to CANDIDATE');
+      failures.push(
+        'candidate preparation must transition the inactive environment from ROLLBACK to CANDIDATE',
+      );
     }
     if (
       nextInactive.synchronizedFrom?.environment !== previousActive.name ||
       nextInactive.synchronizedFrom?.releaseSha !== previousActive.releaseSha
     ) {
-      failures.push('candidate preparation must prove synchronization from the current ACTIVE release');
+      failures.push(
+        'candidate preparation must prove synchronization from the current ACTIVE release',
+      );
     }
     return failures;
   }
@@ -320,7 +331,9 @@ function run(repositoryRoot = DEFAULT_ROOT, argv = process.argv.slice(2)) {
   } else if (mode === 'transition' && first && second) {
     failures = validateTransition(readJson(first), readJson(second), policy);
   } else {
-    process.stderr.write('Usage: blue-green-environment-role-model.mjs boundary|state <file>|transition <before> <after>\n');
+    process.stderr.write(
+      'Usage: blue-green-environment-role-model.mjs boundary|state <file>|transition <before> <after>\n',
+    );
     return 2;
   }
 
@@ -338,7 +351,9 @@ if (invoked === fileURLToPath(import.meta.url)) {
   try {
     process.exitCode = run();
   } catch (error) {
-    process.stderr.write(`UM14.1 BLUE/GREEN ROLE MODEL: ERROR: ${error instanceof Error ? error.message : String(error)}\n`);
+    process.stderr.write(
+      `UM14.1 BLUE/GREEN ROLE MODEL: ERROR: ${error instanceof Error ? error.message : String(error)}\n`,
+    );
     process.exitCode = 1;
   }
 }

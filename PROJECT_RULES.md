@@ -222,4 +222,3 @@ AIM follows ADR-033 and UM14.1's **roles-not-colors, single-write-authority** ru
 - Changes to this contract must pass `pnpm test:blue-green-role-model` and the normal quality gate.
 
 The executable policy is `docs/architecture/blue-green-environment-role-policy.json`.
-

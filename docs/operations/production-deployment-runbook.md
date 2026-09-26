@@ -115,4 +115,3 @@ flowchart TD
 ADR-033 adds reusable BLUE/GREEN environment identities above this deployment sequence. The color name is never production authority. Before any future blue/green operation, the operator-visible state must pass `pnpm test:blue-green-role-model` and identify exactly one `ACTIVE` environment whose name matches the sole database `writeAuthority`.
 
 UM14.1 does not alter this runbook's deployment freeze or Task 0050 production evidence requirements. Database synchronization, candidate data creation, shadow traffic, progressive canary routing and automatic rollback remain unavailable until their later Milestone 14 tasks are separately accepted.
-

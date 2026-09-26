@@ -38,7 +38,12 @@ function rollbackState() {
     writeAuthority: 'BLUE',
     environments: [
       { name: 'BLUE', role: 'ACTIVE', releaseSha: BLUE_SHA, databaseIdentity: 'aim-prod-blue' },
-      { name: 'GREEN', role: 'ROLLBACK', releaseSha: '0'.repeat(40), databaseIdentity: 'aim-prod-green' },
+      {
+        name: 'GREEN',
+        role: 'ROLLBACK',
+        releaseSha: '0'.repeat(40),
+        databaseIdentity: 'aim-prod-green',
+      },
     ],
   };
 }
@@ -95,7 +100,9 @@ describe('UM14.1 blue/green environment role model', () => {
     state.environments[1].role = 'ACTIVE';
     state.writeAuthority = 'GREEN';
     const failures = validateState(state, policy);
-    assert.ok(failures.some((failure) => failure.includes('exactly one environment must be ACTIVE')));
+    assert.ok(
+      failures.some((failure) => failure.includes('exactly one environment must be ACTIVE')),
+    );
   });
 
   it('requires a candidate to prove synchronization from the current ACTIVE release', () => {
@@ -103,7 +110,9 @@ describe('UM14.1 blue/green environment role model', () => {
     state.environments[1].synchronizedFrom.releaseSha = GREEN_SHA;
     const failures = validateState(state, policy);
     assert.ok(
-      failures.some((failure) => failure.includes('must be synchronized from the current ACTIVE release')),
+      failures.some((failure) =>
+        failure.includes('must be synchronized from the current ACTIVE release'),
+      ),
     );
   });
 
@@ -127,6 +136,8 @@ describe('UM14.1 blue/green environment role model', () => {
     const state = rollbackState();
     state.environments[0].databaseIdentity = 'postgresql://user:password@host/database';
     const failures = validateState(state, policy);
-    assert.ok(failures.some((failure) => failure.includes('databaseIdentity is missing or invalid')));
+    assert.ok(
+      failures.some((failure) => failure.includes('databaseIdentity is missing or invalid')),
+    );
   });
 });
