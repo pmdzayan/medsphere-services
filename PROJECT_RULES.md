@@ -222,3 +222,21 @@ AIM follows ADR-033 and UM14.1's **roles-not-colors, single-write-authority** ru
 - Changes to this contract must pass `pnpm test:blue-green-role-model` and the normal quality gate.
 
 The executable policy is `docs/architecture/blue-green-environment-role-policy.json`.
+
+## 16. Blue/green candidate synchronization governance
+
+AIM follows ADR-034 and UM14.2's **snapshot-rebuild-inactive-only** rule.
+
+- Candidate synchronization may rebuild only the inactive environment while it is in the `ROLLBACK` role.
+- The synchronization source must be the current `ACTIVE` database and must exactly match the operator-provided production database reference.
+- The source and candidate database endpoints must differ; the ACTIVE database may never be the destructive rebuild target.
+- Rebuilding the inactive database requires an exact confirmation bound to its physical environment and opaque database identity.
+- Production snapshots must be stored outside the repository on encrypted, access-controlled storage. Never commit a snapshot, database URL, credential, PHI, patient record, pharmacy customer record, or raw backup content.
+- Application write authority remains exclusively on `ACTIVE` during synchronization. UM14.2 does not authorize dual writes or application writes to `CANDIDATE`.
+- A restored candidate must pass the accepted Task 0022 integrity verifier before synchronization evidence may be emitted.
+- Synchronization evidence must be bounded and secret-free, bind the snapshot SHA-256, and identify source/candidate only through approved environment/database/release identities.
+- A failed candidate and failed snapshot are removed by default; diagnostic retention requires explicit operator action and controlled cleanup.
+- Snapshot synchronization is point-in-time, not continuous replication. Later rollout work must prevent post-snapshot ACTIVE writes from being lost before promotion.
+- Changes to this contract must pass `pnpm test:blue-green-candidate-sync`, `pnpm test:architecture-governance` when applicable, Task 0060 independent review, and the normal quality gate.
+
+The executable policy is `docs/architecture/blue-green-candidate-sync-policy.json`.
