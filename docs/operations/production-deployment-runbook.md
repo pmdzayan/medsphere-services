@@ -115,3 +115,17 @@ flowchart TD
 ADR-033 adds reusable BLUE/GREEN environment identities above this deployment sequence. The color name is never production authority. Before any future blue/green operation, the operator-visible state must pass `pnpm test:blue-green-role-model` and identify exactly one `ACTIVE` environment whose name matches the sole database `writeAuthority`.
 
 UM14.1 does not alter this runbook's deployment freeze or Task 0050 production evidence requirements. Database synchronization, candidate data creation, shadow traffic, progressive canary routing and automatic rollback remain unavailable until their later Milestone 14 tasks are separately accepted.
+
+## Blue/Green candidate synchronization — UM14.2
+
+ADR-034 adds a guarded point-in-time candidate refresh above the UM14.1 role boundary. The repository command is:
+
+```bash
+pnpm test:blue-green-candidate-sync
+node scripts/blue-green-candidate-sync.mjs sync
+```
+
+The sync command may destructively rebuild only the inactive `ROLLBACK` database. It requires the source to exactly match the declared production database, requires exact target confirmation, keeps application write authority on `ACTIVE`, stores the snapshot outside the repository on acknowledged encrypted storage, verifies the restored database through the Task 0022 integrity engine, and emits bounded synchronization evidence plus the proposed `CANDIDATE` state.
+
+UM14.2 remains a point-in-time snapshot mechanism. It does not authorize write-bearing canary traffic or promotion while post-snapshot writes could be lost. A later accepted Milestone 14 cutover/catch-up control is required before such promotion.
+
