@@ -205,3 +205,20 @@ AIM follows ADR-032's independent high-risk change rule.
 - High-risk changes must pass `pnpm test:ai-code-security-gate` and the dedicated `AIM Independent AI-Code Security & Data-Integrity Gate` workflow.
 
 The executable policy is `docs/architecture/ai-code-security-data-integrity-policy.json`.
+
+## 15. Blue/green release environment governance
+
+AIM follows ADR-033 and UM14.1's **roles-not-colors, single-write-authority** rule.
+
+- BLUE and GREEN are reusable physical environment identities, not permanent production/test roles.
+- Exactly one environment is `ACTIVE` at a time.
+- Only `ACTIVE` may own production database write authority; dual-write or split-brain blue/green operation is forbidden unless a later Accepted ADR replaces this rule with proven conflict semantics.
+- The inactive environment is either `ROLLBACK` or `CANDIDATE`.
+- A `CANDIDATE` must be freshly synchronized from the current `ACTIVE` release and carry bounded synchronization evidence before promotion.
+- A `ROLLBACK` environment may not become `ACTIVE` directly. It must first become a synchronized `CANDIDATE`.
+- Promotion must atomically move the role and write authority, while the former `ACTIVE` becomes `ROLLBACK`.
+- Role manifests contain opaque identifiers/evidence only; never database URLs, credentials, tokens, PHI, customer data, or raw security findings.
+- Database synchronization, schema compatibility, traffic shifting, canary percentages and automatic rollback require their later Milestone 14 controls; UM14.1 alone does not authorize them.
+- Changes to this contract must pass `pnpm test:blue-green-role-model` and the normal quality gate.
+
+The executable policy is `docs/architecture/blue-green-environment-role-policy.json`.
