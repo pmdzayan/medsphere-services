@@ -240,4 +240,3 @@ AIM follows ADR-034 and UM14.2's **snapshot-rebuild-inactive-only** rule.
 - Changes to this contract must pass `pnpm test:blue-green-candidate-sync`, `pnpm test:architecture-governance` when applicable, Task 0060 independent review, and the normal quality gate.
 
 The executable policy is `docs/architecture/blue-green-candidate-sync-policy.json`.
-

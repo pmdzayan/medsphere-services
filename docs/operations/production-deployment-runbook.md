@@ -128,4 +128,3 @@ node scripts/blue-green-candidate-sync.mjs sync
 The sync command may destructively rebuild only the inactive `ROLLBACK` database. It requires the source to exactly match the declared production database, requires exact target confirmation, keeps application write authority on `ACTIVE`, stores the snapshot outside the repository on acknowledged encrypted storage, verifies the restored database through the Task 0022 integrity engine, and emits bounded synchronization evidence plus the proposed `CANDIDATE` state.
 
 UM14.2 remains a point-in-time snapshot mechanism. It does not authorize write-bearing canary traffic or promotion while post-snapshot writes could be lost. A later accepted Milestone 14 cutover/catch-up control is required before such promotion.
-

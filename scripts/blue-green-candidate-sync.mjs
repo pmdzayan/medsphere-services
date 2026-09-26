@@ -64,11 +64,7 @@ function isWithin(candidate, parent) {
 }
 
 export function sameDatabaseEndpoint(left, right) {
-  return (
-    left.host === right.host &&
-    left.port === right.port &&
-    left.database === right.database
-  );
+  return left.host === right.host && left.port === right.port && left.database === right.database;
 }
 
 export function validateSyncPolicy(policy) {
@@ -380,8 +376,7 @@ function executeSynchronization(repositoryRoot = DEFAULT_ROOT) {
   const candidateDatabaseIdentity = process.env.AIM_BLUE_GREEN_CANDIDATE_DATABASE_IDENTITY;
   const candidateReleaseSha = process.env.AIM_BLUE_GREEN_CANDIDATE_RELEASE_SHA;
   const rebuildConfirmation = process.env.AIM_BLUE_GREEN_REBUILD_CONFIRMATION;
-  const encryptedStorageAcknowledged =
-    process.env.AIM_BLUE_GREEN_BACKUP_STORAGE_ENCRYPTED === '1';
+  const encryptedStorageAcknowledged = process.env.AIM_BLUE_GREEN_BACKUP_STORAGE_ENCRYPTED === '1';
   const keepFailedCandidate = process.env.AIM_BLUE_GREEN_KEEP_FAILED_CANDIDATE === '1';
   const keepFailedSnapshot = process.env.AIM_BLUE_GREEN_KEEP_FAILED_SNAPSHOT === '1';
 
