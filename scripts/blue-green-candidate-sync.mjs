@@ -32,7 +32,7 @@ const SYNC_POLICY_PATH = 'docs/architecture/blue-green-candidate-sync-policy.jso
 function readRequired(repositoryRoot, relativePath) {
   const absolute = path.join(repositoryRoot, relativePath);
   if (!existsSync(absolute)) {
-    throw new Error(\`Required UM14.2 file missing: \${relativePath}\`);
+    throw new Error(`Required UM14.2 file missing: ${relativePath}`);
   }
   return readFileSync(absolute, 'utf8');
 }
@@ -44,8 +44,8 @@ function readJson(filePath) {
 function writeJsonAtomic(filePath, value) {
   const absolute = path.resolve(filePath);
   mkdirSync(path.dirname(absolute), { recursive: true, mode: 0o700 });
-  const temp = \`\${absolute}.tmp-\${process.pid}\`;
-  writeFileSync(temp, \`\${JSON.stringify(value, null, 2)}\\n\`, { encoding: 'utf8', mode: 0o600 });
+  const temp = `${absolute}.tmp-${process.pid}`;
+  writeFileSync(temp, `${JSON.stringify(value, null, 2)}\n`, { encoding: 'utf8', mode: 0o600 });
   renameSync(temp, absolute);
   try {
     chmodSync(absolute, 0o600);
@@ -105,7 +105,7 @@ export function validateSyncPolicy(policy) {
     'applicationWriteAuthorityRemainsActive',
   ]) {
     if (policy.safety?.[key] !== true) {
-      throw new Error(\`UM14.2 safety policy must retain \${key}=true\`);
+      throw new Error(`UM14.2 safety policy must retain ${key}=true`);
     }
   }
   if (
@@ -129,7 +129,7 @@ function activeAndInactive(state) {
 }
 
 export function expectedRebuildConfirmation(inactive) {
-  return \`REBUILD:\${inactive.name}:\${inactive.databaseIdentity}\`;
+  return `REBUILD:${inactive.name}:${inactive.databaseIdentity}`;
 }
 
 export function validateCandidatePreparation({
@@ -155,7 +155,7 @@ export function validateCandidatePreparation({
     return failures;
   }
 
-  failures.push(...validateState(state, rolePolicy).map((failure) => \`state: \${failure}\`));
+  failures.push(...validateState(state, rolePolicy).map((failure) => `state: ${failure}`));
   if (failures.length > 0) return failures;
 
   const { active, inactive } = activeAndInactive(state);
@@ -204,7 +204,7 @@ export function evidenceRefFromHash(syncPolicy, sha256) {
   if (!/^[0-9a-f]{64}$/.test(sha256)) {
     throw new Error('snapshot SHA-256 is invalid');
   }
-  return \`\${syncPolicy.evidence.referencePrefix}\${sha256}\`;
+  return `${syncPolicy.evidence.referencePrefix}${sha256}`;
 }
 
 export function buildSynchronizationEvidence({
@@ -279,11 +279,11 @@ export function buildNextCandidateState({
 }
 
 function parseRequiredConnection(value, label) {
-  if (!value || !value.trim()) throw new Error(\`\${label} is required\`);
+  if (!value || !value.trim()) throw new Error(`${label} is required`);
   try {
     return parseConnectionUrl(value);
   } catch (error) {
-    throw new Error(\`\${label} is invalid: \${error.message}\`);
+    throw new Error(`${label} is invalid: ${error.message}`);
   }
 }
 
@@ -395,7 +395,7 @@ function executeSynchronization(repositoryRoot = DEFAULT_ROOT) {
     ['AIM_BLUE_GREEN_CANDIDATE_RELEASE_SHA', candidateReleaseSha],
     ['AIM_BLUE_GREEN_REBUILD_CONFIRMATION', rebuildConfirmation],
   ]) {
-    if (!value || !value.trim()) throw new Error(\`\${name} is required\`);
+    if (!value || !value.trim()) throw new Error(`${name} is required`);
   }
   if (!existsSync(stateFile)) throw new Error('AIM_BLUE_GREEN_STATE_FILE does not exist');
 
@@ -435,16 +435,16 @@ function executeSynchronization(repositoryRoot = DEFAULT_ROOT) {
   const { active, inactive } = activeAndInactive(state);
   mkdirSync(backupDir, { recursive: true, mode: 0o700 });
   const stamp = new Date().toISOString().replace(/[-:.]/g, '').replace('Z', 'Z');
-  const backupFileName = \`aim-blue-green-\${active.name.toLowerCase()}-to-\${inactive.name.toLowerCase()}-\${candidateReleaseSha.slice(0, 12)}-\${stamp}.dump\`;
+  const backupFileName = `aim-blue-green-${active.name.toLowerCase()}-to-${inactive.name.toLowerCase()}-${candidateReleaseSha.slice(0, 12)}-${stamp}.dump`;
   const backupPath = path.join(backupDir, backupFileName);
   let candidateTouched = false;
   let snapshotCreated = false;
 
   try {
     process.stdout.write(
-      \`UM14.2 source=\${active.name} candidate=\${inactive.name} writeAuthority=\${state.writeAuthority}\\n\`,
+      `UM14.2 source=${active.name} candidate=${inactive.name} writeAuthority=${state.writeAuthority}\n`,
     );
-    process.stdout.write('Creating consistent PostgreSQL snapshot of ACTIVE database...\\n');
+    process.stdout.write('Creating consistent PostgreSQL snapshot of ACTIVE database...\n');
     runTool(sourceConnection, 'pg_dump', [
       '-h',
       sourceConnection.host,
@@ -483,7 +483,7 @@ function executeSynchronization(repositoryRoot = DEFAULT_ROOT) {
       throw new Error('ACTIVE migration history could not be bounded before candidate rebuild');
     }
 
-    process.stdout.write('Rebuilding inactive database from the verified snapshot...\\n');
+    process.stdout.write('Rebuilding inactive database from the verified snapshot...\n');
     cleanupCandidate(candidateConnection);
     candidateTouched = true;
     runTool(candidateConnection, 'createdb', [
@@ -517,7 +517,7 @@ function executeSynchronization(repositoryRoot = DEFAULT_ROOT) {
     const verification = verifier.runAll({ expectedMigrations: migrationCount });
     if (!verification.passed) {
       const failed = verification.checks.filter((check) => !check.ok).map((check) => check.name);
-      throw new Error(\`candidate integrity verification failed: \${failed.join(', ')}\`);
+      throw new Error(`candidate integrity verification failed: ${failed.join(', ')}`);
     }
 
     const evidence = buildSynchronizationEvidence({
@@ -541,30 +541,30 @@ function executeSynchronization(repositoryRoot = DEFAULT_ROOT) {
     });
     const transitionFailures = validateTransition(state, nextState, rolePolicy);
     if (transitionFailures.length > 0) {
-      throw new Error(\`UM14.1 transition validation failed: \${transitionFailures.join('; ')}\`);
+      throw new Error(`UM14.1 transition validation failed: ${transitionFailures.join('; ')}`);
     }
 
     writeJsonAtomic(evidenceFile, evidence);
     writeJsonAtomic(nextStateFile, nextState);
 
-    process.stdout.write(\`evidenceRef=\${evidence.evidenceRef}\\n\`);
-    process.stdout.write(\`candidateRole=\${inactive.name}:CANDIDATE\\n\`);
-    process.stdout.write(\`writeAuthority=\${active.name}\\n\`);
-    process.stdout.write('UM14.2 DATABASE SYNCHRONIZATION & CANDIDATE CREATION: PASS\\n');
+    process.stdout.write(`evidenceRef=${evidence.evidenceRef}\n`);
+    process.stdout.write(`candidateRole=${inactive.name}:CANDIDATE\n`);
+    process.stdout.write(`writeAuthority=${active.name}\n`);
+    process.stdout.write('UM14.2 DATABASE SYNCHRONIZATION & CANDIDATE CREATION: PASS\n');
     return 0;
   } catch (error) {
     if (candidateTouched && !keepFailedCandidate) {
       try {
         cleanupCandidate(candidateConnection);
       } catch {
-        process.stderr.write('Failed candidate cleanup requires operator attention.\\n');
+        process.stderr.write('Failed candidate cleanup requires operator attention.\n');
       }
     }
     if (snapshotCreated && !keepFailedSnapshot) {
       try {
         rmSync(backupPath, { force: true });
       } catch {
-        process.stderr.write('Failed snapshot cleanup requires operator attention.\\n');
+        process.stderr.write('Failed snapshot cleanup requires operator attention.\n');
       }
     }
     throw error;
@@ -576,17 +576,17 @@ export function run(repositoryRoot = DEFAULT_ROOT, argv = process.argv.slice(2))
   if (mode === 'boundary') {
     const failures = checkRepositoryBoundary(repositoryRoot);
     if (failures.length === 0) {
-      process.stdout.write('UM14.2 BLUE/GREEN CANDIDATE SYNC BOUNDARY: PASS\\n');
+      process.stdout.write('UM14.2 BLUE/GREEN CANDIDATE SYNC BOUNDARY: PASS\n');
       return 0;
     }
-    for (const failure of failures) process.stderr.write(\`\${failure}\\n\`);
+    for (const failure of failures) process.stderr.write(`${failure}\n`);
     process.stderr.write(
-      \`UM14.2 BLUE/GREEN CANDIDATE SYNC BOUNDARY: FAIL (\${failures.length} violation(s))\\n\`,
+      `UM14.2 BLUE/GREEN CANDIDATE SYNC BOUNDARY: FAIL (${failures.length} violation(s))\n`,
     );
     return 1;
   }
   if (mode === 'sync') return executeSynchronization(repositoryRoot);
-  process.stderr.write('Usage: blue-green-candidate-sync.mjs boundary|sync\\n');
+  process.stderr.write('Usage: blue-green-candidate-sync.mjs boundary|sync\n');
   return 2;
 }
 
@@ -596,7 +596,7 @@ if (invoked === fileURLToPath(import.meta.url)) {
     process.exitCode = run();
   } catch (error) {
     process.stderr.write(
-      \`UM14.2 DATABASE SYNCHRONIZATION & CANDIDATE CREATION: FAIL: \${error instanceof Error ? error.message : String(error)}\\n\`,
+      `UM14.2 DATABASE SYNCHRONIZATION & CANDIDATE CREATION: FAIL: ${error instanceof Error ? error.message : String(error)}\n`,
     );
     process.exitCode = 1;
   }
