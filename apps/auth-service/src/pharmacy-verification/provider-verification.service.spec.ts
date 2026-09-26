@@ -62,6 +62,8 @@ function buildService(
       providerType: string;
       deletedAt: Date | null;
       isVerified?: boolean;
+      country?: string;
+      state?: string;
     } | null;
     verifications?: VerificationRow[];
     reviewerStillAuthorized?: boolean;
@@ -78,6 +80,8 @@ function buildService(
           providerType: 'PHARMACY',
           deletedAt: null,
           isVerified: false,
+          country: 'India',
+          state: 'Tamil Nadu',
         }
       : options.provider;
   const verifications: VerificationRow[] = options.verifications ?? [];
@@ -142,7 +146,14 @@ function buildService(
           row
             ? {
                 ...row,
-                provider: row.providerId === provider?.id ? { businessName: 'Pharmacy A' } : null,
+                provider:
+                  row.providerId === provider?.id
+                    ? {
+                        businessName: 'Pharmacy A',
+                        country: provider.country ?? 'India',
+                        state: provider.state ?? 'Tamil Nadu',
+                      }
+                    : null,
               }
             : null,
         );
@@ -896,6 +907,21 @@ describe('ProviderVerificationService.getReviewDetail -- duplicate-license signa
     });
     const detail = await service.getReviewDetail('current');
     expect(detail.possibleDuplicateLicenseCount).toBe(0);
+    expect(detail.verificationSources).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 'INDIA_TN_DRUGS_CONTROL',
+          requirement: 'PRIMARY',
+          officialUrl: 'https://drugscontrol.tn.gov.in/sales_services.html',
+        }),
+        expect.objectContaining({
+          id: 'INDIA_TN_PHARMACY_COUNCIL',
+          requirement: 'PRIMARY',
+          officialUrl: 'https://tnpc.ac.in/',
+        }),
+      ]),
+    );
+    expect(detail.jurisdictionReviewRequired).toBe(false);
   });
 
   it('CORRECTION 5 (mandatory): the same license number under a DIFFERENT provider IS counted', async () => {

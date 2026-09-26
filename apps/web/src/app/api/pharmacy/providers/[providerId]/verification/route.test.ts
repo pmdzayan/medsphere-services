@@ -42,12 +42,31 @@ const currentApproved = {
   version: 3,
 };
 
+const verificationStateExtras = {
+  verificationSources: [
+    {
+      id: 'INDIA_TN_DRUGS_CONTROL',
+      authority: 'Tamil Nadu Drugs Control',
+      label: 'Tamil Nadu Drugs Control — drug sales licensing',
+      officialUrl: 'https://drugscontrol.tn.gov.in/sales_services.html',
+      requirement: 'PRIMARY',
+      mode: 'PORTAL_LOOKUP',
+      purpose: 'PREMISES_LICENCE',
+      limitation: 'Primary statutory source.',
+    },
+  ],
+  jurisdictionReviewRequired: false,
+  jurisdictionNote: null,
+};
+
 describe('GET /api/pharmacy/providers/[providerId]/verification', () => {
   it('preserves an initial PENDING submission with no current state', async () => {
     const pending = { ...currentApproved, status: 'PENDING' };
     const fetchMock = vi
       .fn()
-      .mockResolvedValue(Response.json({ current: pending, openSubmission: null }));
+      .mockResolvedValue(
+        Response.json({ current: pending, openSubmission: null, ...verificationStateExtras }),
+      );
     vi.stubGlobal('fetch', fetchMock);
 
     const response = await GET(createRequest({ cookie: 'medsphere_access=token' }), context);
@@ -63,9 +82,13 @@ describe('GET /api/pharmacy/providers/[providerId]/verification', () => {
       verificationId: '33333333-3333-4333-8333-333333333333',
       status: 'UNDER_REVIEW',
     };
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValue(Response.json({ current: currentApproved, openSubmission: renewal }));
+    const fetchMock = vi.fn().mockResolvedValue(
+      Response.json({
+        current: currentApproved,
+        openSubmission: renewal,
+        ...verificationStateExtras,
+      }),
+    );
     vi.stubGlobal('fetch', fetchMock);
 
     const response = await GET(createRequest({ cookie: 'medsphere_access=token' }), context);
@@ -78,11 +101,36 @@ describe('GET /api/pharmacy/providers/[providerId]/verification', () => {
     expect(body.openSubmission.status).toBe('UNDER_REVIEW');
   });
 
+  it('preserves server-controlled official verification source links', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      Response.json({
+        current: currentApproved,
+        openSubmission: null,
+        ...verificationStateExtras,
+      }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await GET(createRequest({ cookie: 'medsphere_access=token' }), context);
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as {
+      verificationSources: Array<{ officialUrl: string; requirement: string }>;
+    };
+    expect(body.verificationSources).toEqual([
+      expect.objectContaining({
+        officialUrl: 'https://drugscontrol.tn.gov.in/sales_services.html',
+        requirement: 'PRIMARY',
+      }),
+    ]);
+  });
+
   it('preserves a rejection applicantMessage', async () => {
     const rejected = { ...currentApproved, status: 'REJECTED', applicantMessage: 'Please retry.' };
     const fetchMock = vi
       .fn()
-      .mockResolvedValue(Response.json({ current: rejected, openSubmission: null }));
+      .mockResolvedValue(
+        Response.json({ current: rejected, openSubmission: null, ...verificationStateExtras }),
+      );
     vi.stubGlobal('fetch', fetchMock);
 
     const response = await GET(createRequest({ cookie: 'medsphere_access=token' }), context);
@@ -94,7 +142,9 @@ describe('GET /api/pharmacy/providers/[providerId]/verification', () => {
     const tampered = { ...currentApproved, verificationNotes: 'internal reasoning' };
     const fetchMock = vi
       .fn()
-      .mockResolvedValue(Response.json({ current: tampered, openSubmission: null }));
+      .mockResolvedValue(
+        Response.json({ current: tampered, openSubmission: null, ...verificationStateExtras }),
+      );
     vi.stubGlobal('fetch', fetchMock);
 
     const response = await GET(createRequest({ cookie: 'medsphere_access=token' }), context);
