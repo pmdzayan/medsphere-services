@@ -220,7 +220,7 @@ describe('UM14.2 database synchronization and candidate creation', () => {
       active,
       inactive,
       candidateReleaseSha: CANDIDATE_SHA,
-      evidenceRef: \`bluegreen:sync:\${'b'.repeat(64)}\`,
+      evidenceRef: `bluegreen:sync:${'b'.repeat(64)}`,
     });
 
     assert.equal(next.writeAuthority, 'BLUE');
