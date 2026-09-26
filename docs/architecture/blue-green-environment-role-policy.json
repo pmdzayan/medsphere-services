@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "task": "UM14.1",
+  "principle": "roles-not-colors-single-write-authority",
+  "physicalEnvironments": ["BLUE", "GREEN"],
+  "roles": ["ACTIVE", "CANDIDATE", "ROLLBACK"],
+  "constraints": {
+    "exactActiveCount": 1,
+    "maxCandidateCount": 1,
+    "maxRollbackCount": 1,
+    "activeWriteAuthorityOnly": true,
+    "candidateRequiresActiveSyncEvidence": true,
+    "directRollbackToActiveForbidden": true,
+    "colorsArePermanentRoles": false
+  },
+  "identifiers": {
+    "releaseShaPattern": "^[0-9a-f]{40}$",
+    "databaseIdentityPattern": "^[A-Za-z0-9._-]{3,80}$",
+    "evidenceRefPattern": "^[A-Za-z0-9._:/#-]{3,500}$"
+  }
+}

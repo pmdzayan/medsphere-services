@@ -199,7 +199,7 @@ Ordered scope:
 
 Ordered scope:
 
-1. UM14.1 Canonical application-version model and release policy covering major, minor, patch, build, API, and database-schema compatibility.
+1. UM14.1 Blue/Green Environment & Role Model — canonical release/environment identity, reusable BLUE/GREEN physical slots, rotating ACTIVE/CANDIDATE/ROLLBACK roles, single database write authority, and fail-closed promotion rules. This refines the original canonical release-policy item without activating synchronization or traffic shifting.
 2. UM14.2 Signed/versioned update-manifest service exposing current version, minimum supported version, update severity, release notes reference, and supported client platforms without exposing secrets.
 3. UM14.3 Web/PWA update detection with safe refresh/reload behavior and a user-facing `Update now` flow when a new frontend build is available.
 4. UM14.4 Optional-versus-required update UX so normal releases may be deferred while critical security or incompatible releases can require an upgrade before continued use.

@@ -109,3 +109,10 @@ flowchart TD
     - Stop the new runtime.
     - Revert application container to previous known-good release SHA.
     - Do not assume a schema downgrade is safe. Application rollback is permitted only when the current forward-migrated schema remains compatible with the previous application artifact; otherwise follow the approved Task 0022 recovery controls and migration policy.
+
+## Blue/Green role boundary — UM14.1
+
+ADR-033 adds reusable BLUE/GREEN environment identities above this deployment sequence. The color name is never production authority. Before any future blue/green operation, the operator-visible state must pass `pnpm test:blue-green-role-model` and identify exactly one `ACTIVE` environment whose name matches the sole database `writeAuthority`.
+
+UM14.1 does not alter this runbook's deployment freeze or Task 0050 production evidence requirements. Database synchronization, candidate data creation, shadow traffic, progressive canary routing and automatic rollback remain unavailable until their later Milestone 14 tasks are separately accepted.
+
