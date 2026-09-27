@@ -7,7 +7,9 @@ import {
   analyzeChangeSet,
   classifyHighRiskFiles,
   evaluateIndependentReviews,
+  evaluateSoloMaintainerEvidence,
   isBootstrapReviewWaiver,
+  isSoloMaintainerTransitionWaiver,
   parsePatch,
   validatePolicy,
 } from './ai-code-security-data-integrity-gate.mjs';
@@ -22,9 +24,9 @@ function fixture() {
 
 function policy(overrides = {}) {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     task: '0060',
-    principle: 'independent-review-for-high-risk-healthcare-changes',
+    principle: 'independent-evidence-for-high-risk-healthcare-changes',
     reviewRequired: [
       { id: 'backend', prefixes: ['apps/auth-service/src/'], excludeSuffixes: ['.spec.ts'] },
       { id: 'database', prefixes: ['packages/database/prisma/migrations/'] },
@@ -63,6 +65,23 @@ function policy(overrides = {}) {
     bootstrap: {
       baseSha: 'base-0060',
       expiresAt: '2026-09-27T00:00:00.000Z',
+      reason: 'fixture',
+      allowedPaths: ['PROJECT_RULES.md'],
+    },
+    approval: {
+      independentHumanReview: { enabled: true, preferred: true },
+      soloMaintainer: {
+        enabled: true,
+        authorizedMaintainers: ['author'],
+        minimumCoolingOffSeconds: 43200,
+        attestationPrefix: 'AIM-SOLO-REVIEW:',
+        requireGitHubWorkflowRunEvidence: true,
+        requireExactHeadAttestation: true,
+      },
+    },
+    transitionBootstrap: {
+      baseSha: 'base-solo-transition',
+      expiresAt: '2026-09-29T00:00:00.000Z',
       reason: 'fixture',
       allowedPaths: ['PROJECT_RULES.md'],
     },
@@ -234,6 +253,134 @@ describe('Task 0060 independent AI-code security/data-integrity gate', () => {
       approved: true,
       approvedBy: ['reviewer-b'],
     });
+  });
+
+  it('accepts solo-maintainer evidence only after GitHub-recorded cooling and exact-head attestation', () => {
+    const p = policy();
+    const head = 'a'.repeat(40);
+    const workflowRuns = {
+      workflow_runs: [
+        {
+          head_sha: head,
+          created_at: '2026-09-25T00:00:00.000Z',
+        },
+      ],
+    };
+
+    assert.deepEqual(
+      evaluateSoloMaintainerEvidence({
+        policy: p,
+        author: 'author',
+        head,
+        workflowRuns,
+        comments: [],
+        now: new Date('2026-09-25T11:59:59.000Z'),
+      }),
+      {
+        approved: false,
+        reason: 'solo-maintainer cooling-off period is still active',
+        coolingEndsAt: '2026-09-25T12:00:00.000Z',
+      },
+    );
+
+    const result = evaluateSoloMaintainerEvidence({
+      policy: p,
+      author: 'author',
+      head,
+      workflowRuns,
+      comments: [
+        {
+          body: `AIM-SOLO-REVIEW: ${head}`,
+          created_at: '2026-09-25T12:01:00.000Z',
+          user: { login: 'author', type: 'User' },
+        },
+      ],
+      now: new Date('2026-09-25T13:00:00.000Z'),
+    });
+    assert.equal(result.approved, true);
+    assert.equal(result.approvedBy, 'author');
+  });
+
+  it('rejects solo attestation from an unauthorized maintainer, bot, wrong head, or before cooling', () => {
+    const p = policy();
+    const head = 'b'.repeat(40);
+    const workflowRuns = {
+      workflow_runs: [{ head_sha: head, created_at: '2026-09-25T00:00:00.000Z' }],
+    };
+    const validBody = `AIM-SOLO-REVIEW: ${head}`;
+
+    assert.match(
+      evaluateSoloMaintainerEvidence({
+        policy: p,
+        author: 'someone-else',
+        head,
+        workflowRuns,
+        comments: [],
+        now: new Date('2026-09-26T00:00:00.000Z'),
+      }).reason,
+      /not an authorized solo maintainer/,
+    );
+
+    for (const comment of [
+      {
+        body: validBody,
+        created_at: '2026-09-25T12:01:00.000Z',
+        user: { login: 'author', type: 'Bot' },
+      },
+      {
+        body: `AIM-SOLO-REVIEW: ${'c'.repeat(40)}`,
+        created_at: '2026-09-25T12:01:00.000Z',
+        user: { login: 'author', type: 'User' },
+      },
+      {
+        body: validBody,
+        created_at: '2026-09-25T11:59:59.000Z',
+        user: { login: 'author', type: 'User' },
+      },
+    ]) {
+      assert.equal(
+        evaluateSoloMaintainerEvidence({
+          policy: p,
+          author: 'author',
+          head,
+          workflowRuns,
+          comments: [comment],
+          now: new Date('2026-09-26T00:00:00.000Z'),
+        }).approved,
+        false,
+      );
+    }
+  });
+
+  it('limits the solo-governance transition waiver to the exact base, allowlist, and expiry', () => {
+    const p = policy();
+    assert.equal(
+      isSoloMaintainerTransitionWaiver({
+        policy: p,
+        base: 'base-solo-transition',
+        files: ['PROJECT_RULES.md'],
+        now: new Date('2026-09-27T12:00:00.000Z'),
+      }),
+      true,
+    );
+    assert.equal(
+      isSoloMaintainerTransitionWaiver({
+        policy: p,
+        base: 'wrong',
+        files: ['PROJECT_RULES.md'],
+        now: new Date('2026-09-27T12:00:00.000Z'),
+      }),
+      false,
+    );
+    assert.equal(
+      isSoloMaintainerTransitionWaiver({
+        policy: p,
+        base: 'base-solo-transition',
+        files: ['apps/auth-service/src/auth/auth.service.ts'],
+        now: new Date('2026-09-27T12:00:00.000Z'),
+      }),
+      false,
+    );
   });
 
   it('limits the bootstrap waiver to the exact base, allowlist, and expiry', () => {

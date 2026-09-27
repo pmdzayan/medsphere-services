@@ -44,10 +44,10 @@ export function validatePolicy(policy) {
   if (!policy || typeof policy !== 'object' || Array.isArray(policy)) {
     throw new Error('Task 0060 policy must be an object');
   }
-  if (policy.schemaVersion !== 1 || policy.task !== '0060') {
+  if (policy.schemaVersion !== 2 || policy.task !== '0060') {
     throw new Error('Task 0060 policy identity is invalid');
   }
-  if (policy.principle !== 'independent-review-for-high-risk-healthcare-changes') {
+  if (policy.principle !== 'independent-evidence-for-high-risk-healthcare-changes') {
     throw new Error('Task 0060 security principle changed');
   }
   if (!Array.isArray(policy.reviewRequired) || policy.reviewRequired.length === 0) {
@@ -103,6 +103,30 @@ export function validatePolicy(policy) {
     policy.bootstrap.allowedPaths.length === 0
   ) {
     throw new Error('Task 0060 bounded bootstrap definition is missing');
+  }
+  const solo = policy.approval?.soloMaintainer;
+  if (
+    policy.approval?.independentHumanReview?.enabled !== true ||
+    !solo ||
+    solo.enabled !== true ||
+    !Array.isArray(solo.authorizedMaintainers) ||
+    solo.authorizedMaintainers.length === 0 ||
+    !Number.isInteger(solo.minimumCoolingOffSeconds) ||
+    solo.minimumCoolingOffSeconds < 3600 ||
+    typeof solo.attestationPrefix !== 'string' ||
+    !solo.attestationPrefix ||
+    solo.requireGitHubWorkflowRunEvidence !== true ||
+    solo.requireExactHeadAttestation !== true
+  ) {
+    throw new Error('Task 0060 solo-maintainer compensating controls are incomplete');
+  }
+  if (
+    !policy.transitionBootstrap?.baseSha ||
+    !policy.transitionBootstrap?.expiresAt ||
+    !Array.isArray(policy.transitionBootstrap?.allowedPaths) ||
+    policy.transitionBootstrap.allowedPaths.length === 0
+  ) {
+    throw new Error('Task 0060 transition bootstrap definition is missing');
   }
 }
 
@@ -299,6 +323,90 @@ export function isBootstrapReviewWaiver({ policy, base, files, now = new Date() 
   return files.length > 0 && files.every((file) => allowed.has(normalize(file)));
 }
 
+export function isSoloMaintainerTransitionWaiver({ policy, base, files, now = new Date() }) {
+  const transition = policy.transitionBootstrap;
+  if (!transition || base !== transition.baseSha) return false;
+  const expiry = new Date(transition.expiresAt);
+  if (!Number.isFinite(expiry.getTime()) || expiry <= now) return false;
+  const allowed = new Set(transition.allowedPaths.map(normalize));
+  return files.length > 0 && files.every((file) => allowed.has(normalize(file)));
+}
+
+export function evaluateSoloMaintainerEvidence({
+  policy,
+  author,
+  head,
+  workflowRuns,
+  comments,
+  now = new Date(),
+}) {
+  const config = policy.approval?.soloMaintainer;
+  const normalizedAuthor = String(author ?? '').toLowerCase();
+  if (!config?.enabled) {
+    return { approved: false, reason: 'solo-maintainer path is disabled' };
+  }
+  const authorized = config.authorizedMaintainers
+    .map((login) => String(login).toLowerCase())
+    .includes(normalizedAuthor);
+  if (!authorized) {
+    return { approved: false, reason: 'PR author is not an authorized solo maintainer' };
+  }
+  if (!/^[0-9a-f]{40}$/.test(String(head ?? ''))) {
+    return { approved: false, reason: 'exact head SHA is missing or invalid' };
+  }
+
+  const runs = Array.isArray(workflowRuns)
+    ? workflowRuns
+    : Array.isArray(workflowRuns?.workflow_runs)
+      ? workflowRuns.workflow_runs
+      : [];
+  const exactHeadRuns = runs
+    .filter((run) => run?.head_sha === head && Date.parse(run?.created_at ?? ''))
+    .map((run) => Date.parse(run.created_at))
+    .sort((a, b) => a - b);
+  if (exactHeadRuns.length === 0) {
+    return { approved: false, reason: 'no GitHub workflow-run evidence exists for the exact head' };
+  }
+
+  const coolingStartedAt = exactHeadRuns[0];
+  const coolingEndsAt = coolingStartedAt + config.minimumCoolingOffSeconds * 1000;
+  if (now.getTime() < coolingEndsAt) {
+    return {
+      approved: false,
+      reason: 'solo-maintainer cooling-off period is still active',
+      coolingEndsAt: new Date(coolingEndsAt).toISOString(),
+    };
+  }
+
+  const expectedAttestation = `${config.attestationPrefix} ${head}`;
+  const attestations = (Array.isArray(comments) ? comments : []).filter((comment) => {
+    const createdAt = Date.parse(comment?.created_at ?? '');
+    return (
+      comment?.user?.type !== 'Bot' &&
+      String(comment?.user?.login ?? '').toLowerCase() === normalizedAuthor &&
+      String(comment?.body ?? '').trim() === expectedAttestation &&
+      Number.isFinite(createdAt) &&
+      createdAt >= coolingEndsAt &&
+      createdAt <= now.getTime()
+    );
+  });
+
+  if (attestations.length === 0) {
+    return {
+      approved: false,
+      reason: `exact-head solo attestation required after cooling-off: ${expectedAttestation}`,
+      coolingEndsAt: new Date(coolingEndsAt).toISOString(),
+    };
+  }
+
+  return {
+    approved: true,
+    approvedBy: author,
+    coolingStartedAt: new Date(coolingStartedAt).toISOString(),
+    coolingEndsAt: new Date(coolingEndsAt).toISOString(),
+  };
+}
+
 function walkFiles(root, relative = '') {
   const absolute = path.join(root, relative);
   return fs.readdirSync(absolute, { withFileTypes: true }).flatMap((entry) => {
@@ -336,6 +444,7 @@ export function checkRepositoryBoundary(repositoryRoot = DEFAULT_ROOT) {
     'scripts/ai-code-security-data-integrity-gate.spec.mjs',
     '.github/workflows/ai-code-security-data-integrity.yml',
     'docs/adr/0032-independent-ai-code-security-data-integrity-gate.md',
+    'docs/adr/0035-solo-maintainer-high-risk-change-governance.md',
     'docs/operations/task-0060-ai-code-security-data-integrity.md',
     'docs/sprints/Task-0060-ai-code-security-data-integrity.md',
   ];
@@ -363,10 +472,18 @@ export function checkRepositoryBoundary(repositoryRoot = DEFAULT_ROOT) {
   );
   for (const marker of [
     'pull_request_review:',
+    'issue_comment:',
     'pull-requests: read',
+    'issues: read',
+    'actions: read',
+    'security-events: write',
+    'github/codeql-action/init@v3',
+    'pnpm audit --prod --audit-level moderate',
     'gh api',
     'ai-code-security-data-integrity-gate.mjs diff',
     '--base',
+    '--comments',
+    '--runs',
   ]) {
     if (!workflow.includes(marker)) {
       failures.push(`Task 0060 workflow is missing required marker: ${marker}`);
@@ -423,7 +540,15 @@ export function runBoundary(repositoryRoot = DEFAULT_ROOT) {
   }
 }
 
-export function runDiff({ repositoryRoot = DEFAULT_ROOT, base, head, author, reviewsPath }) {
+export function runDiff({
+  repositoryRoot = DEFAULT_ROOT,
+  base,
+  head,
+  author,
+  reviewsPath,
+  commentsPath,
+  runsPath,
+}) {
   try {
     if (!base || !head) throw new Error('diff mode requires --base and --head');
     const policy = loadPolicy(repositoryRoot);
@@ -455,23 +580,50 @@ export function runDiff({ repositoryRoot = DEFAULT_ROOT, base, head, author, rev
       return 0;
     }
 
+    if (isSoloMaintainerTransitionWaiver({ policy, base, files })) {
+      process.stdout.write(
+        'TASK 0060 CHANGE GATE: PASS (bounded solo-maintainer governance transition waiver)\n',
+      );
+      return 0;
+    }
+
     if (!author) throw new Error('high-risk diff requires --author');
     if (!reviewsPath) throw new Error('high-risk diff requires --reviews');
     const reviews = JSON.parse(fs.readFileSync(reviewsPath, 'utf8'));
     const review = evaluateIndependentReviews(reviews, author);
-    if (!review.approved) {
+    if (review.approved) {
+      process.stdout.write(
+        `TASK 0060 CHANGE GATE: PASS (independent approval by ${review.approvedBy.join(', ')})\n`,
+      );
+      return 0;
+    }
+
+    if (!commentsPath || !runsPath) {
+      throw new Error(
+        'high-risk diff without independent approval requires --comments and --runs for solo-maintainer evidence',
+      );
+    }
+    const comments = JSON.parse(fs.readFileSync(commentsPath, 'utf8'));
+    const workflowRuns = JSON.parse(fs.readFileSync(runsPath, 'utf8'));
+    const solo = evaluateSoloMaintainerEvidence({
+      policy,
+      author,
+      head,
+      comments,
+      workflowRuns,
+    });
+    if (!solo.approved) {
       const categories = [...new Set(result.highRisk.map((entry) => entry.category))];
       printFailure(
-        `Independent approval required for high-risk AIM change. Categories: ${categories.join(', ') || 'review-signal'}.`,
+        `High-risk AIM change requires independent approval or valid solo-maintainer evidence. Categories: ${categories.join(', ') || 'review-signal'}.`,
       );
-      printFailure(
-        'The approving reviewer must be different from the PR author and their latest review must be APPROVED.',
-      );
+      printFailure(`Solo-maintainer evidence not satisfied: ${solo.reason}.`);
+      if (solo.coolingEndsAt) printFailure(`Cooling-off ends at ${solo.coolingEndsAt}.`);
       return 1;
     }
 
     process.stdout.write(
-      `TASK 0060 CHANGE GATE: PASS (independent approval by ${review.approvedBy.join(', ')})\n`,
+      `TASK 0060 CHANGE GATE: PASS (solo-maintainer exact-head attestation by ${solo.approvedBy}; cooling completed ${solo.coolingEndsAt})\n`,
     );
     return 0;
   } catch (error) {
@@ -490,6 +642,8 @@ if (invokedPath === fileURLToPath(import.meta.url)) {
           head: args.head,
           author: args.author,
           reviewsPath: args.reviews,
+          commentsPath: args.comments,
+          runsPath: args.runs,
         })
       : runBoundary();
 }
