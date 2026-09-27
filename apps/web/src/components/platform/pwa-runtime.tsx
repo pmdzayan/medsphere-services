@@ -3,10 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 
 import { useLanguage } from '@/components/language-provider';
-import {
-  WEB_UPDATE_CHECK_INTERVAL_MS,
-  shouldCheckForWebUpdate,
-} from '@/lib/pwa-update-policy';
+import { WEB_UPDATE_CHECK_INTERVAL_MS, shouldCheckForWebUpdate } from '@/lib/pwa-update-policy';
 
 interface AimBeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -256,9 +253,7 @@ export function PwaRuntime() {
               onClick={() => void applyUpdate()}
               className="organization-theme-focus min-h-11 touch-manipulation rounded-xl bg-[var(--org-primary)] px-4 text-sm font-bold text-white disabled:cursor-wait disabled:opacity-70"
             >
-              {applyingUpdate
-                ? t('workstation.pwa.updating')
-                : t('workstation.pwa.updateNow')}
+              {applyingUpdate ? t('workstation.pwa.updating') : t('workstation.pwa.updateNow')}
             </button>
           </div>
         </div>
