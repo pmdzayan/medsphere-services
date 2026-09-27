@@ -1,26 +1,44 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "task": "0060",
-  "principle": "independent-review-for-high-risk-healthcare-changes",
+  "principle": "independent-evidence-for-high-risk-healthcare-changes",
   "reviewRequired": [
     {
       "id": "backend-healthcare-authority",
-      "prefixes": ["apps/auth-service/src/"],
-      "excludeSuffixes": [".spec.ts", ".test.ts"]
+      "prefixes": [
+        "apps/auth-service/src/"
+      ],
+      "excludeSuffixes": [
+        ".spec.ts",
+        ".test.ts"
+      ]
     },
     {
       "id": "browser-bff-trust-boundary",
-      "prefixes": ["apps/web/src/app/api/"],
-      "excludeSuffixes": [".spec.ts", ".test.ts"]
+      "prefixes": [
+        "apps/web/src/app/api/"
+      ],
+      "excludeSuffixes": [
+        ".spec.ts",
+        ".test.ts"
+      ]
     },
     {
       "id": "shared-security-boundary",
-      "prefixes": ["packages/security/"],
-      "excludeSuffixes": [".spec.ts", ".test.ts"]
+      "prefixes": [
+        "packages/security/"
+      ],
+      "excludeSuffixes": [
+        ".spec.ts",
+        ".test.ts"
+      ]
     },
     {
       "id": "database-schema-and-migrations",
-      "prefixes": ["packages/database/prisma/schema.prisma", "packages/database/prisma/migrations/"]
+      "prefixes": [
+        "packages/database/prisma/schema.prisma",
+        "packages/database/prisma/migrations/"
+      ]
     },
     {
       "id": "gate-integrity",
@@ -118,7 +136,10 @@
       "flags": "i"
     }
   ],
-  "forbiddenTrackedFiles": ["(^|/)\\.env$", "\\.(pem|key|p12|pfx)$"],
+  "forbiddenTrackedFiles": [
+    "(^|/)\\.env$",
+    "\\.(pem|key|p12|pfx)$"
+  ],
   "exceptions": [],
   "bootstrap": {
     "baseSha": "ce836f12d20d30351678b19ea525d7dd34f28bce",
@@ -137,6 +158,38 @@
       "PROJECT_RULES.md",
       "PRODUCT_ROADMAP.md",
       "package.json"
+    ]
+  },
+  "approval": {
+    "independentHumanReview": {
+      "enabled": true,
+      "preferred": true
+    },
+    "soloMaintainer": {
+      "enabled": true,
+      "authorizedMaintainers": [
+        "pmdzayan"
+      ],
+      "minimumCoolingOffSeconds": 43200,
+      "attestationPrefix": "AIM-SOLO-REVIEW:",
+      "requireGitHubWorkflowRunEvidence": true,
+      "requireExactHeadAttestation": true
+    }
+  },
+  "transitionBootstrap": {
+    "baseSha": "9fc623582059aa01b06163bec4147fbe8fafbe6e",
+    "expiresAt": "2026-09-29T00:00:00.000Z",
+    "reason": "One-time migration of Task 0060 from human-only review to independently evidenced solo-maintainer governance. Hard-fail scanning remains active and the waiver is limited to the exact pre-amendment authoritative base and explicit governance files.",
+    "allowedPaths": [
+      "docs/architecture/ai-code-security-data-integrity-policy.json",
+      "scripts/ai-code-security-data-integrity-gate.mjs",
+      "scripts/ai-code-security-data-integrity-gate.spec.mjs",
+      ".github/workflows/ai-code-security-data-integrity.yml",
+      "docs/adr/0032-independent-ai-code-security-data-integrity-gate.md",
+      "docs/adr/0035-solo-maintainer-high-risk-change-governance.md",
+      "docs/adr/README.md",
+      "docs/operations/task-0060-ai-code-security-data-integrity.md",
+      "PROJECT_RULES.md"
     ]
   }
 }
