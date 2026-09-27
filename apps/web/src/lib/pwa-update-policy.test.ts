@@ -1,9 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import {
-  WEB_UPDATE_CHECK_MIN_GAP_MS,
-  shouldCheckForWebUpdate,
-} from './pwa-update-policy';
+import { WEB_UPDATE_CHECK_MIN_GAP_MS, shouldCheckForWebUpdate } from './pwa-update-policy';
 
 describe('UM14.3 web update check policy', () => {
   it('checks immediately when visible and online with no previous check', () => {
