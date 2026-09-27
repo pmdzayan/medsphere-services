@@ -7,7 +7,7 @@
     "start": "next start -p 3001",
     "build": "node scripts/generate-release-marker.mjs && next build",
     "lint": "eslint src --ext .ts,.tsx",
-    "test": "vitest run && node --test scripts/generate-release-marker.spec.mjs",
+    "test": "vitest run && node --test scripts/generate-release-marker.node-test.mjs",
     "test:cov": "vitest run --coverage",
     "clean": "rimraf .next coverage",
     "test:e2e": "playwright test"
