@@ -20,10 +20,7 @@
     },
     {
       "id": "database-schema-and-migrations",
-      "prefixes": [
-        "packages/database/prisma/schema.prisma",
-        "packages/database/prisma/migrations/"
-      ]
+      "prefixes": ["packages/database/prisma/schema.prisma", "packages/database/prisma/migrations/"]
     },
     {
       "id": "gate-integrity",
