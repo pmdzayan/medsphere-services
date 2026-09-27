@@ -1,10 +1,12 @@
 # ADR-0032: Independent AI-Code Security and Data-Integrity Gate
 
-**Status:** Accepted
+**Status:** Superseded
 
 **Date:** 2026-09-25
 
 **Decision owners:** AIM Project Owner and CTO
+
+**Superseded by:** ADR-035 — Solo-Maintainer High-Risk Change Governance
 
 ## Decision
 

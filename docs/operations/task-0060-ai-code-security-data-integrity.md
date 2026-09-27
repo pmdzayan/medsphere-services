@@ -1,130 +1,96 @@
-# Task 0060 — Independent AI-Code Security & Data-Integrity Gate
+# Task 0060 — AI-Code Security & Data-Integrity Gate
 
 ## Purpose
 
-Task 0060 adds a repository-controlled second line of defense for AI-assisted and other high-risk changes. It does not assume that generated code is safe because it compiles, has tests, or was written by a capable model.
+Task 0060 treats AI-assisted and other high-risk AIM changes as untrusted until repository-controlled security and data-integrity evidence passes.
 
-The gate has two layers:
+ADR-035 supersedes ADR-032's human-review-only approval semantics. Independent human approval remains preferred, but an authorized solo maintainer may use a tightly bounded independently evidenced path when no reviewer is available.
 
-1. **hard failures** for configured unsafe additions;
-2. **independent review** for high-risk healthcare, security, tenant, database, and gate-integrity changes.
+## Non-waivable automated controls
 
-## Reused AIM controls
+Every dedicated Task 0060 workflow run retains:
 
-Task 0060 deliberately reuses rather than replaces:
+- locked dependency installation;
+- production dependency audit at moderate-or-higher severity;
+- first-party GitHub CodeQL JavaScript/TypeScript analysis;
+- Task 0060 policy/unit/repository-boundary tests;
+- change-aware hard-fail scanning for configured secrets, unsafe raw SQL, runtime execution, TLS disabling, destructive migration operations, and other configured rules.
 
-- tenant-safe RBAC and provider access guards;
-- exact-user audit requirements;
-- transaction/concurrency tests;
-- clean and populated database-upgrade verification;
-- production dependency audit;
-- architecture, runtime, network, backup/recovery, and release certification;
-- the existing PR Quality Gate.
+Passing Task 0060 never waives AIM's normal lint/test/build, clean migration/drift, populated-upgrade, runtime, backup/recovery, performance, network, or release-certification controls.
 
-The new gate is additive. Passing Task 0060 does not waive any older AIM control.
+## Approval paths
 
-## High-risk classification
+### Preferred: independent human review
 
-The machine-readable policy is:
+A high-risk pull request passes the review requirement when a reviewer other than the author, who is not a bot, has a latest submitted review state of `APPROVED`.
 
-`docs/architecture/ai-code-security-data-integrity-policy.json`
+### Solo-maintainer path
 
-Production changes under these surfaces require independent approval:
+The policy currently authorizes the repository maintainer listed under:
 
-- `apps/auth-service/src/`;
-- `apps/web/src/app/api/`;
-- `packages/security/`;
-- Prisma schema and migrations;
-- Task 0060's own enforcement files;
-- diffs matching configured trust-context, raw-HTML, transaction, locking, or tenant-scope review signals.
+`approval.soloMaintainer.authorizedMaintainers`
 
-Test/spec files do not become high risk merely because they live under the backend or BFF paths. A production file changed in the same PR still triggers review.
+The solo path requires:
 
-## Hard-fail classes
+1. the exact PR head SHA already has a Task 0060 GitHub workflow run;
+2. at least 12 hours have elapsed from the earliest GitHub-hosted workflow run for that exact head;
+3. the head has not changed;
+4. the authorized maintainer posts exactly:
 
-The gate currently rejects configured additions for:
+```text
+AIM-SOLO-REVIEW: <40-character-head-sha>
+```
 
-- private keys / recognizable live secrets;
-- unsafe Prisma raw-query APIs;
-- runtime `eval` / dynamic function creation;
-- child-process execution in production application/package code;
-- disabled TLS certificate verification;
-- destructive Prisma migration SQL without a valid exception.
+5. the comment's GitHub server timestamp is after the cooling period;
+6. the issue-comment event reruns Task 0060 on that exact head;
+7. all automated security controls pass.
 
-A hard failure cannot be overridden by PR approval alone.
+A new commit creates a new head SHA. The prior attestation then stops matching and cannot satisfy the gate.
 
-## Destructive migration exception contract
+## Why workflow-run time is used
 
-A legitimate destructive migration must add a narrow entry under `policy.exceptions` containing:
-
-- unique exception ID;
-- exact hard-fail rule ID;
-- exact migration path;
-- existing Accepted ADR path;
-- expiration timestamp.
-
-The referenced ADR must document why the destructive operation is necessary, populated-upgrade/data-preservation behavior, backup/recovery, rollout, and rollback. Since the policy file itself is a high-risk surface, the exception also requires independent review.
-
-## Independent approval contract
-
-The dedicated workflow reads GitHub pull-request reviews through a read-only token. For a high-risk diff it requires at least one reviewer whose:
-
-- login differs from the PR author;
-- account is not a bot;
-- latest review state is `APPROVED`.
-
-The workflow reruns when reviews are submitted, edited, or dismissed. If a reviewer later requests changes, their earlier approval no longer counts.
+Local Git commit timestamps are author-controlled. The cooling period therefore uses GitHub Actions workflow-run creation time as independent platform evidence. The PR comment timestamp is also supplied by GitHub.
 
 ## Commands
 
-Focused policy/unit tests plus repository boundary:
+Focused Task 0060 validation:
 
 ```bash
 pnpm test:ai-code-security-gate
 ```
 
-Repository boundary only:
-
-```bash
-node scripts/ai-code-security-data-integrity-gate.mjs boundary
-```
-
-Change-aware PR gate:
+Change-aware gate:
 
 ```bash
 node scripts/ai-code-security-data-integrity-gate.mjs diff \
   --base <base-sha> \
   --head <head-sha> \
   --author <pr-author> \
-  --reviews <reviews-json>
+  --reviews <reviews-json> \
+  --comments <issue-comments-json> \
+  --runs <workflow-runs-json>
 ```
-
-The boundary tests and live boundary are also part of `pnpm test:architecture`, so the normal Quality Gate catches missing/disabled Task 0060 enforcement.
 
 ## Failure interpretation
 
-`Hard security failure [...]` means the diff contains a configured unsafe addition. Fix the implementation or add a narrowly approved exception where the policy permits one.
+- `Hard security failure`: the change contains a configured non-waivable unsafe addition.
+- `cooling-off period is still active`: leave the exact head unchanged until the reported timestamp.
+- `exact-head solo attestation required`: after cooling, post the exact `AIM-SOLO-REVIEW: <head>` comment.
+- `PR author is not an authorized solo maintainer`: independent human approval is required unless governance explicitly adds that maintainer.
+- CodeQL/dependency/policy-test failures must be fixed; attestation cannot override them.
 
-`Independent approval required...` means the diff is high risk but there is no valid approval from somebody other than the PR author; request/approval signals and expired waivers fail.
+## Transition bootstrap
 
-`repository boundary` failures mean Task 0060's workflow, command wiring, policy, required documentation, or forbidden secret-file boundary drifted.
-
-Do not solve a failure by deleting the gate from the Quality Gate, weakening the regex, broadening an exception, or moving sensitive logic to an unscanned path.
-
-## Bootstrap
-
-The policy contains one bounded installation waiver for the initial Task 0060 pull request. It is restricted to the exact pre-0060 authoritative SHA, a small file allowlist, and a fixed expiry. It does not disable hard failures and cannot be reused after the base branch advances.
+The ADR-035 migration has a one-time exact-base and exact-file waiver because the old Task 0060 rule cannot independently approve its own replacement in a repository with no second human reviewer. The waiver expires and becomes unusable as soon as the authoritative base advances.
 
 ## Repository enforcement note
 
-The workflow produces enforceable pass/fail status. Server-side prevention of a manual administrator merge additionally depends on GitHub branch protection/rulesets requiring the Task 0060 check. Repository governance must not treat an unprotected branch as equivalent to an enforced review policy.
+The authoritative branch currently has no GitHub branch protection/ruleset enforcing required checks server-side. Task 0060 therefore produces strong evidence but cannot technically prevent a repository administrator from manually bypassing it. Server-side required-check enforcement should be configured when repository settings/access permit it.
 
 ## Out of scope
 
-- claiming that static analysis proves clinical correctness;
-- replacing human security/privacy/compliance review;
-- introducing a new runtime security service;
-- storing patient data in CI;
-- automatic diagnosis/prescribing decisions;
-- relaxing Task 0050 production-release evidence;
-- implementing Tasks 0052–0057 connected-healthcare product workflows.
+- claiming automated analysis proves clinical correctness;
+- replacing qualified security/privacy/compliance review;
+- weakening Task 0050 production-release evidence;
+- allowing hard-fail findings through solo attestation;
+- using a second account controlled by the same person as "independent" review.

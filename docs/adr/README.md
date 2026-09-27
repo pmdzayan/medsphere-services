@@ -15,35 +15,36 @@ Every ADR includes decision, reason/context, alternatives, consequences, impleme
 
 ## Index
 
-| ADR                                                                  | Decision                                               | Status   | Date       |
-| -------------------------------------------------------------------- | ------------------------------------------------------ | -------- | ---------- |
-| [ADR-001](0001-modular-monolith-for-version-1.md)                    | Modular monolith for Version 1                         | Accepted | 2026-07-20 |
-| [ADR-002](0002-append-only-reproducible-database-baseline.md)        | Append-only reproducible database baseline             | Accepted | 2026-07-20 |
-| [ADR-003](0003-trusted-authentication-and-tenant-context.md)         | Trusted authentication and tenant context              | Accepted | 2026-07-20 |
-| [ADR-004](0004-tenant-safe-authorization-and-durable-audit.md)       | Tenant-safe authorization and durable audit            | Accepted | 2026-07-25 |
-| [ADR-005](0005-batch-ledger-and-medicine-reservation-integrity.md)   | Batch ledger and reservation integrity                 | Accepted | 2026-07-25 |
-| [ADR-006](0006-supported-runtime-and-secure-http-baseline.md)        | Supported runtime and secure HTTP baseline             | Accepted | 2026-07-25 |
-| [ADR-007](0007-trusted-provider-access-scope.md)                     | Trusted provider access scope                          | Accepted | 2026-08-02 |
-| [ADR-008](0008-application-boundaries-and-domain-event-contracts.md) | Application boundaries and event contracts             | Accepted | 2026-08-08 |
-| [ADR-009](0009-atomic-completed-inventory-transfer.md)               | Atomic completed inventory transfer                    | Accepted | 2026-08-09 |
-| [ADR-010](0010-atomic-completed-damaged-stock-write-off.md)          | Atomic completed damaged-stock write-off               | Accepted | 2026-08-10 |
-| [ADR-011](0011-physical-batch-expiry-reconciliation.md)              | Physical batch expiry reconciliation                   | Accepted | 2026-08-10 |
-| [ADR-012](0012-one-way-manual-batch-quarantine.md)                   | One-way manual batch quarantine                        | Accepted | 2026-08-10 |
-| [ADR-013](0013-transactional-event-delivery-foundation.md)           | Transactional event delivery foundation                | Accepted | 2026-08-14 |
-| [ADR-014](0014-atomic-inventory-domain-event-producers.md)           | Atomic inventory domain event producers                | Accepted | 2026-08-14 |
-| [ADR-015](0015-provider-neutral-notification-delivery-foundation.md) | Provider-neutral notification delivery                 | Accepted | 2026-08-14 |
-| [ADR-016](0016-reservation-ready-notification-consumer.md)           | Reservation-ready notification consumer                | Accepted | 2026-08-14 |
-| [ADR-017](0017-reservation-notification-recipient-resolution.md)     | Reservation notification recipient resolution          | Accepted | 2026-08-15 |
-| [ADR-018](0018-reservation-notification-composition.md)              | Reservation notification composition                   | Proposed | 2026-08-16 |
-| [ADR-023](0023-phone-otp-verification-and-sms-provider-boundary.md)  | Phone OTP verification and SMS provider boundary       | Proposed | 2026-08-26 |
-| [ADR-024](0024-msg91-sms-provider-adapter.md)                        | MSG91 SMS provider adapter for phone OTP delivery      | Proposed | 2026-08-27 |
-| [ADR-025](0025-secure-organization-onboarding.md)                    | Secure organization onboarding                         | Accepted | 2026-08-29 |
-| [ADR-026](0026-platform-administration-security-boundary.md)         | Dedicated platform-administration security boundary    | Proposed | 2026-09-05 |
-| [ADR-027](0027-production-backup-recovery-foundation.md)             | Production backup/restore/recovery foundation          | Proposed | 2026-09-06 |
-| [ADR-028](0028-production-runtime-secrets-and-deployment-safety.md)  | Production runtime configuration and deployment safety | Accepted | 2026-09-07 |
-| [ADR-029](0029-medicine-availability-trust-freshness.md)             | Medicine availability trust and inventory freshness    | Proposed | 2026-09-09 |
-| [ADR-030](0030-evidence-before-scaling-bottleneck-governance.md)     | Evidence-before-scaling bottleneck governance          | Accepted | 2026-09-25 |
-| [ADR-031](0031-privacy-safe-network-efficiency-low-bandwidth.md)     | Privacy-safe network efficiency and low-bandwidth      | Accepted | 2026-09-25 |
-| [ADR-032](0032-independent-ai-code-security-data-integrity-gate.md)  | Independent AI-code security and data-integrity gate   | Accepted | 2026-09-25 |
-| [ADR-033](0033-blue-green-environment-role-model.md)                 | Blue/green environment role model                      | Accepted | 2026-09-26 |
-| [ADR-034](0034-blue-green-candidate-snapshot-rebuild.md)             | Blue/green candidate snapshot rebuild                  | Accepted | 2026-09-26 |
+| ADR                                                                  | Decision                                               | Status     | Date       |
+| -------------------------------------------------------------------- | ------------------------------------------------------ | ---------- | ---------- |
+| [ADR-001](0001-modular-monolith-for-version-1.md)                    | Modular monolith for Version 1                         | Accepted   | 2026-07-20 |
+| [ADR-002](0002-append-only-reproducible-database-baseline.md)        | Append-only reproducible database baseline             | Accepted   | 2026-07-20 |
+| [ADR-003](0003-trusted-authentication-and-tenant-context.md)         | Trusted authentication and tenant context              | Accepted   | 2026-07-20 |
+| [ADR-004](0004-tenant-safe-authorization-and-durable-audit.md)       | Tenant-safe authorization and durable audit            | Accepted   | 2026-07-25 |
+| [ADR-005](0005-batch-ledger-and-medicine-reservation-integrity.md)   | Batch ledger and reservation integrity                 | Accepted   | 2026-07-25 |
+| [ADR-006](0006-supported-runtime-and-secure-http-baseline.md)        | Supported runtime and secure HTTP baseline             | Accepted   | 2026-07-25 |
+| [ADR-007](0007-trusted-provider-access-scope.md)                     | Trusted provider access scope                          | Accepted   | 2026-08-02 |
+| [ADR-008](0008-application-boundaries-and-domain-event-contracts.md) | Application boundaries and event contracts             | Accepted   | 2026-08-08 |
+| [ADR-009](0009-atomic-completed-inventory-transfer.md)               | Atomic completed inventory transfer                    | Accepted   | 2026-08-09 |
+| [ADR-010](0010-atomic-completed-damaged-stock-write-off.md)          | Atomic completed damaged-stock write-off               | Accepted   | 2026-08-10 |
+| [ADR-011](0011-physical-batch-expiry-reconciliation.md)              | Physical batch expiry reconciliation                   | Accepted   | 2026-08-10 |
+| [ADR-012](0012-one-way-manual-batch-quarantine.md)                   | One-way manual batch quarantine                        | Accepted   | 2026-08-10 |
+| [ADR-013](0013-transactional-event-delivery-foundation.md)           | Transactional event delivery foundation                | Accepted   | 2026-08-14 |
+| [ADR-014](0014-atomic-inventory-domain-event-producers.md)           | Atomic inventory domain event producers                | Accepted   | 2026-08-14 |
+| [ADR-015](0015-provider-neutral-notification-delivery-foundation.md) | Provider-neutral notification delivery                 | Accepted   | 2026-08-14 |
+| [ADR-016](0016-reservation-ready-notification-consumer.md)           | Reservation-ready notification consumer                | Accepted   | 2026-08-14 |
+| [ADR-017](0017-reservation-notification-recipient-resolution.md)     | Reservation notification recipient resolution          | Accepted   | 2026-08-15 |
+| [ADR-018](0018-reservation-notification-composition.md)              | Reservation notification composition                   | Proposed   | 2026-08-16 |
+| [ADR-023](0023-phone-otp-verification-and-sms-provider-boundary.md)  | Phone OTP verification and SMS provider boundary       | Proposed   | 2026-08-26 |
+| [ADR-024](0024-msg91-sms-provider-adapter.md)                        | MSG91 SMS provider adapter for phone OTP delivery      | Proposed   | 2026-08-27 |
+| [ADR-025](0025-secure-organization-onboarding.md)                    | Secure organization onboarding                         | Accepted   | 2026-08-29 |
+| [ADR-026](0026-platform-administration-security-boundary.md)         | Dedicated platform-administration security boundary    | Proposed   | 2026-09-05 |
+| [ADR-027](0027-production-backup-recovery-foundation.md)             | Production backup/restore/recovery foundation          | Proposed   | 2026-09-06 |
+| [ADR-028](0028-production-runtime-secrets-and-deployment-safety.md)  | Production runtime configuration and deployment safety | Accepted   | 2026-09-07 |
+| [ADR-029](0029-medicine-availability-trust-freshness.md)             | Medicine availability trust and inventory freshness    | Proposed   | 2026-09-09 |
+| [ADR-030](0030-evidence-before-scaling-bottleneck-governance.md)     | Evidence-before-scaling bottleneck governance          | Accepted   | 2026-09-25 |
+| [ADR-031](0031-privacy-safe-network-efficiency-low-bandwidth.md)     | Privacy-safe network efficiency and low-bandwidth      | Accepted   | 2026-09-25 |
+| [ADR-032](0032-independent-ai-code-security-data-integrity-gate.md)  | Independent AI-code security and data-integrity gate   | Superseded | 2026-09-25 |
+| [ADR-033](0033-blue-green-environment-role-model.md)                 | Blue/green environment role model                      | Accepted   | 2026-09-26 |
+| [ADR-034](0034-blue-green-candidate-snapshot-rebuild.md)             | Blue/green candidate snapshot rebuild                  | Accepted   | 2026-09-26 |
+| [ADR-035](0035-solo-maintainer-high-risk-change-governance.md)       | Solo-maintainer high-risk change governance            | Accepted   | 2026-09-27 |
