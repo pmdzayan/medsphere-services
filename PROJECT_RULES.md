@@ -192,17 +192,19 @@ The executable budget is `docs/architecture/network-efficiency-budget.json`.
 
 ## 14. AI-code security and data-integrity governance
 
-AIM follows ADR-032's independent high-risk change rule.
+AIM follows ADR-035's independently evidenced high-risk change rule, which supersedes ADR-032's human-review-only requirement while retaining its hard-fail protections.
 
 - AI-assisted code is untrusted until it passes normal AIM tests and Task 0060.
-- Changes to auth-service production code, web BFF/API routes, shared security code, Prisma schema/migrations, or Task 0060 enforcement require independent approval from a reviewer other than the PR author.
-- Bot/self approvals do not count; the reviewer's latest submitted state must be `APPROVED`.
+- High-risk auth, BFF/API, shared-security, Prisma/migration, and gate-integrity changes should use independent human approval whenever an eligible reviewer is available.
+- When AIM is operated by an authorized solo maintainer and no independent reviewer is available, Task 0060 may accept the solo path only after the exact head has accumulated at least 12 hours of GitHub workflow-run cooling evidence and the authorized maintainer posts the exact server-timestamped attestation `AIM-SOLO-REVIEW: <40-character-head-sha>`.
+- The attestation is invalid after the head changes. A new head requires a new GitHub-recorded cooling period and a new exact-head attestation.
+- The solo path never waives dependency audit, CodeQL, Task 0060 policy tests, diff hard-fail scanning, normal quality gates, database migration/upgrade verification, runtime certification, or release controls.
 - Never accept client-supplied tenant, organization, provider, membership, role, or authorization context as authority.
 - Never bypass tenant-qualified authorization, transactions/locking/idempotency, audit, or populated-upgrade safety to satisfy a generated implementation.
-- Configured hard-fail secret, unsafe raw-SQL, runtime-execution, TLS, and destructive-migration findings cannot be waived by ordinary PR approval.
-- Destructive migration exceptions must be exact-path, exact-rule, expiring, backed by an existing Accepted ADR, and independently reviewed.
-- Do not weaken the Task 0060 policy, scanner, workflow, or tests merely to make CI green.
-- High-risk changes must pass `pnpm test:ai-code-security-gate` and the dedicated `AIM Independent AI-Code Security & Data-Integrity Gate` workflow.
+- Configured hard-fail secret, unsafe raw-SQL, runtime-execution, TLS, and destructive-migration findings cannot be waived by human approval or solo attestation.
+- Destructive migration exceptions remain exact-path, exact-rule, expiring, and backed by an existing Accepted ADR; the exception itself remains a high-risk change.
+- Do not weaken the Task 0060 policy, scanner, workflow, cooling period, attestation binding, CodeQL, or tests merely to make CI green.
+- High-risk changes must pass `pnpm test:ai-code-security-gate`, production dependency audit, CodeQL, and the dedicated `AIM Independent AI-Code Security & Data-Integrity Gate` workflow.
 
 The executable policy is `docs/architecture/ai-code-security-data-integrity-policy.json`.
 
