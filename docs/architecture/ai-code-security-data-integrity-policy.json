@@ -5,33 +5,18 @@
   "reviewRequired": [
     {
       "id": "backend-healthcare-authority",
-      "prefixes": [
-        "apps/auth-service/src/"
-      ],
-      "excludeSuffixes": [
-        ".spec.ts",
-        ".test.ts"
-      ]
+      "prefixes": ["apps/auth-service/src/"],
+      "excludeSuffixes": [".spec.ts", ".test.ts"]
     },
     {
       "id": "browser-bff-trust-boundary",
-      "prefixes": [
-        "apps/web/src/app/api/"
-      ],
-      "excludeSuffixes": [
-        ".spec.ts",
-        ".test.ts"
-      ]
+      "prefixes": ["apps/web/src/app/api/"],
+      "excludeSuffixes": [".spec.ts", ".test.ts"]
     },
     {
       "id": "shared-security-boundary",
-      "prefixes": [
-        "packages/security/"
-      ],
-      "excludeSuffixes": [
-        ".spec.ts",
-        ".test.ts"
-      ]
+      "prefixes": ["packages/security/"],
+      "excludeSuffixes": [".spec.ts", ".test.ts"]
     },
     {
       "id": "database-schema-and-migrations",
@@ -136,10 +121,7 @@
       "flags": "i"
     }
   ],
-  "forbiddenTrackedFiles": [
-    "(^|/)\\.env$",
-    "\\.(pem|key|p12|pfx)$"
-  ],
+  "forbiddenTrackedFiles": ["(^|/)\\.env$", "\\.(pem|key|p12|pfx)$"],
   "exceptions": [],
   "bootstrap": {
     "baseSha": "ce836f12d20d30351678b19ea525d7dd34f28bce",
@@ -167,9 +149,7 @@
     },
     "soloMaintainer": {
       "enabled": true,
-      "authorizedMaintainers": [
-        "pmdzayan"
-      ],
+      "authorizedMaintainers": ["pmdzayan"],
       "minimumCoolingOffSeconds": 43200,
       "attestationPrefix": "AIM-SOLO-REVIEW:",
       "requireGitHubWorkflowRunEvidence": true,
