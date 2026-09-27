@@ -17,7 +17,9 @@ describe('AIM PWA cache policy', () => {
       if (event.data?.type === 'PURGE_PUBLIC_CACHE') {}
     `;
     assert.ok(
-      checkPwaCachePolicy(unsafe).some((failure) => failure.includes("importScripts('/sw-release.js')")),
+      checkPwaCachePolicy(unsafe).some((failure) =>
+        failure.includes("importScripts('/sw-release.js')"),
+      ),
     );
   });
 
