@@ -3,11 +3,11 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev -p 3001",
+    "dev": "node scripts/generate-release-marker.mjs && next dev -p 3001",
     "start": "next start -p 3001",
-    "build": "next build",
+    "build": "node scripts/generate-release-marker.mjs && next build",
     "lint": "eslint src --ext .ts,.tsx",
-    "test": "vitest run",
+    "test": "vitest run && node --test scripts/generate-release-marker.spec.mjs",
     "test:cov": "vitest run --coverage",
     "clean": "rimraf .next coverage",
     "test:e2e": "playwright test"

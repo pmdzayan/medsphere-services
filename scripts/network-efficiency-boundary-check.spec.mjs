@@ -80,6 +80,7 @@ function validRepository() {
             { source: '/manifest.webmanifest', headers: [{ key: 'Cache-Control', value: PUBLIC_STATIC_CACHE }] },
             { source: '/icon.svg', headers: [{ key: 'Cache-Control', value: PUBLIC_STATIC_CACHE }] },
             { source: '/sw.js', headers: [{ key: 'Cache-Control', value: SERVICE_WORKER_CACHE }] },
+            { source: '/sw-release.js', headers: [{ key: 'Cache-Control', value: SERVICE_WORKER_CACHE }] },
           ];
         },
       };
