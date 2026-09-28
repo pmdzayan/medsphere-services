@@ -155,9 +155,23 @@ export interface PharmacyVerificationRecord {
   readonly version: number;
 }
 
+export interface VerificationSource {
+  readonly id: string;
+  readonly authority: string;
+  readonly label: string;
+  readonly officialUrl: string;
+  readonly requirement: 'PRIMARY' | 'SUPPORTING' | 'CONDITIONAL';
+  readonly mode: 'PORTAL_LOOKUP' | 'OFFICIAL_DIRECTORY';
+  readonly purpose: string;
+  readonly limitation: string;
+}
+
 export interface PharmacyVerificationState {
   readonly current: PharmacyVerificationRecord | null;
   readonly openSubmission: PharmacyVerificationRecord | null;
+  readonly verificationSources: VerificationSource[];
+  readonly jurisdictionReviewRequired: boolean;
+  readonly jurisdictionNote: string | null;
 }
 
 const VERIFICATION_STATUSES = [
@@ -168,6 +182,35 @@ const VERIFICATION_STATUSES = [
   'SUSPENDED',
   'EXPIRED',
 ] as const;
+
+const SOURCE_REQUIREMENTS = ['PRIMARY', 'SUPPORTING', 'CONDITIONAL'] as const;
+const SOURCE_MODES = ['PORTAL_LOOKUP', 'OFFICIAL_DIRECTORY'] as const;
+
+function isHttpsUrl(value: unknown): value is string {
+  if (typeof value !== 'string') return false;
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === 'https:' && !parsed.username && !parsed.password;
+  } catch {
+    return false;
+  }
+}
+
+function isVerificationSource(value: unknown): value is VerificationSource {
+  if (!isRecord(value)) return false;
+  return (
+    typeof value.id === 'string' &&
+    typeof value.authority === 'string' &&
+    typeof value.label === 'string' &&
+    isHttpsUrl(value.officialUrl) &&
+    typeof value.requirement === 'string' &&
+    (SOURCE_REQUIREMENTS as readonly string[]).includes(value.requirement) &&
+    typeof value.mode === 'string' &&
+    (SOURCE_MODES as readonly string[]).includes(value.mode) &&
+    typeof value.purpose === 'string' &&
+    typeof value.limitation === 'string'
+  );
+}
 
 function isPharmacyVerificationRecord(value: unknown): value is PharmacyVerificationRecord {
   if (!isRecord(value)) return false;
@@ -197,12 +240,24 @@ function isPharmacyVerificationRecord(value: unknown): value is PharmacyVerifica
  */
 export function isPharmacyVerificationState(value: unknown): value is PharmacyVerificationState {
   if (!isRecord(value)) return false;
-  if (!('current' in value) || !('openSubmission' in value)) return false;
+  if (
+    !('current' in value) ||
+    !('openSubmission' in value) ||
+    !('verificationSources' in value) ||
+    !('jurisdictionReviewRequired' in value) ||
+    !('jurisdictionNote' in value)
+  )
+    return false;
+
   const current = value.current;
   const openSubmission = value.openSubmission;
   return (
     (current === null || isPharmacyVerificationRecord(current)) &&
-    (openSubmission === null || isPharmacyVerificationRecord(openSubmission))
+    (openSubmission === null || isPharmacyVerificationRecord(openSubmission)) &&
+    Array.isArray(value.verificationSources) &&
+    value.verificationSources.every(isVerificationSource) &&
+    typeof value.jurisdictionReviewRequired === 'boolean' &&
+    (value.jurisdictionNote === null || typeof value.jurisdictionNote === 'string')
   );
 }
 

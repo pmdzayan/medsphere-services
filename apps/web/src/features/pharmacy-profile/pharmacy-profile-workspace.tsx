@@ -312,6 +312,12 @@ export function PharmacyProfileWorkspace() {
     return 'rose' as const;
   }
 
+  function sourceRequirementLabel(requirement: 'PRIMARY' | 'SUPPORTING' | 'CONDITIONAL') {
+    if (requirement === 'PRIMARY') return t('pharmacyProfile.verification.sources.primary');
+    if (requirement === 'SUPPORTING') return t('pharmacyProfile.verification.sources.supporting');
+    return t('pharmacyProfile.verification.sources.conditional');
+  }
+
   function verificationCard(record: PharmacyVerificationRecord, heading: string) {
     return (
       <article className="rounded-xl border border-[#e4ebe7] bg-[#f8faf9] p-4">
@@ -590,6 +596,56 @@ export function PharmacyProfileWorkspace() {
             <p className="mt-1 text-sm text-[#5a6b62]">
               {t('pharmacyProfile.verification.description')}
             </p>
+
+            {verification?.verificationSources.length ? (
+              <div className="mt-5 rounded-xl border border-[#d5ded9] bg-white p-4">
+                <h3 className="text-sm font-bold text-[#16281f]">
+                  {t('pharmacyProfile.verification.sources.title')}
+                </h3>
+                <p className="mt-1 text-xs leading-5 text-[#5a6b62]">
+                  {t('pharmacyProfile.verification.sources.description')}
+                </p>
+                <ul className="mt-4 space-y-3">
+                  {verification.verificationSources.map((source) => (
+                    <li key={source.id} className="rounded-lg border border-[#e4ebe7] p-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="text-sm font-semibold text-[#16281f]">{source.label}</p>
+                        <span className="rounded-full bg-[#eef5f1] px-2 py-1 text-[11px] font-bold uppercase tracking-wide text-[#35634d]">
+                          {sourceRequirementLabel(source.requirement)}
+                        </span>
+                      </div>
+                      <p className="mt-1 text-xs text-[#6c7b74]">{source.authority}</p>
+                      <p className="mt-2 text-xs leading-5 text-[#5a6b62]">{source.limitation}</p>
+                      <a
+                        className="mt-2 inline-flex text-xs font-semibold text-[#1f7a4d] underline"
+                        href={source.officialUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        {t('pharmacyProfile.verification.sources.open')}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+                {verification.jurisdictionReviewRequired ? (
+                  <p
+                    role="note"
+                    className="mt-4 rounded-lg border border-[#eadfc0] bg-[#fffaf0] p-3 text-xs leading-5 text-[#594814]"
+                  >
+                    {verification.jurisdictionNote ??
+                      t('pharmacyProfile.verification.sources.jurisdictionReview')}
+                  </p>
+                ) : null}
+              </div>
+            ) : verification?.jurisdictionReviewRequired ? (
+              <p
+                role="note"
+                className="mt-5 rounded-xl border border-[#eadfc0] bg-[#fffaf0] p-4 text-sm text-[#594814]"
+              >
+                {verification.jurisdictionNote ??
+                  t('pharmacyProfile.verification.sources.jurisdictionReview')}
+              </p>
+            ) : null}
 
             <div className="mt-5 space-y-4">
               {verification?.current ? (
