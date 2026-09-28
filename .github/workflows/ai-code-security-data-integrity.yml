@@ -1,0 +1,137 @@
+name: AIM Independent AI-Code Security & Data-Integrity Gate
+
+on:
+  pull_request:
+  pull_request_review:
+    types:
+      - submitted
+      - edited
+      - dismissed
+  issue_comment:
+    types:
+      - created
+      - edited
+      - deleted
+
+concurrency:
+  group: ai-security-${{ github.event.pull_request.number || github.event.issue.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: read
+  issues: read
+  actions: read
+  security-events: write
+
+jobs:
+  independent-security-review:
+    name: Independent/high-risk governance gate
+    if: github.event_name != 'issue_comment' || github.event.issue.pull_request
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+
+    steps:
+      - name: Resolve pull-request metadata
+        id: pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          EVENT_PR_NUMBER: ${{ github.event.pull_request.number }}
+          EVENT_ISSUE_NUMBER: ${{ github.event.issue.number }}
+        run: |
+          PR_NUMBER="${EVENT_PR_NUMBER:-${EVENT_ISSUE_NUMBER}}"
+          test -n "$PR_NUMBER"
+          gh api "repos/${REPOSITORY}/pulls/${PR_NUMBER}" > "$RUNNER_TEMP/pr.json"
+          echo "number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
+          echo "base_sha=$(jq -r '.base.sha' "$RUNNER_TEMP/pr.json")" >> "$GITHUB_OUTPUT"
+          echo "head_sha=$(jq -r '.head.sha' "$RUNNER_TEMP/pr.json")" >> "$GITHUB_OUTPUT"
+          echo "author=$(jq -r '.user.login' "$RUNNER_TEMP/pr.json")" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout exact pull-request head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.pr.outputs.head_sha }}
+          fetch-depth: 0
+
+      - name: Install PNPM
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+          run_install: false
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.12.0
+          cache: pnpm
+
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Audit production dependencies
+        run: pnpm audit --prod --audit-level moderate
+
+      - name: Fetch governance evidence
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+          REPOSITORY: ${{ github.repository }}
+          HEAD_SHA: ${{ steps.pr.outputs.head_sha }}
+        run: |
+          gh api --paginate "repos/${REPOSITORY}/pulls/${PR_NUMBER}/reviews?per_page=100" --slurp | jq 'add // []' > "$RUNNER_TEMP/reviews.json"
+          gh api --paginate "repos/${REPOSITORY}/issues/${PR_NUMBER}/comments?per_page=100" --slurp | jq 'add // []' > "$RUNNER_TEMP/comments.json"
+          gh api "repos/${REPOSITORY}/actions/workflows/ai-code-security-data-integrity.yml/runs?head_sha=${HEAD_SHA}&per_page=100" > "$RUNNER_TEMP/runs.json"
+
+      - name: Run Task 0060 policy and repository tests
+        run: pnpm test:ai-code-security-gate
+
+      - name: Run Task 0060 change-aware security gate
+        env:
+          BASE_SHA: ${{ steps.pr.outputs.base_sha }}
+          HEAD_SHA: ${{ steps.pr.outputs.head_sha }}
+          PR_AUTHOR: ${{ steps.pr.outputs.author }}
+        run: >-
+          node scripts/ai-code-security-data-integrity-gate.mjs diff
+          --base "$BASE_SHA"
+          --head "$HEAD_SHA"
+          --author "$PR_AUTHOR"
+          --reviews "$RUNNER_TEMP/reviews.json"
+          --comments "$RUNNER_TEMP/comments.json"
+          --runs "$RUNNER_TEMP/runs.json"
+
+  codeql:
+    name: CodeQL JavaScript/TypeScript analysis
+    if: github.event_name != 'issue_comment' || github.event.issue.pull_request
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      pull-requests: read
+      security-events: write
+
+    steps:
+      - name: Resolve pull-request head
+        id: pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          EVENT_PR_NUMBER: ${{ github.event.pull_request.number }}
+          EVENT_ISSUE_NUMBER: ${{ github.event.issue.number }}
+        run: |
+          PR_NUMBER="${EVENT_PR_NUMBER:-${EVENT_ISSUE_NUMBER}}"
+          gh api "repos/${REPOSITORY}/pulls/${PR_NUMBER}" | jq -r '"head_sha=" + .head.sha' >> "$GITHUB_OUTPUT"
+
+      - name: Checkout exact pull-request head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.pr.outputs.head_sha }}
+          fetch-depth: 0
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+
+      - name: Analyze with CodeQL
+        uses: github/codeql-action/analyze@v3
