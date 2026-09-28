@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "task": "UM14.2",
+  "principle": "snapshot-rebuild-inactive-only",
+  "sourceRole": "ACTIVE",
+  "requiredTargetRole": "ROLLBACK",
+  "targetRoleAfter": "CANDIDATE",
+  "backup": {
+    "format": "postgres-custom",
+    "encryptedStorageAcknowledgementRequired": true,
+    "forbidRepositoryStorage": true,
+    "fileMode": "0600"
+  },
+  "safety": {
+    "sourceMustMatchProductionReference": true,
+    "targetMustDifferFromSource": true,
+    "dropTargetRequiresExactConfirmation": true,
+    "failedCandidateCleanupDefault": true,
+    "applicationWriteAuthorityRemainsActive": true
+  },
+  "evidence": {
+    "schemaVersion": 1,
+    "referencePrefix": "bluegreen:sync:"
+  }
+}
