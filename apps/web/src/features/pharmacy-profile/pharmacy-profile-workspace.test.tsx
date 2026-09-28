@@ -147,7 +147,7 @@ describe('PharmacyProfileWorkspace', () => {
     const officialLinks = screen.getAllByRole('link', { name: 'Open official source' });
     expect(officialLinks[0]).toHaveAttribute('target', '_blank');
     expect(screen.getByText('Tamil Nadu Drugs Control — drug sales licensing')).toBeInTheDocument();
-    expect(screen.getByText('Tamil Nadu Pharmacy Council')).toBeInTheDocument();
+    expect(officialLinks[1]?.closest('li')).toHaveTextContent('Tamil Nadu Pharmacy Council');
 
     expect(officialLinks.map((link) => link.getAttribute('href'))).toEqual([
       'https://drugscontrol.tn.gov.in/sales_services.html',
