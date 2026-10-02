@@ -201,7 +201,7 @@ Ordered scope:
 
 1. UM14.1 Blue/Green Environment & Role Model — canonical release/environment identity, reusable BLUE/GREEN physical slots, rotating ACTIVE/CANDIDATE/ROLLBACK roles, single database write authority, and fail-closed promotion rules. This refines the original canonical release-policy item without activating synchronization or traffic shifting.
 2. UM14.2 Database Synchronization & Candidate Creation — rebuild only the inactive ROLLBACK database from a verified point-in-time snapshot of ACTIVE, preserve single application write authority, emit SHA-bound synchronization evidence, and generate the UM14.1 CANDIDATE state. Continuous replication and write-bearing canary traffic remain out of scope.
-3. UM14.3 Web/PWA update detection with safe refresh/reload behavior and a user-facing `Update now` flow when a new frontend build is available.
+3. UM14.3 Web/PWA Update Detection & Safe Update Flow — bind the service worker to a non-secret build identity, discover new frontend builds on startup/reconnect/foreground with bounded polling, and expose an explicit localized `Update now` flow that never auto-reloads in-progress healthcare work.
 4. UM14.4 Optional-versus-required update UX so normal releases may be deferred while critical security or incompatible releases can require an upgrade before continued use.
 5. UM14.5 Minimum-supported-client enforcement that fails safely and never silently allows a client version known to be incompatible or unsafe.
 6. UM14.6 Android/iOS store-release boundary for directing users to the official Google Play or Apple App Store update path when native applications are published.

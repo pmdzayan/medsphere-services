@@ -6,8 +6,11 @@
  *   inventory data, reservations, or mutation responses;
  * - cache only versioned Next static assets plus public manifest/icon assets.
  */
+importScripts('/sw-release.js');
+
 const CACHE_PREFIX = 'aim-public-static-';
-const CACHE_NAME = `${CACHE_PREFIX}v2`;
+const RELEASE_ID = self.__AIM_WEB_RELEASE__?.id ?? 'unversioned';
+const CACHE_NAME = `${CACHE_PREFIX}${RELEASE_ID}`;
 const PUBLIC_SHELL_ASSETS = new Set(['/manifest.webmanifest', '/icon.svg']);
 
 self.addEventListener('install', (event) => {

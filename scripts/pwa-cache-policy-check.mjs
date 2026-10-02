@@ -9,6 +9,7 @@ export function checkPwaCachePolicy(source = fs.readFileSync(serviceWorkerPath, 
   const failures = [];
 
   const requiredSnippets = [
+    "importScripts('/sw-release.js')",
     "url.pathname.startsWith('/api/')",
     "url.pathname.startsWith('/_next/static/')",
     'PUBLIC_SHELL_ASSETS.has(url.pathname)',

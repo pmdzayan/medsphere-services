@@ -7,6 +7,22 @@ describe('AIM PWA cache policy', () => {
     assert.deepEqual(checkPwaCachePolicy(), []);
   });
 
+  it('fails when the release marker import is removed', () => {
+    const unsafe = `
+      if (request.method !== 'GET') return;
+      if (url.pathname.startsWith('/api/')) return;
+      const isVersionedStaticAsset = url.pathname.startsWith('/_next/static/');
+      const isPublicShellAsset = PUBLIC_SHELL_ASSETS.has(url.pathname);
+      if (event.data?.type === 'SKIP_WAITING') {}
+      if (event.data?.type === 'PURGE_PUBLIC_CACHE') {}
+    `;
+    assert.ok(
+      checkPwaCachePolicy(unsafe).some((failure) =>
+        failure.includes("importScripts('/sw-release.js')"),
+      ),
+    );
+  });
+
   it('fails when the API exclusion is removed', () => {
     const unsafe = `
       if (request.method !== 'GET') return;
