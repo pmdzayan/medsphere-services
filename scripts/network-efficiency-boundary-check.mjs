@@ -140,15 +140,17 @@ export function checkNetworkEfficiencyBoundary(repositoryRoot = DEFAULT_ROOT) {
     }
   }
 
-  if (
-    !containsCacheValue(
-      nextConfig,
-      '/sw.js',
-      policy.cachePolicy.serviceWorker,
-      'SERVICE_WORKER_CACHE',
-    )
-  ) {
-    failures.push('Service-worker update cache policy is missing or unsafe.');
+  for (const source of ['/sw.js', '/sw-release.js']) {
+    if (
+      !containsCacheValue(
+        nextConfig,
+        source,
+        policy.cachePolicy.serviceWorker,
+        'SERVICE_WORKER_CACHE',
+      )
+    ) {
+      failures.push(`Service-worker update cache policy is missing or unsafe for ${source}.`);
+    }
   }
 
   if (

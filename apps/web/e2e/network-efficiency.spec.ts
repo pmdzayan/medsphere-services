@@ -105,7 +105,9 @@ test('Task 0059 public-static cache headers are bounded and service-worker code 
     expect(response.headers()['cache-control']).toBe(networkBudget.cachePolicy.publicStatic);
   }
 
-  const serviceWorker = await request.get('/sw.js');
-  expect(serviceWorker.ok()).toBe(true);
-  expect(serviceWorker.headers()['cache-control']).toBe(networkBudget.cachePolicy.serviceWorker);
+  for (const pathname of ['/sw.js', '/sw-release.js']) {
+    const response = await request.get(pathname);
+    expect(response.ok()).toBe(true);
+    expect(response.headers()['cache-control']).toBe(networkBudget.cachePolicy.serviceWorker);
+  }
 });
