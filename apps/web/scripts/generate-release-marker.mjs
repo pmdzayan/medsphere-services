@@ -10,7 +10,7 @@ const GENERATED_MARKER = path.join('public', 'sw-release.js');
 const RELEASE_SHA_PATTERN = /^[0-9a-f]{40}$/i;
 const UPDATE_MODES = new Set(['optional', 'required']);
 const UPDATE_REASONS = new Set(['routine', 'security', 'incompatible']);
-const CLIENT_GENERATION_PATTERN = /^\\d{1,10}$/;
+const CLIENT_GENERATION_PATTERN = /^\d{1,10}$/;
 const CLIENT_GENERATION_MAX = 1_000_000_000;
 
 function walk(directory, root, files) {
@@ -113,7 +113,10 @@ export function markerSource(releasePolicy) {
   }
 
   const validId = /^(git:[0-9a-f]{40}|content:[0-9a-f]{64})$/.test(releasePolicy.id);
-  const validGeneration = Number.isSafeInteger(releasePolicy.clientGeneration) && releasePolicy.clientGeneration >= 1 && releasePolicy.clientGeneration <= CLIENT_GENERATION_MAX;
+  const validGeneration =
+    Number.isSafeInteger(releasePolicy.clientGeneration) &&
+    releasePolicy.clientGeneration >= 1 &&
+    releasePolicy.clientGeneration <= CLIENT_GENERATION_MAX;
   const validMode = UPDATE_MODES.has(releasePolicy.updateMode);
   const validReason = UPDATE_REASONS.has(releasePolicy.updateReason);
 
