@@ -71,21 +71,22 @@ describe('UM14.3 web update check policy', () => {
 
 describe('UM14.4 optional-versus-required update policy', () => {
   const id = `git:${'a'.repeat(40)}`;
+  const clientGeneration = 3;
 
   it('accepts bounded optional and required policies', () => {
-    expect(parseWebReleasePolicy({ id, updateMode: 'optional', updateReason: 'routine' })).toEqual({
+    expect(parseWebReleasePolicy({ id, clientGeneration, updateMode: 'optional', updateReason: 'routine' })).toEqual({
       id,
       updateMode: 'optional',
       updateReason: 'routine',
     });
 
-    expect(parseWebReleasePolicy({ id, updateMode: 'required', updateReason: 'security' })).toEqual(
-      { id, updateMode: 'required', updateReason: 'security' },
+    expect(parseWebReleasePolicy({ id, clientGeneration, updateMode: 'required', updateReason: 'security' })).toEqual(
+      { id, clientGeneration, updateMode: 'required', updateReason: 'security' },
     );
 
     expect(
-      parseWebReleasePolicy({ id, updateMode: 'required', updateReason: 'incompatible' }),
-    ).toEqual({ id, updateMode: 'required', updateReason: 'incompatible' });
+      parseWebReleasePolicy({ id, clientGeneration, updateMode: 'required', updateReason: 'incompatible' }),
+    ).toEqual({ id, clientGeneration, updateMode: 'required', updateReason: 'incompatible' });
   });
 
   it('rejects malformed or contradictory release policy', () => {
@@ -93,20 +94,20 @@ describe('UM14.4 optional-versus-required update policy', () => {
       parseWebReleasePolicy({ id: 'latest', updateMode: 'required', updateReason: 'security' }),
     ).toBeNull();
     expect(
-      parseWebReleasePolicy({ id, updateMode: 'required', updateReason: 'routine' }),
+      parseWebReleasePolicy({ id, clientGeneration, updateMode: 'required', updateReason: 'routine' }),
     ).toBeNull();
     expect(
-      parseWebReleasePolicy({ id, updateMode: 'optional', updateReason: 'incompatible' }),
+      parseWebReleasePolicy({ id, clientGeneration, updateMode: 'optional', updateReason: 'incompatible' }),
     ).toBeNull();
-    expect(parseWebReleasePolicy({ id, updateMode: 'force', updateReason: 'security' })).toBeNull();
+    expect(parseWebReleasePolicy({ id, clientGeneration, updateMode: 'force', updateReason: 'security' })).toBeNull();
   });
 
   it('allows Later only for optional releases', () => {
-    expect(webUpdatePresentation({ id, updateMode: 'optional', updateReason: 'security' })).toEqual(
+    expect(webUpdatePresentation({ id, clientGeneration, updateMode: 'optional', updateReason: 'security' })).toEqual(
       { required: false, canDefer: true, reason: 'security' },
     );
 
-    expect(webUpdatePresentation({ id, updateMode: 'required', updateReason: 'security' })).toEqual(
+    expect(webUpdatePresentation({ id, clientGeneration, updateMode: 'required', updateReason: 'security' })).toEqual(
       { required: true, canDefer: false, reason: 'security' },
     );
   });
