@@ -8,13 +8,14 @@ import {
   contentReleaseId,
   markerSource,
   resolveWebReleaseId,
+  resolveWebUpdatePolicy,
   writeReleaseMarker,
 } from './generate-release-marker.mjs';
 
 const temporaryDirectories = [];
 
 function fixture() {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'aim-um14-3-'));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'aim-um14-4-'));
   temporaryDirectories.push(root);
   fs.mkdirSync(path.join(root, 'src'), { recursive: true });
   fs.mkdirSync(path.join(root, 'public'), { recursive: true });
@@ -30,7 +31,7 @@ afterEach(() => {
   }
 });
 
-describe('UM14.3 web release marker', () => {
+describe('UM14.3 web release identity', () => {
   it('prefers a bounded non-secret release SHA when supplied', () => {
     const root = fixture();
     const sha = 'A'.repeat(40);
@@ -57,18 +58,93 @@ describe('UM14.3 web release marker', () => {
     fs.writeFileSync(path.join(root, 'public', 'sw-release.js'), 'old generated value');
     assert.equal(contentReleaseId(root), first);
   });
+});
 
-  it('writes only bounded release identity and never copies unrelated environment values', () => {
+describe('UM14.4 release severity marker', () => {
+  const releaseId = `git:${'b'.repeat(40)}`;
+
+  it('defaults normal releases to optional/routine', () => {
+    assert.deepEqual(resolveWebUpdatePolicy({ env: {}, releaseId }), {
+      id: releaseId,
+      updateMode: 'optional',
+      updateReason: 'routine',
+    });
+  });
+
+  it('requires explicit bounded reason for a required release', () => {
+    assert.throws(
+      () => resolveWebUpdatePolicy({ env: { AIM_WEB_UPDATE_MODE: 'required' }, releaseId }),
+      /explicit non-secret update reason/,
+    );
+    assert.deepEqual(
+      resolveWebUpdatePolicy({
+        env: { AIM_WEB_UPDATE_MODE: 'required', AIM_WEB_UPDATE_REASON: 'security' },
+        releaseId,
+      }),
+      { id: releaseId, updateMode: 'required', updateReason: 'security' },
+    );
+  });
+
+  it('rejects contradictory or unbounded update policy', () => {
+    assert.throws(
+      () =>
+        resolveWebUpdatePolicy({
+          env: { AIM_WEB_UPDATE_MODE: 'required', AIM_WEB_UPDATE_REASON: 'routine' },
+          releaseId,
+        }),
+      /routine releases cannot be marked required/,
+    );
+    assert.throws(
+      () =>
+        resolveWebUpdatePolicy({
+          env: { AIM_WEB_UPDATE_MODE: 'optional', AIM_WEB_UPDATE_REASON: 'incompatible' },
+          releaseId,
+        }),
+      /incompatible releases cannot be deferable/,
+    );
+    assert.throws(
+      () =>
+        resolveWebUpdatePolicy({
+          env: { AIM_WEB_UPDATE_MODE: 'mandatory-now', AIM_WEB_UPDATE_REASON: 'security' },
+          releaseId,
+        }),
+      /AIM_WEB_UPDATE_MODE/,
+    );
+  });
+
+  it('writes only bounded release policy and never copies unrelated environment values', () => {
     const root = fixture();
-    const sha = 'b'.repeat(40);
+    const sha = 'c'.repeat(40);
     const result = writeReleaseMarker({
       webRoot: root,
-      env: { RELEASE_SHA: sha, DATABASE_URL: 'postgresql://secret@example/db' },
+      env: {
+        RELEASE_SHA: sha,
+        AIM_WEB_UPDATE_MODE: 'required',
+        AIM_WEB_UPDATE_REASON: 'security',
+        DATABASE_URL: 'postgresql://secret@example/db',
+        PATIENT_NAME: 'not-for-client',
+      },
     });
     const source = fs.readFileSync(result.output, 'utf8');
     assert.equal(result.releaseId, `git:${sha}`);
-    assert.equal(source, markerSource(`git:${sha}`));
+    assert.equal(source, markerSource(result.releasePolicy));
     assert.equal(source.includes('postgresql://'), false);
     assert.equal(source.includes('DATABASE_URL'), false);
+    assert.equal(source.includes('PATIENT_NAME'), false);
+    assert.equal(source.includes('not-for-client'), false);
+  });
+
+  it('changes service-worker marker bytes when release severity changes', () => {
+    const optional = markerSource({
+      id: releaseId,
+      updateMode: 'optional',
+      updateReason: 'routine',
+    });
+    const required = markerSource({
+      id: releaseId,
+      updateMode: 'required',
+      updateReason: 'security',
+    });
+    assert.notEqual(optional, required);
   });
 });
