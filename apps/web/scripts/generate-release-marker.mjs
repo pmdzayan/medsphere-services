@@ -94,7 +94,10 @@ export function markerSource(releasePolicy) {
   if (!/^(git:[0-9a-f]{40}|content:[0-9a-f]{64})$/.test(releasePolicy.id)) {
     throw new Error('UM14.3 web release identity is invalid');
   }
-  if (!UPDATE_MODES.has(releasePolicy.updateMode) || !UPDATE_REASONS.has(releasePolicy.updateReason)) {
+  if (
+    !UPDATE_MODES.has(releasePolicy.updateMode) ||
+    !UPDATE_REASONS.has(releasePolicy.updateReason)
+  ) {
     throw new Error('UM14.4 web release policy is invalid');
   }
   if (releasePolicy.updateMode === 'required' && releasePolicy.updateReason === 'routine') {
