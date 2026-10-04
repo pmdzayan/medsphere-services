@@ -140,7 +140,10 @@ export function markerSource(releasePolicy) {
   if (normalizedPolicy.updateMode === 'required' && normalizedPolicy.updateReason === 'routine') {
     throw new Error('UM14.4 routine releases cannot be marked required');
   }
-  if (normalizedPolicy.updateMode === 'optional' && normalizedPolicy.updateReason === 'incompatible') {
+  if (
+    normalizedPolicy.updateMode === 'optional' &&
+    normalizedPolicy.updateReason === 'incompatible'
+  ) {
     throw new Error('UM14.4 incompatible releases cannot be deferable');
   }
 
