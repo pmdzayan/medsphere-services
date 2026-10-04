@@ -62,9 +62,7 @@ export function resolveWebReleaseId({ env = process.env, webRoot = DEFAULT_WEB_R
 }
 
 export function resolveWebUpdatePolicy({ env = process.env, releaseId }) {
-  const updateMode = String(env.AIM_WEB_UPDATE_MODE ?? 'optional')
-    .trim()
-    .toLowerCase();
+  const updateMode = String(env.AIM_WEB_UPDATE_MODE ?? 'optional').trim().toLowerCase();
   const rawReason = String(env.AIM_WEB_UPDATE_REASON ?? '').trim().toLowerCase();
   const updateReason = rawReason || 'routine';
 
