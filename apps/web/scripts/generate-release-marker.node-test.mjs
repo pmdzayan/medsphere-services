@@ -77,7 +77,12 @@ describe('UM14.4 release severity marker', () => {
 
   it('requires explicit bounded reason for a required release', () => {
     assert.throws(
-      () => resolveWebUpdatePolicy({ env: { AIM_WEB_UPDATE_MODE: 'required' }, releaseId, clientGeneration }),
+      () =>
+        resolveWebUpdatePolicy({
+          env: { AIM_WEB_UPDATE_MODE: 'required' },
+          releaseId,
+          clientGeneration,
+        }),
       /explicit non-secret update reason/,
     );
     assert.deepEqual(
@@ -121,7 +126,10 @@ describe('UM14.4 release severity marker', () => {
   });
 
   it('validates the bounded web client generation', () => {
-    assert.equal(resolveWebClientGeneration({ env: { AIM_WEB_CLIENT_GENERATION: '42' } }), 42);
+    assert.equal(
+      resolveWebClientGeneration({ env: { AIM_WEB_CLIENT_GENERATION: '42' } }),
+      42,
+    );
     assert.throws(
       () => resolveWebClientGeneration({ env: { AIM_WEB_CLIENT_GENERATION: '0' } }),
       /supported range/,
