@@ -15,11 +15,7 @@ export type WebClientCompatibility =
 export function parseWebClientGeneration(value: string | null | undefined): number | null {
   if (!value || !/^\d{1,10}$/.test(value)) return null;
   const parsed = Number(value);
-  if (
-    !Number.isSafeInteger(parsed) ||
-    parsed < 1 ||
-    parsed > WEB_CLIENT_GENERATION_MAX
-  ) {
+  if (!Number.isSafeInteger(parsed) || parsed < 1 || parsed > WEB_CLIENT_GENERATION_MAX) {
     return null;
   }
   return parsed;
@@ -52,7 +48,11 @@ export function evaluateWebClientCompatibility(
     throw new Error('minimum web client generation is invalid');
   }
 
-  if (clientGenerationValue === null || clientGenerationValue === undefined || clientGenerationValue === '') {
+  if (
+    clientGenerationValue === null ||
+    clientGenerationValue === undefined ||
+    clientGenerationValue === ''
+  ) {
     return {
       supported: false,
       reason: 'missing',
