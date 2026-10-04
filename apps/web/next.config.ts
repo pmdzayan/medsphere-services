@@ -24,6 +24,10 @@ const nextConfig: NextConfig = {
         source: '/sw.js',
         headers: [{ key: 'Cache-Control', value: SERVICE_WORKER_CACHE }],
       },
+      {
+        source: '/sw-release.js',
+        headers: [{ key: 'Cache-Control', value: SERVICE_WORKER_CACHE }],
+      },
     ];
   },
 };
