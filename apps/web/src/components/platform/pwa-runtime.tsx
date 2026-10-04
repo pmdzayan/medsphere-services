@@ -44,10 +44,7 @@ async function requestWaitingWorkerReleasePolicy(
       resolve(policy);
     };
 
-    const timeout = window.setTimeout(
-      () => finish(null),
-      WEB_UPDATE_POLICY_RESPONSE_TIMEOUT_MS,
-    );
+    const timeout = window.setTimeout(() => finish(null), WEB_UPDATE_POLICY_RESPONSE_TIMEOUT_MS);
 
     channel.port1.onmessage = (event: MessageEvent<unknown>) => {
       const message = event.data as { type?: unknown; release?: unknown } | null;
