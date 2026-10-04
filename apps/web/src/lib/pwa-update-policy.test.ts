@@ -73,13 +73,15 @@ describe('UM14.4 optional-versus-required update policy', () => {
   const id = `git:${'a'.repeat(40)}`;
 
   it('accepts bounded optional and required policies', () => {
-    expect(
-      parseWebReleasePolicy({ id, updateMode: 'optional', updateReason: 'routine' }),
-    ).toEqual({ id, updateMode: 'optional', updateReason: 'routine' });
+    expect(parseWebReleasePolicy({ id, updateMode: 'optional', updateReason: 'routine' })).toEqual({
+      id,
+      updateMode: 'optional',
+      updateReason: 'routine',
+    });
 
-    expect(
-      parseWebReleasePolicy({ id, updateMode: 'required', updateReason: 'security' }),
-    ).toEqual({ id, updateMode: 'required', updateReason: 'security' });
+    expect(parseWebReleasePolicy({ id, updateMode: 'required', updateReason: 'security' })).toEqual(
+      { id, updateMode: 'required', updateReason: 'security' },
+    );
 
     expect(
       parseWebReleasePolicy({ id, updateMode: 'required', updateReason: 'incompatible' }),
@@ -87,20 +89,26 @@ describe('UM14.4 optional-versus-required update policy', () => {
   });
 
   it('rejects malformed or contradictory release policy', () => {
-    expect(parseWebReleasePolicy({ id: 'latest', updateMode: 'required', updateReason: 'security' })).toBeNull();
-    expect(parseWebReleasePolicy({ id, updateMode: 'required', updateReason: 'routine' })).toBeNull();
-    expect(parseWebReleasePolicy({ id, updateMode: 'optional', updateReason: 'incompatible' })).toBeNull();
+    expect(
+      parseWebReleasePolicy({ id: 'latest', updateMode: 'required', updateReason: 'security' }),
+    ).toBeNull();
+    expect(
+      parseWebReleasePolicy({ id, updateMode: 'required', updateReason: 'routine' }),
+    ).toBeNull();
+    expect(
+      parseWebReleasePolicy({ id, updateMode: 'optional', updateReason: 'incompatible' }),
+    ).toBeNull();
     expect(parseWebReleasePolicy({ id, updateMode: 'force', updateReason: 'security' })).toBeNull();
   });
 
   it('allows Later only for optional releases', () => {
-    expect(
-      webUpdatePresentation({ id, updateMode: 'optional', updateReason: 'security' }),
-    ).toEqual({ required: false, canDefer: true, reason: 'security' });
+    expect(webUpdatePresentation({ id, updateMode: 'optional', updateReason: 'security' })).toEqual(
+      { required: false, canDefer: true, reason: 'security' },
+    );
 
-    expect(
-      webUpdatePresentation({ id, updateMode: 'required', updateReason: 'security' }),
-    ).toEqual({ required: true, canDefer: false, reason: 'security' });
+    expect(webUpdatePresentation({ id, updateMode: 'required', updateReason: 'security' })).toEqual(
+      { required: true, canDefer: false, reason: 'security' },
+    );
   });
 
   it('treats legacy or unavailable policy as optional until UM14.5 enforcement exists', () => {
