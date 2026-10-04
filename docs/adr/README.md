@@ -49,4 +49,4 @@ Every ADR includes decision, reason/context, alternatives, consequences, impleme
 | [ADR-034](0034-blue-green-candidate-snapshot-rebuild.md)                | Blue/green candidate snapshot rebuild                    | Accepted   | 2026-09-26 |
 | [ADR-035](0035-solo-maintainer-high-risk-change-governance.md)          | Solo-maintainer high-risk change governance              | Accepted   | 2026-09-27 |
 | [ADR-036](0036-web-pwa-release-discovery-user-controlled-activation.md) | Web/PWA release discovery and user-controlled activation | Accepted   | 2026-09-27 |
-| [ADR-037](0037-web-update-severity-and-non-deferable-ux.md)              | Web update severity and non-deferable required UX       | Accepted   | 2026-10-04 |
+| [ADR-037](0037-web-update-severity-and-non-deferable-ux.md)             | Web update severity and non-deferable required UX        | Accepted   | 2026-10-04 |
