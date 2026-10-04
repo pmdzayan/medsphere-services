@@ -7,6 +7,7 @@ import { afterEach, describe, it } from 'node:test';
 import {
   contentReleaseId,
   markerSource,
+  resolveWebClientGeneration,
   resolveWebReleaseId,
   resolveWebUpdatePolicy,
   writeReleaseMarker,
@@ -62,10 +63,13 @@ describe('UM14.3 web release identity', () => {
 
 describe('UM14.4 release severity marker', () => {
   const releaseId = `git:${'b'.repeat(40)}`;
+  const clientGeneration = 7;
 
   it('defaults normal releases to optional/routine', () => {
-    assert.deepEqual(resolveWebUpdatePolicy({ env: {}, releaseId }), {
+    assert.equal(resolveWebClientGeneration({ env: {} }), 1);
+    assert.deepEqual(resolveWebUpdatePolicy({ env: {}, releaseId, clientGeneration }), {
       id: releaseId,
+      clientGeneration,
       updateMode: 'optional',
       updateReason: 'routine',
     });
@@ -73,15 +77,16 @@ describe('UM14.4 release severity marker', () => {
 
   it('requires explicit bounded reason for a required release', () => {
     assert.throws(
-      () => resolveWebUpdatePolicy({ env: { AIM_WEB_UPDATE_MODE: 'required' }, releaseId }),
+      () => resolveWebUpdatePolicy({ env: { AIM_WEB_UPDATE_MODE: 'required' }, releaseId, clientGeneration }),
       /explicit non-secret update reason/,
     );
     assert.deepEqual(
       resolveWebUpdatePolicy({
         env: { AIM_WEB_UPDATE_MODE: 'required', AIM_WEB_UPDATE_REASON: 'security' },
         releaseId,
+        clientGeneration,
       }),
-      { id: releaseId, updateMode: 'required', updateReason: 'security' },
+      { id: releaseId, clientGeneration, updateMode: 'required', updateReason: 'security' },
     );
   });
 
@@ -91,6 +96,7 @@ describe('UM14.4 release severity marker', () => {
         resolveWebUpdatePolicy({
           env: { AIM_WEB_UPDATE_MODE: 'required', AIM_WEB_UPDATE_REASON: 'routine' },
           releaseId,
+          clientGeneration,
         }),
       /routine releases cannot be marked required/,
     );
@@ -99,6 +105,7 @@ describe('UM14.4 release severity marker', () => {
         resolveWebUpdatePolicy({
           env: { AIM_WEB_UPDATE_MODE: 'optional', AIM_WEB_UPDATE_REASON: 'incompatible' },
           releaseId,
+          clientGeneration,
         }),
       /incompatible releases cannot be deferable/,
     );
@@ -107,8 +114,21 @@ describe('UM14.4 release severity marker', () => {
         resolveWebUpdatePolicy({
           env: { AIM_WEB_UPDATE_MODE: 'mandatory-now', AIM_WEB_UPDATE_REASON: 'security' },
           releaseId,
+          clientGeneration,
         }),
       /AIM_WEB_UPDATE_MODE/,
+    );
+  });
+
+  it('validates the bounded web client generation', () => {
+    assert.equal(resolveWebClientGeneration({ env: { AIM_WEB_CLIENT_GENERATION: '42' } }), 42);
+    assert.throws(
+      () => resolveWebClientGeneration({ env: { AIM_WEB_CLIENT_GENERATION: '0' } }),
+      /supported range/,
+    );
+    assert.throws(
+      () => resolveWebClientGeneration({ env: { AIM_WEB_CLIENT_GENERATION: 'latest' } }),
+      /bounded positive integer/,
     );
   });
 
@@ -121,12 +141,14 @@ describe('UM14.4 release severity marker', () => {
         RELEASE_SHA: sha,
         AIM_WEB_UPDATE_MODE: 'required',
         AIM_WEB_UPDATE_REASON: 'security',
+        AIM_WEB_CLIENT_GENERATION: '9',
         DATABASE_URL: 'postgresql://secret@example/db',
         PATIENT_NAME: 'not-for-client',
       },
     });
     const source = fs.readFileSync(result.output, 'utf8');
     assert.equal(result.releaseId, `git:${sha}`);
+    assert.equal(result.releasePolicy.clientGeneration, 9);
     assert.equal(source, markerSource(result.releasePolicy));
     assert.equal(source.includes('postgresql://'), false);
     assert.equal(source.includes('DATABASE_URL'), false);
@@ -137,11 +159,13 @@ describe('UM14.4 release severity marker', () => {
   it('changes service-worker marker bytes when release severity changes', () => {
     const optional = markerSource({
       id: releaseId,
+      clientGeneration,
       updateMode: 'optional',
       updateReason: 'routine',
     });
     const required = markerSource({
       id: releaseId,
+      clientGeneration,
       updateMode: 'required',
       updateReason: 'security',
     });
