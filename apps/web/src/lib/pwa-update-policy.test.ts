@@ -74,18 +74,26 @@ describe('UM14.4 optional-versus-required update policy', () => {
   const clientGeneration = 3;
 
   it('accepts bounded optional and required policies', () => {
-    expect(parseWebReleasePolicy({ id, clientGeneration, updateMode: 'optional', updateReason: 'routine' })).toEqual({
+    expect(
+      parseWebReleasePolicy({ id, clientGeneration, updateMode: 'optional', updateReason: 'routine' }),
+    ).toEqual({
       id,
+      clientGeneration,
       updateMode: 'optional',
       updateReason: 'routine',
     });
 
-    expect(parseWebReleasePolicy({ id, clientGeneration, updateMode: 'required', updateReason: 'security' })).toEqual(
-      { id, clientGeneration, updateMode: 'required', updateReason: 'security' },
-    );
+    expect(
+      parseWebReleasePolicy({ id, clientGeneration, updateMode: 'required', updateReason: 'security' }),
+    ).toEqual({ id, clientGeneration, updateMode: 'required', updateReason: 'security' });
 
     expect(
-      parseWebReleasePolicy({ id, clientGeneration, updateMode: 'required', updateReason: 'incompatible' }),
+      parseWebReleasePolicy({
+        id,
+        clientGeneration,
+        updateMode: 'required',
+        updateReason: 'incompatible',
+      }),
     ).toEqual({ id, clientGeneration, updateMode: 'required', updateReason: 'incompatible' });
   });
 
@@ -94,25 +102,37 @@ describe('UM14.4 optional-versus-required update policy', () => {
       parseWebReleasePolicy({ id: 'latest', updateMode: 'required', updateReason: 'security' }),
     ).toBeNull();
     expect(
-      parseWebReleasePolicy({ id, clientGeneration, updateMode: 'required', updateReason: 'routine' }),
+      parseWebReleasePolicy({
+        id,
+        clientGeneration,
+        updateMode: 'required',
+        updateReason: 'routine',
+      }),
     ).toBeNull();
     expect(
-      parseWebReleasePolicy({ id, clientGeneration, updateMode: 'optional', updateReason: 'incompatible' }),
+      parseWebReleasePolicy({
+        id,
+        clientGeneration,
+        updateMode: 'optional',
+        updateReason: 'incompatible',
+      }),
     ).toBeNull();
-    expect(parseWebReleasePolicy({ id, clientGeneration, updateMode: 'force', updateReason: 'security' })).toBeNull();
+    expect(
+      parseWebReleasePolicy({ id, clientGeneration, updateMode: 'force', updateReason: 'security' }),
+    ).toBeNull();
   });
 
   it('allows Later only for optional releases', () => {
-    expect(webUpdatePresentation({ id, clientGeneration, updateMode: 'optional', updateReason: 'security' })).toEqual(
-      { required: false, canDefer: true, reason: 'security' },
-    );
+    expect(
+      webUpdatePresentation({ id, clientGeneration, updateMode: 'optional', updateReason: 'security' }),
+    ).toEqual({ required: false, canDefer: true, reason: 'security' });
 
-    expect(webUpdatePresentation({ id, clientGeneration, updateMode: 'required', updateReason: 'security' })).toEqual(
-      { required: true, canDefer: false, reason: 'security' },
-    );
+    expect(
+      webUpdatePresentation({ id, clientGeneration, updateMode: 'required', updateReason: 'security' }),
+    ).toEqual({ required: true, canDefer: false, reason: 'security' });
   });
 
-  it('treats legacy or unavailable policy as optional until UM14.5 enforcement exists', () => {
+  it('keeps presentation fallback optional while UM14.5 server enforcement remains separate', () => {
     expect(webUpdatePresentation(null)).toEqual({
       required: false,
       canDefer: true,
