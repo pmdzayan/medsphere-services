@@ -7,6 +7,7 @@ export type WebUpdateReason = 'routine' | 'security' | 'incompatible';
 
 export interface WebReleasePolicy {
   id: string;
+  clientGeneration: number;
   updateMode: WebUpdateMode;
   updateReason: WebUpdateReason;
 }
@@ -45,6 +46,7 @@ export function parseWebReleasePolicy(value: unknown): WebReleasePolicy | null {
 
   const candidate = value as Partial<WebReleasePolicy>;
   if (typeof candidate.id !== 'string' || !RELEASE_ID_PATTERN.test(candidate.id)) return null;
+  if (!Number.isSafeInteger(candidate.clientGeneration) || Number(candidate.clientGeneration) < 1 || Number(candidate.clientGeneration) > 1_000_000_000) return null;
   if (candidate.updateMode !== 'optional' && candidate.updateMode !== 'required') return null;
   if (
     candidate.updateReason !== 'routine' &&
@@ -59,6 +61,7 @@ export function parseWebReleasePolicy(value: unknown): WebReleasePolicy | null {
 
   return {
     id: candidate.id,
+    clientGeneration: Number(candidate.clientGeneration),
     updateMode: candidate.updateMode,
     updateReason: candidate.updateReason,
   };
