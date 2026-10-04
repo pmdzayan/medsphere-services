@@ -7,7 +7,6 @@ import { afterEach, describe, it } from 'node:test';
 import {
   contentReleaseId,
   markerSource,
-  resolveWebClientGeneration,
   resolveWebReleaseId,
   resolveWebUpdatePolicy,
   writeReleaseMarker,
@@ -16,7 +15,7 @@ import {
 const temporaryDirectories = [];
 
 function fixture() {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'aim-um14-5-'));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'aim-um14-4-'));
   temporaryDirectories.push(root);
   fs.mkdirSync(path.join(root, 'src'), { recursive: true });
   fs.mkdirSync(path.join(root, 'public'), { recursive: true });
@@ -61,22 +60,13 @@ describe('UM14.3 web release identity', () => {
   });
 });
 
-describe('UM14.4 and UM14.5 release marker policy', () => {
+describe('UM14.4 release severity marker', () => {
   const releaseId = `git:${'b'.repeat(40)}`;
-  const clientGeneration = 7;
 
   it('defaults normal releases to optional/routine', () => {
-    assert.equal(resolveWebClientGeneration({ env: {} }), 1);
-
-    const policy = resolveWebUpdatePolicy({
-      env: {},
-      releaseId,
-      clientGeneration,
-    });
-
-    assert.deepEqual(policy, {
+    assert.deepEqual(resolveWebUpdatePolicy({ env: {}, releaseId }), {
       id: releaseId,
-      clientGeneration,
+      clientGeneration: 1,
       updateMode: 'optional',
       updateReason: 'routine',
     });
@@ -84,87 +74,47 @@ describe('UM14.4 and UM14.5 release marker policy', () => {
 
   it('requires explicit bounded reason for a required release', () => {
     assert.throws(
-      () =>
-        resolveWebUpdatePolicy({
-          env: { AIM_WEB_UPDATE_MODE: 'required' },
-          releaseId,
-          clientGeneration,
-        }),
+      () => resolveWebUpdatePolicy({ env: { AIM_WEB_UPDATE_MODE: 'required' }, releaseId }),
       /explicit non-secret update reason/,
     );
-
-    const policy = resolveWebUpdatePolicy({
-      env: {
-        AIM_WEB_UPDATE_MODE: 'required',
-        AIM_WEB_UPDATE_REASON: 'security',
+    assert.deepEqual(
+      resolveWebUpdatePolicy({
+        env: { AIM_WEB_UPDATE_MODE: 'required', AIM_WEB_UPDATE_REASON: 'security' },
+        releaseId,
+      }),
+      {
+        id: releaseId,
+        clientGeneration: 1,
+        updateMode: 'required',
+        updateReason: 'security',
       },
-      releaseId,
-      clientGeneration,
-    });
-
-    assert.deepEqual(policy, {
-      id: releaseId,
-      clientGeneration,
-      updateMode: 'required',
-      updateReason: 'security',
-    });
+    );
   });
 
   it('rejects contradictory or unbounded update policy', () => {
     assert.throws(
       () =>
         resolveWebUpdatePolicy({
-          env: {
-            AIM_WEB_UPDATE_MODE: 'required',
-            AIM_WEB_UPDATE_REASON: 'routine',
-          },
+          env: { AIM_WEB_UPDATE_MODE: 'required', AIM_WEB_UPDATE_REASON: 'routine' },
           releaseId,
-          clientGeneration,
         }),
       /routine releases cannot be marked required/,
     );
-
     assert.throws(
       () =>
         resolveWebUpdatePolicy({
-          env: {
-            AIM_WEB_UPDATE_MODE: 'optional',
-            AIM_WEB_UPDATE_REASON: 'incompatible',
-          },
+          env: { AIM_WEB_UPDATE_MODE: 'optional', AIM_WEB_UPDATE_REASON: 'incompatible' },
           releaseId,
-          clientGeneration,
         }),
       /incompatible releases cannot be deferable/,
     );
-
     assert.throws(
       () =>
         resolveWebUpdatePolicy({
-          env: {
-            AIM_WEB_UPDATE_MODE: 'mandatory-now',
-            AIM_WEB_UPDATE_REASON: 'security',
-          },
+          env: { AIM_WEB_UPDATE_MODE: 'mandatory-now', AIM_WEB_UPDATE_REASON: 'security' },
           releaseId,
-          clientGeneration,
         }),
       /AIM_WEB_UPDATE_MODE/,
-    );
-  });
-
-  it('validates the bounded web client generation', () => {
-    assert.equal(
-      resolveWebClientGeneration({ env: { AIM_WEB_CLIENT_GENERATION: '42' } }),
-      42,
-    );
-
-    assert.throws(
-      () => resolveWebClientGeneration({ env: { AIM_WEB_CLIENT_GENERATION: '0' } }),
-      /supported range/,
-    );
-
-    assert.throws(
-      () => resolveWebClientGeneration({ env: { AIM_WEB_CLIENT_GENERATION: 'latest' } }),
-      /bounded positive integer/,
     );
   });
 
@@ -183,7 +133,6 @@ describe('UM14.4 and UM14.5 release marker policy', () => {
       },
     });
     const source = fs.readFileSync(result.output, 'utf8');
-
     assert.equal(result.releaseId, `git:${sha}`);
     assert.equal(result.releasePolicy.clientGeneration, 9);
     assert.equal(source, markerSource(result.releasePolicy));
@@ -196,17 +145,14 @@ describe('UM14.4 and UM14.5 release marker policy', () => {
   it('changes service-worker marker bytes when release severity changes', () => {
     const optional = markerSource({
       id: releaseId,
-      clientGeneration,
       updateMode: 'optional',
       updateReason: 'routine',
     });
     const required = markerSource({
       id: releaseId,
-      clientGeneration,
       updateMode: 'required',
       updateReason: 'security',
     });
-
     assert.notEqual(optional, required);
   });
 });
