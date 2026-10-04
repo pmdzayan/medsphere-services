@@ -62,7 +62,10 @@ describe('UM14.5 web client generation policy', () => {
       'sec-fetch-site': 'same-origin',
       'sec-fetch-mode': 'cors',
     });
-    const serverHeaders = new Headers({ accept: 'application/json' });
+    const serverHeaders = new Headers({
+      accept: 'application/json',
+      'sec-fetch-mode': 'cors',
+    });
 
     expect(isBrowserApiRequest(browserHeaders)).toBe(true);
     expect(isBrowserApiRequest(serverHeaders)).toBe(false);
