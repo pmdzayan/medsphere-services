@@ -14,6 +14,8 @@ export function checkPwaCachePolicy(source = fs.readFileSync(serviceWorkerPath, 
     "url.pathname.startsWith('/_next/static/')",
     'PUBLIC_SHELL_ASSETS.has(url.pathname)',
     "request.method !== 'GET'",
+    "event.data?.type === 'GET_RELEASE_POLICY'",
+    "type: 'AIM_RELEASE_POLICY'",
     "event.data?.type === 'SKIP_WAITING'",
     "event.data?.type === 'PURGE_PUBLIC_CACHE'",
   ];

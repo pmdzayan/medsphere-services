@@ -9,7 +9,14 @@
 importScripts('/sw-release.js');
 
 const CACHE_PREFIX = 'aim-public-static-';
-const RELEASE_ID = self.__AIM_WEB_RELEASE__?.id ?? 'unversioned';
+const RELEASE_POLICY =
+  self.__AIM_WEB_RELEASE__ ??
+  Object.freeze({
+    id: 'unversioned',
+    updateMode: 'optional',
+    updateReason: 'routine',
+  });
+const RELEASE_ID = RELEASE_POLICY.id;
 const CACHE_NAME = `${CACHE_PREFIX}${RELEASE_ID}`;
 const PUBLIC_SHELL_ASSETS = new Set(['/manifest.webmanifest', '/icon.svg']);
 
@@ -33,6 +40,14 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('message', (event) => {
+  if (event.data?.type === 'GET_RELEASE_POLICY') {
+    event.ports?.[0]?.postMessage({
+      type: 'AIM_RELEASE_POLICY',
+      release: RELEASE_POLICY,
+    });
+    return;
+  }
+
   if (event.data?.type === 'SKIP_WAITING') {
     void self.skipWaiting();
     return;
