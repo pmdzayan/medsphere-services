@@ -85,10 +85,5 @@ export function evaluateWebClientCompatibility(
 
 export function isBrowserApiRequest(headers: Pick<Headers, 'get'>): boolean {
   const fetchSite = headers.get('sec-fetch-site');
-  if (fetchSite === 'same-origin' || fetchSite === 'same-site' || fetchSite === 'none') {
-    return true;
-  }
-
-  const fetchMode = headers.get('sec-fetch-mode');
-  return fetchMode === 'cors' || fetchMode === 'same-origin' || fetchMode === 'navigate';
+  return fetchSite === 'same-origin' || fetchSite === 'same-site' || fetchSite === 'none';
 }
