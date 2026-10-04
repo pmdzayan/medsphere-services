@@ -75,7 +75,12 @@ describe('UM14.4 optional-versus-required update policy', () => {
 
   it('accepts bounded optional and required policies', () => {
     expect(
-      parseWebReleasePolicy({ id, clientGeneration, updateMode: 'optional', updateReason: 'routine' }),
+      parseWebReleasePolicy({
+        id,
+        clientGeneration,
+        updateMode: 'optional',
+        updateReason: 'routine',
+      }),
     ).toEqual({
       id,
       clientGeneration,
@@ -84,7 +89,12 @@ describe('UM14.4 optional-versus-required update policy', () => {
     });
 
     expect(
-      parseWebReleasePolicy({ id, clientGeneration, updateMode: 'required', updateReason: 'security' }),
+      parseWebReleasePolicy({
+        id,
+        clientGeneration,
+        updateMode: 'required',
+        updateReason: 'security',
+      }),
     ).toEqual({ id, clientGeneration, updateMode: 'required', updateReason: 'security' });
 
     expect(
@@ -118,17 +128,32 @@ describe('UM14.4 optional-versus-required update policy', () => {
       }),
     ).toBeNull();
     expect(
-      parseWebReleasePolicy({ id, clientGeneration, updateMode: 'force', updateReason: 'security' }),
+      parseWebReleasePolicy({
+        id,
+        clientGeneration,
+        updateMode: 'force',
+        updateReason: 'security',
+      }),
     ).toBeNull();
   });
 
   it('allows Later only for optional releases', () => {
     expect(
-      webUpdatePresentation({ id, clientGeneration, updateMode: 'optional', updateReason: 'security' }),
+      webUpdatePresentation({
+        id,
+        clientGeneration,
+        updateMode: 'optional',
+        updateReason: 'security',
+      }),
     ).toEqual({ required: false, canDefer: true, reason: 'security' });
 
     expect(
-      webUpdatePresentation({ id, clientGeneration, updateMode: 'required', updateReason: 'security' }),
+      webUpdatePresentation({
+        id,
+        clientGeneration,
+        updateMode: 'required',
+        updateReason: 'security',
+      }),
     ).toEqual({ required: true, canDefer: false, reason: 'security' });
   });
 
