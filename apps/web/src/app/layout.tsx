@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Script from 'next/script';
 import { BRAND } from '@medsphere/brand';
 import { BrandStartup } from '@/components/brand/brand-startup';
 import { LanguageProvider } from '@/components/language-provider';
@@ -35,6 +36,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
   return (
     <html lang={serverLocale} dir={getLocaleDirection(serverLocale)}>
       <body className="font-[var(--font-body)]">
+        <Script src="/sw-release.js" strategy="beforeInteractive" />
         <LanguageProvider initialLocale={serverPreference}>
           <WorkstationAppearanceProvider>
             <BrandStartup />
