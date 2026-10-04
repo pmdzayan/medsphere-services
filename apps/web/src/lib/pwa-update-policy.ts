@@ -46,7 +46,13 @@ export function parseWebReleasePolicy(value: unknown): WebReleasePolicy | null {
 
   const candidate = value as Partial<WebReleasePolicy>;
   if (typeof candidate.id !== 'string' || !RELEASE_ID_PATTERN.test(candidate.id)) return null;
-  if (!Number.isSafeInteger(candidate.clientGeneration) || Number(candidate.clientGeneration) < 1 || Number(candidate.clientGeneration) > 1_000_000_000) return null;
+  if (
+    !Number.isSafeInteger(candidate.clientGeneration) ||
+    Number(candidate.clientGeneration) < 1 ||
+    Number(candidate.clientGeneration) > 1_000_000_000
+  ) {
+    return null;
+  }
   if (candidate.updateMode !== 'optional' && candidate.updateMode !== 'required') return null;
   if (
     candidate.updateReason !== 'routine' &&
