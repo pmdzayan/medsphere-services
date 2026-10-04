@@ -14,6 +14,28 @@ import {
 
 vi.mock('next/headers', () => ({ cookies: vi.fn() }));
 
+function bodyChildren(element: Awaited<ReturnType<typeof RootLayout>>): React.ReactElement[] {
+  const body = element.props.children as React.ReactElement;
+  const children = body.props.children;
+  return (Array.isArray(children) ? children : [children]).filter(Boolean) as React.ReactElement[];
+}
+
+function initialLocaleFromLayout(element: Awaited<ReturnType<typeof RootLayout>>): unknown {
+  const provider = bodyChildren(element).find(
+    (child) => child?.props && Object.prototype.hasOwnProperty.call(child.props, 'initialLocale'),
+  );
+  return provider?.props.initialLocale;
+}
+
+function releaseBootstrapFromLayout(
+  element: Awaited<ReturnType<typeof RootLayout>>,
+): React.ReactElement | undefined {
+  return bodyChildren(element).find(
+    (child) =>
+      child?.props?.src === '/sw-release.js' && child?.props?.strategy === 'beforeInteractive',
+  );
+}
+
 const profile: SessionProfile = {
   expiresIn: 900,
   user: {
@@ -47,6 +69,12 @@ describe('RootLayout server locale', () => {
     expect(metadata.appleWebApp).toEqual(expect.objectContaining({ title: BRAND.shortName }));
   });
 
+  it('bootstraps the bounded web release marker before interactive application work', async () => {
+    vi.mocked(cookies).mockResolvedValue({ get: () => undefined } as never);
+    const element = await RootLayout({ children: <main>child</main> });
+    expect(releaseBootstrapFromLayout(element)).toBeDefined();
+  });
+
   it('server-renders the signed-out reopening locale from the bounded locale cookie', async () => {
     vi.mocked(cookies).mockResolvedValue({
       get(name: string) {
@@ -58,7 +86,7 @@ describe('RootLayout server locale', () => {
     const element = await RootLayout({ children: <main>child</main> });
     expect(element.props.lang).toBe('ur');
     expect(element.props.dir).toBe('rtl');
-    expect(element.props.children.props.children.props.initialLocale).toBe('ur');
+    expect(initialLocaleFromLayout(element)).toBe('ur');
   });
 
   it('server-renders authenticated Urdu with lang=ur and dir=rtl', async () => {
@@ -75,7 +103,7 @@ describe('RootLayout server locale', () => {
     const element = await RootLayout({ children: <main>child</main> });
     expect(element.props.lang).toBe('ur');
     expect(element.props.dir).toBe('rtl');
-    expect(element.props.children.props.children.props.initialLocale).toBe('ur');
+    expect(initialLocaleFromLayout(element)).toBe('ur');
   });
 
   it('fails closed to English/LTR when the sealed profile is invalid', async () => {
@@ -90,7 +118,7 @@ describe('RootLayout server locale', () => {
     const element = await RootLayout({ children: <main>child</main> });
     expect(element.props.lang).toBe('en');
     expect(element.props.dir).toBe('ltr');
-    expect(element.props.children.props.children.props.initialLocale).toBeNull();
+    expect(initialLocaleFromLayout(element)).toBeNull();
   });
 
   it('keeps a legacy incomplete authenticated preference on the safe English fallback', async () => {
@@ -110,6 +138,6 @@ describe('RootLayout server locale', () => {
     const element = await RootLayout({ children: <main>child</main> });
     expect(element.props.lang).toBe('en');
     expect(element.props.dir).toBe('ltr');
-    expect(element.props.children.props.children.props.initialLocale).toBe('en');
+    expect(initialLocaleFromLayout(element)).toBe('en');
   });
 });
