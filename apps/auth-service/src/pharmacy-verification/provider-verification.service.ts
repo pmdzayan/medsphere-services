@@ -12,6 +12,7 @@ import { PLATFORM_PERMISSIONS } from '../platform/platform.constants';
 import { requireActiveTenantActorWithProvider } from '@medsphere/security';
 import type { TrustedTenantActor } from '@medsphere/security';
 import type { AuditEventType, Prisma } from '@medsphere/database';
+import { resolveProviderVerificationSources } from './provider-verification-source.catalog';
 
 /**
  * Candidate Task 0039 (PROVISIONAL). See
@@ -312,6 +313,12 @@ export class ProviderVerificationService {
    */
   async getCurrentState(actor: TrustedTenantActor, providerId: string) {
     await requireActiveTenantActorWithProvider(this.prisma.client, actor, providerId);
+    const provider = await this.prisma.client.provider.findFirst({
+      where: { id: providerId, tenantId: actor.tenantId, deletedAt: null },
+      select: { providerType: true, country: true, state: true },
+    });
+    if (!provider) throw new NotFoundException('Provider not found');
+
     const rows = await this.prisma.client.providerVerification.findMany({
       where: {
         providerId,
@@ -332,7 +339,15 @@ export class ProviderVerificationService {
     const current = rows.find((r: (typeof rows)[number]) => r.isCurrent) ?? null;
     const openSubmission =
       rows.find((r: (typeof rows)[number]) => OPEN_STATUSES.has(r.status) && !r.isCurrent) ?? null;
-    return { current, openSubmission };
+    const sourceResolution = resolveProviderVerificationSources(provider);
+
+    return {
+      current,
+      openSubmission,
+      verificationSources: sourceResolution.sources,
+      jurisdictionReviewRequired: sourceResolution.jurisdictionReviewRequired,
+      jurisdictionNote: sourceResolution.jurisdictionNote,
+    };
   }
 
   /**
@@ -420,7 +435,8 @@ export class ProviderVerificationService {
         submittedAt: true,
         verifiedAt: true,
         version: true,
-        provider: { select: { businessName: true } },
+        provider: { select: { businessName: true, country: true, state: true } },
+        providerType: true,
       },
     });
     if (!row?.providerId || !row.provider) throw new NotFoundException('Verification not found');
@@ -440,12 +456,21 @@ export class ProviderVerificationService {
         OR: [{ providerId: { not: row.providerId } }, { providerId: null }],
       },
     });
+    const sourceResolution = resolveProviderVerificationSources({
+      providerType: row.providerType,
+      country: row.provider.country,
+      state: row.provider.state,
+    });
+
     return {
       ...row,
       providerId: row.providerId,
       provider: row.provider,
       businessName: row.provider.businessName,
       possibleDuplicateLicenseCount: duplicateCount,
+      verificationSources: sourceResolution.sources,
+      jurisdictionReviewRequired: sourceResolution.jurisdictionReviewRequired,
+      jurisdictionNote: sourceResolution.jurisdictionNote,
     };
   }
 
