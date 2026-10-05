@@ -66,6 +66,7 @@ describe('UM14.4 release severity marker', () => {
   it('defaults normal releases to optional/routine', () => {
     assert.deepEqual(resolveWebUpdatePolicy({ env: {}, releaseId }), {
       id: releaseId,
+      clientGeneration: 1,
       updateMode: 'optional',
       updateReason: 'routine',
     });
@@ -81,7 +82,12 @@ describe('UM14.4 release severity marker', () => {
         env: { AIM_WEB_UPDATE_MODE: 'required', AIM_WEB_UPDATE_REASON: 'security' },
         releaseId,
       }),
-      { id: releaseId, updateMode: 'required', updateReason: 'security' },
+      {
+        id: releaseId,
+        clientGeneration: 1,
+        updateMode: 'required',
+        updateReason: 'security',
+      },
     );
   });
 
@@ -121,12 +127,14 @@ describe('UM14.4 release severity marker', () => {
         RELEASE_SHA: sha,
         AIM_WEB_UPDATE_MODE: 'required',
         AIM_WEB_UPDATE_REASON: 'security',
+        AIM_WEB_CLIENT_GENERATION: '9',
         DATABASE_URL: 'postgresql://secret@example/db',
         PATIENT_NAME: 'not-for-client',
       },
     });
     const source = fs.readFileSync(result.output, 'utf8');
     assert.equal(result.releaseId, `git:${sha}`);
+    assert.equal(result.releasePolicy.clientGeneration, 9);
     assert.equal(source, markerSource(result.releasePolicy));
     assert.equal(source.includes('postgresql://'), false);
     assert.equal(source.includes('DATABASE_URL'), false);
