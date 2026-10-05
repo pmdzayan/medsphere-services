@@ -134,8 +134,6 @@ export function parseUrlConfig(
   ) {
     throw new Error(`${keyName} must not target a loopback host in production`);
   }
-
-  return;
 }
 
 export interface ReleaseIdentity {
@@ -245,7 +243,6 @@ export function validateRuntimeConfig<T extends string>(
 
   return { env, release };
 }
-
 
 export type NativeStorePlatform = 'android' | 'ios';
 
@@ -362,9 +359,7 @@ export function resolveNativeStoreReleaseBoundary(
   }
 
   return Object.freeze({
-    android: androidUrl
-      ? parseOfficialGooglePlayTarget(androidUrl, androidPackageId)
-      : null,
+    android: androidUrl ? parseOfficialGooglePlayTarget(androidUrl, androidPackageId) : null,
     ios: iosUrl ? parseOfficialAppleStoreTarget(iosUrl, iosAppStoreId) : null,
   });
 }
