@@ -134,8 +134,6 @@ export function parseUrlConfig(
   ) {
     throw new Error(`${keyName} must not target a loopback host in production`);
   }
-
-  return;
 }
 
 export interface ReleaseIdentity {
@@ -244,4 +242,138 @@ export function validateRuntimeConfig<T extends string>(
   assertNoServerSecretsInPublicEnv(environment);
 
   return { env, release };
+}
+
+export type NativeStorePlatform = 'android' | 'ios';
+
+export interface NativeStoreReleaseTarget {
+  readonly platform: NativeStorePlatform;
+  readonly url: string;
+  readonly applicationId: string;
+}
+
+const ANDROID_PACKAGE_PATTERN = /^[A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z][A-Za-z0-9_]*)+$/;
+const IOS_APP_STORE_ID_PATTERN = /^\d{6,20}$/;
+
+function parseOfficialGooglePlayTarget(
+  rawUrl: string,
+  packageId: string,
+): NativeStoreReleaseTarget {
+  if (!ANDROID_PACKAGE_PATTERN.test(packageId)) {
+    throw new Error('AIM_ANDROID_PACKAGE_ID has an invalid package identifier format');
+  }
+
+  let parsed: URL;
+  try {
+    parsed = new URL(rawUrl);
+  } catch {
+    throw new Error('AIM_ANDROID_PLAY_STORE_URL must be a valid HTTPS URL');
+  }
+
+  if (
+    parsed.protocol !== 'https:' ||
+    parsed.hostname.toLowerCase() !== 'play.google.com' ||
+    parsed.pathname !== '/store/apps/details' ||
+    parsed.username ||
+    parsed.password ||
+    parsed.hash
+  ) {
+    throw new Error('AIM_ANDROID_PLAY_STORE_URL must use the official Google Play app-details URL');
+  }
+
+  if (parsed.searchParams.get('id') !== packageId) {
+    throw new Error('AIM_ANDROID_PLAY_STORE_URL id must match AIM_ANDROID_PACKAGE_ID');
+  }
+
+  const extraKeys = [...parsed.searchParams.keys()].filter((key) => key !== 'id');
+  if (extraKeys.length > 0) {
+    throw new Error('AIM_ANDROID_PLAY_STORE_URL must not contain unapproved query parameters');
+  }
+
+  return Object.freeze({
+    platform: 'android' as const,
+    url: parsed.toString(),
+    applicationId: packageId,
+  });
+}
+
+function parseOfficialAppleStoreTarget(
+  rawUrl: string,
+  appStoreId: string,
+): NativeStoreReleaseTarget {
+  if (!IOS_APP_STORE_ID_PATTERN.test(appStoreId)) {
+    throw new Error('AIM_IOS_APP_STORE_ID must contain the numeric Apple App Store ID');
+  }
+
+  let parsed: URL;
+  try {
+    parsed = new URL(rawUrl);
+  } catch {
+    throw new Error('AIM_IOS_APP_STORE_URL must be a valid HTTPS URL');
+  }
+
+  if (
+    parsed.protocol !== 'https:' ||
+    parsed.hostname.toLowerCase() !== 'apps.apple.com' ||
+    parsed.username ||
+    parsed.password ||
+    parsed.search ||
+    parsed.hash
+  ) {
+    throw new Error('AIM_IOS_APP_STORE_URL must use the official Apple App Store URL');
+  }
+
+  if (!parsed.pathname.endsWith(`/id${appStoreId}`)) {
+    throw new Error('AIM_IOS_APP_STORE_URL id must match AIM_IOS_APP_STORE_ID');
+  }
+
+  return Object.freeze({
+    platform: 'ios' as const,
+    url: parsed.toString(),
+    applicationId: appStoreId,
+  });
+}
+
+export interface NativeStoreReleaseBoundary {
+  readonly android: NativeStoreReleaseTarget | null;
+  readonly ios: NativeStoreReleaseTarget | null;
+}
+
+export function resolveNativeStoreReleaseBoundary(
+  environment: Readonly<Record<string, string | undefined>> = process.env,
+): NativeStoreReleaseBoundary {
+  const androidUrl = environment.AIM_ANDROID_PLAY_STORE_URL?.trim() ?? '';
+  const androidPackageId = environment.AIM_ANDROID_PACKAGE_ID?.trim() ?? '';
+  const iosUrl = environment.AIM_IOS_APP_STORE_URL?.trim() ?? '';
+  const iosAppStoreId = environment.AIM_IOS_APP_STORE_ID?.trim() ?? '';
+
+  if (Boolean(androidUrl) !== Boolean(androidPackageId)) {
+    throw new Error(
+      'AIM Android store publication requires both AIM_ANDROID_PLAY_STORE_URL and AIM_ANDROID_PACKAGE_ID',
+    );
+  }
+  if (Boolean(iosUrl) !== Boolean(iosAppStoreId)) {
+    throw new Error(
+      'AIM iOS store publication requires both AIM_IOS_APP_STORE_URL and AIM_IOS_APP_STORE_ID',
+    );
+  }
+
+  return Object.freeze({
+    android: androidUrl ? parseOfficialGooglePlayTarget(androidUrl, androidPackageId) : null,
+    ios: iosUrl ? parseOfficialAppleStoreTarget(iosUrl, iosAppStoreId) : null,
+  });
+}
+
+export function requireNativeStoreReleaseTarget(
+  platform: NativeStorePlatform,
+  environment: Readonly<Record<string, string | undefined>> = process.env,
+): NativeStoreReleaseTarget {
+  const boundary = resolveNativeStoreReleaseBoundary(environment);
+  const target = boundary[platform];
+  if (!target) {
+    throw new Error(
+      `AIM ${platform} native application is not published to an approved official store`,
+    );
+  }
+  return target;
 }
