@@ -10,6 +10,8 @@ import {
   parseReleaseIdentity,
   assertNoServerSecretsInPublicEnv,
   validateRuntimeConfig,
+  resolveNativeStoreReleaseBoundary,
+  requireNativeStoreReleaseTarget,
 } from '../packages/config/dist/index.js';
 import {
   AUTH_PRODUCTION_FORBIDDEN_FLAGS,
@@ -329,5 +331,72 @@ describe('Task 0023 — Production Runtime & Configuration Policy Spec', () => {
     const output = `${result.stdout ?? ''}${result.stderr ?? ''}`;
 
     assert.strictEqual(output.includes(sentinel), false);
+  });
+
+  it('UM14.6: native-store targets are official, paired and fail closed before publication', () => {
+    const unpublished = resolveNativeStoreReleaseBoundary({});
+    assert.deepStrictEqual(unpublished, { android: null, ios: null });
+
+    assert.throws(
+      () =>
+        requireNativeStoreReleaseTarget('android', {
+          AIM_ANDROID_PACKAGE_ID: 'com.allinmedico.aim',
+        }),
+      /requires both AIM_ANDROID_PLAY_STORE_URL and AIM_ANDROID_PACKAGE_ID/,
+    );
+
+    const android = requireNativeStoreReleaseTarget('android', {
+      AIM_ANDROID_PACKAGE_ID: 'com.allinmedico.aim',
+      AIM_ANDROID_PLAY_STORE_URL:
+        'https://play.google.com/store/apps/details?id=com.allinmedico.aim',
+    });
+    assert.strictEqual(android.platform, 'android');
+    assert.strictEqual(android.applicationId, 'com.allinmedico.aim');
+    assert.strictEqual(
+      android.url,
+      'https://play.google.com/store/apps/details?id=com.allinmedico.aim',
+    );
+
+    const ios = requireNativeStoreReleaseTarget('ios', {
+      AIM_IOS_APP_STORE_ID: '1234567890',
+      AIM_IOS_APP_STORE_URL: 'https://apps.apple.com/in/app/aim/id1234567890',
+    });
+    assert.strictEqual(ios.platform, 'ios');
+    assert.strictEqual(ios.applicationId, '1234567890');
+    assert.strictEqual(ios.url, 'https://apps.apple.com/in/app/aim/id1234567890');
+
+    assert.throws(
+      () =>
+        requireNativeStoreReleaseTarget('android', {
+          AIM_ANDROID_PACKAGE_ID: 'com.allinmedico.aim',
+          AIM_ANDROID_PLAY_STORE_URL:
+            'https://example.com/store/apps/details?id=com.allinmedico.aim',
+        }),
+      /official Google Play/,
+    );
+
+    assert.throws(
+      () =>
+        requireNativeStoreReleaseTarget('android', {
+          AIM_ANDROID_PACKAGE_ID: 'com.allinmedico.aim',
+          AIM_ANDROID_PLAY_STORE_URL:
+            'https://play.google.com/store/apps/details?id=com.attacker.fake',
+        }),
+      /must match AIM_ANDROID_PACKAGE_ID/,
+    );
+
+    assert.throws(
+      () =>
+        requireNativeStoreReleaseTarget('ios', {
+          AIM_IOS_APP_STORE_ID: '1234567890',
+          AIM_IOS_APP_STORE_URL: 'https://apps.apple.com/in/app/aim/id9999999999',
+        }),
+      /must match AIM_IOS_APP_STORE_ID/,
+    );
+
+    assert.throws(
+      () => requireNativeStoreReleaseTarget('ios', {}),
+      /not published to an approved official store/,
+    );
   });
 });
