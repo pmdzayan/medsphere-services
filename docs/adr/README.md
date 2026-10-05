@@ -51,3 +51,4 @@ Every ADR includes decision, reason/context, alternatives, consequences, impleme
 | [ADR-036](0036-web-pwa-release-discovery-user-controlled-activation.md) | Web/PWA release discovery and user-controlled activation | Accepted   | 2026-09-27 |
 | [ADR-037](0037-web-update-severity-and-non-deferable-ux.md)             | Web update severity and non-deferable required UX        | Accepted   | 2026-10-04 |
 | [ADR-038](0038-minimum-supported-web-client-generation.md)              | Minimum supported web client generation                  | Accepted   | 2026-10-04 |
+| [ADR-039](0039-native-store-release-boundary.md)                        | Native official-store release boundary                   | Accepted   | 2026-10-05 |
